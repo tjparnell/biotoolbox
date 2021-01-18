@@ -10,7 +10,7 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 580;
+	plan tests => 608;
 }
 else {
 	plan tests => 380;
@@ -646,12 +646,15 @@ sub test_gappedPeak {
 
 sub test_parsed_gff_table {
 	print " >> Testing parsed GFF data file\n";
+	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	my $flavor = $Data->taste_file($gfffile);
 	is($flavor, 'gff', 'GFF file flavor');
 	my $p = $Data->parse_table($gfffile);
 	is($p, 1, 'parsed GFF table');
+	
+	# test metadata and table
 	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 33, 'number of rows');
 	is($Data->database, "Parsed:$gfffile", 'database source');
@@ -659,6 +662,8 @@ sub test_parsed_gff_table {
 	is($Data->name(1), 'Name', 'Second column name');
 	is($Data->value(1,0), 'YAL069W', 'First row ID');
 	is($Data->value(1,1), 'YAL069W', 'First row Name');
+	
+	# test seqfeature
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'YAL069W', 'SeqFeature display name');
@@ -666,6 +671,16 @@ sub test_parsed_gff_table {
 	is($f->start, 335, 'SeqFeature start position');
 	my @subf = $f->get_SeqFeatures;
 	is(scalar @subf, 0, 'Number of SeqFeature sub features');
+	
+	# test table feature seqfeature
+	my $row = $Data->get_row(5);
+	isa_ok($row, 'Bio::ToolBox::Data::Feature', 'GFF Table fifth row Feature object');
+	is($row->name, 'YAL067C', 'Feature display name');
+	is($row->type, 'gene', 'Feature type');
+	is($row->start, 7235, 'Feature start coordinate');
+	is($row->strand, -1, 'Feature strand');
+	isnt($row->start(8000), 8000, 'Attempted change to Feature start');
+	is($row->start, 7235, 'Check start coordinate start after change');
 	
 	# reparse with subfeatures
 	undef $f;
@@ -678,13 +693,14 @@ sub test_parsed_gff_table {
 	);
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	is($Data->last_row, 33, 'number of rows');
+	
+	# test seqfeature with subfeatures
 	$f = $Data->get_seqfeature(3);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'Third row SeqFeature object');
 	is($f->display_name, 'YAL068C', 'SeqFeature display name');
 	is($f->start, 1807, 'SeqFeature start position');
 	@subf = $f->get_SeqFeatures;
 	is(scalar @subf, 1, 'Number of SeqFeature sub features');
-	
 	my $f2 = shift @subf;
 	is($f2->type, 'CDS:SGD', 'Sub feature type');
 	is($f2->name, 'YAL068C', 'Sub feature name');
@@ -708,12 +724,15 @@ sub test_parsed_gff_table {
 
 sub test_parsed_ucsc_table {
 	print " >> Testing parsed UCSC data file\n";
+	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	my $flavor = $Data->taste_file($ucscfile);
 	is($flavor, 'ucsc', 'UCSC file flavor');
 	my $p = $Data->parse_table($ucscfile);
 	is($p, 1, 'parsed UCSC table');
+	
+	# metadata and table data
 	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 5, 'number of rows');
 	is($Data->database, "Parsed:$ucscfile", 'database source');
@@ -721,6 +740,8 @@ sub test_parsed_ucsc_table {
 	is($Data->name(1), 'Name', 'Second column name');
 	is($Data->value(1,0), 'ENSG00000125826', 'First row ID');
 	is($Data->value(1,1), 'ENSG00000125826', 'First row Name');
+	
+	# seqfeature and subfeatures
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'ENSG00000125826', 'SeqFeature display name');
@@ -730,6 +751,16 @@ sub test_parsed_ucsc_table {
 	my $f2 = shift @subf;
 	is($f2->type, 'mRNA:EnsGene', 'Sub feature type');
 	is($f2->name, 'ENST00000411647', 'Sub feature name');
+	
+	# test table feature seqfeature
+	my $row = $Data->get_row(5);
+	isa_ok($row, 'Bio::ToolBox::Data::Feature', 'UCSC Table fifth row Feature object');
+	is($row->name, 'ENSG00000252103', 'Feature display name');
+	is($row->type, 'gene', 'Seqfeature type through row Feature');
+	is($row->start, 1509702, 'Seqfeature start coordinate through row Feature');
+	is($row->strand, -1, 'Seqfeature strand through row Feature');
+	isnt($row->start(2500000), 2500000, 'Attempted change to Feature start');
+	is($row->start, 1509702, 'Check start coordinate start after change');
 	
 	# reparse with mRNA feature
 	undef $Data;
@@ -761,6 +792,7 @@ sub test_parsed_ucsc_table {
 
 sub test_parsed_bed6_table {
 	print " >> Testing parsed BED6 data file\n";
+	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	my $flavor = $Data->taste_file($bed6file);
@@ -768,6 +800,7 @@ sub test_parsed_bed6_table {
 	my $p = $Data->parse_table($bed6file);
 	is($p, 1, 'parsed Bed table');
 	
+	# metadata and data table
 	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 5, 'number of rows');
 	is($Data->database, "Parsed:$bed6file", 'database source');
@@ -776,11 +809,22 @@ sub test_parsed_bed6_table {
 	is($Data->value(1,0), 'chrI:54988-56857', 'First row ID');
 	is($Data->value(1,1), 'YAL047C', 'First row Name');
 	
+	# seqfeature
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'YAL047C', 'SeqFeature display name');
 	is($f->start, 54989, 'SeqFeature start position');
 	
+	# test table feature seqfeature
+	my $row = $Data->get_row(5);
+	isa_ok($row, 'Bio::ToolBox::Data::Feature', 'BED6 Table fifth row Feature object');
+	is($row->name, 'YAL043C', 'Feature display name');
+	is($row->type, 'region', 'Seqfeature type through row Feature');
+	is($row->start, 58695, 'Seqfeature start coordinate through row Feature');
+	is($row->strand, -1, 'Seqfeature strand through row Feature');
+	isnt($row->start(100000), 100000, 'Attempted change to Feature start');
+	is($row->start, 58695, 'Check start coordinate start after change');
+		
 	# attempt to reload the file
 	my $s = $Data->save($outfile);
 	is($s, $outfile, 'Saved temporary file');
@@ -799,6 +843,7 @@ sub test_parsed_bed6_table {
 
 sub test_parsed_bed12_table {
 	print " >> Testing parsed BED12 data file\n";
+	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	my $flavor = $Data->taste_file($bed12file);
@@ -806,6 +851,7 @@ sub test_parsed_bed12_table {
 	my $p = $Data->parse_table($bed12file);
 	is($p, 1, 'parsed Bed table');
 	
+	# metadata and table
 	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 17, 'number of rows');
 	is($Data->database, "Parsed:$bed12file", 'database source');
@@ -814,10 +860,21 @@ sub test_parsed_bed12_table {
 	is($Data->value(1,0), 'chr20:388141-398466', 'First row ID');
 	is($Data->value(1,1), 'ENST00000411647', 'First row Name');
 	
+	# seqfeature
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'ENST00000411647', 'SeqFeature display name');
 	is($f->start, 388142, 'SeqFeature start position');
+	
+	# test table feature seqfeature
+	my $row = $Data->get_row(17);
+	isa_ok($row, 'Bio::ToolBox::Data::Feature', 'BED12 Table fifth row Feature object');
+	is($row->name, 'ENST00000516294', 'Feature display name');
+	is($row->type, 'ncRNA', 'Seqfeature type through row Feature');
+	is($row->start, 1509702, 'Seqfeature start coordinate through row Feature');
+	is($row->strand, -1, 'Seqfeature strand through row Feature');
+	isnt($row->start(2500000), 2500000, 'Attempted change to Feature start');
+	is($row->start, 1509702, 'Check start coordinate start after change');
 	
 	# attempt to reload the file
 	my $s = $Data->save($outfile);
@@ -837,6 +894,8 @@ sub test_parsed_bed12_table {
 
 sub test_parsed_narrowPeak_table {
 	print " >> Testing parsed narrowPeak data file\n";
+	
+	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	my $flavor = $Data->taste_file($peakfile);
@@ -844,6 +903,7 @@ sub test_parsed_narrowPeak_table {
 	my $p = $Data->parse_table($peakfile);
 	is($p, 1, 'parsed narrowPeak table');
 	
+	# metadata and table
 	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 5, 'number of rows');
 	is($Data->database, "Parsed:$peakfile", 'database source');
@@ -852,6 +912,7 @@ sub test_parsed_narrowPeak_table {
 	is($Data->value(1,0), 'chr1:11908310-11909810', 'First row ID');
 	is($Data->value(1,1), 'narrowPeak207', 'First row Name');
 	
+	# seqfeature
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'narrowPeak207', 'SeqFeature display name');
@@ -876,6 +937,8 @@ sub test_parsed_narrowPeak_table {
 
 sub test_parsed_gappedPeak_table {
 	print " >> Testing parsed gappedPeak data file\n";
+	
+	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
 	my $flavor = $Data->taste_file($gapfile);
@@ -883,6 +946,7 @@ sub test_parsed_gappedPeak_table {
 	my $p = $Data->parse_table($gapfile);
 	is($p, 1, 'parsed gappedPeak table');
 	
+	# metadata and table
 	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 5, 'number of rows');
 	is($Data->database, "Parsed:$gapfile", 'database source');
@@ -891,6 +955,7 @@ sub test_parsed_gappedPeak_table {
 	is($Data->value(1,0), 'chr1:5055-5366', 'First row ID');
 	is($Data->value(1,1), 'peak_1', 'First row Name');
 	
+	# seqfeature
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'peak_1', 'SeqFeature display name');
