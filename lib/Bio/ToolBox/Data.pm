@@ -1507,10 +1507,10 @@ sub get_row {
 		'index'     => $row_number,
 	);
 	if (
-		exists $self->{data}->{SeqFeatureObjects} and
-		defined $self->{data}->{SeqFeatureObjects}->[$row_number] 
+		exists $self->{SeqFeatureObjects} and
+		defined $self->{SeqFeatureObjects}->[$row_number] 
 	) {
-		push @options, 'feature', $self->{data}->{SeqFeatureObjects}->[$row_number];
+		push @options, 'feature', $self->{SeqFeatureObjects}->[$row_number];
 	}
 	return Bio::ToolBox::Data::Feature->new(@options);	
 }
