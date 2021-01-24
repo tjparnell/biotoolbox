@@ -1,17 +1,66 @@
 # ADVANCED INSTALLATION
 
-This is a brief, advanced installation guide for getting a complete installation. I
-recommend using a simple CPAN package manager such as [CPAN
-Minus](https://metacpan.org/pod/App::cpanminus), i.e. `cpanm`. Note that in the
-following example commands, `cpanm` is given a Perl module name, which is used to
-query [CPAN](https://metacpan.org), but it can also easily take a URL or a downloaded
-archive file. 
+This is an advanced installation guide for getting a complete installation. 
 
-Note that `Make` and compilation tools, e.g. `GCC` or `clang`, are required. Most Linux 
-distributions have these available as an optional install if they're not already 
-available. On MacOS, install the Xcode Command Line Tools. 
+## TLDR Brief guide
 
-For additional guidance when working on MacOS, see [MacOS Notes](MacOSNotes.md).
+This is a no-nonsense, quick guide for those who already know what they're doing on 
+an established Linux system with a modern Perl installation, and know how to adjust 
+accordingly for their system. If that doesn't describe you, skip ahead to the 
+[Detailed guide](#detailed-guide).
+
+- Install external libraries
+
+    These are external libraries that must be compiled and installed prior to installing 
+    the Perl adapters. See [External libraries](#external-libraries) below for more 
+    information. 
+
+    Install [HTSlib](https://github.com/samtools/htslib) for Bam file support. You may 
+    already have it. It defaults to installing in `/usr/local`. 
+
+        $ curl -o htslib-1.9.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2 
+        $ tar -xf htslib-1.9.tar.bz2
+        $ cd htslib-1.9
+        $ make && make install
+        $ cd ..
+
+    Install [libBigWig](https://github.com/dpryan79/libBigWig) for bigWig and bigBed 
+    support. It defaults to installing in `/usr/local`.
+    
+        $ curl -o libBigWig-0.4.4.tar.gz -L https://github.com/dpryan79/libBigWig/archive/0.4.4.tar.gz 
+        $ tar -xf libBigWig-0.4.4.tar.gz
+        $ cd libBigWig-0.4.4
+        $ make && make install
+        $ cd ..
+
+- Install Perl modules
+
+    These are the Perl modules that should be explicitly installed. See 
+    [Perl Modules](#perl-modules) below for more information. This assumes 
+    [CPAN Minus](https://metacpan.org/pod/App::cpanminus) is installed. 
+
+        $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
+        $ cpanm --notest Data::Swap
+        $ cpanm https://cpan.metacpan.org/authors/id/A/AV/AVULLO/Bio-DB-HTS-3.01.tar.gz
+        $ cpanm https://github.com/Ensembl/Bio-DB-Big/archive/master.zip
+        $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
+
+- External applications
+
+    These are external helper applications for converting to and from bigWig and bigBed 
+    formats. Assumes installation to `/usr/local/bin`.
+
+        $ curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig
+        $ curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigWigToWig
+        $ curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedToBigBed
+        $ chmod +x wigToBigWig bigWigToWig bedToBigBed
+        $ mv wigToBigWig bigWigToWig bedToBigBed /usr/local/bin/
+
+## Detailed guide
+
+This assumes installation on a Linux work station with available standard compilation 
+tools. Installation on MacOS (x86_64) is also possible with Xcode Command Line Tools 
+installed; see see [MacOS Notes](MacOSNotes.md) for additional guidance.
 
 ## Perl installations and locations
 
@@ -35,8 +84,8 @@ installations; adjust accordingly. For example, the following command will insta
 `local::lib` and the CPAN Minus application
 
     $ curl -L https://cpanmin.us | perl - -l $HOME/perl5 local::lib App::cpanminus \
-    && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.profile \
-    && . ~/.profile
+      && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.profile \
+      && . ~/.profile
 
 ### Custom installation
 
@@ -51,7 +100,7 @@ An alternate package manager may be used to install a Perl version in a generall
 available location. For example, MacOS users can easily install a modern Perl using
 [Homebrew](https://brew.sh). Similarly, Linux (and evidently Microsoft Windows Subsystem
 for Linux) users can use [Linuxbrew](http://linuxbrew.sh). These typically install the
-latest production release, currently `5.28`, with a single command.
+latest production release, currently `5.32`, with a single command.
 
 To install a Perl in your home directory (or other location) with a simple, but powerful,
 tool, use the excellent [PerlBrew](https://perlbrew.pl). This tool can painlessly compile,
@@ -61,7 +110,7 @@ installations, in case you want to isolate packages.
 
 BioToolBox does not utilize threading (it uses forks for parallel execution), so if you 
 have a choice, compile a non-threaded Perl for a (very) slight performance gain. For 
-those adventurous to try, BioToolBox does work under [cperl](http://perl11.org/cperl/), 
+those adventurous to try, BioToolBox does work under [cperl](https://github.com/perl11/cperl), 
 although installing some prerequisite modules is a trying experience (many failed 
 tests and partial functionality).
 
@@ -102,10 +151,14 @@ installed.
 
 ## Perl modules
 
+Using a simple CPAN package installer such as [CPAN Minus](https://metacpan.org/pod/App::cpanminus), 
+i.e. `cpanm`, is highly recommended for ease and simplicity in installing modules 
+from [CPAN](https://metacpan.org). It can install directly from CPAN or take a URL 
+or downloaded archive file. Other CPAN package managers are available too.
+
 The following Perl packages should be explicitly installed. Most of these will 
 bring along a number of dependencies (which in turn bring along more dependencies). In 
 the end you will have installed dozens of packages. 
-
 
 - [Module::Build](https://metacpan.org/pod/Module::Build)
 
@@ -195,8 +248,8 @@ download these from the UCSC Genome Browser utilities section for either
 An example for downloading on Linux:
 
     $ for name in wigToBigWig bedGraphToBigWig bigWigToWig bedToBigBed; \
-    do curl http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name > $HOME/bin/$name \
-    && chmod +x $HOME/bin/$name; done;
+      do curl -o $HOME/bin/$name http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name \
+      && chmod +x $HOME/bin/$name; done;
 
 
 ## Legacy Perl modules
