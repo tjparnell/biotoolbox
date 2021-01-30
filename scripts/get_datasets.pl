@@ -1384,30 +1384,36 @@ These are some examples of some common scenarios for collecting data.
 You want to collect the mean score from a bigWig file for each feature 
 in a BED file of intervals.
 
-  get_datasets.pl --data scores.bw --in input.bed
+  get_datasets.pl --in input.bed --data scores.bw
 
 =item Collect normalized counts
 
-You want to collect normalized read counts from a Bam file of alignments 
-for each feature in a BED file.
+You want to collect normalized read counts from multiple Bam files 
+for each feature in a BED file. This will count alignment names (safe for 
+paired-end alignments) over the intervals, and transform to Fragments (Reads) 
+Per Million, a depth-normalizing function based on the total number of 
+fragments counted in each dataset. 
 
-  get_datasets.pl --data alignments.bam --method rpm --in input.bed
+  get_datasets.pl --in input.bed --method ncount --fpkm region *.bam 
 
 =item Collect stranded RNASeq data
 
 You have stranded RNASeq data, and you would like to determine the 
-expression level for all genes in an annotation database.
+expression level for all genes from an annotation file. Use the 
+C<ncount> method to count alignment names to avoid double counting 
+alignments split over multiple exons.
   
-  get_datasets.pl --db annotation --feature gene --data rnaseq.bam \
-  --strand sense --exons --method rpkm --out expression.txt
+  get_datasets.pl --in annotation.gtf --feature transcript --subfeature exon \
+  --strand sense --method ncount --out expression.txt *.bam
 
 =item Restrict to specific region
 
 You have ChIPSeq enrichment scores in a bigWig file and you now want 
-to score just the transcription start site of known transcripts in an 
-annotation database. Here you will restrict to 500 bp flanking the TSS.
+to score just the transcription start site of known transcripts in a 
+L<Bio::DB::SeqFeature::Store> annotation database. Here you will 
+restrict to 500 bp flanking the TSS.
   
-  get_datasets.pl --db annotation --feature mRNA --start=-500 \
+  get_datasets.pl --db annotation.sqlite --feature mRNA --start=-500 \
   --stop=500 --pos 5 --data scores.bw --out tss_scores.txt
 
 =item Count intervals
@@ -1416,27 +1422,29 @@ You have identified all possible transcription factor binding sites in
 the genome and put them in a bigBed file. Now you want to count how 
 many exist in each upstream region of each gene.
   
-  get_datasets.pl --db annotation --feature gene --start=-5000 \
+  get_datasets.pl --db annotation.gtf --feature gene --start=-5000 \
   --stop=0 --data tfbs.bb --method count --out tfbs_sums.txt
 
 =item Many datasets at once
 
-You can place multiple bigWig files in a single directory and treat it 
-as a data database, known as a BigWigSet. Each file becomes a database 
-feature, and you can interactively choose one or more from which to 
-collect. Each dataset is appended to the input file as new column.
+While you can provide multiple data source files as a space-delimited 
+list at the end of the command, you can also treat a folder or directory 
+of bigWig files as a special database, known as a BigWigSet. Each file 
+becomes a database feature, and you can interactively choose one or more 
+from which to collect. Each dataset is appended to the input file as a new 
+column. Provide the folder as a data database C<--ddb> option.
   
-  get_datasets.pl --ddb /path/to/bigwigset --in input.txt
+  get_datasets.pl --in input.txt --ddb /path/to/bigwigset
 
 =item Stranded BigWig data
 
 You can generate stranded RNASeq coverage from a Bam file using the 
 BioToolBox script bam2wig.pl, which yields rnaseq_f.bw and rnaseq_r.bw 
 files. These are automatically interpreted as stranded datasets in a 
-BigWigSet context.
+BigWigSet folder context; see above.
   
-  get_datasets.pl --ddb /path/to/rnaseq/bigwigset --strand sense \
-  --in input.txt
+  get_datasets.pl --in input.txt --strand sense \
+  --ddb /path/to/rnaseq/bigwigset 
 
 =item Binned coverage across the genome
 
@@ -1451,8 +1459,9 @@ depleted regions. You count reads in 1 kb intervals across the genome.
 You are interested in the maximum score in the central 50% of each 
 feature.
   
-  get_datasets.pl --fstart=0.25 --fstop=0.75 --data scores.bw --in \
-  input.txt
+  get_datasets.pl --in input.txt --fstart=0.25 --fstop=0.75 \
+  --data scores.bw 
+  
 
 =back
 
