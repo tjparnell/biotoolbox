@@ -16,7 +16,8 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     information. 
 
     Install [HTSlib](https://github.com/samtools/htslib) for Bam file support. You may 
-    already have it. It defaults to installing in `/usr/local`. 
+    already have it; later versions may work as well. It defaults to installing in 
+    `/usr/local`. 
 
         $ curl -o htslib-1.9.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2 
         $ tar -xf htslib-1.9.tar.bz2
@@ -40,9 +41,10 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     [CPAN Minus](https://metacpan.org/pod/App::cpanminus) is installed. 
 
         $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
+        $ cpanm Bio::DB::HTS
+        $ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
+        $ cpanm bio-db-big-master.zip
         $ cpanm --notest Data::Swap
-        $ cpanm https://cpan.metacpan.org/authors/id/A/AV/AVULLO/Bio-DB-HTS-3.01.tar.gz
-        $ cpanm https://github.com/Ensembl/Bio-DB-Big/archive/master.zip
         $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
 
 - External applications
@@ -138,8 +140,8 @@ installed.
 
     Follow the directions within for installation. 
     [Version 1.9](https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2) 
-    is the latest supported version. By default, it installs into `/usr/local`, or it 
-    may be set to another directory (`$HOME` for example) by adding `--prefix=$HOME` 
+    is known to work; later versions should work too. By default, it installs into `/usr/local`, 
+    or it may be set to another directory (`$HOME` for example) by adding `--prefix=$HOME` 
     option to the `configure` step. This may also be available via OS or other package 
     managers.
 
@@ -200,7 +202,7 @@ the end you will have installed dozens of packages.
     
     *NOTE*: The distribution from CPAN will install dozens of unnecessary modules for
     remote URL testing. You may be better off installing from
-    [source](https://github.com/Ensembl/Bio-DB-Big/archive/master.zip).
+    [source](https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master).
 
 - [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
 
@@ -226,7 +228,8 @@ you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust ac
 
     $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
     $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
-    $ cpanm --configure-args="--libbigwig $HOME" Bio::DB::Big
+	$ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
+	$ cpanm --configure-args="--libbigwig $HOME" bio-db-big-master.zip
     $ cpanm --notest Data::Swap
     $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
 
