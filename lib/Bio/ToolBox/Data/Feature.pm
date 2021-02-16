@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -353,19 +353,13 @@ the sequence. Acceptable values include
 
 =item * exon
 
-All exons included
-
 =item * cds
-
-The CDS or coding sequence are extracted from mRNA
 
 =item * 5p_utr
 
-The 5' UTR of mRNA
-
 =item * 3p_utr
 
-The 3' UTR of mRNA
+=item * intron
 
 =back
 
@@ -498,19 +492,13 @@ subfeature to use. Accepted values include the following.
 
 =item * exon
 
-All exons included
-
 =item * cds
-
-The CDS or coding sequence are extracted from mRNA
 
 =item * 5p_utr
 
-The 5' UTR of mRNA
-
 =item * 3p_utr
 
-The 3' UTR of mRNA
+=item * intron
 
 =back
 
@@ -692,19 +680,13 @@ Pass the name of the subfeature to use. Accepted values include the following.
 
 =item * exon
 
-All exons included
-
 =item * cds
-
-The CDS or coding sequence are extracted from mRNA
 
 =item * 5p_utr
 
-The 5' UTR of mRNA
-
 =item * 3p_utr
 
-The 3' UTR of mRNA
+=item * intron
 
 =back
 
@@ -791,6 +773,84 @@ Precisely count only containing (not overlapping) items.
 Count overlapping unique names only.
 
 =back
+
+=back
+
+=item fetch_alignments
+
+  my $sam = $Data->open_database('/path/to/file.bam');
+  my $alignment_data = { mapq => [] };
+  my $callback = sub {
+     my ($a, $data) = @_;
+     push @{ $data->{mapq} }, $a->qual;
+  };
+  while (my $row = $stream->next_row) {
+     $row->fetch_alignments(
+        'db'        => $sam,
+        'data'      => $alignment_data,
+        'callback'  => $callback,
+     );
+  }
+
+This function allows you to iterate over alignments in a Bam file, 
+allowing custom information to be collected based on a callback 
+code reference that is provided. 
+
+Three parameters are required: C<db>, C<data>, and C<callback>. A 
+true value (1) is returned upon success.
+
+=over 4
+
+=item db
+
+Provide an opened, high-level, Bam database object. 
+
+=item callback
+
+Provide a code callback reference to use when iterating over the 
+alignments. Two objects are passed to this code function: the 
+alignment object and the data structure that is provided. See the 
+Bam adapter documentation for details on low-level C<fetch> through 
+the Bam index object for details.
+
+=item data
+
+This is a reference to a C<HASH> data object for storing information. 
+It is passed to the callback function along with the alignment. Three 
+new key =E<gt> value pairs are automatically added: C<start>, C<end>, 
+and C<strand>. These correspond to the values for the current queried 
+interval. Coordinates are automatically transformed to 0-base coordinate 
+system to match low level alignment objects.
+
+=item subfeature
+
+If the feature has subfeatures, such as exons, introns, etc., pass 
+the name of the subfeature to restrict iteration only over the 
+indicated subfeatures. The C<data> object will inherit the coordinates 
+for each subfeatures. Allowed subfeatures include the following:
+
+=over 4 
+
+=item * exon
+
+=item * cds
+
+=item * 5p_utr
+
+=item * 3p_utr
+
+=item * intron
+
+=back
+
+=item start
+
+=item stop
+
+=item end
+
+Provide alternate, custom start and stop coordinates for the row 
+feature. Ignored with subfeatures.
 
 =back
 
@@ -926,6 +986,7 @@ use Bio::ToolBox::db_helper qw(
 	get_segment_score
 	calculate_score
 	get_genomic_sequence
+	low_level_bam_fetch
 );
 use Bio::ToolBox::db_helper::constants;
 
@@ -1006,66 +1067,142 @@ sub value {
 
 sub seq_id {
 	my $self = shift;
-	carp "seq_id is a read only method" if @_;
-	my $i = $self->{data}->chromo_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->chromo_column;
+		if (defined $i) {
+			my $c = $self->value($i, $_[0]);
+			return $c;
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update seq_id for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Chromosome column to update!";
+		}
 	}
-	return $self->{feature}->seq_id if exists $self->{feature};
-	return undef;
+	# seqfeature
+	if (exists $self->{feature}) {
+		my $c = $self->{feature}->seq_id;
+		return $c;
+	}
+	# collect from table
+	my $i = $self->{data}->chromo_column;
+	my $c = defined $i ? $self->value($i) : undef;
+	return $c;
 }
 
 sub start {
 	my $self = shift;
-	carp "start is a read only method" if @_;
-	my $i = $self->{data}->start_column;
-	if (defined $i) {
-		my $v = $self->value($i);
-		$v++ if (substr($self->{data}->name($i), -1) eq '0'); # compensate for 0-based
-		return $v < 1 ? 1 : $v;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->start_column;
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
+		if (defined $i and $d) {
+			if (substr($self->{data}->name($i), -1) eq '0') {
+				# compensate for 0-based, assuming we're always working with 1-based
+				my $n = $_[0] - 1;
+				return $self->value($i, $n);
+			}
+			else {
+				return $self->value($i, $_[0]);
+			}
+		}
+		elsif (not $d) {
+			carp "Start coordinate value is not an integer";
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update Start coordinate for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Start coordinate column to update!";
+		}
 	}
-	elsif (exists $self->{feature}) {
+	# seqfeature
+	if (exists $self->{feature}) {
 		return $self->{feature}->start;
 	}
-	else {
-		return;
+	# collect from table
+	my $i = $self->{data}->start_column;
+	if (defined $i) {
+		my $s = $self->value($i);
+		if (substr($self->{data}->name($i), -1) eq '0') {
+			# compensate for 0-based index
+			return $s + 1;
+		}
+		else {
+			return $s;
+		}
 	}
+	return;
 }
 
 *stop = \&end;
 sub end {
 	my $self = shift;
-	carp "end is a read only method" if @_;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->stop_column;
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
+		if (defined $i and $d) {
+			return $self->value($i, $_[0]);
+		}
+		elsif (not $d) {
+			carp "End coordinate value is not an integer";
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update End coordinate for parsed SeqFeature objects";
+		}
+		else {
+			carp "No End coordinate column to update!";
+		}
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		my $e = $self->{feature}->end;
+		$self->{end} = $e;
+		return $e;
+	}
+	# collect from table
 	my $i = $self->{data}->stop_column;
-	if (defined $i) {
-		return $self->value($i);
-	}
-	elsif (exists $self->{feature}) {
-		return $self->{feature}->end;
-	}
-	else {
-		return;
-	}
+	my $e = defined $i ? $self->value($i) : undef;
+	$self->{end} = $e;
+	return $e;
 }
 
 sub strand {
 	my $self = shift;
-	carp "strand is a read only method" if @_;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->strand_column;
+		if (defined $i) {
+			$self->value($i, $_[0]);
+			return $self->_strand($_[0]);
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update Strand for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Strand column to update!";
+		}
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		my $s = $self->{feature}->strand;
+		return $s;
+	}
+	# collect from table
 	my $i = $self->{data}->strand_column;
-	if (defined $i) {
-		return $self->_strand( $self->value($i) );
-	}
-	elsif (exists $self->{feature}) {
-		return $self->{feature}->strand;
-	}
-	return 0;
+	return defined $i ? $self->_strand( $self->value($i) ) : 0;
 }
 
 sub _strand {
 	my $self = shift;
 	my $str = shift;
-	if ($str eq '+') {
+	if ($str eq '1' or $str eq '-1' or $str eq '0') {
+		return $str;
+	} 
+	elsif ($str eq '+') {
 		return 1;
 	}
 	elsif ($str eq '-') {
@@ -1074,8 +1211,13 @@ sub _strand {
 	elsif ($str eq '.') {
 		return 0;
 	}
-	elsif ($str =~ /^[\+\-]?1$/) {
-		return $str;
+	elsif ($str eq '2') {
+		# R packages use 1 for + and 2 for -
+		return -1;
+	}
+	elsif ($str eq '*') {
+		# R packages use * for .
+		return 0;
 	}
 	else {
 		return 0;
@@ -1085,17 +1227,32 @@ sub _strand {
 *name = \&display_name;
 sub display_name {
 	my $self = shift;
-	carp "name is a read only method" if @_;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->name_column;
+		if (defined $i) {
+			return $self->value($i, $_[0]);
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update display_name for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Name column to update!";
+		}
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		return $self->{feature}->display_name;
+	}
+	# collect from table
 	my $i = $self->{data}->name_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if (defined $i) {
+		return $self->value($i);
 	}
-	return $self->{feature}->display_name if exists $self->{feature};
-	if (my $att = $self->gff_attributes) {
-		return $att->{Name} || $att->{ID} || $att->{transcript_name};
+	elsif (my $att = $self->gff_attributes) {
+		return $att->{Name} || $att->{ID} || $att->{transcript_name} || 
+			$att->{gene_name} || undef;
 	}
-	return undef;
 }
 
 sub coordinate {
@@ -1114,14 +1271,32 @@ sub coordinate {
 
 sub type {
 	my $self = shift;
-	carp "type is a read only method" if @_;
-	my $i = $self->{data}->type_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->type_column;
+		if (defined $i) {
+			return $self->value($i, $_[0]);
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update primary_tag for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Type column to update!";
+		}
 	}
-	return $self->{feature}->primary_tag if exists $self->{feature};
-	return $self->{data}->feature if $self->{data}->feature; # general metadata feature type
+	# collect from table
+	my $i = $self->{data}->type_column;
+	if (defined $i) {
+		return $self->value($i);
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		return $self->{feature}->primary_tag;
+	}
+	# general metadata
+	if ($self->{data}->feature) {
+		return $self->{data}->feature;
+	}
 	return undef;
 }
 
@@ -1411,9 +1586,46 @@ sub get_sequence {
 sub _get_subfeature_sequence {
 	my ($self, $db, $args) = @_;
 	
+	# get the subfeatures
+	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	unless (@$subfeatures) {
+		carp "no subfeatures available! Returning parent sequence!";
+		# just return the parent
+		undef $args->{subfeature};
+		return $self->get_sequence(@$args);
+	}
+	
+	# sort subfeatures
+	# this should be done by GeneTools in most cases but just to be sure
+	# note that this does NOT merge redundant or overlapping exons!!!!
+	my @sorted = 	map { $_->[0] }
+					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+					map { [$_, $_->start, $_->end] } 
+					@$subfeatures;
+	
+	# collect sequence
+	my $sequence;
+	foreach my $subf (@sorted) {
+		my $seq = get_genomic_sequence($db, $subf->seq_id, $subf->start, $subf->stop);
+		$sequence .= $seq;
+	}
+	
+	# flip the sequence
+	if ($self->strand == -1) {
+		$sequence =~ tr/gatcGATC/ctagCTAG/;
+		$sequence = reverse $sequence;
+	}
+	return $sequence;
+}
+
+sub _get_subfeatures {
+	my $self = shift;
+	my $subf = lc shift;
+	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
+		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs 
+			get_introns));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1424,51 +1636,30 @@ sub _get_subfeature_sequence {
 	
 	# feature
 	my $feature = $self->seqfeature;
-	unless ($feature) {
-		carp "no SeqFeature available! Cannot collect subfeature sequence!";
-		return;
-	}
+	return unless ($feature);
 	
 	# get the subfeatures
 	my @subfeatures;
-	if ($args->{subfeature} eq 'exon') {
+	if ($subf eq 'exon') {
 		@subfeatures = get_exons($feature);
 	}
-	elsif ($args->{subfeature} eq 'cds') {
+	elsif ($subf eq 'cds') {
 		@subfeatures = get_cds($feature);
 	}
-	elsif ($args->{subfeature} eq '5p_utr') {
+	elsif ($subf eq '5p_utr') {
 		@subfeatures = get_5p_utrs($feature);
 	}
-	elsif ($args->{subfeature} eq '3p_utr') {
+	elsif ($subf eq '3p_utr') {
 		@subfeatures = get_3p_utrs($feature);
 	}
+	elsif ($subf eq 'intron') {
+		@subfeatures = get_introns($feature);
+	}
 	else {
-		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
-	}
-	# it's possible nothing is returned, which means no sequence will be retrieved
-	
-	# sort subfeatures
-	# this should be done by GeneTools in most cases but just to be sure
-	# note that this does NOT merge redundant or overlapping exons!!!!
-	my @sorted = 	map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-					map { [$_, $_->start, $_->end] } 
-					@subfeatures;
-	
-	# collect sequence
-	my $sequence;
-	foreach my $subf (@sorted) {
-		my $seq = get_genomic_sequence($db, $subf->seq_id, $subf->start, $subf->stop);
-		$sequence .= $seq;
+		croak "unrecognized subfeature parameter '$subf'!";
 	}
 	
-	# flip the sequence
-	if ($feature->strand == -1) {
-		$sequence =~ tr/gatcGATC/ctagCTAG/;
-		$sequence = reverse $sequence;
-	}
-	return $sequence;
+	return \@subfeatures;
 }
 
 sub get_score {
@@ -1483,7 +1674,7 @@ sub get_score {
 	}
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} ||= $args{exon} || q();
+	$args{subfeature} ||= q();
 	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_scores($db, \%args);
@@ -1549,46 +1740,19 @@ sub get_score {
 sub _get_subfeature_scores {
 	my ($self, $db, $args) = @_;
 	
-	# load GeneTools
-	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
-		if ($@) {
-			croak "missing required modules! $@";
-		}
-		else {
-			$GENETOOL_LOADED = 1;
-		}
-	}
-	
-	# feature
-	my $feature = $self->seqfeature;
-	unless ($feature) {
-		carp "no SeqFeature available! Cannot collect exon data!";
-		return;
-	}
-	
 	# get the subfeatures
-	my @subfeatures;
-	if ($args->{subfeature} eq 'exon') {
-		@subfeatures = get_exons($feature);
+	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	unless (@$subfeatures) {
+		carp "no subfeatures available! Returning parent score data!";
+		# just return the parent
+		undef $args->{subfeature};
+		delete $args->{exon} if exists $args->{exon};
+		return $self->get_score(@$args);
 	}
-	elsif ($args->{subfeature} eq 'cds') {
-		@subfeatures = get_cds($feature);
-	}
-	elsif ($args->{subfeature} eq '5p_utr') {
-		@subfeatures = get_5p_utrs($feature);
-	}
-	elsif ($args->{subfeature} eq '3p_utr') {
-		@subfeatures = get_3p_utrs($feature);
-	}
-	else {
-		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
-	}
-	# it's possible nothing is returned, which means no score will be calculated
-	
+		
 	# collect over each subfeature
 	my @scores;
-	foreach my $exon (@subfeatures) {
+	foreach my $exon (@$subfeatures) {
 		my @params; # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
 		$params[STRT] = $exon->start;
@@ -1680,13 +1844,12 @@ sub get_region_position_scores {
 	# assign some defaults here, in case we get passed on to subfeature method
 	$args{strandedness} ||= $args{stranded} || 'all';
 	$args{extend}       ||= 0;
-	$args{exon}         ||= 0;
 	$args{position}     ||= 5;
 	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} ||= $args{exon} || q();
+	$args{subfeature} ||= q();
 	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_position_scores(\%args, $ddb);
@@ -1735,54 +1898,21 @@ sub get_region_position_scores {
 sub _get_subfeature_position_scores {
 	my ($self, $args, $ddb) = @_;
 	
-	# load GeneTools
-	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
-		if ($@) {
-			croak "missing required modules! $@";
-		}
-		else {
-			$GENETOOL_LOADED = 1;
-		}
-	}
-	
-	# feature
-	my $feature = $self->seqfeature;
-	unless ($feature) {
-		carp "no SeqFeature available! Cannot collect exon data!";
-		return;
-	}
-	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
-	
 	# get the subfeatures
-	my @subfeatures;
-	my $subf = lc $args->{subfeature};
-	if ($subf eq 'exon') {
-		@subfeatures = get_exons($feature);
-	}
-	elsif ($subf eq 'cds') {
-		@subfeatures = get_cds($feature);
-	}
-	elsif ($subf eq '5p_utr') {
-		@subfeatures = get_5p_utrs($feature);
-	}
-	elsif ($subf eq '3p_utr') {
-		@subfeatures = get_3p_utrs($feature);
-	}
-	else {
-		croak "unrecognized subfeature parameter '$subf'!";
-	}
-	
-	# it's possible no subfeatures are returned
-	unless (@subfeatures) {
-		return;
+	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	unless (@$subfeatures) {
+		carp "no subfeatures available! Returning parent score data!";
+		# just return the parent
+		undef $args->{subfeature};
+		delete $args->{exon} if exists $args->{exon};
+		return $self->get_sequence(@$args);
 	}
 	
 	# reset the practical start and stop to the actual subfeatures' final start and stop
 	# we can no longer rely on the feature start and stop, consider CDS
 	# these subfeatures should already be genomic sorted by GeneTools
-	my $practical_start = $subfeatures[0]->start;
-	my $practical_stop  = $subfeatures[-1]->end;
+	my $practical_start = $subfeatures->[0]->start;
+	my $practical_stop  = $subfeatures->[-1]->end;
 	
 	# collect over each exon
 	# we will adjust the positions of each reported score so that 
@@ -1792,7 +1922,8 @@ sub _get_subfeature_position_scores {
 	my $namecheck = {}; # to check unique names when using ncount method....
 	my $current_end = $practical_start;
 	my $adjustment = 0;
-	foreach my $exon (@subfeatures) {
+	my $fstrand = defined $args->{strand} ? $args->{strand} : $self->strand;
+	foreach my $exon (@$subfeatures) {
 		
 		my @params; # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
@@ -1821,7 +1952,7 @@ sub _get_subfeature_position_scores {
 	if ($args->{extend}) {
 		# left side
 		my @params; # parameters to pass on to adapter
-		$params[CHR]  = $feature->seq_id;
+		$params[CHR]  = $self->seq_id;
 		$params[STRT] = $practical_start - $args->{extend};
 		$params[STOP] = $practical_start - 1;
 		$params[STR]  = $fstrand;
@@ -1999,6 +2130,82 @@ sub _process_exon_scores {
 		}
 	}
 }
+
+sub fetch_alignments {
+	my $self = shift;
+	my %args = @_;
+	$args{db} ||= $args{dataset} || undef;
+	$args{data} ||= undef;
+	$args{callback} ||= undef;
+	$args{subfeature} ||= q();
+	
+	# verify - trusting that these are valid, else they will fail lower down in the code
+	unless ($args{db}) {
+		croak "must provide a Bam object database to fetch alignments!\n";
+	}
+	unless ($args{data} and ref($args{data}) eq 'HASH') {
+		croak "must provide a data HASH for the fetch callback!\n";
+	}
+	unless ($args{callback}) {
+		croak "must provide a callback code reference!\n";
+	}
+	
+	# array of features to iterate, probably just one or subfeatures
+	my @intervals;
+	if ($self->feature_type eq 'named' and $args{subfeature}) {
+		# we have subfeatures to iterate over
+
+		# get the subfeatures
+		my $subfeatures = $self->_get_subfeatures($args{subfeature});
+		if (@$subfeatures) {
+			foreach my $sf (@$subfeatures) {
+				push @intervals, [
+					$sf->start - 1,
+					$sf->end
+				];
+			}
+		}
+		else {
+			# zere subfeatures? just take the parent then
+			push @intervals, [
+				($args{start} || $self->start) - 1,
+				$args{stop} || $args{end} || $self->end
+			];
+		}
+	}
+	else {
+		# take feature as is
+		push @intervals, [
+			($args{start} || $self->start) - 1,
+			$args{stop} || $args{end} || $self->end
+		];
+	}
+
+	# get the target id for the chromosome
+	# this will fail if the user didn't provide a real bam object!!!
+	my ($tid, undef, undef) = $args{db}->header->parse_region($self->seq_id);
+	return unless defined $tid;
+	
+	# now iterate over the intervals
+	foreach my $i (@intervals) {
+		$args{data}->{start}  = $i->[0];
+		$args{data}->{end}    = $i->[1];
+		$args{data}->{strand} = $self->strand;
+		low_level_bam_fetch(
+			$args{db}, 
+			$tid, 
+			$i->[0],
+			$i->[1], 
+			$args{callback}, 
+			$args{data}
+		);
+	}
+	
+	# nothing to return since we're using a data reference
+	return 1;
+}
+
+
 
 ### String export
 

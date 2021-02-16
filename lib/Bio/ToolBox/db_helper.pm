@@ -1151,7 +1151,7 @@ sub open_db_connection {
 			}
 			
 			# a cram database
-			if ($database =~ /\.cram$/i) {
+			elsif ($database =~ /\.cram$/i) {
 				# open using HTS bam adaptor only
 				$BAM_ADAPTER ||= 'hts';
 				if ($BAM_ADAPTER eq 'sam') {
@@ -1171,8 +1171,10 @@ sub open_db_connection {
 						" Bio::DB::HTS is not installed\n";
 				}
 			}
+			
+			# something unrecognized?
 			else {
-				$error .= " Programmer error! Cannot interpret database type for $database!\n";
+				$error .= " ERROR! Cannot identify database type for $database!\n";
 			}
 		}
 		
@@ -2277,11 +2279,15 @@ sub low_level_bam_fetch {
 	}
 	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
-		return $sam->hts_index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
+		my $index = $sam->hts_index;
+		return unless $index;
+		return $index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
 	}
 	elsif ($BAM_ADAPTER eq 'sam') {
 		# using Bio::DB::Sam
-		return $sam->bam_index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
+		my $index = $sam->bam_index;
+		return unless $index;
+		return $index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
 	}
 	else {
 		confess "no bam adapter loaded!\n";
@@ -2298,11 +2304,15 @@ sub low_level_bam_coverage {
 	}
 	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
-		return $sam->hts_index->coverage($sam->hts_file, $tid, $start, $stop);
+		my $index = $sam->hts_index;
+		return unless $index;
+		return $index->coverage($sam->hts_file, $tid, $start, $stop);
 	}
 	elsif ($BAM_ADAPTER eq 'sam') {
 		# using Bio::DB::Sam
-		return $sam->bam_index->coverage($sam->bam, $tid, $start, $stop);
+		my $index = $sam->bam_index;
+		return unless $index;
+		return $index->coverage($sam->bam, $tid, $start, $stop);
 	}
 	else {
 		confess "no bam adapter loaded!\n";
@@ -2538,17 +2548,26 @@ sub _load_helper_module {
 
 
 sub _load_bam_helper_module {
-	if ($BAM_ADAPTER =~ /sam/i) {
-		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
-		$BAM_ADAPTER = 'sam'; # for internal consistency
-	}
-	elsif ($BAM_ADAPTER =~ /hts/i) {
-		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
-		$BAM_ADAPTER = 'hts'; # for internal consistency
-	}
-	elsif ($BAM_ADAPTER =~ /none/i) {
-		# basically for testing purposes, don't use a module
-		return 0;
+	if ($BAM_ADAPTER) {
+		if ($BAM_ADAPTER =~ /sam/i) {
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
+			$BAM_ADAPTER = 'sam'; # for internal consistency
+		}
+		elsif ($BAM_ADAPTER =~ /hts/i) {
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+			$BAM_ADAPTER = 'hts'; # for internal consistency
+		}
+		elsif ($BAM_ADAPTER =~ /none/i) {
+			# basically for testing purposes, don't use a module
+			return 0;
+		}
+		else {
+			# unrecognized
+			$@ = 'unrecognized';
+		}
+		if (not $BAM_OK) {
+			print "Requested '$BAM_ADAPTER' adapter could not be loaded: $@\n";
+		}
 	}
 	else {
 		# try hts first, then sam
@@ -2562,24 +2581,32 @@ sub _load_bam_helper_module {
 			$BAM_ADAPTER = 'sam' if $BAM_OK;
 		}
 	}
-# 	print " using $BAM_ADAPTER bam adaptor\n";
 	return $BAM_OK;
 }
 
 
 sub _load_bigwig_helper_module {
-	if ($BIG_ADAPTER =~ /ucsc|kent/i) {
-		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
-		$BIG_ADAPTER = 'ucsc'; # for internal consistency
-	}
-	elsif ($BIG_ADAPTER =~ /big/i) {
-		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
-		$BIGBED_OK = $BIGWIG_OK; # bigbed too!
-		$BIG_ADAPTER = 'big'; # for internal consistency
-	}
-	elsif ($BIG_ADAPTER =~ /none/i) {
-		# basically for testing purposes, don't use a module
-		return 0;
+	if ($BIG_ADAPTER) {
+		if ($BIG_ADAPTER =~ /ucsc|kent/i) {
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+			$BIG_ADAPTER = 'ucsc'; # for internal consistency
+		}
+		elsif ($BIG_ADAPTER =~ /big/i) {
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
+			$BIGBED_OK = $BIGWIG_OK; # bigbed too!
+			$BIG_ADAPTER = 'big'; # for internal consistency
+		}
+		elsif ($BIG_ADAPTER =~ /none/i) {
+			# basically for testing purposes, don't use a module
+			return 0;
+		}
+		else {
+			# unrecognized
+			$@ = 'unrecognized';
+		}
+		if (not $BIGWIG_OK) {
+			print "Requested '$BIG_ADAPTER' adapter could not be loaded: $@\n";
+		}
 	}
 	else {
 		# we have to try each one out
@@ -2599,18 +2626,27 @@ sub _load_bigwig_helper_module {
 }
 
 sub _load_bigbed_helper_module {
-	if ($BIG_ADAPTER =~ /ucsc|kent/i) {
-		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
-		$BIG_ADAPTER = 'ucsc'; # for internal consistency
-	}
-	elsif ($BIG_ADAPTER =~ /big/i) {
-		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
-		$BIGWIG_OK = $BIGBED_OK; # bigwig too!
-		$BIG_ADAPTER = 'big'; # for internal consistency
-	}
-	elsif ($BIG_ADAPTER =~ /none/i) {
-		# basically for testing purposes, don't use a module
-		return 0;
+	if ($BIG_ADAPTER) {
+		if ($BIG_ADAPTER =~ /ucsc|kent/i) {
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
+			$BIG_ADAPTER = 'ucsc'; # for internal consistency
+		}
+		elsif ($BIG_ADAPTER =~ /big/i) {
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
+			$BIGWIG_OK = $BIGBED_OK; # bigwig too!
+			$BIG_ADAPTER = 'big'; # for internal consistency
+		}
+		elsif ($BIG_ADAPTER =~ /none/i) {
+			# basically for testing purposes, don't use a module
+			return 0;
+		}
+		elsif ($BAM_ADAPTER =~ /\w+/) {
+			# unrecognized
+			$@ = 'unrecognized';
+		}
+		if (not $BIGWIG_OK) {
+			print "Requested '$BIG_ADAPTER' adapter could not be loaded: $@\n";
+		}
 	}
 	else {
 		# we have to try each one out

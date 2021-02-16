@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 169;
+	plan tests => 200;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -220,10 +220,10 @@ undef $row;
 undef $stream;
 undef $Data;
 
-
 ### reopen saved Bed file
 # many of the same types of tests as above, just with bed file
 $Data = Bio::ToolBox::Data->new(file => $file);
+# metadata tests
 isa_ok($Data, 'Bio::ToolBox::Data', 'Bed Data');
 is($Data->gff, 0, 'gff version');
 is($Data->bed, 4, 'bed version');
@@ -242,6 +242,7 @@ is($Data->start_column, 1, 'start column');
 is($Data->stop_column, 2, 'stop column');
 is($Data->strand_column, undef, 'strand column');
 is($Data->type_column, undef, 'type column');
+# stream tests and row feature
 $stream = $Data->row_stream;
 $row = $stream->next_row;
 isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Feature object');
@@ -249,11 +250,49 @@ is($row->value(0), 'chrI', 'row object value of chromo index');
 is($row->start, 35155, 'row object start value');
 is($row->end, 36303, 'row object end value');
 is($row->name, 'Feature41', 'row object feature name');
+is($row->type, 'region', 'row object type value');
 is($row->coordinate, 'chrI:35154-36303', 'row object coordinate string');
+
+# grab row feature directly and change attributes using high API functions - v1.68
+$row = $Data->get_row(25);
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Direct Feature object');
+is($row->value(0), 'chrI', 'Feature chromosome actual value');
+is($row->seq_id, 'chrI', 'Feature chromosome');
+is($row->seq_id('chrX'), 'chrX', 'Change chromosome via high level');
+is($row->seq_id, 'chrX', 'Feature changed chromosome');
+is($Data->value(25,0), 'chrX', 'Feature chromosome actual value');
+
+is($row->value(1), 52800, 'Feature start actual value');
+is($row->start, 52801, 'Feature start coordinate');
+is($row->start(52901), 52900, 'Change start coordinate via high level');
+is($row->start, 52901, 'Feature changed start coordinate');
+is($Data->value(25,1), 52900, 'Feature start actual value');
+
+is($row->value(2), 54789, 'Feature end actual value');
+is($row->stop, 54789, 'Feature end coordinate');
+is($row->stop(54589), 54589, 'Change end coordinate via high level');
+is($row->end, 54589, 'Feature changed end coordinate');
+is($Data->value(25,2), 54589, 'Feature end actual value');
+
+is($row->value(3), 'Feature63', 'Feature name actual value');
+is($row->name, 'Feature63', 'Feature name');
+is($row->name('bob'), 'bob', 'Change name via high level');
+is($row->name, 'bob', 'Feature changed name');
+is($Data->value(25,3), 'bob', 'Feature name actual value');
+
+is($row->value(5), '.', 'Feature actual strand value (nonexistent)');
+is($row->strand, 0, 'Feature strand (implied)');
+is($row->strand(1), 0, 'Attempt strand change via high level');
+is($row->strand, 0, 'Check attempted strand change');
+is($Data->value(25,5), undef, 'Feature actual changed strand value');
+
+is($row->type, 'region', 'Feature type (implied)');
+is($row->type('gene'), 'region', 'Attempt type change via high level');
+isnt($row->type, 'gene', 'Check attempted type change');
+is($row->type, 'region', 'Check actual type value');
 undef $row;
 undef $stream;
 undef $Data;
-
 
 
 ### Testing Stream object ###
@@ -336,6 +375,7 @@ $outStream->close_fh;
 cmp_ok(-s $file2, '<', -s $file, "smaller file size due to lack of comments");
 
 # reload the duplicate files
+# this should effectively delete the child files
 $Data = Bio::ToolBox::Data->new();
 isa_ok($Data, 'Bio::ToolBox::Data', 'new empty Data object');
 is($Data->number_columns, 0, 'number of columns');

@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -477,8 +477,8 @@ sub set_defaults {
 	if ($subfeature and (defined $fstart or defined $start_adj)) {
 		die " Cannot modify coordinates when subfeatures are requested!\n";
 	}
-	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
-		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr|intron)$/) {
+		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr 3p_utr, or intron\n";
 	} 
 	
 	# generate formatter
@@ -517,7 +517,7 @@ sub parallel_execution {
 		}
 		
 		# collapse transcripts if needed
-		if ($feature =~ /^gene/i and $subfeature eq 'exon') {
+		if ($feature =~ /^gene/i and $subfeature =~ /exon|intron/) {
 			my $c = $Data->collapse_gene_transcripts;
 			if ($c != $Data->last_row) {
 				printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
@@ -563,7 +563,7 @@ sub parallel_execution {
 sub single_execution {
 	
 	# collapse transcripts if needed
-	if ($feature =~ /^gene/i and $subfeature eq 'exon') {
+	if ($feature =~ /^gene/i and $subfeature =~ /exon|intron/) {
 		my $c = $Data->collapse_gene_transcripts;
 		if ($c != $Data->last_row) {
 			printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
@@ -1009,7 +1009,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
             pcount|ncount]
   -t --strand [all|sense|antisense]   strand of data relative to feature (all)
   -u --subfeature [exon|cds|          collect over gene subfeatures 
-        5p_utr|3p_utr] 
+        5p_utr|3p_utr|intron] 
   --force_strand                      use the specified strand in input file
   --fpkm [region|genome]              calculate FPKM using which total count
   --tpm                               calculate TPM values
@@ -1196,14 +1196,14 @@ presence of a "strand" column in the input data file. This option only
 works with input file lists of database features, not defined genomic
 regions (e.g. BED files). Default is false.
 
-=item --subfeature [ exon | cds | 5p_utr | 3p_utr ]
+=item --subfeature [ exon | cds | 5p_utr | 3p_utr | intron ]
 
 Optionally specify the type of subfeature to collect from, rather than 
-the entire gene. If the parent feature is gene and the subfeature is exon, 
-then all transcripts of the gene will be collapsed. The other subfeatures 
-(cds, 5p_utr, and 3p_utr) will not work with gene features but only with 
-coding mRNA transcripts. Note that the options extend, start, stop, fstart, 
-and fstop are ignored. Default is null. 
+the entire gene. If the parent feature is gene and the subfeature is exon
+or intron, then all transcripts of the gene will be collapsed. The other 
+subfeatures (cds, 5p_utr, and 3p_utr) will not work with gene features but 
+only with coding mRNA transcripts. Note that the options extend, start, stop, 
+fstart, and fstop are ignored. Default is null. 
 
 =item --exons
 
@@ -1384,30 +1384,36 @@ These are some examples of some common scenarios for collecting data.
 You want to collect the mean score from a bigWig file for each feature 
 in a BED file of intervals.
 
-  get_datasets.pl --data scores.bw --in input.bed
+  get_datasets.pl --in input.bed --data scores.bw
 
 =item Collect normalized counts
 
-You want to collect normalized read counts from a Bam file of alignments 
-for each feature in a BED file.
+You want to collect normalized read counts from multiple Bam files 
+for each feature in a BED file. This will count alignment names (safe for 
+paired-end alignments) over the intervals, and transform to Fragments (Reads) 
+Per Million, a depth-normalizing function based on the total number of 
+fragments counted in each dataset. 
 
-  get_datasets.pl --data alignments.bam --method rpm --in input.bed
+  get_datasets.pl --in input.bed --method ncount --fpkm region *.bam 
 
 =item Collect stranded RNASeq data
 
 You have stranded RNASeq data, and you would like to determine the 
-expression level for all genes in an annotation database.
+expression level for all genes from an annotation file. Use the 
+C<ncount> method to count alignment names to avoid double counting 
+alignments split over multiple exons.
   
-  get_datasets.pl --db annotation --feature gene --data rnaseq.bam \
-  --strand sense --exons --method rpkm --out expression.txt
+  get_datasets.pl --in annotation.gtf --feature transcript --subfeature exon \
+  --strand sense --method ncount --out expression.txt *.bam
 
 =item Restrict to specific region
 
 You have ChIPSeq enrichment scores in a bigWig file and you now want 
-to score just the transcription start site of known transcripts in an 
-annotation database. Here you will restrict to 500 bp flanking the TSS.
+to score just the transcription start site of known transcripts in a 
+L<Bio::DB::SeqFeature::Store> annotation database. Here you will 
+restrict to 500 bp flanking the TSS.
   
-  get_datasets.pl --db annotation --feature mRNA --start=-500 \
+  get_datasets.pl --db annotation.sqlite --feature mRNA --start=-500 \
   --stop=500 --pos 5 --data scores.bw --out tss_scores.txt
 
 =item Count intervals
@@ -1416,27 +1422,29 @@ You have identified all possible transcription factor binding sites in
 the genome and put them in a bigBed file. Now you want to count how 
 many exist in each upstream region of each gene.
   
-  get_datasets.pl --db annotation --feature gene --start=-5000 \
+  get_datasets.pl --db annotation.gtf --feature gene --start=-5000 \
   --stop=0 --data tfbs.bb --method count --out tfbs_sums.txt
 
 =item Many datasets at once
 
-You can place multiple bigWig files in a single directory and treat it 
-as a data database, known as a BigWigSet. Each file becomes a database 
-feature, and you can interactively choose one or more from which to 
-collect. Each dataset is appended to the input file as new column.
+While you can provide multiple data source files as a space-delimited 
+list at the end of the command, you can also treat a folder or directory 
+of bigWig files as a special database, known as a BigWigSet. Each file 
+becomes a database feature, and you can interactively choose one or more 
+from which to collect. Each dataset is appended to the input file as a new 
+column. Provide the folder as a data database C<--ddb> option.
   
-  get_datasets.pl --ddb /path/to/bigwigset --in input.txt
+  get_datasets.pl --in input.txt --ddb /path/to/bigwigset
 
 =item Stranded BigWig data
 
 You can generate stranded RNASeq coverage from a Bam file using the 
 BioToolBox script bam2wig.pl, which yields rnaseq_f.bw and rnaseq_r.bw 
 files. These are automatically interpreted as stranded datasets in a 
-BigWigSet context.
+BigWigSet folder context; see above.
   
-  get_datasets.pl --ddb /path/to/rnaseq/bigwigset --strand sense \
-  --in input.txt
+  get_datasets.pl --in input.txt --strand sense \
+  --ddb /path/to/rnaseq/bigwigset 
 
 =item Binned coverage across the genome
 
@@ -1451,8 +1459,9 @@ depleted regions. You count reads in 1 kb intervals across the genome.
 You are interested in the maximum score in the central 50% of each 
 feature.
   
-  get_datasets.pl --fstart=0.25 --fstop=0.75 --data scores.bw --in \
-  input.txt
+  get_datasets.pl --in input.txt --fstart=0.25 --fstop=0.75 \
+  --data scores.bw 
+  
 
 =back
 

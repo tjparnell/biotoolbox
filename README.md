@@ -29,21 +29,29 @@ any data format.
 
 # INSTALLATION
 
-Basic installation is simple with the standard [Module::Build](https://metacpan.org/pod/Module::Build) 
-incantation. This will get you a minimal installation that will work with 
-text files (BED, GFF, GTF, etc), but not binary files. 
+[Released versions](https://metacpan.org/pod/Bio::ToolBox) can be installed 
+from [CPAN](https://metacpan.org) using your favorite installer. For example,
+using [CPAN Minus](https://metacpan.org/pod/App::cpanminus) 
+
+    cpanm Bio::ToolBox
+
+Manual installation is simple with the standard [Module::Build](https://metacpan.org/pod/Module::Build) 
+incantation. 
 
     perl ./Build.PL
     ./Build
     ./Build test
     ./Build install
 
-To work with binary Bam and BigWig files, see [advanced
-installation](docs/AdvancedInstallation.md) for further guidance. Most scripts should fail
-gently with warnings if required modules are missing.
+In either case, this will get you a minimal installation that will work with 
+text files (BED, GFF, GTF, etc), but not binary files. To work with binary Bam and 
+BigWig files, two additional [external libraries](docs/AdvancedInstallation.md#external-libraries)
+must also be compiled and installed; This is not hard, and you likely already have 
+one (maybe both) installed on your system. Most scripts should fail gently with 
+warnings if required modules are missing.
 
-Released versions may be obtained though the CPAN repository using your favorite 
-package manager. 
+For step-by-step instructions to get a complete installation, see the 
+[Advanced Installation guide](docs/AdvancedInstallation.md).
 
 ## Docker
 

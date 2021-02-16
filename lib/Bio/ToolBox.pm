@@ -6,73 +6,6 @@ our $VERSION = '1.68';
 
 Bio::ToolBox - Tools for querying and analysis of genomic data
 
-=head1 USAGE
-
-This module provides a handful of commonly used convenience methods 
-as entry points to working with data files. Most of them use or 
-return a L<Bio::ToolBox::Data> object.
-
-=head2 Methods
-
-=over 4
-
-=item load_file
-
-Open a tab-delimited text file as a L<Bio::ToolBox::Data> object. 
-Simply pass the file path as a single argument. It assumes the first 
-row is the column headers, and comment lines begin with C<#>. 
-Compressed files are transparently handled. See the 
-L<Bio::ToolBox::Data> C<new> method for more details or options.
-
-  $Data = Bio::ToolBox->load_file('myfile.txt');
-
-=item parse_file
-
-Parse an annotation file, such as BED, GTF, GFF3, UCSC genePred or 
-refFlat file, into a L<Bio::ToolBox::Data> table. Each row in the 
-resulting table is linked to a parsed SeqFeature gene object. See 
-the L<Bio::ToolBox::Data> C<new> method for more details or options.
-
-  $Data = Bio::ToolBox->parse_file('genes.gtf.gz');
-    
-=item new_data
-
-Generate a new, empty L<Bio::ToolBox::Data> table with the given column 
-names. Pass the names of the columns in the new table.
-
-  $Data = Bio::ToolBox->new_data( qw(Name ID Score) );
-    
-=item open_file
-
-Open a generic file handle for reading. It transparently handles 
-compression as necessary. Returns an L<IO::File> object. Pass the 
-file path as an argument. 
-    
-  $fh = Bio::ToolBox->open_file('mydata.txt.gz');
-    
-=item write_file
-
-Open a generic file handle for writing. It transparently handles 
-compression as necessary based on filename extension or passed 
-options. It will use the C<pigz> multi-threaded, external, compression
-utility if available. See the C<open_to_write_fh> method in 
-<Bio::ToolBox::Data::file> for more information.
-
-  $fh = Bio::ToolBox->write_file('mynewdata.txt.gz');
-
-=item open_database
-
-Open a binary database file, including Bam, bigWig, bigBed, Fasta, 
-L<Bio::DB::SeqFeature::Store> SQLite file or named MySQL connection, 
-USeq file, or any other supported binary or indexed file formats. 
-Database type is transparently and automatically checked by looking for 
-common file extensions, if present. See the C<open_db_connection> in 
-L<Bio::ToolBox::db_helper> for more information.
-
-  $db = Bio::ToolBox->open_database($database);
-    
-=back
-
 =head1 DESCRIPTION
 
 The Bio::ToolBox libraries provide a useful interface for working 
@@ -204,6 +137,75 @@ a synopsis of available options, or add C<--help> to print the full documentatio
 
 =back
 
+=head1 USAGE
+
+This module provides a handful of commonly used convenience methods 
+as entry points to working with data files. Most of them use or 
+return a L<Bio::ToolBox::Data> object.
+
+=head2 Methods
+
+=over 4
+
+=item load_file
+
+Open a tab-delimited text file as a L<Bio::ToolBox::Data> object. 
+Simply pass the file path as a single argument. It assumes the first 
+row is the column headers, and comment lines begin with C<#>. 
+Compressed files are transparently handled. See the 
+L<Bio::ToolBox::Data> C<new> method for more details or options.
+
+  $Data = Bio::ToolBox->load_file('myfile.txt');
+
+=item parse_file
+
+Parse an annotation file, such as BED, GTF, GFF3, UCSC genePred or 
+refFlat file, into a L<Bio::ToolBox::Data> table. Each row in the 
+resulting table is linked to a parsed SeqFeature gene object. See 
+the L<Bio::ToolBox::Data> C<new> method for more details or options.
+Default options include parsing subfeatures (exon, cds, and utr) and 
+simple GFF attributes.
+
+  $Data = Bio::ToolBox->parse_file('genes.gtf.gz');
+    
+=item new_data
+
+Generate a new, empty L<Bio::ToolBox::Data> table with the given column 
+names. Pass the names of the columns in the new table.
+
+  $Data = Bio::ToolBox->new_data( qw(Name ID Score) );
+    
+=item open_file
+
+Open a generic file handle for reading. It transparently handles 
+compression as necessary. Returns an L<IO::File> object. Pass the 
+file path as an argument. 
+    
+  $fh = Bio::ToolBox->open_file('mydata.txt.gz');
+    
+=item write_file
+
+Open a generic file handle for writing. It transparently handles 
+compression as necessary based on filename extension or passed 
+options. It will use the C<pigz> multi-threaded, external, compression
+utility if available. See the C<open_to_write_fh> method in 
+<Bio::ToolBox::Data::file> for more information.
+
+  $fh = Bio::ToolBox->write_file('mynewdata.txt.gz');
+
+=item open_database
+
+Open a binary database file, including Bam, bigWig, bigBed, Fasta, 
+L<Bio::DB::SeqFeature::Store> SQLite file or named MySQL connection, 
+USeq file, or any other supported binary or indexed file formats. 
+Database type is transparently and automatically checked by looking for 
+common file extensions, if present. See the C<open_db_connection> in 
+L<Bio::ToolBox::db_helper> for more information.
+
+  $db = Bio::ToolBox->open_database($database);
+    
+=back
+
 =head1 REPOSITORY
 
 Source code for the Bio::ToolBox package is maintained at 
@@ -255,8 +257,10 @@ sub parse_file {
 	my $self = shift;
 	if (scalar(@_) == 1) {
 		return Bio::ToolBox::Data->new(
-			file   => $_[0],
-			parse  => 1,
+			file       => $_[0],
+			parse      => 1,
+			simplify   => 1,
+			subfeature => 'exon,cds,utr',
 		);
 	}
 	else {

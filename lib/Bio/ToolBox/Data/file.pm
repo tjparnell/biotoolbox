@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -221,18 +221,24 @@ sub parse_headers {
 	# first data row which contains the column names
 	$self->program(undef); # reset this to blank, it will be filled by file metadata
 	my $header_line_count = 0;
-	while (my $line = $fh->getline) {		
+	my $line = $fh->getline; # first line
+	
+	# check the first line for proper line endings
+	{
+		my $line2 = $line;
+		chomp($line2);
+		if ($line2 =~ /[\r\n]+/) {
+			my $filename = $self->filename;
+			die "File '$filename' does not have expected line endings!\n" . 
+				" Try converting to native line endings and try again\n";
+		}
+	}
+	
+	while ($line) {		
 		# we are not chomping the line here because of possible side effects
 		# with UCSC tables where we have to count elements in the first line
 		# and potential header lines, and the first line has a null value at 
 		# the end
-		
-		# check for Mac-style return line endings
-		if ($line =~ /\r/ and $line !~ /\n/) {
-			my $filename = $self->filename;
-			die "File '$filename' does not appear to have unix line endings!\n" . 
-				" Please convert to unix-style line endings and try again\n";
-		}
 		
 		# Parse the datafile metadata headers
 		
@@ -245,7 +251,6 @@ sub parse_headers {
 		# the generating program
 		elsif ($line =~ m/^# Program (.+)$/) {
 			my $p = $1;
-			$p =~ s/[\r\n]+$//;
 			$self->program($p);
 			$header_line_count++;
 		}
@@ -253,7 +258,6 @@ sub parse_headers {
 		# the source database
 		elsif ($line =~ m/^# Database (.+)$/) {
 			my $d = $1;
-			$d =~ s/[\r\n]+$//;
 			$self->database($d);
 			$header_line_count++;
 		}
@@ -261,7 +265,6 @@ sub parse_headers {
 		# the type of feature in this datafile
 		elsif ($line =~ m/^# Feature (.+)$/) {
 			my $f = $1;
-			$f =~ s/[\r\n]+$//;
 			$self->feature($f);
 			$header_line_count++;
 		}
@@ -280,7 +283,6 @@ sub parse_headers {
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			my $g = $1;
-			$g =~ s/[\r\n]+$//;
 			$self->gff($g);
 			$header_line_count++;
 		}
@@ -288,10 +290,9 @@ sub parse_headers {
 		# VCF version header
 		elsif ($line =~ /^##fileformat=VCFv([\d\.]+)$/) {
 			# store the VCF version in the hash
-			# this may or may not be present in the gff file, but want to keep
+			# this may or may not be present in the vcf file, but want to keep
 			# it if it is
 			my $v = $1;
-			$v =~ s/[\r\n]+$//;
 			$self->vcf($v);
 			$self->add_comment($line); # so that it is written properly
 			$header_line_count++;
@@ -374,7 +375,14 @@ sub parse_headers {
 				$header_line_count++;
 			}
 		}
-		last if $self->number_columns != 0;
+		
+		# keep processing by going to the next line until we have identified columns
+		if ($self->number_columns == 0) {
+			$line = $fh->getline; 
+		}
+		else {
+			undef $line;
+		}
 	}
 	
 	# if we didn't find columns, check that it wasn't actually commented
@@ -450,8 +458,7 @@ sub add_data_line {
 	# chomp the last element
 	# we do this here to ensure the tab split above gets all of the values
 	# otherwise trailing null values aren't included in @linedata
-	# be sure to handle both newlines and carriage returns
-	$linedata[-1] =~ s/[\r\n]+$//;
+	chomp $linedata[-1];
 	
 	# check for extra remaining tabs
 	if (index($linedata[-1], "\t") != -1) {
@@ -945,7 +952,7 @@ sub open_to_write_fh {
 		if ($filename =~ m/\.vcf(\.gz)?$/i) {
 			$gz = 2; # bgzip
 		}
-		if ($filename =~ m/\.gz$/i) {
+		elsif ($filename =~ m/\.gz$/i) {
 			$gz = 1; # regular gzip
 		}
 		else {
@@ -1077,7 +1084,7 @@ sub add_column_metadata {
 	my ($data, $line, $index) = @_;
 	
 	# strip the Column metadata identifier
-	$line =~ s/[\r\n]+$//;
+	chomp $line;
 	$line =~ s/^# Column_\d+ //; 
 	
 	# break up the column metadata
@@ -1402,7 +1409,7 @@ sub add_standard_metadata {
 	my ($self, $line) = @_;
 	
 	my @namelist = split '\t', $line;
-	$namelist[-1] =~ s/[\r\n]+$//;
+	chomp $namelist[-1];
 	
 	# we will define the columns based on
 	for my $i (0..$#namelist) {

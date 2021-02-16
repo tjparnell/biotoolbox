@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::Sam; 1}) {
-		plan tests => 40;
+		plan tests => 45;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::Sam not available';
@@ -212,3 +212,28 @@ is(scalar @{$pos2scores{56}}, 2, 'positioned name count at 56');
 is(scalar keys %pos2scores, 79, 'number of positioned scores');
 is($pos2scores{57593}, 2, 'positioned score at 57593');
 is($pos2scores{57613}, 1, 'positioned score at 57613');
+
+
+# Fetch alignments
+my $alignment_data = { mapq => [] };
+my $callback = sub {
+ my ($a, $data) = @_;
+ push @{ $data->{mapq} }, $a->qual;
+};
+my $f = $row->fetch_alignments(
+'db'        => $db,
+'data'      => $alignment_data,
+'callback'  => $callback,
+);
+is($f, 1, 'Raw alignment fetch');
+# printf "found %d alignments\n", scalar(@{$alignment_data->{mapq}});
+# for my $i (0..183) {
+# 	printf "$i\t%d\n", $alignment_data->{mapq}->[$i];
+# }
+is(scalar(@{$alignment_data->{mapq}}), 184, 'Raw fetch mapq number');
+is($alignment_data->{mapq}->[0], 150, 'First alignment mapq');
+is($alignment_data->{mapq}->[66], 0, '66th alignment mapq');
+is($alignment_data->{mapq}->[80], 95, '80th alignment mapq');
+
+
+

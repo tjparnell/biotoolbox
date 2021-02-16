@@ -1,5 +1,39 @@
 ######## Bio::ToolBox revision history #############
 
+v1.68
+	- Script bam2wig.pl script can now record both ends of paired-end 
+	fragments, rather than faking it as single-end. Paired-end start 
+	now respectes orientation. Added new option to only record either 
+	first or second read in a pair. Added new option to ignore 
+	zero intervals when writing bedGraph format. Changed multi-hit 
+	scoring to preferentially use NH instead of IH. 
+	- Scripts get_binned_data.pl and get_relative_data.pl now 
+	can write out column names and associated datasets in separate 
+	groups file for use in plotting. Also specify score decimal format.
+	- Script get_features.pl has new option to only keep features with 
+	explicit tag value.
+	- High level ToolBox convenience function parse_file() now includes
+	 basic default subfeatures exon, cds, and utr.
+	- Efficiency improvements in loading large text files by going
+	back to chomp. Should still fail appropriately with wrong 
+	line endings.
+	- Feature objects now allow certain attribute methods to be both 
+	get and set, including seq_id, start, end, strand, name, and 
+	type, so long as the table does not contain parsed or database 
+	SeqFeature objects.
+	- Add Data object function to return any single row Feature without 
+	having to use an iterator.
+	- Add high level function for iterating over Bam alignments.
+	- Add support for intron subfeatures in Feature objects and data 
+	collection scripts. 
+	- Allow bigWigToBedGraph to be explicitly used
+	- Better handling of verified dataset names
+	- Bug fixes and improvements in identifying database file 
+	formats and loading adapters.
+	- Bug fix in writing bgzip files.
+	
+	
+
 v1.67
 	- Add new option of smart coverage to script bam2wig that
 	smartly handles pair-end alignments with gaps (introns)

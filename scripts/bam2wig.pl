@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 	
 	
 
@@ -58,6 +58,7 @@ my (
 	$use_cspan,
 	$use_extend,
 	$use_smartpe,
+	$use_ends,
 	$position,
 	$use_coverage,
 	$splice,
@@ -79,6 +80,8 @@ my (
 	$nosupplementary,
 	$max_isize,
 	$min_isize,
+	$first,
+	$second,
 	$multi_hit_scale,
 	$splice_scale,
 	$rpm,
@@ -93,6 +96,7 @@ my (
 	$do_fixstep,
 	$do_varstep,
 	$do_bedgraph,
+	$no_zero,
 	$bwapp,
 	$gz,
 	$cpu,
@@ -116,6 +120,7 @@ GetOptions(
 	'cspan!'       => \$use_cspan, # record center span
 	'e|extend!'    => \$use_extend, # extend read
 	'smartcov!'    => \$use_smartpe, # smart paired coverage
+	'ends!'        => \$use_ends, # record paired-end endpoints 
 	'coverage!'    => \$use_coverage, # calculate coverage
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
@@ -137,6 +142,8 @@ GetOptions(
 	'U|nosupplementary' => \$nosupplementary, # skip supplementary alignments
 	'maxsize=i'    => \$max_isize, # maximum paired insert size to accept
 	'minsize=i'    => \$min_isize, # minimum paired insert size to accept
+	'first!'       => \$first, # only take first read
+	'second!'      => \$second, # only take second read
 	'fraction!'    => \$multi_hit_scale, # scale by number of hits
 	'splfrac!'     => \$splice_scale, # divide counts by number of spliced segments
 	'r|rpm!'       => \$rpm, # calculate reads per million
@@ -153,6 +160,7 @@ GetOptions(
 	'bdg!'         => \$do_bedgraph, # write a bedgraph output
 	'fix!'         => \$do_fixstep, # write a fixedStep output
 	'var!'         => \$do_varstep, # write a varStep output
+	'nozero!'       => \$no_zero, # do not write zero coverage
 	'z|gz!'        => \$gz, # compress text output
 	'c|cpu=i'      => \$cpu, # number of cpu cores to use
 	'intron=i'     => \$max_intron, # maximum intron size to allow
@@ -386,22 +394,26 @@ sub check_defaults {
 			$paired = 1;
 			$splice = 1;
 		}
+		elsif ($position eq 'ends') {
+			$use_ends = 1;
+			$paired = 1;
+		}
 		else {
 			die " unrecognized position value '$position'! see help\n";
 		}
 	}
 	my $position_check = $use_start + $use_mid + $use_span + $use_cspan + $use_extend + 
-		$use_coverage + $use_smartpe;
+		$use_coverage + $use_smartpe + $use_ends;
 	if ( $position_check > 1) {
 		die " Modes are mutually exclusive! Please select only one of\n" . 
-			" --start, --mid, --span, --cpsan, --extend, --smartcov, or --coverage\n";
+			" --start, --mid, --span, --cpsan, --extend, --smartcov, --ends, or --coverage\n";
 	}
 	elsif (not $position_check) {
 		# we allow no position if user has selected shift so that we can calculate
 		# the shift value without running through entire wig conversion
 		unless ($shift) {
 			die " Please select one of the following modes:\n" . 
-				" --start, --mid, --span, --cspan, --extend, --smartcov, or --coverage\n";
+				" --start, --mid, --span, --cspan, --extend, --smartcov, --ends, or --coverage\n";
 		}
 	}
 	
@@ -426,6 +438,10 @@ sub check_defaults {
 	
 	# check paired-end requirements
 	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
+	if (($paired or $use_smartpe) and ($first or $second)) {
+		$paired = 0; # not necessary
+		$use_smartpe = 0;
+	}
 	if ($use_smartpe) {
 		$paired = 1;
 		$splice = 1;
@@ -447,6 +463,9 @@ sub check_defaults {
 		};
 		die " Module Set::IntSpan::Fast is required for smart-paired coverage\n" if $@;
 	}
+	if ($use_ends) {
+		$paired = 1;
+	}
 	
 	# incompatible options
 	if ($splice and ($use_extend or $extend_value)) {
@@ -459,6 +478,14 @@ sub check_defaults {
 	if ($shift and $paired) {
 		warn " disabling shift with paired reads\n";
 		undef $shift;
+	}
+	if ($use_ends and $shift) {
+		warn " disabling shift when recording paired endpoints\n";
+		undef $shift;
+	}
+	if ($use_ends and $splice) {
+		warn " disabling splices when recording paired endpoints\n";
+		undef $splice;
 	}
 	
 	# check to shift position or not
@@ -540,7 +567,7 @@ sub check_defaults {
 	}
 	else {
 		# set default to 10 bp for any span or coverage, or 1 bp for point data
-		$bin_size = ($use_start or $use_mid) ? 1 : 10;
+		$bin_size = ($use_start or $use_mid or $use_ends) ? 1 : 10;
 	}
 	
 	# determine binary file packing and length
@@ -651,7 +678,7 @@ sub check_defaults {
 				$do_bedgraph = 1;
 			}
 		}
-		elsif ($use_start or $use_mid) {
+		elsif ($use_start or $use_mid or $use_ends) {
 			if ($bin_size > 1) {
 				$do_fixstep = 1;
 			}
@@ -821,6 +848,14 @@ sub check_defaults {
 	elsif ($paired and $do_strand and $use_smartpe) {
 		$callback = \&smart_stranded_pe;
 		print " Recording stranded, smart paired-end coverage\n";
+	}
+	elsif ($paired and not $do_strand and $use_ends) {
+		$callback = \&pe_ends;
+		print " Recording paired-end fragment endpoints\n";
+	}
+	elsif ($paired and $do_strand and $use_ends) {
+		$callback = \&pe_strand_ends;
+		print " Recording stranded, paired-end fragment endpoints\n";
 	}
 	else {
 		die "programmer error!\n" unless $shift; # special exception
@@ -2123,8 +2158,14 @@ sub write_bedgraph {
 			else {
 				my $end = $cpos * $bin_size;
 				$end = $seq_length if $end > $seq_length;
-				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval) 
-					if $end; # this avoids writing nonexistent start 0 end 0 lines
+				if ($no_zero and $cval == 0) {
+					# we will skip the nonzero intervals 
+					# do nothing here
+				}
+				else {
+					$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval) 
+						if $end; # this avoids writing nonexistent start 0 end 0 lines
+				}
 				$lpos = $cpos;
 				$cval = $value;
 				$cpos++;
@@ -2240,10 +2281,12 @@ sub se_callback {
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
 	my $flag = $a->flag;
-	return if ($nosecondary and $flag & 0x0100); # secondary alignment
-	return if ($noduplicate and $flag & 0x0400); # marked duplicate
-	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
+	return if ($nosecondary and $flag & 0x100); # secondary alignment
+	return if ($noduplicate and $flag & 0x400); # marked duplicate
+	return if ($flag & 0x200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x800); # supplementary hit
+	return if ($first and not $flag & 0x40); # first read in pair
+	return if ($second and not $flag & 0x80); # second read in pair
 	
 	# filter black listed regions
 	if (defined $data->{black_list}) {
@@ -2252,32 +2295,23 @@ sub se_callback {
 	}
 	
 	# scale by number of hits
-	my $score; 
+	my $score = $data->{score}; # probably 1, but may be chromosome scaled
 	if ($multi_hit_scale) {
-		# preferentially use the number of included hits, then number of hits
-		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
-		$score = $nh > 1 ? 1/$nh : 1;
-		# record fractional alignment counts
-		if ($do_strand and $a->reversed) {
-			$data->{r_count} += $score; 
+		my $nh = $a->aux_get('NH') || 1;
+		if ($nh > 1) {
+			$score /= $nh;
 		}
-		else {
-			$data->{f_count} += $score;
-		}
-		$score *= $data->{score}; # multiply by chromosome scaling factor
-	}
-	else {
-		 # always record one alignment
-		if ($do_strand and $a->reversed) {
-			$data->{r_count} += 1; 
-		}
-		else {
-			$data->{f_count} += 1;
-		}
-		$score = $data->{score}; # probably 1, but may be chromosome scaled
 	}
 	
-	# pass checks
+	# always record one alignment regardless of multiple hit status
+	if ($do_strand and $a->reversed) {
+		$data->{r_count} += 1; 
+	}
+	else {
+		$data->{f_count} += 1;
+	}
+	
+	# pass on to appropriate callback
 	if ($splice and $a->cigar_str =~ /N/) {
 		# check for splices
 		se_spliced_callback($a, $data, $score);
@@ -2304,17 +2338,19 @@ sub fast_pe_callback {
 	return unless $a->proper_pair; # both alignments are mapped
 	return if $a->reversed; # only look at forward alignments, that's why it's fast
 	return unless $a->tid == $a->mtid; # same chromosome?
-	my $isize = abs($a->isize); 
-	return if $isize > $max_isize;
-	return if $isize < $min_isize; 
 	
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
 	my $flag = $a->flag;
-	return if ($nosecondary and $flag & 0x0100); # secondary alignment
-	return if ($noduplicate and $flag & 0x0400); # marked duplicate
-	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
+	return if ($nosecondary and $flag & 0x100); # secondary alignment
+	return if ($noduplicate and $flag & 0x400); # marked duplicate
+	return if ($flag & 0x200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x800); # supplementary hit
+	
+	# check insertion size
+	my $isize = abs($a->isize); 
+	return if $isize > $max_isize;
+	return if $isize < $min_isize; 
 	
 	# filter black listed regions
 	if ($data->{black_list}) {
@@ -2323,45 +2359,34 @@ sub fast_pe_callback {
 	}
 	
 	# scale by number of hits
-	my $score;
+	my $score = $data->{score}; # probably 1, but may be chromosome scaled
 	if ($multi_hit_scale) {
-		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
-		$score = $nh > 1 ? 1/$nh : 1;
-		# record fractional alignment counts
-		if ($do_strand and $flag & 0x80) {
-			# this alignment is forward and second mate, so must be reverse strand
-			$data->{r_count} += $score; 
+		my $nh = $a->aux_get('NH') || 1;
+		if ($nh > 1) {
+			$score /= $nh;
 		}
-		else {
-			# otherwise this forward alignment must be first mate
-			# or unstranded analysis defaults to forward strand
-			$data->{f_count} += $score;
-		}
-		$score *= $data->{score}; # multiply by chromosome scaling factor
+	}
+	
+	# always record one alignment regardless of multiple hit status
+	if ($do_strand and $flag & 0x80) {
+		# this alignment is forward and second mate, so must be reverse strand
+		$data->{r_count} += 1; 
 	}
 	else {
-		 # always record one alignment
-		if ($do_strand and $flag & 0x80) {
-			# this alignment is forward and second mate, so must be reverse strand
-			$data->{r_count} += 1; 
-		}
-		else {
-			# otherwise this forward alignment is second mate
-			# or unstranded analysis defaults to forward strand
-			$data->{f_count} += 1;
-		}
-		$score = $data->{score}; # probably 1, but may be chromosome scaled
+		# otherwise this forward alignment must be first mate
+		# or unstranded analysis defaults to forward strand
+		$data->{f_count} += 1;
 	}
 	
 	# record based on the forward read
 	&$callback($a, $data, $score);
 	
 	# check data size
-	if (scalar(@{$data->{f}}) > 600_000) {
+	if (scalar(@{$data->{f}}) > 1_000_000) {
 		$data->{fpack} .= pack("$binpack*", splice(@{$data->{f}}, 0, 500_000));
 		$data->{f_offset} += 500_000;
 	}
-	if (scalar(@{$data->{r}}) > 600_000) {
+	if (scalar(@{$data->{r}}) > 1_000_000) {
 		$data->{rpack} .= pack("$binpack*", splice(@{$data->{r}}, 0, 500_000));
 		$data->{r_offset} += 500_000;
 	}
@@ -2373,6 +2398,16 @@ sub pe_callback {
 	# check paired status
 	return unless $a->proper_pair; # both alignments are mapped
 	return unless $a->tid == $a->mtid; # same chromosome?
+	
+	# check alignment quality and flags
+	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
+	my $flag = $a->flag;
+	return if ($nosecondary and $flag & 0x100); # secondary alignment
+	return if ($noduplicate and $flag & 0x400); # marked duplicate
+	return if ($flag & 0x200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x800); # supplementary hit
+	
+	# check insertion size
 	my $isize = $a->isize; 
 	if ($a->reversed) {
 		# in proper FR pairs reverse alignments are negative
@@ -2381,14 +2416,6 @@ sub pe_callback {
 	}
 	return if $isize > $max_isize;
 	return if $isize < $min_isize; 
-	
-	# check alignment quality and flags
-	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
-	my $flag = $a->flag;
-	return if ($nosecondary and $flag & 0x0100); # secondary alignment
-	return if ($noduplicate and $flag & 0x0400); # marked duplicate
-	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
 	
 	# filter black listed regions
 	if ($data->{black_list}) {
@@ -2409,46 +2436,30 @@ sub pe_callback {
 		delete $data->{pair}->{$a->qname};
 		
 		# scale by number of hits
-		my $score;
+		my $score = $data->{score}; # probably 1, but may be chromosome scaled
 		if ($multi_hit_scale) {
-			my $r_nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
-			my $f_nh = $f->aux_get('IH') || $f->aux_get('NH') || 1;
-			if ($f_nh == $r_nh) {
-				$score = 1/$f_nh;
-			}
-			elsif ($f_nh < $r_nh) {
-				# take the lowest number of hits recorded
-				$score = $f_nh > 1 ? 1/$f_nh : 1;
+			my $r_nh = $a->aux_get('NH') || 1;
+			my $f_nh = $f->aux_get('NH') || 1;
+			# use the lowest number of hits reported for either alignment
+			if ($f_nh <= $r_nh) {
+				$score /= $f_nh if $f_nh > 1; 
 			}
 			else {
-				$score = $r_nh > 1 ? 1/$r_nh : 1;
+				$score /= $r_nh if $r_nh > 1;
 			}
-			# record fractional alignment counts
-			if ($do_strand and $flag & 0x40) {
-				# this alignment is reverse and first mate, so must be reverse strand
-				$data->{r_count} += $score; 
-			}
-			else {
-				# otherwise this reverse alignment is second mate
-				# or unstranded analysis defaults to forward strand
-				$data->{f_count} += $score;
-			}
-			$score *= $data->{score}; # multiply by chromosome scaling factor
-		}
-		else {
-			# always record one alignment
-			if ($do_strand and $flag & 0x40) {
-				# this alignment is reverse and first mate, so must be reverse strand
-				$data->{r_count} += 1; 
-			}
-			else {
-				# otherwise this reverse alignment is second mate
-				# or unstranded analysis defaults to forward strand
-				$data->{f_count} += 1;
-			}
-			$score = $data->{score}; # probably 1, but may be chromosome scaled
 		}
 		
+		# always record one alignment regardless of multiple hit status
+		if ($do_strand and $flag & 0x40) {
+			# this alignment is reverse and first mate, so must be reverse strand
+			$data->{r_count} += 1; 
+		}
+		else {
+			# otherwise this reverse alignment is second mate
+			# or unstranded analysis defaults to forward strand
+			$data->{f_count} += 1;
+		}
+
 		# record based primarily on the forward read, but pass reverse read at end
 		# for use in smart pairing
 		&$callback($f, $data, $score, $a);
@@ -2459,11 +2470,11 @@ sub pe_callback {
 	}
 	
 	# check data size
-	if (scalar(@{$data->{f}}) > 600_000) {
+	if (scalar(@{$data->{f}}) > 1_000_000) {
 		$data->{fpack} .= pack("$binpack*", splice(@{$data->{f}}, 0, 500_000));
 		$data->{f_offset} += 500_000;
 	}
-	if (scalar(@{$data->{r}}) > 600_000) {
+	if (scalar(@{$data->{r}}) > 1_000_000) {
 		$data->{rpack} .= pack("$binpack*", splice(@{$data->{r}}, 0, 500_000));
 		$data->{r_offset} += 500_000;
 	}
@@ -2839,10 +2850,22 @@ sub se_shift_strand_extend {
 }
 
 sub pe_start {
-	# this essentially just records the forward start position
-	# it ignores sequencing orientation
 	my ($a, $data, $score) = @_;
-	$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	my $flag = $a->flag;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
+	if ($flag & 0x0040) {
+		# first read implies forward orientation
+		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	}
+	elsif ($flag & 0x0080) {
+		# second read implies reverse orientation
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
+	}
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
 }
 
 sub pe_strand_start {
@@ -2851,11 +2874,11 @@ sub pe_strand_start {
 	# we always receive the forward read, never reverse, from pe_callback
 	# therefore the first and second read flag indicates orientation
 	if ($flag & 0x0040) {
-		# first read, forward
+		# first read implies forward orientation
 		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
 	}
 	elsif ($flag & 0x0080) {
-		# second read, reverse
+		# second read implies reverse orientation
 		my $pos = int(($a->pos + $a->isize) / $bin_size);
 		$data->{r}->[$pos - $data->{r_offset}] += $score;
 	}
@@ -3051,6 +3074,45 @@ sub smart_stranded_pe {
 	}
 }
 
+sub pe_ends {
+	my ($a, $data, $score) = @_;
+	# we always receive the forward read, never reverse, from pe_callback
+	
+	# first position
+	$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	
+	# second position
+	my $pos = int(($a->pos + $a->isize) / $bin_size);
+	$data->{f}->[$pos - $data->{f_offset}] += $score;
+}
+
+sub pe_strand_ends {
+	my ($a, $data, $score) = @_;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
+	
+	# calculate both positions
+	my $flag = $a->flag;
+	if ($flag & 0x0040) {
+		# first read implies forward orientation
+		# first position is forward
+		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+		# second position is reverse
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{r}->[$pos - $data->{r_offset}] += $score;
+	}
+	elsif ($flag & 0x0080) {
+		# second read implies reverse orientation
+		# first position is reverse
+		$data->{r}->[int($a->pos / $bin_size) - $data->{r_offset}] += $score;
+		# second position is forward
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
+	}
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
+}
 
 __END__
 
@@ -3067,7 +3129,7 @@ bam2wig.pl [--options...] E<lt>file.bamE<gt>
 bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   
  Required options:
-  -i --in <filename.bam>           repeat if multiple bams, or comma-delimited list
+  -i --in <filename.bam>        repeat if multiple bams, or comma-delimited list
  
  Reporting options (pick one):
   -s --start                    record at 5' position
@@ -3076,6 +3138,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -e --extend                   extend alignment (record predicted fragment)
   --cspan                       record a span centered on midpoint
   --smartcov                    record paired coverage without overlaps, splices
+  --ends                        record paired endpoints
   --coverage                    raw alignment coverage
  
  Alignment reporting options:
@@ -3088,15 +3151,17 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -P --fastpe                   process paired-end alignments, only F are checked
   --minsize <integer>           minimum allowed insertion size (30)
   --maxsize <integer>           maximum allowed insertion size (600)
+  --first                       only process paired first read (0x40) as single-end
+  --second                      only process paired second read (0x80) as single-end
   
  Alignment filtering options:
   -K --chrskip <regex>          regular expression to skip chromosomes
   -B --blacklist <file>         interval file of regions to skip (bed, gff, txt)
   -q --qual <integer>           minimum mapping quality (0)          
-  -S --nosecondary              ignore secondary alignments (false)
-  -D --noduplicate              ignore marked duplicate alignments (false)
-  -U --nosupplementary          ignore supplementary alignments (false)
-  --intron <integer>            maximum allowed intron size in bp (none)
+  -S --nosecondary              ignore secondary (0x100) alignments (false)
+  -D --noduplicate              ignore duplicate (0x400) alignments (false)
+  -U --nosupplementary          ignore supplementary (0x800) alignments (false)
+  --intron <integer>            maximum allowed gap (intron) size in bp (none)
   
   Shift options:
   -I --shift                    shift reads in the 3' direction
@@ -3118,17 +3183,18 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   --chrnorm <float>             use chromosome-specific normalization factor
   --chrapply <regex>            regular expression to apply chromosome-specific factor
  
- Output options:
-  -o --out <filename>           output file name, default is bam file basename
-  -b --bw                       convert to bigWig format
-  --bin <integer>               bin size for span or extend mode (10)
-  --bwapp /path/to/wigToBigWig  path to external converter
-  -z --gz                       gzip compress output
-  
  Wig format:
+  --bin <integer>               bin size for span or extend mode (10)
   --bdg                         bedGraph, default for span and extend at bin 1
   --fix                         fixedStep, default for bin > 1
   --var                         varStep, default for start, mid
+  --nozero                      do not write zero score intervals in bedGraph
+  
+ Output options:
+  -o --out <filename>           output file name, default is bam file basename
+  -b --bw                       convert to bigWig format (supports bdg, fix, var)
+  --bwapp /path/to/wigToBigWig  path to external converter (default searches \$PATH)
+  -z --gz                       gzip compress text output 
   
  General options:
   -c --cpu <integer>            number of parallel processes (4)
@@ -3189,6 +3255,14 @@ The span is defined by the extension value.
 
 Smart alignment coverage of paired-end alignments without 
 double-counting overlaps or recording gaps (intron splices). 
+
+=item --ends
+
+Record both endpoints of paired-end fragments, i.e. the outermost 
+or 5' ends of properly paired fragments. This may be useful with 
+ATAC-Seq, Cut&Run-Seq, or other cleavage experiments where you want 
+to record the locations of cutting yet retain the ability to filter 
+paired-end fragment sizes.
 
 =item --coverage
 
@@ -3260,6 +3334,18 @@ Default is 30 bp.
 
 Specify the maximum paired-end fragment size in bp to accept for recording. 
 Default is 600 bp.
+
+=item --first
+
+Take only the first read of a pair, indicated by flag 0x40, and record as 
+a single-end alignment. No test of insert size or proper pair status is 
+made.
+
+=item --second
+
+Take only the second read of a pair, indicated by flag 0x80, and record as 
+a single-end alignment. No test of insert size or proper pair status is 
+made.
 
 =back
 
@@ -3450,15 +3536,9 @@ the X chromosome only.
 
 =back
 
-=head2 Output Options
+=head2 Wig format
 
 =over 4
-
-=item --out E<lt>filenameE<gt>
-
-Specify the output base filename. An appropriate extension will be 
-added automatically. By default it uses the base name of the 
-input file.
 
 =item --bin E<lt>integerE<gt>
 
@@ -3466,29 +3546,6 @@ Specify the bin size in bp for the output wig file. In general, specifying
 a larger bin size will decrease the run time and memory requirements in 
 exchange for loss of resolution. The default for span, center span, or 
 extend mode is 10 bp; all other modes is 1 bp. 
-
-=item --bw
-
-Specify whether or not the wig file should be further converted into 
-an indexed, compressed, binary BigWig file. The default is false.
-
-=item --bwapp /path/to/wigToBigWig
-
-Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
-utility. The application path may be set in the F<.biotoolbox.cfg> file 
-or found in the default executable path, which makes this option 
-unnecessary. 
-
-=item --gz
-
-Specify whether (or not) the output file should be compressed with 
-gzip. Disable with --nogz.
-
-=back
-
-=head2 Wig format
-
-=over 4
 
 =item --bdg
 
@@ -3504,6 +3561,40 @@ default format for coverage mode of operation.
 
 Specify that the output wig format is in variableStep wig format. This is 
 the default format for start and midpoint modes of operation.
+
+=item --nozero
+
+When writing bedGraph format, skip (do not write) intervals with a value of 
+zero. Does not apply to fixedStep or variableStep formats.
+
+=back
+
+=head2 Output Options
+
+=over 4
+
+=item --out E<lt>filenameE<gt>
+
+Specify the output base filename. An appropriate extension will be 
+added automatically. By default it uses the base name of the 
+input file.
+
+=item --bw
+
+Specify whether or not the wig file should be further converted into 
+an indexed, compressed, binary BigWig file. The default is false.
+
+=item --bwapp /path/to/wigToBigWig
+
+Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
+utility. The application path may be set in the F<.biotoolbox.cfg> file 
+or found in the default environment C<$PATH>, which makes this option 
+mostly unnecessary. 
+
+=item --gz
+
+Specify whether (or not) the output text file should be compressed with 
+gzip. Disable with C<--nogz>. Does not apply to bigWig format.
 
 =back
 

@@ -419,7 +419,7 @@ manipulate_wig.pl [options] -i <file1.wig> -o <file1.out.wig>
   Manipulation functions (in order of execution):
   -u --null                 Convert null, NA, N/A, NaN, inf values to 0
   -d --delog [2|10]         Delog values of given base 
-  -a --abs                  Convert to the absolute value 
+  -b --abs                  Convert to the absolute value 
   -m --mult <float>         Multiply score by the given value
   -a --add <float>          Add the given value to the score
   -l --log [2|10]           Convert to log2 or log10. 

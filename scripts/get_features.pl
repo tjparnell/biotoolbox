@@ -13,7 +13,7 @@ use Bio::ToolBox::GeneTools qw(
 	:transcript
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -56,9 +56,11 @@ my (
 	$print_version,
 );
 my @features;
-my @include_tags;
+my @output_tags;
 my @exclude_tags;
+my @include_tags;
 my %exclude_tag2value;
+my %include_tag2value;
 
 # Command line options
 GetOptions( 
@@ -71,8 +73,9 @@ GetOptions(
 	'b|start=i'   => \$start_adj, # start coordinate adjustment
 	'e|stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'p|pos=s'     => \$position, # relative position to adjust coordinates
-	't|tag=s'     => \@include_tags, # attributes to include
+	't|tag=s'     => \@output_tags, # attributes to include in output
 	'x|exclude=s' => \@exclude_tags, # attribute and keys to exclude
+	'n|include=s' => \@include_tags, # attribute and keys to include
 	'tsl=s'       => \$tsl, # filter on transcript support level
 	'gencode!'    => \$gencode, # filter on gencode basic tag
 	'biotype=s'   => \$tbiotype, # filter on transcript biotype
@@ -228,16 +231,30 @@ sub check_requirements {
 		$position = '53';
 	}
 	
-	# check include tags
-	if (@include_tags and scalar(@include_tags) == 1 and $include_tags[0] =~ /,/) {
-		@include_tags = split /,/, shift @include_tags;
+	# check tags to include output
+	if (@output_tags and scalar(@output_tags) == 1 and $output_tags[0] =~ /,/) {
+		@output_tags = split /,/, shift @output_tags;
 	}
 	
 	# exclude tags
 	if (@exclude_tags) {
 		foreach (@exclude_tags) {
 			my ($k, $v) = split /[,=]/, $_;
+			unless (defined $k and defined $v) {
+				die " exclude tags must be a \"key=value\" pair!\n";
+			}
 			$exclude_tag2value{$k} = $v;
+		}
+	}
+	
+	# include tags
+	if (@include_tags) {
+		foreach (@include_tags) {
+			my ($k, $v) = split /[,=]/, $_;
+			unless (defined $k and defined $v) {
+				die " include tags must be a \"key=value\" pair!\n";
+			}
+			$include_tag2value{$k} = $v;
 		}
 	}
 	
@@ -346,13 +363,32 @@ sub filter_features {
 	if (%exclude_tag2value) {
 		foreach my $k (keys %exclude_tag2value) {
 			my $check = $exclude_tag2value{$k};
-			print " Filtering tag $k for $check...\n";
+			print " Filtering out tag $k => $check...\n";
 			my @unwanted;
 			$Data->iterate( sub {
 				my $row = shift;
 				my ($v) = $row->seqfeature(1)->get_tag_values($k);
 				if ($v =~ /$check/i) {
 					# the tag matches, so discard
+					push @unwanted, $row->row_index;
+				}
+			});
+			if (@unwanted) {
+				$Data->delete_row(@unwanted);
+			}
+		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
+	}
+	if (%include_tag2value) {
+		foreach my $k (keys %include_tag2value) {
+			my $check = $include_tag2value{$k};
+			print " Filtering for tag $k => $check...\n";
+			my @unwanted;
+			$Data->iterate( sub {
+				my $row = shift;
+				my ($v) = $row->seqfeature(1)->get_tag_values($k);
+				if ($v !~ /$check/i) {
+					# the tag doesn't match, so discard
 					push @unwanted, $row->row_index;
 				}
 			});
@@ -674,8 +710,8 @@ sub export_to_txt {
 	}
 	
 	# collect attribute tags, this does not recurse
-	if (@include_tags) {
-		foreach my $t (@include_tags) {
+	if (@output_tags) {
+		foreach my $t (@output_tags) {
 			my $i = $Data->add_column($t);
 			$Data->iterate( sub {
 				my $row = shift;
@@ -948,7 +984,8 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   -l --list <filename>          file of feature IDs to keep
   -K --chrskip <regex>          skip features from certain chromosomes
   -x --exclude <tag=value>      exclude features with specific attribute value
-  --biotype <regex>             include only specific biotype
+  -n --include <tag=value>      include features with specific attribute value
+  --biotype <regex>             include only specific transcript biotype
   --tsl [best|best1|best2|      specify minimum transcript support level 
          best3|best4|best5|       primarily Ensembl annotation 
          1|2|3|4|5|NA]  
@@ -1048,9 +1085,19 @@ properly escaped on the command line. Examples might be
 =item --exclude E<lt>tag=valueE<gt>
 
 Provide a GFF/GTF attribute tag on which to filter out the features 
-matching the indicated value. For example, to filter on protein 
+matching the indicated value. For example, to filter out protein 
 coding genes using C<gene_biotype>, specify "gene_biotype=protein_coding". 
+The value is checked by regular expression and can be specified as such.
 This filter does not descend into subfeatures. More than one exclusion 
+tag may be specified with multiple options or a comma-delimited list. 
+
+=item --include E<lt>tag=valueE<gt>
+
+Provide a GFF/GTF attribute tag on which to filter for the features 
+matching the indicated value. For example, to filter for protein 
+coding genes using C<gene_biotype>, specify "gene_biotype=protein_coding". 
+The value is checked by regular expression and can be specified as such.
+This filter does not descend into subfeatures. More than one inclusion 
 tag may be specified with multiple options or a comma-delimited list. 
 
 =item --biotype E<lt>regex<gt> 
