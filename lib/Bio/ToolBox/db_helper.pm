@@ -2529,8 +2529,8 @@ sub _load_helper_module {
 	my $class = shift;
 	my $success = 0;
 	eval {
-		load $class; # using Module::Load to dynamically load modules
-		$class->import; # must be done particularly for my modules
+		# using Module::Load to dynamically load modules and import default functions
+		autoload $class; 
 		$success = 1;
 	};
 	return $success;
