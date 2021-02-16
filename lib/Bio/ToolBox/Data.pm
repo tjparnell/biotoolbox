@@ -1559,12 +1559,7 @@ sub collapse_gene_transcripts {
 	}
 	
 	# load module
-	my $class = "Bio::ToolBox::GeneTools";
-	eval {load $class, qw(collapse_transcripts)};
-	if ($@) {
-		carp "unable to load $class! cannot collapse transcripts!";
-		return;
-	}
+	load Bio::ToolBox::GeneTools, qw(collapse_transcripts);
 	
 	# collapse the transcripts
 	my $success = 0;
@@ -1608,12 +1603,8 @@ sub add_transcript_length {
 	}
 	
 	# load module
-	eval {load "Bio::ToolBox::GeneTools", qw(get_transcript_length get_transcript_cds_length
-		get_transcript_5p_utr_length get_transcript_3p_utr_length)};
-	if ($@) {
-		carp "unable to load Bio::ToolBox::GeneTools! cannot collapse transcripts!";
-		return;
-	}
+	load Bio::ToolBox::GeneTools, qw(get_transcript_length get_transcript_cds_length
+		get_transcript_5p_utr_length get_transcript_3p_utr_length);
 	
 	# determine name and calculation method
 	my $length_calculator;
@@ -2001,11 +1992,7 @@ sub reload_children {
 	
 	# prepare Stream
 	my $class = "Bio::ToolBox::Data::Stream";
-	eval {load $class};
-	if ($@) {
-		carp "unable to load $class! can't reload children!";
-		return;
-	}
+	load $class;
 	
 	# open first stream
 	my $first = shift @files;
