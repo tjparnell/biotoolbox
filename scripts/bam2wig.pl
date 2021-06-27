@@ -8,7 +8,7 @@ use Pod::Usage;
 use File::Spec;
 use File::Temp;
 use List::Util qw(sum0);
-use List::MoreUtils qw(natatime);
+use List::MoreUtils qw(any natatime);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	low_level_bam_coverage
@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.68';
+my $VERSION = '1.69';
 	
 	
 
@@ -1579,6 +1579,12 @@ sub process_alignments {
 			}
 		}
 		
+		# sanity check of totals to avoid division by 0
+		if (any {$_ == 0} @totals) {
+			die sprintf(" One or more bam files generated zero alignment counts!\n Counts: %s\n",
+				join(',', @totals));
+		}
+		
 		# merging multiple files
 		if (scalar(@sams) > 1) {
 			print " Merging temporary files from each bam\n" if (scalar(@sams) > 1);
@@ -1727,6 +1733,12 @@ sub parallel_process_alignments {
 				$seq_totals{$seq_id}{$strand} += $count;
 				$files{$seq_id}{$strand}{$samid} = $file;
 			}
+		}
+		
+		# sanity check of totals to avoid division by 0
+		if (any {$_ == 0} @totals) {
+			die sprintf(" One or more bam files generated zero alignment counts!\n Counts: %s\n",
+				join(',', @totals));
 		}
 		
 		# merging multiple files
