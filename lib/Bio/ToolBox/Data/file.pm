@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.68';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -581,7 +581,7 @@ sub write_file {
 	elsif ($extension =~ /txt/i) {
 		# plain old text file, sounds good to me
 		# make sure headers are enabled
-		$self->{'headers'} = 1;
+		$self->{'headers'} = 1 unless $self->{'headers'} == -1; # original noheader
 	}
 	elsif (not $extension) {
 		# no extension was available
