@@ -2191,7 +2191,7 @@ sub get_chromosome_list {
 		foreach my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get chromosome size
 			my $length = $db->length($chr);
@@ -2214,7 +2214,7 @@ sub get_chromosome_list {
 			my $length = $db->target_len($tid);
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# store
 			push @chrom_lengths, [ $chr, $length ];
@@ -2225,7 +2225,7 @@ sub get_chromosome_list {
 	elsif ($type eq 'Bio::DB::HTS::Faidx') {
 		for my $chr ($db->get_all_sequence_ids) {
 			# check for excluded
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get length and store it
 			my $length = $db->length($chr);
@@ -2238,7 +2238,7 @@ sub get_chromosome_list {
 		for my $chr ($db->get_all_ids) {
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get chromosome size
 			my $seq = $db->get_Seq_by_id($chr);
@@ -2254,7 +2254,7 @@ sub get_chromosome_list {
 		foreach my $chr ($db->seq_ids) {
 		
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 		
 			# generate a segment representing the chromosome
 			# due to fuzzy name matching, we may get more than one back
