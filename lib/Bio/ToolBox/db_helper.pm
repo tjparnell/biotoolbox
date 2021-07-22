@@ -837,7 +837,7 @@ use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
 use Module::Load; # for dynamic loading during runtime
-use List::Util qw(min max sum0);
+use List::Util qw(min max sum0 uniq);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
@@ -1319,14 +1319,14 @@ sub get_dataset_list {
 			
 			# get the appropriate tags
 			foreach my $attribute (keys %{ $metadata->{$file} } ) {
-				if ($attribute =~ m/^primary_tag|method$/i) {
-					$primary = $metadata->{$file}{$attribute};
-				}
-				elsif ($attribute =~ m/^type/i) {
+				if ($attribute =~ m/^type/i) {
 					$type = $metadata->{$file}{$attribute};
 				}
-				elsif ($attribute =~ m/^display_name/i) {
+				elsif ($attribute =~ m/name/i) {
 					$name = $metadata->{$file}{$attribute};
+				}
+				elsif ($attribute =~ m/^primary_tag|method$/i) {
+					$primary = $metadata->{$file}{$attribute};
 				}
 			}
 				
@@ -1335,7 +1335,8 @@ sub get_dataset_list {
 		}
 		
 		# sort the types in alphabetical order
-		@types = sort {$a cmp $b} @types;
+		# and discard duplicate types - which may occur with stranded entries
+		@types = uniq(sort {$a cmp $b} @types);
 	}
 	
 	# some other database
