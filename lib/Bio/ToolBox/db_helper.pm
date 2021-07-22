@@ -2436,7 +2436,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak " Bam support is not enabled! " . 
-					"Is Bio::DB::Sam installed?\n";
+					"Is Bio::DB::HTS or Bio::DB::Sam installed?\n";
 			}
 		}
 		
