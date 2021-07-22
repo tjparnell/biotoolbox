@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.68';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -2226,6 +2226,13 @@ sub bed_string {
 		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
 	}
+	if ($start > $stop) {
+		# reversed coordinates? old school way of setting reverse strand
+		my $s  = $start;
+		$start = $stop;
+		$stop  = $s;
+		$args{strand} = -1; # this will override any user provided data?
+	}
 	$start -= 1; # 0-based coordinates
 	my $string = "$chr\t$start\t$stop";
 	
@@ -2269,6 +2276,13 @@ sub gff_string {
 	if ($chr eq '.' or not CORE::length($chr) or $start eq '.' or not CORE::length($start)) {
 		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
+	}
+	if ($start > $stop) {
+		# reversed coordinates? old school way of setting reverse strand
+		my $s  = $start;
+		$start = $stop;
+		$stop  = $s;
+		$args{strand} = -1; # this will override any user provided data?
 	}
 	my $strand;
 	if (exists $args{strand} and defined $args{strand}) {
