@@ -929,6 +929,9 @@ sub open_db_connection {
 	# skip parsed databases
 	return if $database =~ /^Parsed:/; # we don't open parsed annotation files
 	
+	# remove file prefix, just in case
+	$database =~ s/^file://;
+	
 	
 	### Attempt to open the database
 	# we go through a series of checks to determine if it is remote, local, 
@@ -1023,14 +1026,8 @@ sub open_db_connection {
 	
 	}
 	
-	# check for a known file type
-	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig|cram/i) {
-		
-		# remove prefix, just in case
-		$database =~ s/^file://;
-		
-		# first check that it exists
-		if (-e $database) {
+	# a local existing file
+	elsif (-f $database) {
 		
 			# a Bam database
 			if ($database =~ /\.bam$/i) {
@@ -1105,7 +1102,7 @@ sub open_db_connection {
 			}
 			
 			# a Fasta File
-			elsif ($database =~ /\.fa(?:sta)?$/i) {
+			elsif ($database =~ /\.fa(?:sta)?(?:\.gz)?$/i) {
 				# first try a modern fai indexed adapter
 				_load_bam_helper_module() unless $BAM_OK;
 				if ($BAM_OK) {
@@ -1174,15 +1171,8 @@ sub open_db_connection {
 			
 			# something unrecognized?
 			else {
-				$error .= " ERROR! Cannot identify database type for $database!\n";
+				$error .= " ERROR! Cannot identify database type based on extension for $database!\n";
 			}
-		}
-		
-		# file does not exist or can be read
-		else {
-			# file does not exist
-			$error = " ERROR: file '$database' does not exist!\n";
-		}
 	}
 	
 	# a directory, presumably of bigwig files
@@ -1220,13 +1210,6 @@ sub open_db_connection {
 			}
 		}
 	}
-	
-	# unrecognized real file
-	elsif (-e $database) {
-		# file exists, I just don't recognize the extension
-		$error = " File '$database' type and/or extension is not recognized\n";
-	}
-	
 	
 	# otherwise assume the name of a SeqFeature::Store database in the configuration
 	else {
