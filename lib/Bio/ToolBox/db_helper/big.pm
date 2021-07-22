@@ -7,7 +7,7 @@ use Carp;
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Big;
-our $VERSION = '1.66';
+our $VERSION = '1.69';
 
 # Initialize CURL buffers
 BEGIN {
@@ -723,11 +723,11 @@ sub new {
 		my $name = $f;
 		$name =~ s/\.(?:bw|bigwig)$//i; # remove extension for the name
 		my ($type, $strand);
-		if ($f =~ /^(.+)[\._](?:f|for|forward|plus|\+)\.(?:bw|bigwig)$/i) {
+		if ($name =~ /^(.+)[\._](?:f|for|forward|plus|\+)$/i) {
 			$type = $1;
 			$strand = 1;
 		}
-		elsif ($f =~ /^(.+)[\._](?:r|rev|reverse|minus|\-)\.(?:bw|bigwig)$/i) {	
+		elsif ($name =~ /^(.+)[\._](?:r|rev|reverse|minus|\-)$/i) {	
 			$type = $1;
 			$strand = -1;
 		}
