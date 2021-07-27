@@ -66,9 +66,21 @@ may be combined, for example two stranded bigWig files, with an ampersand.
 This function will safely remove the prefix, directories, and everything after 
 the first period. 
 
+=item sane_chromo_sort
 
+    my @chromo = $db->seq_ids;
+    my @sorted = sane_chromo_sort(@chromo);
 
+This subroutine will take a list of chromosome or sequence identifiers and sort
+them into a reasonably sane order: standard numeric identifiers first (numeric
+order), sex chromosomes (alphabetical), mitochondrial, names with text and
+numbers (text first alphabetically, then numbers numerically) for contigs and
+such, and finally anything else (aciibetically). Any 'chr' prefix is ignored.
+Roman numerals are properly handled numerically. 
 
+The provided list may be a list of SCALAR values (chromosome names) or ARRAY 
+references, with the first element assumed to be the name, e.g. 
+C<[$name, $length]>. 
 
 =back
 
@@ -78,7 +90,6 @@ use strict;
 use Carp;
 use File::Spec;
 require Exporter;
-use Bio::ToolBox::Data::file;
 
 
 ### Variables
@@ -89,6 +100,7 @@ our @EXPORT = qw(
 	format_with_commas
 	ask_user_for_index
 	simplify_dataset_name
+	sane_chromo_sort
 );
 our $DATA_COLNAMES  = undef;
 our $DATA_FILENAME  = undef;
@@ -256,6 +268,107 @@ sub simplify_dataset_name {
 }
 
 
+sub sane_chromo_sort {
+	my @chroms = @_;
+	return unless scalar @chroms;
+	
+	# let's try and sort in some kind of rational order
+	my @numeric;
+	my @romanic;
+	my @mixed;
+	my @alphic;
+	my @sex;
+	my @mito;
+	foreach my $c (@chroms) {
+		
+		my $name;
+		if (ref($c) eq 'ARRAY') {
+			$name = $c->[0];
+		}
+		else {
+			$name = $c;
+		}
+		
+		# identify the type of chromosome name to sort
+		if ($name =~ /^(?:chr)?([wxyz])$/i) {
+			# sex chromosomes
+			push @sex, [$1, $c];
+		}
+		elsif ($name =~ /^(?:chr)?(?:m|mt|mito)(?:dna)?$/i) {
+			# mitochondrial
+			push @mito, [$name, $c];
+		}
+		elsif ($name =~ /^(?:chr)?(\d+)$/i) {
+			# standard numeric chromosome
+			push @numeric, [$1, $c];
+		} 
+		elsif ($name =~ /^(?:chr)?([IVX]+)$/) {
+			# Roman numerals - silly Saccharomyces cerevisiae
+			push @romanic, [$1, $c];
+		}
+		elsif ($name =~ /^([a-zA-Z_\-\.]+)(\d+)/) {
+			# presumed contigs and such?
+			push @mixed, [$1, $2, $name, $c];
+		}
+		else {
+			# everything else
+			push @alphic, [$name, $c];
+		}
+	}
+	
+	# check romanic 
+	if (scalar @romanic) {
+		# looks like we have romanic chromosomes
+		if (scalar @sex) {
+			# probably caught up chrX, unlikely WYZ
+			my @x = grep { $sex[$_]->[0] =~ m/^X$/ } (0 .. $#sex);
+			foreach (reverse @x) {
+				# I'm assuming and hoping there's only one chrX found
+				# but reverse the list, just in case - assuming grep returns in order
+				push @romanic, ( splice(@sex, $_, 1) );
+			}
+		}
+		if (scalar @numeric) {
+			# well, shoot, this is weird, mix of both numeric and romanic chromosomes?
+			# just merge romanic with alphic and hope for the best
+			push @alphic, @romanic;
+		}
+		else {
+			# convert the romanic to numeric 
+			while (@romanic) {
+				my $r = shift @romanic;
+				my $c = $r->[0];
+				$c =~ s/IV/4/;
+				$c =~ s/IX/9/;
+				$c =~ s/V/5/;
+				$c =~ s/I/1/g;
+				my $n = 0;
+				foreach (split q(), $c) {
+					if ($_ eq 'X') {
+						$n += 10;
+					}
+					else {
+						$n += $_;
+					}
+				}
+				push @numeric, [$n, $r->[1]];
+			}
+		}
+	}
+	
+	# sort
+	my @sorted;
+	push @sorted, map { $_->[1] } sort {$a->[0] <=> $b->[0]} @numeric;
+	push @sorted, map { $_->[1] } sort {$a->[0] cmp $b->[0]} @sex;
+	push @sorted, map { $_->[1] } sort {$a->[0] cmp $b->[0]} @mito;
+	push @sorted, map { $_->[3] } sort {
+		$a->[0] cmp $b->[0] or 
+		$a->[1] <=> $b->[1] or 
+		$a->[2] cmp $b->[2]
+	} @mixed; 
+	push @sorted, map { $_->[1] } sort { $a->[0] cmp $b->[0] } @alphic;
+	
+	return @sorted;
 }
 
 
