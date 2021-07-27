@@ -12,7 +12,7 @@ use Bio::ToolBox::big_helper qw(
 	open_bigwig_to_wig_fh
 	generate_chromosome_file
 );
-my $VERSION = 1.67;
+my $VERSION = 1.69;
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -131,7 +131,7 @@ elsif ($infile =~ /(?:bw|bigwig)$/i and -e $infile) {
 	) or die "unable to open input bigWig file '$infile'!\n";
 } 
 elsif (-e $infile) {
-	$infh = Bio::ToolBox->open_file($infile) or 
+	$infh = Bio::ToolBox->read_file($infile) or 
 		die "can't open $infile! $!";
 }
 else {

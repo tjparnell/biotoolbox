@@ -9,17 +9,14 @@ use File::Spec;
 use File::Temp;
 use List::Util qw(sum0);
 use List::MoreUtils qw(any natatime);
+use Bio::ToolBox;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	low_level_bam_coverage
 	low_level_bam_fetch
 	$BAM_ADAPTER
 );
-use Bio::ToolBox::utility qw(
-	format_with_commas
-	open_to_read_fh 
-	open_to_write_fh 
-); 
+use Bio::ToolBox::utility qw(format_with_commas); 
 use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh 
 	generate_chromosome_file
@@ -184,11 +181,8 @@ if ($help) {
 # Print version
 if ($print_version) {
 	print " Biotoolbox script bam2wig.pl, version $VERSION\n";
-	eval {
-		require Bio::ToolBox;
-		my $v = Bio::ToolBox->VERSION;
-		print " Biotoolbox package version $v\n";
-	};
+	my $v = Bio::ToolBox->VERSION;
+	print " Biotoolbox package version $v\n";
 	exit;
 }
 
@@ -875,7 +869,6 @@ sub check_defaults {
 
 sub process_black_list {
 	if ($black_list and -e $black_list) {
-		eval {require 'Bio::ToolBox::Data'};
 		my $i = 0;
 		eval {require Set::IntervalTree; $i = 1;};
 		unless ($i) {
@@ -884,7 +877,7 @@ sub process_black_list {
 			return;
 		}
 		my %black_list_hash = map { $_ => [] } @seq_list;
-		my $Data = Bio::ToolBox::Data->new(file => $black_list) or 
+		my $Data = Bio::ToolBox->load_file($black_list) or 
 			die "unable to read black list file '$black_list'\n";
 		$Data->iterate( sub {
 			my $row = shift;
@@ -1198,13 +1191,6 @@ sub write_model_file {
 	my ($value, $f_profile, $r_profile, $shifted_profile, $r_valuess, 
 		$regions, $region_shifts, $region_bestr) = @_;
 	
-	# check Data
-	my $data_good;
-	eval {use Bio::ToolBox::Data; $data_good = 1;};
-	unless ($data_good) {
-		warn "unable to write model files! Cannot load Data library!\n";
-		return;
-	}
 	
 	### Profile model
 	# Prepare the centered profiles from the raw profiles
@@ -1243,7 +1229,7 @@ sub write_model_file {
 	
 	
 	# Prepare the data structure
-	my $profile = Bio::ToolBox::Data->new(
+	my $profile = Bio::ToolBox->new_data(
 		feature     => 'shift_model_profile',
 		datasets    => ['Start', "$outfile\_F", "$outfile\_R", "$outfile\_shift"],
 	);
@@ -1277,7 +1263,7 @@ sub write_model_file {
 	
 	### R squared data
 	# prepare the data structure
-	my $Data = Bio::ToolBox::Data->new(
+	my $Data = Bio::ToolBox->new_data(
 		feature   => 'Shift_correlations',
 		datasets  => ['Shift', "$outfile\_R"],
 	);
@@ -1307,7 +1293,7 @@ sub write_model_file {
 	
 	### Write regions
 	undef $Data;
-	$Data = Bio::ToolBox::Data->new(
+	$Data = Bio::ToolBox->new_data(
 		feature  => 'Correlated regions',
 		datasets => ['Region', 'Shift', 'BestCorrelation']
 	);
@@ -1360,7 +1346,7 @@ sub open_wig_file {
 	my $do_gz = ($gz and $do_bw) ? 1 : 0; 
 		# using the do_bw value because that tells us if it's a temp file or not
 	$name .= '.gz' if ($do_gz and $name !~ /\.gz$/i);
-	my $fh = open_to_write_fh($name, $do_gz) or 
+	my $fh = Bio::ToolBox->write_file($name, $do_gz) or 
 		die " unable to open output wig file '$name'!\n";
 		
 	# finished
@@ -1935,7 +1921,7 @@ sub process_alignments_on_chromosome {
 sub write_bin_file {
 	my ($data, $filename) = @_;
 		# note that $data is a reference
-	my $fh = open_to_write_fh($filename) or 
+	my $fh = Bio::ToolBox->write_file($filename) or 
 		die " unable to write temporary file '$filename'!\n";
 	$fh->binmode;
 	$fh->print($$data);
@@ -1951,7 +1937,7 @@ sub merge_bin_files {
 	# open filehandles to each binary file
 	my %fhs;
 	foreach my $samid (keys %$files) {
-		my $fh = open_to_read_fh($files->{$samid}) or 
+		my $fh = Bio::ToolBox->read_file($files->{$samid}) or 
 			die sprintf " unable to read temporary file %s!\n", $files->{$samid};
 		$fh->binmode;
 		$fhs{$samid} = $fh;
@@ -2024,7 +2010,7 @@ sub normalize_bin_file {
 	my $long_window = 10 * $window;
 	
 	# open file
-	my $fh = open_to_read_fh($file) or 
+	my $fh = Bio::ToolBox->read_file($file) or 
 		die " unable to read temporary $file!\n";
 	$fh->binmode;
 	
@@ -2272,7 +2258,7 @@ sub merge_wig_files {
 	my ($filename1, $fh) = open_wig_file($ofile, 1);
 	while (@files) {
 		my $file = shift @files;
-		my $in = open_to_read_fh($file); 
+		my $in = Bio::ToolBox->read_file($file); 
 		unless ($in) {
 			warn "one or more sub-process forks failed! Check your parameters and input file.\nAttempting to clean up\n";
 			foreach (@files) {unlink $_;}

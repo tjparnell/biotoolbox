@@ -6,14 +6,11 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Net::FTP;
-use Bio::ToolBox::utility qw(
-	format_with_commas
-	open_to_read_fh
-	open_to_write_fh
-);
+use Bio::ToolBox;
+use Bio::ToolBox::utility;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::GeneTools qw(gtf_string);
-my $VERSION = '1.60';
+my $VERSION = '1.69';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -94,11 +91,8 @@ if ($help) {
 # Print version
 if ($print_version) {
 	print " Biotoolbox script ucsc_table2gff3.pl, version $VERSION\n";
-	eval {
-		require Bio::ToolBox;
-		my $v = Bio::ToolBox->VERSION;
-		print " Biotoolbox package version $v\n";
-	};
+	my $v = Bio::ToolBox->VERSION;
+	print " Biotoolbox package version $v\n";
 	exit;
 }
 
@@ -410,7 +404,7 @@ sub open_output_gff {
 	}
 	
 	# open file handle
-	my $fh = open_to_write_fh($outfile, $gz) or
+	my $fh = Bio::ToolBox->write_file($outfile, $gz) or
 		die " unable to open file '$outfile' for writing!\n";
 	
 	# print comments
@@ -522,7 +516,7 @@ sub print_chromosomes {
 	my $out_fh = shift;
 	
 	# open the chromosome file
-	my $chromo_fh = open_to_read_fh($chromof) or die 
+	my $chromo_fh = Bio::ToolBox->read_file($chromof) or die 
 		"unable to open specified chromosome file '$chromof'!\n";
 	
 	# convert the chromosomes into GFF features
