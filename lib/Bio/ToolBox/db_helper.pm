@@ -2135,39 +2135,14 @@ sub get_chromosome_list {
 		# it's a hash, so randomly sorted!!!!! Never will be in same order as file!!!!
 		my $chroms = $db->chroms();
 		
-		# let's try and sort in some kind of rational order
-		my @numeric;
-		my @romanic;
-		my @partial;
-		my @alphic;
+		my @list;
 		foreach (values %$chroms) {
 			# check for excluded chromosomes
 			next if (defined $chr_exclude and $_->{name} =~ /$chr_exclude/i);
-			
-			# identify the type of chromosome name to sort
-			if ($_->{name} =~ /^(?:chr)?(\d+)$/i) {
-				# standard numeric chromosome
-				push @numeric, [$1, $_->{name}, $_->{length}];
-			} 
-			elsif ($_->{name} =~ /^(?:chr)?[IVX]+$/) {
-				# silly Saccharomyces cerevisiae Roman numerals
-				# these will be sorted alphabetically
-				push @romanic, [$_->{name}, $_->{length}];
-			}
-			elsif ($_->{name} =~ /(\d+)/) {
-				# presumed contigs and such?
-				push @partial, [$1, $_->{name}, $_->{length}];
-			}
-			else {
-				# sex, mitochondrial, and all other text only
-				push @alphic, [$_->{name}, $_->{length}];
-			}
+			push @list, [$_->{name}, $_->{length}];
 		}
-		push @chrom_lengths, map { [$_->[1], $_->[2]] } sort { $a->[0] <=> $b->[0] } @numeric;
-		push @chrom_lengths, sort { $a->[0] cmp $b->[0] } @romanic; # I hate sorting roman
-		push @chrom_lengths, sort { $b->[1] <=> $a->[1] } @alphic; # sort by decreasing size?
-		push @chrom_lengths, map { [$_->[1], $_->[2]] } # sort by numeric or decreasing size
-			sort { $a->[0] <=> $b->[0] or $b->[2] <=> $a->[2] } @partial;
+		# sort consistently by a sane system
+		@chrom_lengths = sane_chromo_sort(@list);
 	}
 	
 	# UCSC kent Bigfile
