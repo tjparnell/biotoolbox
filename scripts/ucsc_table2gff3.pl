@@ -520,9 +520,7 @@ sub print_chromosomes {
 		"unable to open specified chromosome file '$chromof'!\n";
 	
 	# convert the chromosomes into GFF features
-	# UCSC orders their chromosomes by chromosome length
-	# I would prefer to order by numeric ID if possible
-	my %chromosomes;
+	my @chromosomes;
 	while (my $line = $chromo_fh->getline) {
 		next if ($line =~ /^#/);
 		chomp $line;
@@ -530,39 +528,15 @@ sub print_chromosomes {
 		unless (defined $chr and $end =~ m/^\d+$/) {
 			die " format of chromsome doesn't seem right! Are you sure?\n";
 		}
-		
-		# store the chromosome according to name
-		if ($chr =~ /^chr(\d+)$/i) {
-			$chromosomes{'numeric_chr'}{$1} = "$chr 1 $end";
-		}
-		elsif ($chr =~ /^chr(\w+)$/i) {
-			$chromosomes{'other_chr'}{$1} = "$chr 1 end";
-		}
-		elsif ($chr =~ /(\d+)$/) {
-			$chromosomes{'other_numeric'}{$1} = "$chr 1 end";
-		}
-		else {
-			$chromosomes{'other'}{$chr} = "$chr 1 end";
-		}
+		push @chromosomes, [$chr, $end];
 	}
 	$chromo_fh->close;
 	
 	# print the chromosomes
-	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'numeric_chr'} }) {
-		# numeric chromosomes
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'numeric_chr'}{$key});
-	}
-	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other_chr'} }) {
-		# other chromosomes
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other_chr'}{$key});
-	}
-	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'other_numeric'} }) {
-		# numbered contigs, etc
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other_numeric'}{$key});
-	}
-	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other'} }) {
-		# contigs, etc
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other'}{$key});
+	# UCSC orders their chromosomes by chromosome length
+	# I would prefer to order by ID if possible
+	foreach my $chr (sane_chromo_sort(@chromosomes)) {
+		$out_fh->printf("##sequence-region  %s 1 %d\n", $chr->[0], $chr->[1]);
 	}
 }
 
