@@ -181,7 +181,7 @@ is($Data->value(78,3), 1, 'check last start after reverse sort');
 
 # genomic sort rows
 $Data->gsort_data;
-is($Data->value(1,8), 'Feature2', 'check first name after genomic sort');
+is($Data->value(1,8), 'Feature1', 'check first name after genomic sort');
 is($Data->value(1,3), 1, 'check first start after genomic sort');
 is($Data->value(78,8), 'Feature77', 'check last name after genomic sort');
 is($Data->value(78,3), 58695, 'check last start after genomic sort');
