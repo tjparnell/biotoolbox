@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.68';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -66,40 +66,9 @@ may be combined, for example two stranded bigWig files, with an ampersand.
 This function will safely remove the prefix, directories, and everything after 
 the first period. 
 
-=back
 
-=head1 LEGACY SUBROUTINES
 
-These are additional functions that can be optionally exported. These provide 
-accessibility to the L<Bio::ToolBox::Data::file> functions that might be needed 
-for old scripts that do not implement L<Bio::ToolBox::Data> objects. You normally 
-should not need these. If you import these, be sure to import the ones above 
-if you need those too.
 
-=over 4
-
-=item open_to_read_fh
-
-Wrapper around L<Bio::ToolBox::Data::file/open_to_read_fh>.
-Opens a file as an L<IO::Handle> read only object. Transparently handles gzip 
-and bzip2 compression. 
-
-=item open_to_write_fh
-
-   my $fh = open_to_write_fh($file, $gz, $append);
-
-Wrapper around L<Bio::ToolBox::Data::file/open_to_write_fh>. 
-Opens a file as an L<IO::Handle> write only object. Pass the file name as the option.
-Optionally provide a boolean value if you want the file to be written as a compressed 
-gzip file. Pass another boolean value if you want to append to an existing file; 
-otherwise an existing file with the same name will be overwritten!
-
-=item check_file
-
-Wrapper around the L<Bio::ToolBox::Data::file/check_file> method.
-Checks to see if a file exists. If not, some common missing extensions are appended 
-and then existence is re-checked. If a file is found, the name is returned so that 
-it could be opened. Useful, for example, if you forget the F<.txt> or F<.gz> extensions.
 
 =back
 
@@ -120,11 +89,6 @@ our @EXPORT = qw(
 	format_with_commas
 	ask_user_for_index
 	simplify_dataset_name
-);
-our @EXPORT_OK = qw(
-	open_to_read_fh
-	open_to_write_fh
-	check_file
 );
 our $DATA_COLNAMES  = undef;
 our $DATA_FILENAME  = undef;
@@ -292,17 +256,6 @@ sub simplify_dataset_name {
 }
 
 
-sub open_to_read_fh {
-	return Bio::ToolBox::Data::file->open_to_read_fh(@_);
-}
-
-
-sub open_to_write_fh {
-	return Bio::ToolBox::Data::file->open_to_write_fh(@_);
-}
-
-sub check_file {
-	return Bio::ToolBox::Data::file->check_file(@_);
 }
 
 
