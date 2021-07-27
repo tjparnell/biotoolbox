@@ -1091,7 +1091,7 @@ use Bio::ToolBox::db_helper qw(
 	get_new_genome_list
 	get_db_feature
 );
-use Bio::ToolBox::utility qw(simplify_dataset_name);
+use Bio::ToolBox::utility qw(simplify_dataset_name sane_chromo_sort);
 use Module::Load;
 
 1;
@@ -1869,72 +1869,46 @@ sub gsort_data {
 	}
 	my $chromo_i = $self->chromo_column;
 	my $start_i  = $self->start_column;
+	my $stop_i   = $self->stop_column || $start_i;
 	
-	# Load the data into a temporary hash
-	# The datalines will be put into a hash of hashes: The first key will be 
-	# the chromosome name, the second hash will be the start value.
-	# 
-	# To deal with some chromosomes that don't have numbers (e.g. chrM), we'll
-	# use two separate hashes: one is for numbers, the other for strings
-	# when it comes time to sort, we'll put the numbers first, then strings
-	
-	my %num_datahash;
-	my %str_datahash;
-	for my $row (1 .. $self->last_row) { 
-		
-		my $startvalue = $self->value($row, $start_i);
-		
-		# put the dataline into the appropriate temporary hash
-		if ($self->value($row, $chromo_i) =~ /^(?:chr)?(\d+)$/) {
-			# dealing with a numeric chromosome name
-			# restricting to either chr2 or just 2 but not 2-micron
-			my $chromovalue = $1;
-			while (exists $num_datahash{$chromovalue}{$startvalue}) { 
-				# if another item already exists at this location
-				# add a really small number to bump it up and make it unique
-				$startvalue += 0.001; 
-			}
-			$num_datahash{$chromovalue}{$startvalue} = $self->{data_table}->[$row];
-		} 
-		else {
-			# dealing with a non-numeric chromosome name
-			my $chromovalue = $self->value($row, $chromo_i);
-			# use the entire chromosome name as key
-			while (exists $str_datahash{$chromovalue}{$startvalue}) { 
-				# if another item already exists at this location
-				# add a really small number to bump it up and make it unique
-				$startvalue += 0.001; 
-			}
-			$str_datahash{$chromovalue}{$startvalue} = $self->{data_table}->[$row];
-		}
+	# collect the data by chromosome: start and end
+	my %chrom2row;
+	for my $row (1 .. $self->last_row) {
+		my $c = $self->{data_table}->[$row]->[$chromo_i];
+		$chrom2row{$c} ||= [];
+		push @{ $chrom2row{$c} }, [
+			$self->{data_table}->[$row]->[$start_i], 
+			$self->{data_table}->[$row]->[$stop_i], 
+			$self->{data_table}->[$row]
+		];
 	}
 	
+	# get sane chromosome order
+	my @chroms = sane_chromo_sort(keys %chrom2row); 
 	
-	# Now re-load the data array with sorted data
-	# put the numeric chromosome data back first
-	my $i = 1; # keep track of the row
-	foreach my $chromovalue (sort {$a <=> $b} keys %num_datahash) {
-		# first, numeric sort on increasing chromosome number
-		foreach my $startvalue (
-			sort {$a <=> $b} keys %{ $num_datahash{$chromovalue} } 
-		) {
-			# second, numeric sort on increasing position value
-			$self->{data_table}->[$i] = $num_datahash{$chromovalue}{$startvalue};
-			$i++; # increment for next row
+	# sort the table
+	my @sorted_data;
+	push @sorted_data, $self->{data_table}->[0];
+	if ($self->gff) {
+		# sort by increasing start and decreasing end, i.e. decreasing length
+		# this should mostly handle putting genes/transcripts before exons
+		foreach my $chr (@chroms) {
+			push @sorted_data, 
+				map { $_->[2] }
+				sort { $a->[0] <=> $b->[0] or $b->[1] <=> $a->[1] }
+				@{ $chrom2row{$chr} };
 		}
 	}
-	# next put the string chromosome data back
-	foreach my $chromovalue (sort {$a cmp $b} keys %str_datahash) {
-		# first, ascii sort on increasing chromosome name
-		foreach my $startvalue (
-			sort {$a <=> $b} keys %{ $str_datahash{$chromovalue} } 
-		) {
-			# second, numeric sort on increasing position value
-			$self->{data_table}->[$i] = $str_datahash{$chromovalue}{$startvalue};
-			$i++; # increment for next row
+	else {
+		# sort by increasing start followed by increasing end, i.e. increasing length
+		foreach my $chr (@chroms) {
+			push @sorted_data, 
+				map { $_->[2] }
+				sort { $a->[0] <=> $b->[0] or $a->[1] <=> $b->[1] }
+				@{ $chrom2row{$chr} };
 		}
 	}
-	
+	$self->{data_table} = \@sorted_data;
 	return 1;
 }
 
