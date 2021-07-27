@@ -1150,6 +1150,12 @@ sub add_gff_metadata {
 			$self->gff(2); # hope for the best
 		}
 	}
+	# set format based on version
+	if (not $self->format) {
+		my $v = $self->gff;
+		my $f = $v == 3 ? 'gff3' : $v > 2 ? 'gtf' : 'gff';
+		$self->format($f);
+	}
 	
 	# set the metadata for the each column
 		# some of these may already be defined if there was a 

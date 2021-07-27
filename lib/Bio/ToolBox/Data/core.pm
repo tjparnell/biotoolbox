@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.66';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -1054,16 +1054,6 @@ sub gff {
 	my $self = shift;
 	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.[2|5]|3)$/) {
 		$self->{gff} = $_[0];
-		if ($_[0] eq '2.2' or $_[0] eq '2.5') {
-			$self->format('gtf');
-		}
-		elsif ($_[0] eq '3') {
-			$self->format('gff3');
-		}
-		else {
-			$self->format('gff');
-		}
-		
 	}
 	return $self->{gff};
 }
@@ -1542,6 +1532,11 @@ Returns or sets the short name of bam adapter being used: "sam" or "hts".
 
 Returns or sets the short name of the bigWig and bigBed adapter being 
 used: "ucsc" or "big".
+
+=item format
+
+Returns a text string describing the format of the file contents, such 
+as C<gff3>, C<gtf>, C<bed>, C<genePred>, C<narrowPeak>, etc.
 
 =item gff
 
