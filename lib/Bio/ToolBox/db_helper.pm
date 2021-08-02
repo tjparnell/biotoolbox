@@ -853,10 +853,10 @@ our $BAM_ADAPTER = undef; # preference for which bam adapter to use
 our $BIG_ADAPTER = undef;
 
 # define reusable variables
-our %total_read_number; # for rpm calculations
-our $primary_id_warning; # for out of date primary IDs
-our %OPENED_DB; # cache for some opened Bio::DB databases
-our %DB_METHODS; # cache for database score methods
+my %TOTAL_READ_NUMBER; # for rpm calculations
+my $PRIMARY_ID_WARNING; # for out of date primary IDs
+my %OPENED_DB; # cache for some opened Bio::DB databases
+my %DB_METHODS; # cache for database score methods
 
 # score calculators
 my %SCORE_CALCULATOR_SUB = (
@@ -1713,10 +1713,10 @@ sub check_dataset_for_rpm_support {
 	# this uses the global variable $rpkm_read_sum
 	my $rpm_read_sum;
 	
-	if (exists $total_read_number{$dataset}) {
+	if (exists $TOTAL_READ_NUMBER{$dataset}) {
 		# this dataset has already been summed
 		# no need to do it again
-		$rpm_read_sum = $total_read_number{$dataset};
+		$rpm_read_sum = $TOTAL_READ_NUMBER{$dataset};
 	}
 	
 	elsif ($dataset =~ /\.bam$/) {
@@ -1758,7 +1758,7 @@ sub check_dataset_for_rpm_support {
 	}
 	
 	# return the sum value if we've made it this far
-	$total_read_number{$dataset} = $rpm_read_sum;
+	$TOTAL_READ_NUMBER{$dataset} = $rpm_read_sum;
 	return $rpm_read_sum;
 }
 
@@ -1957,9 +1957,9 @@ sub get_db_feature {
 		}
 		else {
 			# the primary_ids are out of date
-			unless ($primary_id_warning) {
+			unless ($PRIMARY_ID_WARNING) {
 				warn "CAUTION: Some primary IDs in Input file appear to be out of date\n";
-				$primary_id_warning++;
+				$PRIMARY_ID_WARNING++;
 			}
 		}
 	}
