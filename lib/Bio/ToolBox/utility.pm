@@ -150,19 +150,21 @@ sub parse_list {
 sub format_with_commas {
 	# for formatting a number with commas
 	my $number = shift;
-	if ($number =~ /[^\d,\-\.]/) {
-		carp " the string contains characters that can't be parsed\n";
-		return $number;
-	}
 	
-	# check for decimals
-	my ($integers, $decimals);
-	if ($number =~ /^\-?(\d+)\.(\d+)$/) {
-		$integers = $1;
-		$decimals = $2;
+	# check number
+	my ($integers, $decimals, $sign);
+	if ($number =~ /^(\-)?(\d+)\.(\d+)$/) {
+		$sign     = $1;
+		$integers = $2;
+		$decimals = $3;
+	}
+	elsif ($number =~ /^(\-)?(\d+)$/) {
+		$sign     = $1;
+		$integers = $2;
 	}
 	else {
-		$integers = $number;
+		carp " the string contains characters that can't be parsed\n";
+		return $number;
 	}
 	
 	# format
@@ -183,8 +185,9 @@ sub format_with_commas {
 	}
 	
 	# finished
-	my $final = join("", @formatted);
-	$final .= $decimals if defined $decimals;
+	my $final = $sign ? $sign : '';
+	$final .= join("", @formatted);
+	$final .= '.' . $decimals if defined $decimals;
 	return $final;
 }
 
