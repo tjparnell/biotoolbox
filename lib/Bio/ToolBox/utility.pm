@@ -253,16 +253,19 @@ sub simplify_dataset_name {
 			}
 		}
 	}
-	elsif ($dataset =~ m|/|) {
-		# appears to have paths
-		my (undef, undef, $file_name) = File::Spec->splitpath($dataset);
-		$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-		$new_name = $file_name;
-	}
 	else {
-		# strip everything after first period, like above
-		$dataset =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-		$new_name = $dataset;
+		# a single dataset
+		# this could be either a file name or an entry in a BioPerl or BigWigSet database 
+		# remove any possible paths 
+		(undef, undef, $new_name) = File::Spec->splitpath($dataset);
+		
+		# remove any known file extensions
+		$new_name =~ s/\.(?:bw|bam|bb|useq|bigwig|bigbed|g[tf]f3?|cram|wig|bdg|bedgraph)(?:\.gz)?$//i;
+		
+		# remove common non-useful stuff
+		# trying to imagine all sorts of possible things
+		$new_name =~ s/[_\.\-](?:sort|sorted|dedup|dedupe|deduplicated|rmdup|mkdup|markdup|dup|unique|filt|filtered)\b//gi;
+		$new_name =~ s/[_\.\-](?:coverage|rpm|ext\d*|extend\d*|log2fe|log\d+|qvalue|fragment|count|lambda_control|fe|fold.?enrichment|ratio|log\d*ratio)\b//gi;
 	}
 	return $new_name;
 }
