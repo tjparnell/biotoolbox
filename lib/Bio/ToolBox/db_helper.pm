@@ -858,6 +858,82 @@ our $primary_id_warning; # for out of date primary IDs
 our %OPENED_DB; # cache for some opened Bio::DB databases
 our %DB_METHODS; # cache for database score methods
 
+# score calculators
+my %SCORE_CALCULATOR_SUB = (
+	'mean' => sub {
+		my $s = shift;
+		return sum0(@$s)/(scalar(@$s) || 1);
+	},
+	'sum'  => sub {
+		my $s = shift;
+		return sum0(@$s);
+	},
+	'median' => sub {
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return median(@$s);
+	},
+	'min' => sub {
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return min(@$s);
+	},
+	'max' => sub {
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return max(@$s);
+	},
+	'count' => sub {
+		my $s = shift;
+		return scalar(@$s);
+	},
+	'pcount' => sub {
+		my $s = shift;
+		return scalar(@$s);
+	},
+	'ncount' => sub {
+		# Convert names into unique counts
+		my $s = shift;
+		my %name2count;
+		foreach my $n (@$s) { 
+			if (ref($n) eq 'ARRAY') {
+				# this is likely from a ncount indexed hash
+				foreach (@$n) {
+					$name2count{$_} += 1;
+				} 
+			}
+			else {
+				$name2count{$n} += 1;
+			}
+		}
+		return scalar(keys %name2count);
+	},
+	'range' => sub {
+		# the range value is 'min-max'
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return range(@$s);
+	},
+	'stddev' => sub {
+		# we are using the standard deviation of the population, 
+		# since these are the only scores we are considering
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return stddevp(@$s);
+	},
+	'rpm' => sub {
+		confess " The rpm methods have been deprecated due to complexity and " .
+			"the variable way of calculating the value. Collect counts and " . 
+			"calculate your preferred way.\n";
+	},
+	'rpkm' => sub {
+		confess " The rpm methods have been deprecated due to complexity and " .
+			"the variable way of calculating the value. Collect counts and " . 
+			"calculate your preferred way.\n";
+	}
+);
+
+
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw();
@@ -2016,63 +2092,10 @@ sub get_segment_score {
 sub calculate_score {
 	my ($method, $scores) = @_;
 	$scores ||= []; # just in case
-	
-	# calculate a score based on the method
-	if ($method eq 'mean') {
-		return sum0(@$scores)/(scalar(@$scores) || 1);
-	} 
-	elsif ($method eq 'sum') {
-		return sum0(@$scores);
-	}
-	elsif ($method eq 'median') {
-		return '.' unless scalar(@$scores);
-		return median(@$scores);
-	}
-	elsif ($method eq 'min') {
-		return '.' unless scalar(@$scores);
-		return min(@$scores);
-	}
-	elsif ($method eq 'max') {
-		return '.' unless scalar(@$scores);
-		return max(@$scores);
-	}
-	elsif ($method eq 'count' or $method eq 'pcount') {
-		return scalar(@$scores);
-	}
-	elsif ($method eq 'ncount') {
-		# Convert names into unique counts
-		my %name2count;
-		foreach my $s (@$scores) { 
-			if (ref($s) eq 'ARRAY') {
-				# this is likely from a ncount indexed hash
-				foreach (@$s) {
-					$name2count{$_} += 1;
-				} 
-			}
-			else {
-				$name2count{$s} += 1;
-			}
-		}
-		return scalar(keys %name2count);
-	}
-	elsif ($method eq 'range') {
-		# the range value is 'min-max'
-		return '.' unless scalar(@$scores);
-		return range(@$scores);
-	}
-	elsif ($method eq 'stddev') {
-		# we are using the standard deviation of the population, 
-		# since these are the only scores we are considering
-		return '.' unless scalar(@$scores);
-		return stddevp(@$scores);
-	}
-	elsif ($method =~ /rpk?m/) {
-		confess " The rpm methods have been deprecated due to complexity and " .
-			"the variable way of calculating the value. Collect counts and " . 
-			"calculate your preferred way.\n";
+	if (exists $SCORE_CALCULATOR_SUB{$method}) {
+		return &{$SCORE_CALCULATOR_SUB{$method}}($scores);
 	}
 	else {
-		# somehow bad method snuck past our checks
 		confess " unrecognized method '$method'!";
 	}
 }
