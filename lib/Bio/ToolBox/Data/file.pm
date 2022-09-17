@@ -431,6 +431,11 @@ sub parse_headers {
 			my $i = $self->add_column('Column1');
 			$self->reorder_column($i, 0 .. $old_last);
 		}
+		if (ref($self) eq 'Bio::ToolBox::Data::Stream') {
+			# store an example first line for Stream objects
+			chomp $nextdata[-1];
+			$self->{example} = \@nextdata;
+		}
 	}
 	
 	# re-open the file
