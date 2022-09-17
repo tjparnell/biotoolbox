@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.68';
+my $VERSION = '1.69';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -65,6 +65,9 @@ my (
 	$format,
 	$win,
 	$step,
+	$exclusion_file,
+	$chrskip,
+	$prefix_text,
 	$set_strand,
 	$discard,
 	$gz,
@@ -101,6 +104,9 @@ GetOptions(
 	'r|format=i'       => \$format, # decimal formatting
 	'win=i'            => \$win, # indicate the size of genomic intervals
 	'step=i'           => \$step, # step size for genomic intervals
+	'blacklist=s'      => \$exclusion_file, # exclusion intervals for genomic intervals
+	'chrskip=s'        => \$chrskip, # chromosome exclusion regex for genomic intervals
+	'prefix=s'         => \$prefix_text, # prefix text for naming genomic intervals
 	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
 				# force_strand is preferred option, but respect the old option
 	'discard=f'        => \$discard, # discard feature below threshold
@@ -188,7 +194,18 @@ elsif ($new) {
 		feature => $feature,
 		win     => $win,
 		step    => $step,
+		chrskip => $chrskip,
+		exclude => $exclusion_file
 	) or die " unable to generate new feature list\n";
+	
+	# add a genomic interval name
+	if ($feature eq 'genome' and $prefix_text) {
+		my $i = $Data->add_column('Name');
+		$Data->iterate( sub {
+			my $row = shift;
+			$row->value($i, sprintf("%s%d", $prefix_text, $row->row_index));
+		});
+	}
 }
 
 # update program name
@@ -999,7 +1016,10 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   
   Options for feature "genome":
   --win <integer>                     size of windows across genome (500 bp)
-  --step <integer>                    step size of windows across genome 
+  --step <integer>                    step size of windows across genome
+  --chrskip <regex>                   regular expression to skip chromosomes
+  --blacklist <filename>              file of intervals to skip (bed, gff, txt)
+  --prefix <text>                     prefix text for naming windows
   
   Options for data collection:
   -D --ddb <name|file>                data or BigWigSet database
@@ -1099,6 +1119,28 @@ optionally specify the window size.
 
 Optionally indicate the step size when generating a new list of intervals 
 across the genome. The default is equal to the window size.
+
+=item --chrskip E<lt>regexE<gt>
+
+Provide a regular expression to skip certain chromosomes. Perl-based 
+regular expressions are employed. Expressions should be quoted or 
+properly escaped on the command line. Examples might be 
+    
+    'chrM'
+    'scaffold.+'
+    'chr.+alt|chrUn.+|chr.+_random'
+
+=item --blacklist E<lt>fileE<gt>
+
+Provide a file of genomic intervals to avoid. Examples might include 
+multi-copy repetitive elements, ribosomal RNA, or heterochromatic regions.
+The file should be any text file interpretable by L<Bio::ToolBox::Data> 
+with chromosome, start, and stop coordinates, including BED and GFF formats.
+
+=item --prefix <text>
+
+Provide a text string to prefix the name of generated genomic windows. 
+Names will be appended with an incrementing, unformatted digit. 
 
 =back
 
