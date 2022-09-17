@@ -123,6 +123,15 @@ Use the L</value> method if you don't want this to happen.
 The strand of the feature or segment. Returns -1, 0, or 1. Default is 0, 
 or unstranded.
 
+=item midpoint
+
+The calculated midpoint position of the feature.
+
+=item peak
+
+For features in a C<narrowPeak> file, this will report the peak coordinate, 
+transformed into a genomic coordinate. 
+
 =item name
 
 =item display_name
@@ -1221,6 +1230,31 @@ sub _strand {
 	}
 	else {
 		return 0;
+	}
+}
+
+sub peak {
+	my $self = shift;
+	if ($self->{data}->format eq 'narrowPeak') {
+		return $self->value(1) + $self->value(9) + 1;
+	}
+	elsif (exists $self->{feature} and $self->{feature}->has_tag('peak')) {
+		return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
+	}
+	else {
+		return $self->midpoint;
+	}
+}
+
+sub midpoint {
+	my $self = shift;
+	my $s = $self->start;
+	my $e = $self->end;
+	if ($s and $e) {
+		return int( ($s + $e) / 2 );
+	}
+	else {
+		return undef;
 	}
 }
 
