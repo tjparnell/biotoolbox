@@ -2114,27 +2114,41 @@ sub _get_subfeature_position_scores {
 
 sub _calculate_reference {
 	my ($self, $args) = @_;
-	my $feature = $self->seqfeature || $self;
-	my $strand = defined $args->{strand} ? $args->{strand} : $feature->strand;
-	if ($args->{position} == 5 and $strand >= 0) {
-		$args->{coordinate} = $args->{practical_start} || $feature->start;
+	my $strand = defined $args->{strand} ? $args->{strand} : $self->strand;
+	if ($args->{position} == 5) {
+		if ($strand >= 0) {
+			$args->{coordinate} = $args->{practical_start} || $self->start;
+		}
+		else {
+			$args->{coordinate} = $args->{practical_stop} || $self->end;
+		}
 	}
-	elsif ($args->{position} == 3 and $strand >= 0) {
-		$args->{coordinate} = $args->{practical_stop} || $feature->end;
-	}
-	elsif ($args->{position} == 5 and $strand < 0) {
-		$args->{coordinate} = $args->{practical_stop} || $feature->end;
-	}
-	elsif ($args->{position} == 3 and $strand < 0) {
-		$args->{coordinate} = $args->{practical_start} || $feature->start;
+	elsif ($args->{position} == 3) {
+		if ($strand >= 0) {
+			$args->{coordinate} = $args->{practical_stop} || $self->end;
+		}
+		else {
+			$args->{coordinate} = $args->{practical_start} || $self->start;
+		}
 	}
 	elsif ($args->{position} == 4) {
 		# strand doesn't matter here
-		my $s = $args->{practical_start} || $feature->start;
-		$args->{coordinate} = $s + int(($feature->length / 2) + 0.5);
+		# but practical coordinates do
+		if (exists $args->{practical_start}) {
+			$args->{coordinate} = int( 
+				( ($args->{practical_start} + $args->{practical_stop}) / 2 ) + 0.5
+			); 
+		}
+		else {
+			$args->{coordinate} = $self->midpoint;
+		}
+	}
+	elsif ($args->{position} == 9) {
+		# narrowPeak coordinate
+		$args->{coordinate} = $self->peak;
 	}
 	else {
-		croak "position must be one of 5, 3, or 4";
+		confess "position must be one of 5, 3, 4, or 9";
 	}
 }
 
