@@ -1471,7 +1471,7 @@ sub gff_attributes {
 	return $self->{attributes} if (exists $self->{attributes});
 	$self->{attributes} = {};
 	foreach my $g (split(/\s*;\s*/, $self->value(8))) {
-		my ($tag, $value) = split /\s+/, $g;
+		my ($tag, $value) = split /\s+|=/, $g;
 		next unless ($tag and $value);
 		# unescape URL encoded values, borrowed from Bio::DB::GFF
 		$value =~ tr/+/ /;
