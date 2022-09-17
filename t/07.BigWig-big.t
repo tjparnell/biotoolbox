@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::Big; 1}) {
-		plan tests => 25;
+		plan tests => 37;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::Big not available';
@@ -150,4 +150,27 @@ is(sprintf("%.2f", $pos2scores->{96}), 0.48, 'relative positioned score at 96');
 # BigWig does not support stranded data collection
 # save that for BigWigSet
 
+
+### Generate new genomic window file
+undef $Data;
+undef $row;
+$Data = Bio::ToolBox::Data->new(
+	feature  => 'genome',
+	db       => $dataset,
+	win      => 500
+);
+isa_ok($Data, 'Bio::ToolBox::Data', 'new genome window file');
+is($Data->feature, 'genome', 'Data feature name');
+is($Data->feature_type, 'coordinate', 'Data feature type is coordinate');
+is($Data->number_columns, 3, 'Data number of columns');
+is($Data->number_rows, 461, 'Data number of rows');
+$row = $Data->get_row(1);
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'First row object');
+is($row->start, 1, 'First row start coordinate');
+is($row->stop, 500, 'First row stop coordinate');
+is($row->length, 500, 'First row length');
+$row = $Data->get_row(461);
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Last row object');
+is($row->start, 230001, 'Last row start coordinate');
+is($row->length, 208, 'Last row length');
 

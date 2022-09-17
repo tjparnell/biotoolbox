@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.68';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -1102,6 +1102,9 @@ use Module::Load;
 sub new {
 	my $class = shift;
 	my %args  = @_;
+	if (ref($class)) {
+		$class = ref($class);
+	}
 	
 	# check for important arguments
 	$args{features} ||= $args{feature} || 'gene';
@@ -1150,6 +1153,26 @@ sub new {
 		$args{data} = $self;
 		my $result;
 		if ($args{features} eq 'genome') {
+			# create a genomic interval list
+			# first must parse any exclusion list provided as a new Data object
+			$args{blacklist} ||= $args{exclude} || undef;
+			if (defined $args{blacklist}) {
+				my $exclusion_Data = $self->new(
+					file => $args{blacklist},
+					parse => 0 # we don't need to parse
+				);
+				if ($exclusion_Data and $exclusion_Data->feature_type eq 'coordinate') {
+					printf "   Loaded %d exclusion list items\n", 
+						$exclusion_Data->number_rows;
+					delete $args{blacklist};
+					delete $args{exclude};
+					$args{exclude} = $exclusion_Data;
+				}
+				else {
+					carp " Cannot not load exclusion coordinate list file $args{blacklist}!";
+					return;
+				}
+			}
 			$result = get_new_genome_list(%args);
 		}
 		else {

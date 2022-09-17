@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::HTS; 1}) {
-		plan tests => 48;
+		plan tests => 60;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::HTS not available';
@@ -240,6 +240,27 @@ is($alignment_data->{mapq}->[66], 0, '66th alignment mapq');
 is($alignment_data->{mapq}->[80], 95, '80th alignment mapq');
 
 
-
+# Generate new genomic window file
+undef $Data;
+undef $row;
+$Data = Bio::ToolBox::Data->new(
+	feature  => 'genome',
+	db       => $dataset,
+	win      => 500
+);
+isa_ok($Data, 'Bio::ToolBox::Data', 'new genome window file');
+is($Data->feature, 'genome', 'Data feature name');
+is($Data->feature_type, 'coordinate', 'Data feature type is coordinate');
+is($Data->number_columns, 3, 'Data number of columns');
+is($Data->number_rows, 461, 'Data number of rows');
+$row = $Data->get_row(1);
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'First row object');
+is($row->start, 1, 'First row start coordinate');
+is($row->stop, 500, 'First row stop coordinate');
+is($row->length, 500, 'First row length');
+$row = $Data->get_row(461);
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Last row object');
+is($row->start, 230001, 'Last row start coordinate');
+is($row->length, 208, 'Last row length');
 
 

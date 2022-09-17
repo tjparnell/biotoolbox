@@ -1859,11 +1859,9 @@ sub get_new_genome_list {
 	my $data = $args{data} || undef;
 	unless ($data) {
 		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
-		return;
 	}
 	unless (ref($data) eq 'Bio::ToolBox::Data') {
 		confess 'must pass a Bio::ToolBox::Data object!';
-		return;
 	}
 		
 	# Open a db connection 
@@ -1894,19 +1892,49 @@ sub get_new_genome_list {
 		return;
 	}
 	
+	# Load exclusion intervals
+	my %exclusion_tree;
+	$args{exclude} ||= $args{blacklist} || undef;
+	if (exists $args{exclude} and defined $args{exclude}) {
+		if (ref($args{exclude}) eq 'Bio::ToolBox::Data') {
+			if (_load_helper_module('Set::IntervalTree')) {
+				# iterate through the data object of intervals
+				# prepare an Interval Tree for each chromosome 
+				# and load the exclusion interval into it
+				$args{exclude}->iterate( sub {
+					my $row = shift;
+					unless (exists $exclusion_tree{$row->seq_id} ) {
+						$exclusion_tree{ $row->seq_id } = Set::IntervalTree->new();
+					}
+					$exclusion_tree{ $row->seq_id }->insert(1, $row->start - 1, $row->end);
+				} );
+			}
+			else {
+				carp " Set::IntervalTree must be installed to use exclusion intervals!";
+			}
+		}
+		else {
+			confess " Exclusion data must be a Bio::ToolBox::Data object!";
+		}
+	}
+	
 	# Collect the genomic windows
 	print "   Generating $args{win} bp windows in $args{step} bp increments\n";
 	foreach (@chromosomes) {
 		
 		# name and length as sub-array in each element
 		my ($chr, $length) = @{$_};
+		my $Tree = $exclusion_tree{$chr} || undef;
 		
+		# iterate through chromosome
 		for (my $start = 1; $start <= $length; $start += $args{step}) {
 			my $end = $start + $args{win} - 1; 
 			if ($end > $length) {
 				# fix end to the length of the chromosome
 				$end = $length;
-			} 
+			}
+			# skip if excluded
+			next if ($Tree and scalar( @{ $Tree->fetch($start - 1, $end) } ) >= 1);
 			$data->add_row( [ $chr, $start, $end] );
 		}
 	}
