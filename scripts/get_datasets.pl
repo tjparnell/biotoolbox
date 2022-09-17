@@ -369,14 +369,14 @@ sub set_defaults {
 		# database for new files checked below
 	}
 	if (defined $start_adj or defined $stop_adj) {
-		unless (defined $start_adj and defined $stop_adj) {
-			die " You must define both start and stop coordinate adjustments!\n";
-		}
+		# set other to zero if not defined
+		$start_adj ||= 0;
+		$stop_adj  ||= 0;
 	}
 	if (defined $fstart or defined $fstop) {
-		unless (defined $fstart and defined $fstop) {
-			die " You must define both fstart and fstop coordinate adjustments!\n";
-		}
+		# set defaults in case one is not defined
+		$fstart ||= 0;
+		$fstop  ||= 1;
 	}
 	
 	# check parallel support
@@ -441,7 +441,7 @@ sub set_defaults {
 	# check the relative position
 	if (defined $position) {
 		# check the position value
-		unless ($position =~ m/^(?:5|4|3|m)$/i) {
+		unless ($position =~ m/^(?:5|4|53|3|m)$/i) {
 			die " Unknown relative position '$position'!\n";
 		}
 		$position =~ s/m/4/i # change to match internal usage
@@ -663,25 +663,29 @@ sub get_adjusted_dataset {
 		# adjust coordinates as requested
 		# depends on feature strand and relative position
 		my ($start, $stop);
-		if ($position == 5 and $feature->strand >= 0) { 
-			# 5' end of forward strand
-			$start = $feature->start + $start_adj;
-			$stop  = $feature->start + $stop_adj;
+		if ($position == 5) { 
+			if ($feature->strand >= 0) { 
+				# 5' end of forward strand
+				$start = $feature->start + $start_adj;
+				$stop  = $feature->start + $stop_adj;
+			}
+			else { 
+				# 5' end of reverse strand
+				$start = $feature->end - $stop_adj;
+				$stop  = $feature->end - $start_adj;
+			}
 		}
-		elsif ($position == 5 and $feature->strand < 0) { 
-			# 5' end of reverse strand
-			$start = $feature->end - $stop_adj;
-			$stop  = $feature->end - $start_adj;
-		}
-		elsif ($position == 3 and $feature->strand >= 0) { 
-			# 3' end of forward strand
-			$start = $feature->end + $start_adj;
-			$stop  = $feature->end + $stop_adj;
-		}
-		elsif ($position == 3 and $feature->strand < 0) {
-			# 3' end of reverse strand
-			$start = $feature->start - $stop_adj;
-			$stop  = $feature->start - $start_adj;
+		elsif ($position == 3) { 
+			if ($feature->strand >= 0) { 
+				# 3' end of forward strand
+				$start = $feature->end + $start_adj;
+				$stop  = $feature->end + $stop_adj;
+			}
+			else {
+				# 3' end of reverse strand
+				$start = $feature->start - $stop_adj;
+				$stop  = $feature->start - $start_adj;
+			}
 		}
 		elsif ($position == 4) {
 			# middle position
@@ -693,6 +697,18 @@ sub get_adjusted_dataset {
 			else {
 				$start = $middle - $stop_adj;
 				$stop  = $middle - $start_adj;
+			}
+		}
+		elsif ($position == 53) {
+			if ($feature->strand >= 0) { 
+				# forward strand
+				$start = $feature->start + $start_adj;
+				$stop  = $feature->end + $stop_adj;
+			}
+			else {
+				# reverse strand
+				$start = $feature->start - $start_adj;
+				$stop  = $feature->end - $stop_adj;
 			}
 		}
 		
@@ -1034,13 +1050,13 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --fpkm [region|genome]              calculate FPKM using which total count
   --tpm                               calculate TPM values
   -r --format <integer>               number of decimal places for numbers
-  --discard <number>                  discard features where sum below threshold
+  --discard <number>                  discard features whose sum below threshold
   
   Adjustments to features:
   -x --extend <integer>               extend the feature in both directions
   -b --begin --start <integer>        adjust relative start coordinate
   -e --end --stop <integer>           adjust relative stop coordinate
-  -p --pos [5|m|3]                    define the relative position to adjust
+  -p --pos [5|m|3|53]                 define the relative position to adjust
   --fstart=<decimal>                  adjust fractional start
   --fstop=<decimal>                   adjust fractional stop
   --limit <integer>                   minimum size to take fractional window
@@ -1325,17 +1341,18 @@ Optionally specify adjustment values to adjust the region to collect values
 relative to the feature position defined by the C<--pos> option (default is 
 the 5' position). A negative value is shifted upstream (5' direction), 
 and a positive value is shifted downstream. Adjustments are always made 
-relative to the feature's strand. Both options must be applied; one is 
-not allowed.
+relative to the feature's strand. Default value is 0 (no change).
 
-=item --pos [5|m|3]
+=item --pos [5|m|3|53]
 
 Indicate the relative position of the feature with which the 
 data is collected when combined with the "start" and "stop" or "fstart" 
-and "fstop" options. Three values are accepted: "5" indicates the 
-5' prime end is used, "3" indicates the 3' end is used, and "m" 
-indicates the middle of the feature is used. The default is to 
-use the 5' end, or the start position of unstranded features. 
+and "fstop" options. Four values are accepted: "5" indicates the 
+5' prime end is used, "3" indicates the 3' end is used, "m" 
+indicates the middle of the feature is used, and '53' indicates that 
+both ends are modified, i.e. start modifies start and end modifies end 
+(strand relative). The default is to use the 5' end, or the start 
+position of unstranded features. 
 
 =item --fstart=<number>
 
@@ -1345,8 +1362,8 @@ Optionally specify the fractional start and stop position of the region to
 collect values as a function of the feature's length and relative to the 
 specified feature position defined by the C<--pos> option (default is 5'). The 
 fraction should be presented as a decimal number, e.g. 0.25. Prefix a 
-negative sign to specify an upstream position. Both options must be 
-applied; one is not allowed. 
+negative sign to specify an upstream position. Default values are 0 (fstart)
+and 1 (fstop), or no change. 
 
 =item --limit E<lt>integerE<gt>
 
@@ -1457,6 +1474,12 @@ restrict to 500 bp flanking the TSS.
   
   get_datasets.pl --db annotation.sqlite --feature mRNA --start=-500 \
   --stop=500 --pos 5 --data scores.bw --out tss_scores.txt
+
+=item Avoid first and last 1 Kb of each interval
+
+  get_datasets.pl --in file.bed --start=1000 \
+  --stop=-1000 --pos 53 --data scores.bw --out file_scores.txt
+
 
 =item Count intervals
 
