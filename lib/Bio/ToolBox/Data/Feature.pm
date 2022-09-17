@@ -140,7 +140,9 @@ The name of the feature.
 
 =item coordinate
 
-Returns a coordinate string formatted as C<seqid:start-stop>.
+Returns a coordinate string formatted as C<seqid:start-stop>. This uses the 
+start coordinate as listed in the source file and does not convert 0-based 
+start values to 1-based values. This may confound downstream applications. 
 
 =item type
 
