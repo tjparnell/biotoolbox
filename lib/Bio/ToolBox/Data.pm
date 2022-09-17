@@ -483,6 +483,10 @@ in ascending (left to right) order.
 
 Returns the number of columns in the Data table. 
 
+=item number_rows
+
+Returns the number of rows in the Data table.
+
 =item last_column
 
 Returns the array index number for the last (right most) 

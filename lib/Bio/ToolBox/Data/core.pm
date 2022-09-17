@@ -1088,6 +1088,12 @@ sub number_columns {
 	return $self->{number_columns};
 }
 
+sub number_rows {
+	my $self = shift;
+	carp "number_rows is a read only method" if @_;
+	return $self->{last_row};
+}
+
 sub last_column {
 	my $self = shift;
 	carp "last_column is a read only method" if @_;
