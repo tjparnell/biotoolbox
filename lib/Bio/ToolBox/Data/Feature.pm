@@ -1079,11 +1079,11 @@ sub value {
 sub seq_id {
 	my $self = shift;
 	if ($_[0]) {
-		# update only if we have an actual column
 		my $i = $self->{data}->chromo_column;
+		# update only if we have an actual column
 		if (defined $i) {
-			my $c = $self->value($i, $_[0]);
-			return $c;
+			$self->value($i, $_[0]);
+			$self->{seqid} = $_[0];
 		}
 		elsif (exists $self->{feature}) {
 			carp "Unable to update seq_id for parsed SeqFeature objects";
@@ -1092,31 +1092,51 @@ sub seq_id {
 			carp "No Chromosome column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		my $c = $self->{feature}->seq_id;
-		return $c;
-	}
-	# collect from table
+	
+	# return cached value
+	return $self->{seqid} if exists $self->{seqid};
+	
+	# get seq_id value
+	my $c;
 	my $i = $self->{data}->chromo_column;
-	my $c = defined $i ? $self->value($i) : undef;
+	my $j = $self->{data}->coord_column;
+	if (defined $i) {
+		# collect from table
+		$c = $self->value($i);
+	}
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$c = $self->{feature}->seq_id;
+	}
+	elsif (defined $j) {
+		$self->_from_coordinate_string($j);
+		return $self->{seqid};
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$c = $f->seq_id;
+		}
+	}
+	$self->{seqid} = $c if defined $c;
 	return $c;
 }
 
 sub start {
 	my $self = shift;
 	if ($_[0]) {
-		# update only if we have an actual column
 		my $i = $self->{data}->start_column;
-		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
+		# update only if we have an actual column
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0; # looks like an integer
 		if (defined $i and $d) {
-			if (substr($self->{data}->name($i), -1) eq '0') {
+			if ($self->{data}->interbase) {
 				# compensate for 0-based, assuming we're always working with 1-based
-				my $n = $_[0] - 1;
-				return $self->value($i, $n);
+				$self->value($i, $_[0] - 1);
+				$self->{start} = $_[0];
 			}
 			else {
-				return $self->value($i, $_[0]);
+				$self->value($i, $_[0]);
+				$self->{start} = $_[0];
 			}
 		}
 		elsif (not $d) {
@@ -1129,34 +1149,50 @@ sub start {
 			carp "No Start coordinate column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		return $self->{feature}->start;
-	}
-	# collect from table
+	
+	# return cached value
+	return $self->{start} if exists $self->{start};
+	
+	# get start value
+	my $s;
 	my $i = $self->{data}->start_column;
+	my $j = $self->{data}->coord_column;
 	if (defined $i) {
-		my $s = $self->value($i);
-		if (substr($self->{data}->name($i), -1) eq '0') {
+		# collect from table
+		$s = $self->value($i);
+		if ($self->{data}->interbase) {
 			# compensate for 0-based index
-			return $s + 1;
-		}
-		else {
-			return $s;
+			$s += 1;
 		}
 	}
-	return;
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$s = $self->{feature}->start;
+	}
+	elsif (defined $j) {
+		$self->_from_coordinate_string($j);
+		return $self->{start};
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$s = $f->start;
+		}
+	}
+	$self->{start} = $s if defined $s;
+	return $s;
 }
 
 *stop = \&end;
 sub end {
 	my $self = shift;
 	if ($_[0]) {
-		# update only if we have an actual column
 		my $i = $self->{data}->stop_column;
+		# update only if we have an actual column
 		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
 		if (defined $i and $d) {
-			return $self->value($i, $_[0]);
+			$self->value($i, $_[0]);
+			$self->{end} = $_[0];
 		}
 		elsif (not $d) {
 			carp "End coordinate value is not an integer";
@@ -1168,16 +1204,33 @@ sub end {
 			carp "No End coordinate column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		my $e = $self->{feature}->end;
-		$self->{end} = $e;
-		return $e;
-	}
-	# collect from table
+	
+	# return cached value
+	return $self->{end} if exists $self->{end};
+	
+	# get end value
+	my $e;
 	my $i = $self->{data}->stop_column;
-	my $e = defined $i ? $self->value($i) : undef;
-	$self->{end} = $e;
+	my $j = $self->{data}->coord_column;
+	if (defined $i) {
+		# collect from table
+		$e = $self->value($i);
+	}
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$e = $self->{feature}->end;
+	}
+	elsif (defined $j) {
+		$self->_from_coordinate_string($j);
+		return $self->{end};
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$e = $f->end;
+		}
+	}
+	$self->{end} = $e if defined $e;
 	return $e;
 }
 
@@ -1188,7 +1241,7 @@ sub strand {
 		my $i = $self->{data}->strand_column;
 		if (defined $i) {
 			$self->value($i, $_[0]);
-			return $self->_strand($_[0]);
+			$self->{strand} = $self->_strand($_[0]);
 		}
 		elsif (exists $self->{feature}) {
 			carp "Unable to update Strand for parsed SeqFeature objects";
@@ -1197,14 +1250,28 @@ sub strand {
 			carp "No Strand column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		my $s = $self->{feature}->strand;
-		return $s;
+	
+	# return cached value
+	return $self->{strand} if exists $self->{strand};
+	
+	# get strand value
+	my $s = 0;
+	if (my $i = $self->{data}->strand_column) {
+		# collect from table
+		$s = $self->_strand( $self->value($i) );
 	}
-	# collect from table
-	my $i = $self->{data}->strand_column;
-	return defined $i ? $self->_strand( $self->value($i) ) : 0;
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$s = $self->{feature}->strand;
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$s = $f->strand;
+		}
+	}
+	$self->{strand} = $s;
+	return $s;
 }
 
 sub _strand {
@@ -1232,6 +1299,19 @@ sub _strand {
 	}
 	else {
 		return 0;
+	}
+}
+
+sub _from_coordinate_string {
+	my ($self, $i) = shift;
+	my ($chr, $start, $end, $str) = split /(?:\-|\.\.|\s)/, $self->value($i);
+	$self->{seqid} = $chr unless exists $self->{seqid};
+	$self->{start} = $start unless exists $self->{start};
+		# we assume this is a 1-based coordinate
+	$self->{end}   = $end unless exists $self->{end};
+	if (defined $str and not exists $self->{strand}) {
+		# you never know, the strand may be added to the string
+		$self->{strand} = $self->_strand($str);
 	}
 }
 
