@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 608;
+	plan tests => 610;
 }
 else {
-	plan tests => 380;
+	plan tests => 382;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -909,8 +909,13 @@ sub test_parsed_narrowPeak_table {
 	is($Data->database, "Parsed:$peakfile", 'database source');
 	is($Data->name(0), 'Primary_ID', 'First column name');
 	is($Data->name(1), 'Name', 'Second column name');
-	is($Data->value(1,0), 'chr1:11908310-11909810', 'First row ID');
-	is($Data->value(1,1), 'narrowPeak207', 'First row Name');
+	
+	# row
+	my $row = $Data->get_row(1);
+	is($row->primary_id, 'chr1:11908310-11909810', 'row Feature ID');
+	is($row->name, 'narrowPeak207', 'row Feature name');
+	is($row->midpoint, 11909060, 'row Feature midpoint coordinate');
+	is($row->peak, 11908866, 'row Feature peak coordinate');
 	
 	# seqfeature
 	my $f = $Data->get_seqfeature(1);
