@@ -1101,7 +1101,6 @@ sub last_column {
 	return $self->{number_columns} - 1;
 }
 
-
 sub last_row {
 	my $self = shift;
 	carp "last_row is a read only method" if @_;
@@ -1365,6 +1364,38 @@ sub _find_column_indices {
 	my $stop   = $self->find_column('^stop|end|txEnd');
 	my $strand = $self->find_column('^strand');
 	my $score  = $self->find_column('^score$');
+	
+	# check for coordinate string
+	my $coord  = $self->find_column('^coordinate$');
+	if (not defined $coord and not defined $chromo and not defined $start) {
+		# check if ID or name id looks like a coordinate string
+		if (defined $id and defined $self->{data_table}->[1]) {
+			if ($self->{data_table}->[1][$id] =~ /^[\w\-\.]+:\d+(?:[\-\.]{1,2}\d+)?$/) {
+				# first value looks like a coordinate string
+				$coord = $id;
+			}
+		}
+		if (
+			not defined $coord and defined $name and 
+			defined defined $self->{data_table}->[1]
+		) {
+			if ($self->{data_table}->[1][$name] =~ /^[\w\-\.]+:\d+(?:[\-\.]{1,2}\d+)?$/) {
+				# first value looks like a coordinate string
+				$coord = $name;
+			}
+		}
+	}
+	
+	# determine zero-based start coordinates
+	if (
+		$self->{zerostart} == 0 and 
+		defined $start and 
+		substr($self->name($start), -1) eq '0'
+	) {
+		$self->{zerostart} = 1;
+	}
+	
+	# cache the indexes
 	$self->{column_indices} = {
 		'name'      => $name,
 		'type'      => $type,
@@ -1376,67 +1407,135 @@ sub _find_column_indices {
 		'end'       => $stop,
 		'strand'    => $strand,
 		'score'     => $score,
+		'coord'     => $coord,
 	};
 	return 1;
 }
 
 sub chromo_column {
 	my $self = shift;
-	carp "chromo_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{chromo} = $_[0];
+		}
+		else {
+			carp sprintf("chromo_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{chromo};
 }
 
 sub start_column {
 	my $self = shift;
-	carp "start_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{start} = $_[0];
+		}
+		else {
+			carp sprintf("start_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{start};
 }
 
 sub stop_column {
 	my $self = shift;
-	carp "stop_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{stop} = $_[0];
+		}
+		else {
+			carp sprintf("stop_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{stop};
 }
+*end_column = \&stop_column;
 
-sub end_column {
-	return shift->stop_column;
+sub coord_column {
+	my $self = shift;
+	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{coord} = $_[0];
+		}
+		else {
+			carp sprintf("coord_column %s is not a valid index!", $_[0]);
+		}
+	}
+	return $self->{column_indices}{coord};
 }
 
 sub strand_column {
 	my $self = shift;
-	carp "strand_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{strand} = $_[0];
+		}
+		else {
+			carp sprintf("strand_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{strand};
 }
 
 sub name_column {
 	my $self = shift;
-	carp "name_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{name} = $_[0];
+		}
+		else {
+			carp sprintf("name_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{name};
 }
 
 sub type_column {
 	my $self = shift;
-	carp "type_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{type} = $_[0];
+		}
+		else {
+			carp sprintf("type_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{type};
 }
 
 sub id_column {
 	my $self = shift;
-	carp "id_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{id} = $_[0];
+		}
+		else {
+			carp sprintf("id_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{id};
 }
 
 sub score_column {
 	my $self = shift;
-	carp "score_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{score} = $_[0];
+		}
+		else {
+			carp sprintf("score_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{score};
 }
 
