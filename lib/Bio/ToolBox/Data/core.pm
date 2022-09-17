@@ -58,6 +58,7 @@ sub new {
 		'comments'       => [],
 		'data_table'     => [],
 		'header_line_count' => 0,
+		'zerostart'      => 0,
 	);
 	
 	# Finished
@@ -1439,6 +1440,26 @@ sub score_column {
 	return $self->{column_indices}{score};
 }
 
+*zero_start = \&interbase;
+sub interbase {
+	my $self = shift;
+	if (@_) {
+		my $i = $self->start_column;
+		my $n = $self->name($i);
+		if ($_[0] eq '1' and $n =~ /^start$/i) {
+			$self->{zerostart} = 1;
+			$self->name($i, 'Start0');
+		}
+		elsif ($_[0] eq '0' and $n =~ /^start0$/i) {
+			$self->{zerostart} = 0;
+			$self->name($i, 'Start');
+		}
+		else {
+			carp "use 1 (true) or 0 (false) to set interbase mode";
+		}
+	}
+	return $self->{zerostart};
+}
 
 #### Special Row methods ####
 
@@ -1674,6 +1695,17 @@ column used in databases.
 
 Returns the index of the column that represents the Score 
 column in certain formats, such as GFF, BED, bedGraph, etc.
+
+=item zero_start
+
+=item interbase
+
+Returns true (1) or false (0) if the coordinate system appears to 
+be an interbase, half-open, or zero-based coordinate system. This is 
+based on file type, e.g. F<.bed>, or if the start coordinate column 
+name is C<start0>. The coordinate system can also be explicitly changed 
+by passing an appropriate value; note that this will also change the 
+start coordinate column name as appropriate. 
 
 =item get_seqfeature
 

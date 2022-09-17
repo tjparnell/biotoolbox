@@ -1221,6 +1221,7 @@ sub add_bed_metadata {
 		$bed_names = $self->standard_column_names('bed12');
 	}
 	$self->{'number_columns'} = $column_count; 
+	$self->{'zerostart'} = 1;
 	
 	# set the metadata for each column
 		# some of these may already be defined if there was a 
@@ -1282,6 +1283,7 @@ sub add_peak_metadata {
 		$column_names = $self->standard_column_names('bed12');
 	}
 	$self->{'number_columns'} = $column_count; 
+	$self->{'zerostart'} = 1;
 	
 	# add metadata
 	for (my $i = 0; $i < $column_count; $i++) {
@@ -1344,6 +1346,7 @@ sub add_ucsc_metadata {
 		$self->format('genePred');
 		$column_names = $self->standard_column_names('ucsc10');
 	}
+	$self->{'zerostart'} = 1;
 	
 	# assign the column names and metadata
 	for (my $i = 0; $i < $column_count; $i++) {
