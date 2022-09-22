@@ -441,10 +441,12 @@ sub set_defaults {
 	# check the relative position
 	if (defined $position) {
 		# check the position value
-		unless ($position =~ m/^(?:5|4|53|3|m)$/i) {
+		unless ($position =~ m/^(?:5|4|53|3|m|p)$/) {
 			die " Unknown relative position '$position'!\n";
 		}
-		$position =~ s/m/4/i # change to match internal usage
+		# change to match internal usage as necessary
+		$position = 4 if $position eq 'm'; 
+		$position = 9 if $position eq 'p';
 	}
 	else {
 		# default position to use the 5' end
@@ -458,7 +460,7 @@ sub set_defaults {
 			# set a minimum size limit on sub fractionating a feature
 			$limit = 10;
 		}
-		if ($position == 4) {
+		if ($position == 4 or $position == 9) {
 			die " set position to 5 or 3 only when using fractional start and stop\n";
 		}
 	}
@@ -657,39 +659,36 @@ sub get_adjusted_dataset {
 	$Data->iterate( sub {
 		my $row = shift;
 		
-		# make sure we work with the represented seqfeature if present
-		my $feature = $row->seqfeature || $row;
-		
 		# adjust coordinates as requested
 		# depends on feature strand and relative position
 		my ($start, $stop);
 		if ($position == 5) { 
-			if ($feature->strand >= 0) { 
+			if ($row->strand >= 0) { 
 				# 5' end of forward strand
-				$start = $feature->start + $start_adj;
-				$stop  = $feature->start + $stop_adj;
+				$start = $row->start + $start_adj;
+				$stop  = $row->start + $stop_adj;
 			}
 			else { 
 				# 5' end of reverse strand
-				$start = $feature->end - $stop_adj;
-				$stop  = $feature->end - $start_adj;
+				$start = $row->end - $stop_adj;
+				$stop  = $row->end - $start_adj;
 			}
 		}
 		elsif ($position == 3) { 
-			if ($feature->strand >= 0) { 
+			if ($row->strand >= 0) { 
 				# 3' end of forward strand
-				$start = $feature->end + $start_adj;
-				$stop  = $feature->end + $stop_adj;
+				$start = $row->end + $start_adj;
+				$stop  = $row->end + $stop_adj;
 			}
 			else {
 				# 3' end of reverse strand
-				$start = $feature->start - $stop_adj;
-				$stop  = $feature->start - $start_adj;
+				$start = $row->start - $stop_adj;
+				$stop  = $row->start - $start_adj;
 			}
 		}
 		elsif ($position == 4) {
 			# middle position
-			my $middle = int( ($feature->start + $feature->end) / 2);
+			my $middle = int( ($row->start + $row->end) / 2);
 			if ($row->strand >= 0) {
 				$start = $middle + $start_adj;
 				$stop  = $middle + $stop_adj;
@@ -700,15 +699,27 @@ sub get_adjusted_dataset {
 			}
 		}
 		elsif ($position == 53) {
-			if ($feature->strand >= 0) { 
+			if ($row->strand >= 0) { 
 				# forward strand
-				$start = $feature->start + $start_adj;
-				$stop  = $feature->end + $stop_adj;
+				$start = $row->start + $start_adj;
+				$stop  = $row->end + $stop_adj;
 			}
 			else {
 				# reverse strand
-				$start = $feature->start - $start_adj;
-				$stop  = $feature->end - $stop_adj;
+				$start = $row->start - $start_adj;
+				$stop  = $row->end - $stop_adj;
+			}
+		}
+		elsif ($position == 9) {
+			# peak summit position
+			my $middle = $row->peak;
+			if ($row->strand >= 0) {
+				$start = $middle + $start_adj;
+				$stop  = $middle + $stop_adj;
+			}
+			else {
+				$start = $middle - $stop_adj;
+				$stop  = $middle - $start_adj;
 			}
 		}
 		
@@ -822,11 +833,17 @@ sub add_new_dataset {
 	$Data->metadata($index, 'decimal_format', $format) if defined $format;
 	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
 		exists $dataset2sum{$dataset};
+	if ($position == 5) {
+		$Data->metadata($index, 'relative_position', "5'end");	
+	}
 	if ($position == 3) {
 		$Data->metadata($index, 'relative_position', "3'end");	
 	}
 	elsif ($position == 4) {
 		$Data->metadata($index, 'relative_position', 'middle');
+	}
+	elsif ($position == 9) {
+		$Data->metadata($index, 'relative_position', 'summit');
 	}
 
 	# add database name if different
@@ -1056,7 +1073,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   -x --extend <integer>               extend the feature in both directions
   -b --begin --start <integer>        adjust relative start coordinate
   -e --end --stop <integer>           adjust relative stop coordinate
-  -p --pos [5|m|3|53]                 define the relative position to adjust
+  -p --pos [5|m|3|53|p]               relative position to adjust (default 5')
   --fstart=<decimal>                  adjust fractional start
   --fstop=<decimal>                   adjust fractional stop
   --limit <integer>                   minimum size to take fractional window
@@ -1343,13 +1360,14 @@ the 5' position). A negative value is shifted upstream (5' direction),
 and a positive value is shifted downstream. Adjustments are always made 
 relative to the feature's strand. Default value is 0 (no change).
 
-=item --pos [5|m|3|53]
+=item --pos [5|m|3|53|p]
 
 Indicate the relative position of the feature with which the 
 data is collected when combined with the "start" and "stop" or "fstart" 
-and "fstop" options. Four values are accepted: "5" indicates the 
-5' prime end is used, "3" indicates the 3' end is used, "m" 
-indicates the middle of the feature is used, and '53' indicates that 
+and "fstop" options. Five values are accepted: `5` indicates the 
+5' prime end is used, `3` indicates the 3' end is used, `m` 
+indicates the middle of the feature is used, `p` indicates a peak 
+summit position is used (narrowPeak input only), and `53` indicates that 
 both ends are modified, i.e. start modifies start and end modifies end 
 (strand relative). The default is to use the 5' end, or the start 
 position of unstranded features. 

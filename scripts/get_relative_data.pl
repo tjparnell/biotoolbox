@@ -185,6 +185,13 @@ else {
 }
 $Data->program("$0, v $VERSION");
 
+# check peak summit
+if ($position == 9 and $Data->format ne 'narrowPeak') {
+	print " Peak summit indicated as reference point, but input file is not narrowPeak!\n";
+	print "  using interval midpoint instead\n";
+	$position = 4;
+}
+
 
 # the number of columns already in the data array
 my $beginningcolumn = $Data->last_column; 
@@ -252,9 +259,10 @@ my $ending_point = $win * $down_number;
 	# likewise default values will give endingpoint of 1000
 
 # Print collection statement
-printf " Collecting $method data between %d..%d at the %s in %d bp windows from %s\n", 
+printf " Collecting $method data between %d..%d from the %s in %d bp windows from %s\n", 
 	$starting_point, $ending_point, 
-	$position == 3 ? "3' end" : $position == 4 ? "midpoint" : "5' end", 
+	$position == 5 ? "5' end" : $position == 4 ? "midpoint" : 
+	$position == 9 ? "peak summit" : "3' end", 
 	$win, join(', ', @datasets), ;
 
 
@@ -404,11 +412,18 @@ sub check_defaults {
 			$position == 5 or
 			$position == 3 or
 			$position == 4 or
-			$position eq 'm'
+			$position eq 'm' or 
+			$position eq 'p'
 		) {
 			die " Unknown relative position '$position'!\n";
 		}
-		if ($position eq 'm') {$position = 4} # change to match internal usage
+		# change to match internal usage
+		if ($position eq 'm') {
+			$position = 4; # midpoint
+		}
+		elsif ($position eq 'p') {
+			$position = 9; # narrowPeak summit
+		}
 	}
 	else {
 		# default position to use the 5' end
@@ -621,11 +636,14 @@ sub prepare_window_datasets {
 		if ($position == 5) {
 			$Data->metadata($new_index, 'relative_position', '5prime_end');
 		}
-		elsif ($position == 3) {
-			$Data->metadata($new_index, 'relative_position', '3prime_end');
-		}
-		else { # midpoint
+		elsif ($position == 4) { # midpoint
 			$Data->metadata($new_index, 'relative_position', 'center');
+		}
+		elsif ($position == 9) {
+			$Data->metadata($new_index, 'relative_position', 'peak_summit');
+		}
+		else {
+			$Data->metadata($new_index, 'relative_position', '3prime_end');
 		}
 		if ($set_strand) {
 			$Data->metadata($new_index, 'strand_implied', 1);
@@ -704,36 +722,12 @@ sub map_relative_long_data {
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
 		
-		# get feature from the database if necessary
-		my $feature = $row->seqfeature || $row;
-		
-		# calculate a reference point
-		my $reference;
-		if ($feature->strand >= 0 and $position == 5) {
-			# 5' end of forward strand
-			$reference = $feature->start;
-		}
-		elsif ($feature->strand == -1 and $position == 5) {
-			# 5' end of reverse strand
-			$reference = $feature->stop;
-		}
-		elsif ($feature->strand >= 0 and $position == 3) {
-			# 3' end of forward strand
-			$reference = $feature->stop;
-		}
-		elsif ($feature->strand == -1 and $position == 3) {
-			# 3' end of reverse strand
-			$reference = $feature->start;
-		}
-		elsif ($position == 4) {
-			# midpoint regardless of strand
-			$reference = int( ( ($feature->stop + $feature->start) / 2) + 0.5);
-		}
-		else {
-			# something happened
-			die " programming error!? feature " . 
-				" at data row $row\n";
-		}
+		# calculate a reference point using an internal feature method
+		my $args = {
+			position => $position
+		};
+		$row->_calculate_reference($args);
+		my $reference = $args->{coordinate};
 		
 		# collect the data for every window 
 		for (
@@ -746,14 +740,14 @@ sub map_relative_long_data {
 			my $score = $row->get_score(
 				'db'          => $ddb,
 				'dataset'     => $dataset,
-				'chromo'      => $feature->seq_id,
-				'start'       => $feature->strand >= 0 ? 
+				'chromo'      => $row->seq_id,
+				'start'       => $row->strand >= 0 ? 
 									$reference + $Data->metadata($column, 'start') :
 									$reference - $Data->metadata($column, 'start'),
-				'stop'        => $feature->strand >= 0 ? 
-									$reference + $Data->metadata($column, 'stop') : 
-									$reference - $Data->metadata($column, 'stop'),
-				'strand'      => $feature->strand,
+				'stop'        => $row->strand >= 0 ? 
+									$row + $Data->metadata($column, 'stop') : 
+									$row - $Data->metadata($column, 'stop'),
+				'strand'      => $row->strand,
 				'method'      => $method,
 				'stranded'    => $strand_sense,
 			);
