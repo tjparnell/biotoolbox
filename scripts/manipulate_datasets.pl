@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.67';
+my $VERSION = '1.69';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -481,7 +481,8 @@ sub delete_function {
 	}
 	
 	$Data->delete_column(@deletion_list);
-	print " datasets '" . join(", ", @deletion_list) . "' deleted\n";
+	print " datasets " . join(", ", map { sprintf "'%s'", $Data->name($_) } 
+		@deletion_list) . " deleted\n";
 	# reset structure
 	$Data->gff(0);
 	$Data->bed(0);
