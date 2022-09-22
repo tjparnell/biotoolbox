@@ -103,13 +103,13 @@ sub taste_file {
 	
 	# check existing metadata
 	if ($Taste->gff) {
-		return 'gff';
+		return ('gff', $Taste->format);
 	}
 	elsif ($Taste->bed) {
-		return 'bed';
+		return ('bed', $Taste->format);
 	}
 	elsif ($Taste->ucsc) {
-		return 'ucsc';
+		return ('ucsc', $Taste->format);
 	}
 	
 	
@@ -119,7 +119,9 @@ sub taste_file {
 		# possibly a GFF file
 		$Taste->gff(2);
 		$Taste->verify(1);
-		return 'gff' if $Taste->gff == 2;
+		if ($Taste->gff == 2) {
+			return ('gff', $Taste->format);
+		}
 	}
 	elsif ($number == 10) {
 		# possibly a genePred file
@@ -128,7 +130,9 @@ sub taste_file {
 		return 'ucsc' if $Taste->ucsc == 10;
 		$Taste->add_ucsc_metadata(10,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 10;
+		if ($Taste->ucsc == 10) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	elsif ($number == 11) {
 		# possibly a refFlat file
@@ -137,40 +141,59 @@ sub taste_file {
 		return 'ucsc' if $Taste->ucsc == 11;
 		$Taste->add_ucsc_metadata(11,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 11;
+		if ($Taste->ucsc == 11) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	elsif ($number == 12) {
 		# possibly a knownGene or BED12 file
 		$Taste->ucsc(12);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 12;
+		if ($Taste->ucsc == 12) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->bed(12);
 		$Taste->verify(1);
-		return 'bed' if $Taste->bed == 12;
+		if ($Taste->bed == 12) {
+			return ('bed', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(12,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 12;
+		if ($Taste->ucsc == 12) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_bed_metadata(12,1); # force metadata
 		$Taste->verify(1);
-		return 'bed' if $Taste->bed == 12;
+		if ($Taste->bed == 12) {
+			return ('bed', $Taste->format);
+		}
 	}
 	elsif ($number == 15) {
 		# possibly a genePredExt file
 		$Taste->ucsc(15);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 15;
+		if ($Taste->ucsc == 15) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(15,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 15;
+		if ($Taste->ucsc == 15) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	elsif ($number == 16) {
 		# possibly a genePredExt file
 		$Taste->ucsc(16);
 		$Taste->verify(1);
+		if ($Taste->ucsc == 16) {
+			return ('ucsc', $Taste->format);
+		}
 		return 'ucsc' if $Taste->ucsc == 16; 
 		$Taste->add_ucsc_metadata(16,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 16;
+		if ($Taste->ucsc == 16) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	return;
 }
@@ -1723,12 +1746,15 @@ Pass the name of the filename.
 
 =item taste_file
 
-Tastes, or checks, a file for a certain flavor, or known gene file formats. 
-This is based on file extension, metadata headers, and/or file content 
-in the first 10 lines or so. Returns a string based on the file format.
-Values include gff, bed, ucsc, or undefined. Useful for determining if 
-the file represents a known gene table format that lacks a defined file 
-extension, e.g. UCSC formats. Pass the path to the file to check.
+Tastes, or checks, a file for a certain flavor, or known gene file formats.
+Useful for determining if the file represents a known gene table format
+that lacks a defined file extension, e.g. UCSC formats. This can be based
+on the file extension, metadata headers, and/or file contents from the
+first 10 lines. Returns two strings: the first is a generic flavor, and the
+second is a more specific format, if applicable. Generic flavor values will
+be one of `gff`, `bed`, `ucsc`, or `undefined`. These correlate to specific
+Parser adapters. Specific formats could be any number of possibilities, for
+example `undefined`, `gtf`, `gff3`, `narrowPeak`, `genePred`, etc.  
 
 =item sample_gff_type_list
 

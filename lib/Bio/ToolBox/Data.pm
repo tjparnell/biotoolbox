@@ -901,15 +901,20 @@ Pass the name of the filename.
 
 =item taste_file
 
-  my $flavor = $Data->taste_file($filename);
-  # returns gff, bed, ucsc, or undef
+  my ($flavor, $format) = $Data->taste_file($filename);
+  # $flavor is generic term: gff, bed, ucsc, or undef
+  # $format is specific term: gtf, gff3, narrowPeak, genePred, etc.
 
-Tastes, or checks, a file for a certain flavor, or known gene file formats. 
-This is based on file extension, metadata headers, and/or file content 
-in the first 10 lines or so. Returns a string based on the file format.
-Values include gff, bed, ucsc, or undefined. Useful for determining if 
-the file represents a known gene table format that lacks a defined file 
-extension, e.g. UCSC formats.
+Tastes, or checks, a file for a certain flavor, or known gene file formats.
+Useful for determining if the file represents a known gene table format
+that lacks a defined file extension, e.g. UCSC formats. This can be based
+on the file extension, metadata headers, and/or file contents from the
+first 10 lines. Returns two strings: the first is a generic flavor, and the
+second is a more specific format, if applicable. Generic flavor values will
+be one of `gff`, `bed`, `ucsc`, or `undefined`. These correlate to specific
+Parser adapters. Specific formats could be any number of possibilities, for
+example `undefined`, `gtf`, `gff3`, `narrowPeak`, `genePred`, etc.  
+
 
 =item save
 
@@ -1286,13 +1291,14 @@ sub parse_table {
 	}
 	
 	# the file format determines the parser class
-	my $flavor = $self->taste_file($file) or return;
+	my ($flavor, $format) = $self->taste_file($file) or return;
 	my $class = 'Bio::ToolBox::parser::' . $flavor;
 	eval {load $class};
 	if ($@) {
 		carp "unable to load $class! cannot parse $flavor!";
 		return;
 	}
+	$self->format($format); # specify the specific format
 	
 	# open parser
 	my $parser = $class->new() or return;
