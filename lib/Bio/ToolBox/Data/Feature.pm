@@ -1318,10 +1318,12 @@ sub _from_coordinate_string {
 sub peak {
 	my $self = shift;
 	if ($self->{data}->format eq 'narrowPeak') {
-		return $self->value(1) + $self->value(9) + 1;
-	}
-	elsif (exists $self->{feature} and $self->{feature}->has_tag('peak')) {
-		return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
+		if (exists $self->{feature} and $self->{feature}->has_tag('peak')) {
+			return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
+		}
+		else {
+			return $self->value(1) + $self->value(9) + 1;
+		}
 	}
 	else {
 		return $self->midpoint;
