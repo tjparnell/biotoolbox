@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 610;
+	plan tests => 614;
 }
 else {
-	plan tests => 382;
+	plan tests => 384;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -649,8 +649,9 @@ sub test_parsed_gff_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($gfffile);
+	my ($flavor, $format) = $Data->taste_file($gfffile);
 	is($flavor, 'gff', 'GFF file flavor');
+	is($format, 'gff3', 'GFF file format');
 	my $p = $Data->parse_table($gfffile);
 	is($p, 1, 'parsed GFF table');
 	
@@ -727,8 +728,9 @@ sub test_parsed_ucsc_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($ucscfile);
+	my ($flavor, $format) = $Data->taste_file($ucscfile);
 	is($flavor, 'ucsc', 'UCSC file flavor');
+	is($format, 'genePredExt', 'UCSC file format');
 	my $p = $Data->parse_table($ucscfile);
 	is($p, 1, 'parsed UCSC table');
 	
@@ -898,8 +900,9 @@ sub test_parsed_narrowPeak_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($peakfile);
+	my ($flavor, $format) = $Data->taste_file($peakfile);
 	is($flavor, 'bed', 'narrowPeak file flavor');
+	is($format, 'narrowPeak', 'narrowPeak file format');
 	my $p = $Data->parse_table($peakfile);
 	is($p, 1, 'parsed narrowPeak table');
 	
@@ -946,8 +949,9 @@ sub test_parsed_gappedPeak_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($gapfile);
+	my ($flavor, $format) = $Data->taste_file($gapfile);
 	is($flavor, 'bed', 'gappedPeak file flavor');
+	is($format, 'gappedPeak', 'gappedPeak file format');
 	my $p = $Data->parse_table($gapfile);
 	is($p, 1, 'parsed gappedPeak table');
 	
