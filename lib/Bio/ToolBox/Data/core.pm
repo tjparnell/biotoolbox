@@ -1686,6 +1686,10 @@ Returns or sets the VCF version value in the metadata.
 
 Returns the number of columns in the data table.
 
+=item number_rows
+
+Returns the number of rows in the data table.
+
 =item last_column
 
 Returns the array index of the last column in the data table.
