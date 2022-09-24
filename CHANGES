@@ -1,5 +1,28 @@
 ######## Bio::ToolBox revision history #############
 
+
+v1.69
+	- Revise genomic sorting by introducing a sane, logical chromosome
+	ordering that smartly handles numerical, Roman, contigs, and 
+	alternate names. Sorting is done by both start and end coordinates.
+	Sorting speed modestly improved.
+	- Improve handling of coordinates of Data Feature objects, including
+	caching and setting.
+	- Add support for narrowPeak summit coordinate as reference point 
+	in multiple scripts.
+	- Improve handling of databases, including bigWigSet feature types.
+	Make simplification of dataset names a little less aggressive.
+	- Include options for excluding chromosomes and/or intervals when 
+	generating a new list of genomic bins
+	- Improve tasting of file formats, keeping the file format of parsed files 
+	in the Data object.
+	- Allow non-stranded values when parsing UCSC files, including bed files.
+	- Optimize scoring subroutines
+	- Remove legacy subroutines from utility module
+	- Include new test file for utility functions
+	- Numerous other small changes and fixes
+	
+
 v1.68
 	- Script bam2wig.pl script can now record both ends of paired-end 
 	fragments, rather than faking it as single-end. Paired-end start 
