@@ -17,7 +17,6 @@ check_useq();
 check_sam();
 check_big();
 
-
 ### Build the script
 my $build = Module::Build->new(%$options);
 $build->create_build_script;
@@ -36,10 +35,10 @@ sub get_base_options {
 		dist_author       => 'Timothy Parnell <parnell.tj@gmail.com>',
 		dist_abstract     => 'Tools for querying and analysis of genomic data',
 		configure_requires => {
-			'Module::Build'           => 0,
+			'Module::Build'           => 0.42,
 		},
 		test_requires     => {
-			'Test::More'              => 0,
+			'Test::More'              => 1.302,
 		},
 		meta_merge        => {
 			resources     => {
@@ -48,19 +47,19 @@ sub get_base_options {
 		},
 		requires          => {
 			'Config::Simple'          => 4.58,
-			'Module::Load'            => 0,
+			'Module::Load'            => 0.32,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
-			'List::Util'              => 0,
-			'List::MoreUtils'         => 0,
-			'File::Which'             => 0,
+			'List::Util'              => 1.45,
+			'List::MoreUtils'         => 0.400,
+			'File::Which'             => 1.17,
 			'Getopt::Long'            => 2.24,
 		},
 		recommends        => {
 			'Net::FTP'                => 0,
 			'Parallel::ForkManager'   => 1.02,
 			'Set::IntervalTree'       => 0.10,
-			'Set::IntSpan::Fast::XS'  => 0,
+			'Set::IntSpan::Fast'      => 1.15,
 		},
 		script_files => [
 			'scripts/bam2wig.pl',
