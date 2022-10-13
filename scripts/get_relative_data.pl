@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 4999;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.68';
+my $VERSION = 'v1.691';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -745,8 +745,8 @@ sub map_relative_long_data {
 									$reference + $Data->metadata($column, 'start') :
 									$reference - $Data->metadata($column, 'start'),
 				'stop'        => $row->strand >= 0 ? 
-									$row + $Data->metadata($column, 'stop') : 
-									$row - $Data->metadata($column, 'stop'),
+									$reference + $Data->metadata($column, 'stop') : 
+									$reference - $Data->metadata($column, 'stop'),
 				'strand'      => $row->strand,
 				'method'      => $method,
 				'stranded'    => $strand_sense,
