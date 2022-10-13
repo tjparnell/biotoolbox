@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.69';
+our $VERSION = '1.691';
 
 =head1 NAME
 
@@ -400,6 +400,30 @@ The following methods allow for data collection from various
 sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc. 
 
 =over 4
+
+=item calculate_reference($position)
+
+Calculates and returns the absolute genomic coordinate for a relative 
+reference position taking into account feature orientation (strand). 
+This is not explicitly data collection, but often used in conjunction
+with such. Provide an integer representing the relative position point:
+
+=over 4 
+
+=item * C<3> representing C<3'> end coordinate
+
+=item * C<4> representing mid point coordinate
+
+=item * C<5> representing C<5'> end coordinate
+
+=item * C<9> representing peak summit in F<narrowPeak> formatted files
+
+=back
+
+If necessary, an array or array reference may be provided as an 
+alternative parameter with keys including C<position>, C<strand>, 
+C<practical_start>, and C<practical_end> if alternate or adjusted 
+coordinates should be used instead of the given row feature coordinates.
 
 =item get_score
 
@@ -1913,7 +1937,9 @@ sub get_relative_point_position_scores {
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# determine reference coordinate
-	$self->_calculate_reference(\%args) unless defined $args{coordinate};
+	unless (defined $args{coordinate}) {
+		$args{coordinate} = $self->calculate_reference(\%args);
+	}
 	
 	# build parameter array to pass on to the adapter
 	my @params;
@@ -2007,7 +2033,9 @@ sub get_region_position_scores {
 	}
 	else {
 		# return data converted to relative positions
-		$self->_calculate_reference(\%args) unless defined $args{coordinate};
+		unless (defined $args{coordinate}) {
+			$args{coordinate} = $self->calculate_reference(\%args);
+		}
 		return $self->_convert_to_relative_positions($pos2data, 
 			$args{coordinate}, $params[STR]);
 	}
@@ -2108,50 +2136,74 @@ sub _get_subfeature_position_scores {
 		# can no longer use original coordinates, but instead the new shifted coordinates
 		$args->{practical_start} = $practical_start;
 		$args->{practical_stop} = $current_end; 
-		$self->_calculate_reference($args);
+		my $reference = $self->calculate_reference($args);
 		return $self->_convert_to_relative_positions($pos2data, 
-			$args->{coordinate}, $fstrand);
+			$reference, $fstrand);
 	}
 }
 
-sub _calculate_reference {
-	my ($self, $args) = @_;
+sub calculate_reference {
+	# my ($self, $args) = @_;
+	# I need position
+	# optionally alternate start, stop, and/or strand
+	my $self = shift;
+	my $args;
+	if (scalar @_ == 1) {
+		# single variable passed
+		if (ref($_[0]) eq 'HASH') {
+			$args = shift @_;
+		}
+		else {
+			# assumed to be the position
+			$args = {
+				position => $_[0]
+			};
+		}
+	}
+	else {
+		# multiple variables
+		$args = { @_ };
+	}
+	
+	# calculate reference coordinate
+	my $coordinate;
 	my $strand = defined $args->{strand} ? $args->{strand} : $self->strand;
 	if ($args->{position} == 5) {
 		if ($strand >= 0) {
-			$args->{coordinate} = $args->{practical_start} || $self->start;
+			$coordinate = $args->{practical_start} || $self->start;
 		}
 		else {
-			$args->{coordinate} = $args->{practical_stop} || $self->end;
+			$coordinate = $args->{practical_stop} || $self->end;
 		}
 	}
 	elsif ($args->{position} == 3) {
 		if ($strand >= 0) {
-			$args->{coordinate} = $args->{practical_stop} || $self->end;
+			$coordinate = $args->{practical_stop} || $self->end;
 		}
 		else {
-			$args->{coordinate} = $args->{practical_start} || $self->start;
+			$coordinate = $args->{practical_start} || $self->start;
 		}
 	}
 	elsif ($args->{position} == 4) {
 		# strand doesn't matter here
 		# but practical coordinates do
 		if (exists $args->{practical_start}) {
-			$args->{coordinate} = int( 
+			$coordinate = int( 
 				( ($args->{practical_start} + $args->{practical_stop}) / 2 ) + 0.5
 			); 
 		}
 		else {
-			$args->{coordinate} = $self->midpoint;
+			$coordinate = $self->midpoint;
 		}
 	}
 	elsif ($args->{position} == 9) {
 		# narrowPeak coordinate
-		$args->{coordinate} = $self->peak;
+		$coordinate = $self->peak;
 	}
 	else {
 		confess "position must be one of 5, 3, 4, or 9";
 	}
+	return $coordinate;
 }
 
 sub _avoid_positions {

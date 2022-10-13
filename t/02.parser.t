@@ -10,7 +10,7 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 614;
+	plan tests => 615;
 }
 else {
 	plan tests => 414;
@@ -919,6 +919,7 @@ sub test_parsed_narrowPeak_table {
 	is($row->name, 'narrowPeak207', 'row Feature name');
 	is($row->midpoint, 11909060, 'row Feature midpoint coordinate');
 	is($row->peak, 11908866, 'row Feature peak coordinate');
+	is($row->calculate_reference(9), 11908866, 'calculated reference point for peak');
 	
 	# seqfeature
 	my $f = $Data->get_seqfeature(1);

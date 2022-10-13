@@ -320,19 +320,15 @@ isnt($row->type, 'gene', 'Check attempted type change');
 is($row->type, 'region', 'Check actual type value');
 
 # check calculating reference point
-my $args = {position => 5};
-$row->_calculate_reference($args);
-is($args->{coordinate}, 52901, '5\' reference position');
-$args->{position} = 3;
-$row->_calculate_reference($args);
-is($args->{coordinate}, 54589, '3\' reference position');
-$args->{position} = 4;
-$row->_calculate_reference($args);
-is($args->{coordinate}, 53745, 'midpoint reference position');
-$args->{practical_start} = 1001;
-$args->{practical_stop}  = 2000;
-$row->_calculate_reference($args);
-is($args->{coordinate}, 1501, 'midpoint reference position of given positions');
+is($row->calculate_reference(5), 52901, '5\' reference position');
+is($row->calculate_reference(3), 54589, '3\' reference position');
+is($row->calculate_reference(4), 53745, 'midpoint reference position');
+my $args = {
+	position        => 4,
+	practical_start => 1001,
+	practical_stop  => 2000
+};
+is($row->calculate_reference($args), 1501, 'midpoint reference position of given positions');
 
 undef $row;
 undef $stream;
