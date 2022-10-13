@@ -1,6 +1,11 @@
 ######## Bio::ToolBox revision history #############
 
 
+v1.691
+	- Fix critical error in script get_relative_data.pl
+	- Fix prerequisite version numbers leading to build failures
+	- Change a private function to a public function
+
 v1.69
 	- Revise genomic sorting by introducing a sane, logical chromosome
 	ordering that smartly handles numerical, Roman, contigs, and 
