@@ -723,11 +723,7 @@ sub map_relative_long_data {
 	while (my $row = $stream->next_row) {
 		
 		# calculate a reference point using an internal feature method
-		my $args = {
-			position => $position
-		};
-		$row->_calculate_reference($args);
-		my $reference = $args->{coordinate};
+		my $reference = $row->calculate_reference($position);
 		
 		# collect the data for every window 
 		for (
