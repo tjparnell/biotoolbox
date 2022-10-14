@@ -16,8 +16,9 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     information. 
 
     Install [HTSlib](https://github.com/samtools/htslib) for Bam file support. You may 
-    already have it; later versions may work as well. It defaults to installing in 
-    `/usr/local`. 
+    already have it; later versions may (usually) work just as well, but version 1.9 
+    is officially recommended. It defaults to installing in `/usr/local` but doesn't 
+    have to be; see below. 
 
         $ curl -o htslib-1.9.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2 
         $ tar -xf htslib-1.9.tar.bz2
@@ -36,14 +37,17 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
 
 - Install Perl modules
 
-    These are the Perl modules that should be explicitly installed. See 
-    [Perl Modules](#perl-modules) below for more information. This assumes 
-    [CPAN Minus](https://metacpan.org/pod/App::cpanminus) is installed. 
+    These are the Perl modules that should be explicitly installed. A custom 
+    [minimal version](https://github.com/tjparnell/bioperl-live/tree/minimal-tjparnell)
+    of BioPerl is preferentially used. See [Perl Modules](#perl-modules) below for more 
+    information. This assumes [CPAN Minus](https://metacpan.org/pod/App::cpanminus) is 
+    installed. 
 
-        $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
-        $ cpanm Bio::DB::HTS
+        $ curl -O -L https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
         $ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
+        $ cpanm Minimal-BioPerl-1.7.8.tar.gz
         $ cpanm bio-db-big-master.zip
+        $ cpanm Bio::DB::HTS
         $ cpanm --notest Data::Swap
         $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
 
@@ -143,7 +147,7 @@ installed.
     is known to work; later versions should work too. By default, it installs into `/usr/local`, 
     or it may be set to another directory (`$HOME` for example) by adding `--prefix=$HOME` 
     option to the `configure` step. This may also be available via OS or other package 
-    managers.
+    managers. 
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
@@ -170,21 +174,17 @@ the end you will have installed dozens of packages.
 
 - [BioPerl](https://metacpan.org/pod/BioPerl)
 
-    The BioPerl package is a large bundle that brings along a number of extraneous 
-    modules and bundled scripts, the vast majority of which is not needed by Bio::ToolBox.
+    The BioPerl package is a large bundle consisting of hundreds of modules and 
+    bundled scripts, the vast majority of which is not needed by Bio::ToolBox.
     However, it is required by Bio::DB::HTS and all of the legacy adapters (see below). 
     
-    *NOTE*: With recent changes in version 1.7.3 and later, BioPerl is being
-    refactored and split into smaller packages, such as the legacy SeqFeature
-    database module (see below). While this may be good in the long run, the latest
-    CPAN release now forces the installation of an extraordinary number of
-    prerequisites. Installation of an older version is highly recommended for sanity
-    purposes. 
+	*NOTE:* For users with no other explicit need for BioPerl, an unofficial, custom, 
+	[minimal version](https://github.com/tjparnell/bioperl-live/tree/minimal-tjparnell) 
+	has been generated, which is considerably faster to install and has a footprint 
+	one-third the size of the full distribution; use this 
+	[file](https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz)
+	to install.
     
-    [Release
-    1.7.2](https://github.com/bioperl/bioperl-live/archive/release-1-7-2.tar.gz) is
-    the last, convenient, monolithic release and is recommended in most situations.
-
 - [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS)
 
     This provides a perl interface to the [HTSlib](https://github.com/samtools/htslib) 
@@ -226,7 +226,7 @@ the end you will have installed dozens of packages.
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
 
-    $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
+    $ cpanm Module::Build https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
     $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
 	$ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
 	$ cpanm --configure-args="--libbigwig $HOME" bio-db-big-master.zip
