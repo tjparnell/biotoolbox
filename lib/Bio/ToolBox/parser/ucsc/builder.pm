@@ -233,7 +233,7 @@ sub new {
 	
 	# verify
 	my @errors; 
-	push @errors, 'strand'     unless $self{strand}     =~ /^[\+\-]$/;
+	push @errors, 'strand'     unless $self{strand}     =~ /^[\+\-\.]$/;
 	push @errors, 'txStart'    unless $self{txStart}    =~ /^\d+$/;
 	push @errors, 'txEnd'      unless $self{txEnd}      =~ /^\d+$/;
 	push @errors, 'cdsStart'   unless $self{cdsStart}   =~ /^\d+$/;
@@ -247,7 +247,7 @@ sub new {
 	}
 	
 	# fix values
-	$self{strand}     = $self{strand} eq '+' ? 1 : -1;
+	$self{strand}     = $self{strand} eq '+' ? 1 : $self{strand} eq '-' ? -1 : 0;
 	$self{exonStarts} = [ map {$_ += 1} ( split ",", $self{exonStarts} ) ];
 	$self{exonEnds}   = [ ( split ",", $self{exonEnds} ) ];
 	
