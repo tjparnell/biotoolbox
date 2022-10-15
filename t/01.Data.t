@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 200;
+	plan tests => 224;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -31,6 +31,7 @@ is($Data->format, 'gff3', 'GFF3 format');
 is($Data->program, undef, 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
+is($Data->interbase, 0, 'coordinates are not interbase');
 is($Data->database, undef, 'database');
 is($Data->filename, $infile, 'filename');
 is($Data->basename, 'chrI', 'basename');
@@ -56,6 +57,7 @@ is($comments[2], 'this is a comment', 'added comment');
 is($Data->number_columns, 9, 'number of columns');
 
 # test last_row
+is($Data->number_rows, 79, 'number of rows');
 is($Data->last_row, 79, 'last row index');
 
 # test columns
@@ -64,6 +66,19 @@ is($Data->start_column, 3, 'start column');
 is($Data->stop_column, 4, 'stop column');
 is($Data->strand_column, 6, 'strand column');
 is($Data->type_column, 2, 'type column');
+
+# change column indexes
+is($Data->chromo_column(1), 1, 'changed chromosome column index');
+is($Data->start_column(1), 1, 'changed start column index');
+is($Data->stop_column(1), 1, 'changed stop column index');
+is($Data->strand_column(1), 1, 'changed strand column index');
+is($Data->type_column(1), 1, 'changed type column index');
+# change them all back to normal before continuing
+$Data->chromo_column(0);
+$Data->start_column(3);
+$Data->stop_column(4);
+$Data->strand_column(6);
+$Data->type_column(2);
 
 # test find_column
 is($Data->find_column('Group'), 8, 'find column Group');
@@ -126,12 +141,23 @@ $row = $stream->next_row;
 is($row->value(2), 'repeat_region', 'next row object value');
 is($row->end, 62, 'row object end value');
 
+# check gff attribute
+my $gff_att = $row->gff_attributes;
+isa_ok($gff_att, 'HASH', 'row GFF attributes hash');
+is($gff_att->{Name}, 'TEL01L-TR', 'row GFF attribute Name');
+$gff_att->{Note} = 'I hereby claim this telomeric repeat to be mine';
+is($row->rewrite_gff_attributes, 1, 'rewrite row GFF attributes');
+is($row->value(8), 
+	'ID=TEL01L-TR; Name=TEL01L-TR; Note=I%20hereby%20claim%20this%20telomeric%20repeat%20to%20be%20mine',
+	'rewritten row GFF attribute');
+
 # change value
 $row->value(4, 100);
 
 # check the changed value
-is($row->end, 100, 'checked changed row object end value');
+is($row->end, 62, 'checked row object cached end value');
 is($Data->value(2,4), 100, 'checked changed value in data table');
+is($row->end(100), 100, 'row end value changed via high level');
 
 # test delete row
 $Data->delete_row(1);
@@ -181,7 +207,7 @@ is($Data->value(78,3), 1, 'check last start after reverse sort');
 
 # genomic sort rows
 $Data->gsort_data;
-is($Data->value(1,8), 'Feature2', 'check first name after genomic sort');
+is($Data->value(1,8), 'Feature1', 'check first name after genomic sort');
 is($Data->value(1,3), 1, 'check first start after genomic sort');
 is($Data->value(78,8), 'Feature77', 'check last name after genomic sort');
 is($Data->value(78,3), 58695, 'check last start after genomic sort');
@@ -236,7 +262,9 @@ is($Data->filename, $file, 'filename');
 is($Data->basename, 'chrI', 'basename');
 is($Data->extension, '.bed', 'extension');
 is($Data->number_columns, 4, 'number of columns');
+is($Data->number_rows, 39, 'number of rows');
 is($Data->last_row, 39, 'last row index');
+is($Data->interbase, 1, 'coordinates are interbase');
 is($Data->chromo_column, 0, 'chromosome column');
 is($Data->start_column, 1, 'start column');
 is($Data->stop_column, 2, 'stop column');
@@ -264,7 +292,7 @@ is($Data->value(25,0), 'chrX', 'Feature chromosome actual value');
 
 is($row->value(1), 52800, 'Feature start actual value');
 is($row->start, 52801, 'Feature start coordinate');
-is($row->start(52901), 52900, 'Change start coordinate via high level');
+is($row->start(52901), 52901, 'Change start coordinate via high level');
 is($row->start, 52901, 'Feature changed start coordinate');
 is($Data->value(25,1), 52900, 'Feature start actual value');
 
@@ -290,6 +318,18 @@ is($row->type, 'region', 'Feature type (implied)');
 is($row->type('gene'), 'region', 'Attempt type change via high level');
 isnt($row->type, 'gene', 'Check attempted type change');
 is($row->type, 'region', 'Check actual type value');
+
+# check calculating reference point
+is($row->calculate_reference(5), 52901, '5\' reference position');
+is($row->calculate_reference(3), 54589, '3\' reference position');
+is($row->calculate_reference(4), 53745, 'midpoint reference position');
+my $args = {
+	position        => 4,
+	practical_start => 1001,
+	practical_stop  => 2000
+};
+is($row->calculate_reference($args), 1501, 'midpoint reference position of given positions');
+
 undef $row;
 undef $stream;
 undef $Data;
@@ -328,6 +368,8 @@ isa_ok($f, 'Bio::ToolBox::Data::Feature', 'next row Feature object');
 is($f->seq_id, 'chrI', 'feature seq_id');
 is($f->start, 35155, 'feature start position transformed');
 is($f->stop, 36303, 'feature stop position');
+is($f->midpoint, 35729, 'feature midpoint position');
+is($f->peak, 35729, 'feature peak position, default to midpoint');
 is($f->name, 'Feature41', 'feature name');
 is($f->coordinate, 'chrI:35154-36303', 'feature coordinate string');
 
@@ -390,6 +432,7 @@ is($Data->number_columns, 4, 'reloaded number of columns');
 
 ### Open a narrowPeak test file
 undef $Data;
+undef $row;
 $infile = File::Spec->catfile($Bin, "Data", "H3K4me3.narrowPeak");
 $Data = Bio::ToolBox::Data->new(
 	file => $infile,
@@ -406,6 +449,11 @@ is($Data->number_columns, 10, 'number of columns');
 is($Data->start_column, 1, 'start column');
 is($Data->stop_column, 2, 'stop column');
 is($Data->find_column('pValue'), 7, 'find column pValue');
+is($Data->find_column('peak'), 9, 'find column peak');
+$row = $Data->get_row(1);
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'first peak interval Feature object');
+is($row->peak, 11908866, 'peak interval peak coordinate');
+is($row->midpoint, 11909060, 'peak interval midpoint');
 
 
 
@@ -427,6 +475,5 @@ is($Data->number_columns, 15, 'number of columns');
 is($Data->start_column, 1, 'start column');
 is($Data->stop_column, 2, 'stop column');
 is($Data->find_column('pValue'), 13, 'find column pValue');
-
 
 

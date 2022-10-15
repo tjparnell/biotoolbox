@@ -6,14 +6,11 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Net::FTP;
-use Bio::ToolBox::utility qw(
-	format_with_commas
-	open_to_read_fh
-	open_to_write_fh
-);
+use Bio::ToolBox;
+use Bio::ToolBox::utility;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::GeneTools qw(gtf_string);
-my $VERSION = '1.60';
+my $VERSION = '1.69';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -94,11 +91,8 @@ if ($help) {
 # Print version
 if ($print_version) {
 	print " Biotoolbox script ucsc_table2gff3.pl, version $VERSION\n";
-	eval {
-		require Bio::ToolBox;
-		my $v = Bio::ToolBox->VERSION;
-		print " Biotoolbox package version $v\n";
-	};
+	my $v = Bio::ToolBox->VERSION;
+	print " Biotoolbox package version $v\n";
 	exit;
 }
 
@@ -410,7 +404,7 @@ sub open_output_gff {
 	}
 	
 	# open file handle
-	my $fh = open_to_write_fh($outfile, $gz) or
+	my $fh = Bio::ToolBox->write_file($outfile, $gz) or
 		die " unable to open file '$outfile' for writing!\n";
 	
 	# print comments
@@ -522,13 +516,11 @@ sub print_chromosomes {
 	my $out_fh = shift;
 	
 	# open the chromosome file
-	my $chromo_fh = open_to_read_fh($chromof) or die 
+	my $chromo_fh = Bio::ToolBox->read_file($chromof) or die 
 		"unable to open specified chromosome file '$chromof'!\n";
 	
 	# convert the chromosomes into GFF features
-	# UCSC orders their chromosomes by chromosome length
-	# I would prefer to order by numeric ID if possible
-	my %chromosomes;
+	my @chromosomes;
 	while (my $line = $chromo_fh->getline) {
 		next if ($line =~ /^#/);
 		chomp $line;
@@ -536,39 +528,15 @@ sub print_chromosomes {
 		unless (defined $chr and $end =~ m/^\d+$/) {
 			die " format of chromsome doesn't seem right! Are you sure?\n";
 		}
-		
-		# store the chromosome according to name
-		if ($chr =~ /^chr(\d+)$/i) {
-			$chromosomes{'numeric_chr'}{$1} = "$chr 1 $end";
-		}
-		elsif ($chr =~ /^chr(\w+)$/i) {
-			$chromosomes{'other_chr'}{$1} = "$chr 1 end";
-		}
-		elsif ($chr =~ /(\d+)$/) {
-			$chromosomes{'other_numeric'}{$1} = "$chr 1 end";
-		}
-		else {
-			$chromosomes{'other'}{$chr} = "$chr 1 end";
-		}
+		push @chromosomes, [$chr, $end];
 	}
 	$chromo_fh->close;
 	
 	# print the chromosomes
-	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'numeric_chr'} }) {
-		# numeric chromosomes
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'numeric_chr'}{$key});
-	}
-	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other_chr'} }) {
-		# other chromosomes
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other_chr'}{$key});
-	}
-	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'other_numeric'} }) {
-		# numbered contigs, etc
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other_numeric'}{$key});
-	}
-	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other'} }) {
-		# contigs, etc
-		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other'}{$key});
+	# UCSC orders their chromosomes by chromosome length
+	# I would prefer to order by ID if possible
+	foreach my $chr (sane_chromo_sort(@chromosomes)) {
+		$out_fh->printf("##sequence-region  %s 1 %d\n", $chr->[0], $chr->[1]);
 	}
 }
 

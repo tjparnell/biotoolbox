@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 608;
+	plan tests => 615;
 }
 else {
-	plan tests => 380;
+	plan tests => 414;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -649,8 +649,9 @@ sub test_parsed_gff_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($gfffile);
+	my ($flavor, $format) = $Data->taste_file($gfffile);
 	is($flavor, 'gff', 'GFF file flavor');
+	is($format, 'gff3', 'GFF file format');
 	my $p = $Data->parse_table($gfffile);
 	is($p, 1, 'parsed GFF table');
 	
@@ -727,8 +728,9 @@ sub test_parsed_ucsc_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($ucscfile);
+	my ($flavor, $format) = $Data->taste_file($ucscfile);
 	is($flavor, 'ucsc', 'UCSC file flavor');
+	is($format, 'genePredExt', 'UCSC file format');
 	my $p = $Data->parse_table($ucscfile);
 	is($p, 1, 'parsed UCSC table');
 	
@@ -898,8 +900,9 @@ sub test_parsed_narrowPeak_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($peakfile);
+	my ($flavor, $format) = $Data->taste_file($peakfile);
 	is($flavor, 'bed', 'narrowPeak file flavor');
+	is($format, 'narrowPeak', 'narrowPeak file format');
 	my $p = $Data->parse_table($peakfile);
 	is($p, 1, 'parsed narrowPeak table');
 	
@@ -909,8 +912,14 @@ sub test_parsed_narrowPeak_table {
 	is($Data->database, "Parsed:$peakfile", 'database source');
 	is($Data->name(0), 'Primary_ID', 'First column name');
 	is($Data->name(1), 'Name', 'Second column name');
-	is($Data->value(1,0), 'chr1:11908310-11909810', 'First row ID');
-	is($Data->value(1,1), 'narrowPeak207', 'First row Name');
+	
+	# row
+	my $row = $Data->get_row(1);
+	is($row->primary_id, 'chr1:11908310-11909810', 'row Feature ID');
+	is($row->name, 'narrowPeak207', 'row Feature name');
+	is($row->midpoint, 11909060, 'row Feature midpoint coordinate');
+	is($row->peak, 11908866, 'row Feature peak coordinate');
+	is($row->calculate_reference(9), 11908866, 'calculated reference point for peak');
 	
 	# seqfeature
 	my $f = $Data->get_seqfeature(1);
@@ -941,8 +950,9 @@ sub test_parsed_gappedPeak_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($gapfile);
+	my ($flavor, $format) = $Data->taste_file($gapfile);
 	is($flavor, 'bed', 'gappedPeak file flavor');
+	is($format, 'gappedPeak', 'gappedPeak file format');
 	my $p = $Data->parse_table($gapfile);
 	is($p, 1, 'parsed gappedPeak table');
 	

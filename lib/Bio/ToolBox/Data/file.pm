@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.68';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -103,13 +103,13 @@ sub taste_file {
 	
 	# check existing metadata
 	if ($Taste->gff) {
-		return 'gff';
+		return ('gff', $Taste->format);
 	}
 	elsif ($Taste->bed) {
-		return 'bed';
+		return ('bed', $Taste->format);
 	}
 	elsif ($Taste->ucsc) {
-		return 'ucsc';
+		return ('ucsc', $Taste->format);
 	}
 	
 	
@@ -119,7 +119,9 @@ sub taste_file {
 		# possibly a GFF file
 		$Taste->gff(2);
 		$Taste->verify(1);
-		return 'gff' if $Taste->gff == 2;
+		if ($Taste->gff == 2) {
+			return ('gff', $Taste->format);
+		}
 	}
 	elsif ($number == 10) {
 		# possibly a genePred file
@@ -128,7 +130,9 @@ sub taste_file {
 		return 'ucsc' if $Taste->ucsc == 10;
 		$Taste->add_ucsc_metadata(10,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 10;
+		if ($Taste->ucsc == 10) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	elsif ($number == 11) {
 		# possibly a refFlat file
@@ -137,40 +141,59 @@ sub taste_file {
 		return 'ucsc' if $Taste->ucsc == 11;
 		$Taste->add_ucsc_metadata(11,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 11;
+		if ($Taste->ucsc == 11) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	elsif ($number == 12) {
 		# possibly a knownGene or BED12 file
 		$Taste->ucsc(12);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 12;
+		if ($Taste->ucsc == 12) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->bed(12);
 		$Taste->verify(1);
-		return 'bed' if $Taste->bed == 12;
+		if ($Taste->bed == 12) {
+			return ('bed', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(12,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 12;
+		if ($Taste->ucsc == 12) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_bed_metadata(12,1); # force metadata
 		$Taste->verify(1);
-		return 'bed' if $Taste->bed == 12;
+		if ($Taste->bed == 12) {
+			return ('bed', $Taste->format);
+		}
 	}
 	elsif ($number == 15) {
 		# possibly a genePredExt file
 		$Taste->ucsc(15);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 15;
+		if ($Taste->ucsc == 15) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(15,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 15;
+		if ($Taste->ucsc == 15) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	elsif ($number == 16) {
 		# possibly a genePredExt file
 		$Taste->ucsc(16);
 		$Taste->verify(1);
+		if ($Taste->ucsc == 16) {
+			return ('ucsc', $Taste->format);
+		}
 		return 'ucsc' if $Taste->ucsc == 16; 
 		$Taste->add_ucsc_metadata(16,1); # force metadata
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 16;
+		if ($Taste->ucsc == 16) {
+			return ('ucsc', $Taste->format);
+		}
 	}
 	return;
 }
@@ -431,6 +454,11 @@ sub parse_headers {
 			my $i = $self->add_column('Column1');
 			$self->reorder_column($i, 0 .. $old_last);
 		}
+		if (ref($self) eq 'Bio::ToolBox::Data::Stream') {
+			# store an example first line for Stream objects
+			chomp $nextdata[-1];
+			$self->{example} = \@nextdata;
+		}
 	}
 	
 	# re-open the file
@@ -581,7 +609,7 @@ sub write_file {
 	elsif ($extension =~ /txt/i) {
 		# plain old text file, sounds good to me
 		# make sure headers are enabled
-		$self->{'headers'} = 1;
+		$self->{'headers'} = 1 unless $self->{'headers'} == -1; # original noheader
 	}
 	elsif (not $extension) {
 		# no extension was available
@@ -1150,6 +1178,12 @@ sub add_gff_metadata {
 			$self->gff(2); # hope for the best
 		}
 	}
+	# set format based on version
+	if (not $self->format) {
+		my $v = $self->gff;
+		my $f = $v == 3 ? 'gff3' : $v > 2 ? 'gtf' : 'gff';
+		$self->format($f);
+	}
 	
 	# set the metadata for the each column
 		# some of these may already be defined if there was a 
@@ -1215,6 +1249,7 @@ sub add_bed_metadata {
 		$bed_names = $self->standard_column_names('bed12');
 	}
 	$self->{'number_columns'} = $column_count; 
+	$self->{'zerostart'} = 1;
 	
 	# set the metadata for each column
 		# some of these may already be defined if there was a 
@@ -1276,6 +1311,7 @@ sub add_peak_metadata {
 		$column_names = $self->standard_column_names('bed12');
 	}
 	$self->{'number_columns'} = $column_count; 
+	$self->{'zerostart'} = 1;
 	
 	# add metadata
 	for (my $i = 0; $i < $column_count; $i++) {
@@ -1338,6 +1374,7 @@ sub add_ucsc_metadata {
 		$self->format('genePred');
 		$column_names = $self->standard_column_names('ucsc10');
 	}
+	$self->{'zerostart'} = 1;
 	
 	# assign the column names and metadata
 	for (my $i = 0; $i < $column_count; $i++) {
@@ -1709,12 +1746,15 @@ Pass the name of the filename.
 
 =item taste_file
 
-Tastes, or checks, a file for a certain flavor, or known gene file formats. 
-This is based on file extension, metadata headers, and/or file content 
-in the first 10 lines or so. Returns a string based on the file format.
-Values include gff, bed, ucsc, or undefined. Useful for determining if 
-the file represents a known gene table format that lacks a defined file 
-extension, e.g. UCSC formats. Pass the path to the file to check.
+Tastes, or checks, a file for a certain flavor, or known gene file formats.
+Useful for determining if the file represents a known gene table format
+that lacks a defined file extension, e.g. UCSC formats. This can be based
+on the file extension, metadata headers, and/or file contents from the
+first 10 lines. Returns two strings: the first is a generic flavor, and the
+second is a more specific format, if applicable. Generic flavor values will
+be one of `gff`, `bed`, `ucsc`, or `undefined`. These correlate to specific
+Parser adapters. Specific formats could be any number of possibilities, for
+example `undefined`, `gtf`, `gff3`, `narrowPeak`, `genePred`, etc.  
 
 =item sample_gff_type_list
 

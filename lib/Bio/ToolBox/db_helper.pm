@@ -837,7 +837,7 @@ use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
 use Module::Load; # for dynamic loading during runtime
-use List::Util qw(min max sum0);
+use List::Util qw(min max sum0 uniq);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
@@ -853,10 +853,86 @@ our $BAM_ADAPTER = undef; # preference for which bam adapter to use
 our $BIG_ADAPTER = undef;
 
 # define reusable variables
-our %total_read_number; # for rpm calculations
-our $primary_id_warning; # for out of date primary IDs
-our %OPENED_DB; # cache for some opened Bio::DB databases
-our %DB_METHODS; # cache for database score methods
+my %TOTAL_READ_NUMBER; # for rpm calculations
+my $PRIMARY_ID_WARNING; # for out of date primary IDs
+my %OPENED_DB; # cache for some opened Bio::DB databases
+my %DB_METHODS; # cache for database score methods
+
+# score calculators
+my %SCORE_CALCULATOR_SUB = (
+	'mean' => sub {
+		my $s = shift;
+		return sum0(@$s)/(scalar(@$s) || 1);
+	},
+	'sum'  => sub {
+		my $s = shift;
+		return sum0(@$s);
+	},
+	'median' => sub {
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return median(@$s);
+	},
+	'min' => sub {
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return min(@$s);
+	},
+	'max' => sub {
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return max(@$s);
+	},
+	'count' => sub {
+		my $s = shift;
+		return scalar(@$s);
+	},
+	'pcount' => sub {
+		my $s = shift;
+		return scalar(@$s);
+	},
+	'ncount' => sub {
+		# Convert names into unique counts
+		my $s = shift;
+		my %name2count;
+		foreach my $n (@$s) { 
+			if (ref($n) eq 'ARRAY') {
+				# this is likely from a ncount indexed hash
+				foreach (@$n) {
+					$name2count{$_} += 1;
+				} 
+			}
+			else {
+				$name2count{$n} += 1;
+			}
+		}
+		return scalar(keys %name2count);
+	},
+	'range' => sub {
+		# the range value is 'min-max'
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return range(@$s);
+	},
+	'stddev' => sub {
+		# we are using the standard deviation of the population, 
+		# since these are the only scores we are considering
+		my $s = shift;
+		return '.' unless scalar(@$s);
+		return stddevp(@$s);
+	},
+	'rpm' => sub {
+		confess " The rpm methods have been deprecated due to complexity and " .
+			"the variable way of calculating the value. Collect counts and " . 
+			"calculate your preferred way.\n";
+	},
+	'rpkm' => sub {
+		confess " The rpm methods have been deprecated due to complexity and " .
+			"the variable way of calculating the value. Collect counts and " . 
+			"calculate your preferred way.\n";
+	}
+);
+
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -928,6 +1004,9 @@ sub open_db_connection {
 	
 	# skip parsed databases
 	return if $database =~ /^Parsed:/; # we don't open parsed annotation files
+	
+	# remove file prefix, just in case
+	$database =~ s/^file://;
 	
 	
 	### Attempt to open the database
@@ -1023,14 +1102,8 @@ sub open_db_connection {
 	
 	}
 	
-	# check for a known file type
-	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig|cram/i) {
-		
-		# remove prefix, just in case
-		$database =~ s/^file://;
-		
-		# first check that it exists
-		if (-e $database) {
+	# a local existing file
+	elsif (-f $database) {
 		
 			# a Bam database
 			if ($database =~ /\.bam$/i) {
@@ -1105,7 +1178,7 @@ sub open_db_connection {
 			}
 			
 			# a Fasta File
-			elsif ($database =~ /\.fa(?:sta)?$/i) {
+			elsif ($database =~ /\.fa(?:sta)?(?:\.gz)?$/i) {
 				# first try a modern fai indexed adapter
 				_load_bam_helper_module() unless $BAM_OK;
 				if ($BAM_OK) {
@@ -1174,15 +1247,8 @@ sub open_db_connection {
 			
 			# something unrecognized?
 			else {
-				$error .= " ERROR! Cannot identify database type for $database!\n";
+				$error .= " ERROR! Cannot identify database type based on extension for $database!\n";
 			}
-		}
-		
-		# file does not exist or can be read
-		else {
-			# file does not exist
-			$error = " ERROR: file '$database' does not exist!\n";
-		}
 	}
 	
 	# a directory, presumably of bigwig files
@@ -1220,13 +1286,6 @@ sub open_db_connection {
 			}
 		}
 	}
-	
-	# unrecognized real file
-	elsif (-e $database) {
-		# file exists, I just don't recognize the extension
-		$error = " File '$database' type and/or extension is not recognized\n";
-	}
-	
 	
 	# otherwise assume the name of a SeqFeature::Store database in the configuration
 	else {
@@ -1336,14 +1395,14 @@ sub get_dataset_list {
 			
 			# get the appropriate tags
 			foreach my $attribute (keys %{ $metadata->{$file} } ) {
-				if ($attribute =~ m/^primary_tag|method$/i) {
-					$primary = $metadata->{$file}{$attribute};
-				}
-				elsif ($attribute =~ m/^type/i) {
+				if ($attribute =~ m/^type/i) {
 					$type = $metadata->{$file}{$attribute};
 				}
-				elsif ($attribute =~ m/^display_name/i) {
+				elsif ($attribute =~ m/name/i) {
 					$name = $metadata->{$file}{$attribute};
+				}
+				elsif ($attribute =~ m/^primary_tag|method$/i) {
+					$primary = $metadata->{$file}{$attribute};
 				}
 			}
 				
@@ -1352,7 +1411,8 @@ sub get_dataset_list {
 		}
 		
 		# sort the types in alphabetical order
-		@types = sort {$a cmp $b} @types;
+		# and discard duplicate types - which may occur with stranded entries
+		@types = uniq(sort {$a cmp $b} @types);
 	}
 	
 	# some other database
@@ -1653,10 +1713,10 @@ sub check_dataset_for_rpm_support {
 	# this uses the global variable $rpkm_read_sum
 	my $rpm_read_sum;
 	
-	if (exists $total_read_number{$dataset}) {
+	if (exists $TOTAL_READ_NUMBER{$dataset}) {
 		# this dataset has already been summed
 		# no need to do it again
-		$rpm_read_sum = $total_read_number{$dataset};
+		$rpm_read_sum = $TOTAL_READ_NUMBER{$dataset};
 	}
 	
 	elsif ($dataset =~ /\.bam$/) {
@@ -1698,7 +1758,7 @@ sub check_dataset_for_rpm_support {
 	}
 	
 	# return the sum value if we've made it this far
-	$total_read_number{$dataset} = $rpm_read_sum;
+	$TOTAL_READ_NUMBER{$dataset} = $rpm_read_sum;
 	return $rpm_read_sum;
 }
 
@@ -1799,11 +1859,9 @@ sub get_new_genome_list {
 	my $data = $args{data} || undef;
 	unless ($data) {
 		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
-		return;
 	}
 	unless (ref($data) eq 'Bio::ToolBox::Data') {
 		confess 'must pass a Bio::ToolBox::Data object!';
-		return;
 	}
 		
 	# Open a db connection 
@@ -1834,19 +1892,49 @@ sub get_new_genome_list {
 		return;
 	}
 	
+	# Load exclusion intervals
+	my %exclusion_tree;
+	$args{exclude} ||= $args{blacklist} || undef;
+	if (exists $args{exclude} and defined $args{exclude}) {
+		if (ref($args{exclude}) eq 'Bio::ToolBox::Data') {
+			if (_load_helper_module('Set::IntervalTree')) {
+				# iterate through the data object of intervals
+				# prepare an Interval Tree for each chromosome 
+				# and load the exclusion interval into it
+				$args{exclude}->iterate( sub {
+					my $row = shift;
+					unless (exists $exclusion_tree{$row->seq_id} ) {
+						$exclusion_tree{ $row->seq_id } = Set::IntervalTree->new();
+					}
+					$exclusion_tree{ $row->seq_id }->insert(1, $row->start - 1, $row->end);
+				} );
+			}
+			else {
+				carp " Set::IntervalTree must be installed to use exclusion intervals!";
+			}
+		}
+		else {
+			confess " Exclusion data must be a Bio::ToolBox::Data object!";
+		}
+	}
+	
 	# Collect the genomic windows
 	print "   Generating $args{win} bp windows in $args{step} bp increments\n";
 	foreach (@chromosomes) {
 		
 		# name and length as sub-array in each element
 		my ($chr, $length) = @{$_};
+		my $Tree = $exclusion_tree{$chr} || undef;
 		
+		# iterate through chromosome
 		for (my $start = 1; $start <= $length; $start += $args{step}) {
 			my $end = $start + $args{win} - 1; 
 			if ($end > $length) {
 				# fix end to the length of the chromosome
 				$end = $length;
-			} 
+			}
+			# skip if excluded
+			next if ($Tree and scalar( @{ $Tree->fetch($start - 1, $end) } ) >= 1);
 			$data->add_row( [ $chr, $start, $end] );
 		}
 	}
@@ -1895,9 +1983,9 @@ sub get_db_feature {
 		}
 		else {
 			# the primary_ids are out of date
-			unless ($primary_id_warning) {
+			unless ($PRIMARY_ID_WARNING) {
 				warn "CAUTION: Some primary IDs in Input file appear to be out of date\n";
-				$primary_id_warning++;
+				$PRIMARY_ID_WARNING++;
 			}
 		}
 	}
@@ -2031,63 +2119,10 @@ sub get_segment_score {
 sub calculate_score {
 	my ($method, $scores) = @_;
 	$scores ||= []; # just in case
-	
-	# calculate a score based on the method
-	if ($method eq 'mean') {
-		return sum0(@$scores)/(scalar(@$scores) || 1);
-	} 
-	elsif ($method eq 'sum') {
-		return sum0(@$scores);
-	}
-	elsif ($method eq 'median') {
-		return '.' unless scalar(@$scores);
-		return median(@$scores);
-	}
-	elsif ($method eq 'min') {
-		return '.' unless scalar(@$scores);
-		return min(@$scores);
-	}
-	elsif ($method eq 'max') {
-		return '.' unless scalar(@$scores);
-		return max(@$scores);
-	}
-	elsif ($method eq 'count' or $method eq 'pcount') {
-		return scalar(@$scores);
-	}
-	elsif ($method eq 'ncount') {
-		# Convert names into unique counts
-		my %name2count;
-		foreach my $s (@$scores) { 
-			if (ref($s) eq 'ARRAY') {
-				# this is likely from a ncount indexed hash
-				foreach (@$s) {
-					$name2count{$_} += 1;
-				} 
-			}
-			else {
-				$name2count{$s} += 1;
-			}
-		}
-		return scalar(keys %name2count);
-	}
-	elsif ($method eq 'range') {
-		# the range value is 'min-max'
-		return '.' unless scalar(@$scores);
-		return range(@$scores);
-	}
-	elsif ($method eq 'stddev') {
-		# we are using the standard deviation of the population, 
-		# since these are the only scores we are considering
-		return '.' unless scalar(@$scores);
-		return stddevp(@$scores);
-	}
-	elsif ($method =~ /rpk?m/) {
-		confess " The rpm methods have been deprecated due to complexity and " .
-			"the variable way of calculating the value. Collect counts and " . 
-			"calculate your preferred way.\n";
+	if (exists $SCORE_CALCULATOR_SUB{$method}) {
+		return &{$SCORE_CALCULATOR_SUB{$method}}($scores);
 	}
 	else {
-		# somehow bad method snuck past our checks
 		confess " unrecognized method '$method'!";
 	}
 }
@@ -2149,17 +2184,15 @@ sub get_chromosome_list {
 		# this doesn't follow the typical BioPerl convention
 		# it's a hash, so randomly sorted!!!!! Never will be in same order as file!!!!
 		my $chroms = $db->chroms();
-		# so we'll sort the chromosomes by decreasing length
-		# this is common for a lot of genomes anyway, except for yeast 
-		foreach (
-			sort { $b->[1] <=> $a->[1] }
-			map { [$_->{name}, $_->{length}] } 
-			values %$chroms
-		) {
+		
+		my @list;
+		foreach (values %$chroms) {
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $_->[0] =~ /$chr_exclude/i);
-			push @chrom_lengths, $_;
+			next if (defined $chr_exclude and $_->{name} =~ /$chr_exclude/i);
+			push @list, [$_->{name}, $_->{length}];
 		}
+		# sort consistently by a sane system
+		@chrom_lengths = sane_chromo_sort(@list);
 	}
 	
 	# UCSC kent Bigfile
@@ -2167,7 +2200,7 @@ sub get_chromosome_list {
 		foreach my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get chromosome size
 			my $length = $db->length($chr);
@@ -2190,7 +2223,7 @@ sub get_chromosome_list {
 			my $length = $db->target_len($tid);
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# store
 			push @chrom_lengths, [ $chr, $length ];
@@ -2201,7 +2234,7 @@ sub get_chromosome_list {
 	elsif ($type eq 'Bio::DB::HTS::Faidx') {
 		for my $chr ($db->get_all_sequence_ids) {
 			# check for excluded
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get length and store it
 			my $length = $db->length($chr);
@@ -2214,7 +2247,7 @@ sub get_chromosome_list {
 		for my $chr ($db->get_all_ids) {
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get chromosome size
 			my $seq = $db->get_Seq_by_id($chr);
@@ -2230,7 +2263,7 @@ sub get_chromosome_list {
 		foreach my $chr ($db->seq_ids) {
 		
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 		
 			# generate a segment representing the chromosome
 			# due to fuzzy name matching, we may get more than one back
@@ -2428,7 +2461,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak " Bam support is not enabled! " . 
-					"Is Bio::DB::Sam installed?\n";
+					"Is Bio::DB::HTS or Bio::DB::Sam installed?\n";
 			}
 		}
 		

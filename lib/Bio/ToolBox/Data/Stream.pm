@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.66';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -649,8 +649,9 @@ sub new {
 		$self->parse_headers($args{noheader});
 		$self->{line_count} = $self->{header_line_count};
 		
-		# push a dummy row, this will get tossed when the first next_row() is called
-		$self->{data_table}->[1] = $self->{'column_names'}; 
+		# add example row, this will get tossed when the first next_row() is called
+		$self->{data_table}->[1] = $self->{example};
+		delete $self->{example}; 
 	}
 	
 	# prepare to write to a new stream

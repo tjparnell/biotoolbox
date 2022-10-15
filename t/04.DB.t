@@ -70,8 +70,8 @@ ok($row->row_index, 'row index'); # could be anything
 is($row->type, 'gene:SGD', 'Feature type');
 is($row->name, 'YAL043C', 'Feature name');
 cmp_ok($row->id, '>=', 1, 'primary id'); # in memory db, could be anything?
-is($row->start, undef, 'Feature start, undefined'); # not in table, returns nothing
-is($row->stop, undef, 'Feature stop, undefined'); # not in table, returns nothing
+is($row->start, 58695, 'Feature start'); # now automatically collected from db
+is($row->stop, 61052, 'Feature stop'); # now automatically collected from db
 
 # test SeqFeature
 my $feature = $row->feature;
@@ -240,7 +240,7 @@ is(scalar(keys %score1), 26, 'number of keys avoided extended relative positione
 	'method' => 'count',
 );
 # print "position_score is \n" . print_hash(\%score1);
-is($score1{-5}, 1, 'count at relative position -5 in positioned score hash');
+is($score1{-6}, 1, 'count at relative position -5 in positioned score hash');
 
 
 

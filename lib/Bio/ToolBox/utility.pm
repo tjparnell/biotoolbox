@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.68';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -66,40 +66,21 @@ may be combined, for example two stranded bigWig files, with an ampersand.
 This function will safely remove the prefix, directories, and everything after 
 the first period. 
 
-=back
+=item sane_chromo_sort
 
-=head1 LEGACY SUBROUTINES
+    my @chromo = $db->seq_ids;
+    my @sorted = sane_chromo_sort(@chromo);
 
-These are additional functions that can be optionally exported. These provide 
-accessibility to the L<Bio::ToolBox::Data::file> functions that might be needed 
-for old scripts that do not implement L<Bio::ToolBox::Data> objects. You normally 
-should not need these. If you import these, be sure to import the ones above 
-if you need those too.
+This subroutine will take a list of chromosome or sequence identifiers and sort
+them into a reasonably sane order: standard numeric identifiers first (numeric
+order), sex chromosomes (alphabetical), mitochondrial, names with text and
+numbers (text first alphabetically, then numbers numerically) for contigs and
+such, and finally anything else (aciibetically). Any 'chr' prefix is ignored.
+Roman numerals are properly handled numerically. 
 
-=over 4
-
-=item open_to_read_fh
-
-Wrapper around L<Bio::ToolBox::Data::file/open_to_read_fh>.
-Opens a file as an L<IO::Handle> read only object. Transparently handles gzip 
-and bzip2 compression. 
-
-=item open_to_write_fh
-
-   my $fh = open_to_write_fh($file, $gz, $append);
-
-Wrapper around L<Bio::ToolBox::Data::file/open_to_write_fh>. 
-Opens a file as an L<IO::Handle> write only object. Pass the file name as the option.
-Optionally provide a boolean value if you want the file to be written as a compressed 
-gzip file. Pass another boolean value if you want to append to an existing file; 
-otherwise an existing file with the same name will be overwritten!
-
-=item check_file
-
-Wrapper around the L<Bio::ToolBox::Data::file/check_file> method.
-Checks to see if a file exists. If not, some common missing extensions are appended 
-and then existence is re-checked. If a file is found, the name is returned so that 
-it could be opened. Useful, for example, if you forget the F<.txt> or F<.gz> extensions.
+The provided list may be a list of SCALAR values (chromosome names) or ARRAY 
+references, with the first element assumed to be the name, e.g. 
+C<[$name, $length]>. 
 
 =back
 
@@ -109,7 +90,6 @@ use strict;
 use Carp;
 use File::Spec;
 require Exporter;
-use Bio::ToolBox::Data::file;
 
 
 ### Variables
@@ -120,11 +100,7 @@ our @EXPORT = qw(
 	format_with_commas
 	ask_user_for_index
 	simplify_dataset_name
-);
-our @EXPORT_OK = qw(
-	open_to_read_fh
-	open_to_write_fh
-	check_file
+	sane_chromo_sort
 );
 our $DATA_COLNAMES  = undef;
 our $DATA_FILENAME  = undef;
@@ -174,19 +150,21 @@ sub parse_list {
 sub format_with_commas {
 	# for formatting a number with commas
 	my $number = shift;
-	if ($number =~ /[^\d,\-\.]/) {
-		carp " the string contains characters that can't be parsed\n";
-		return $number;
-	}
 	
-	# check for decimals
-	my ($integers, $decimals);
-	if ($number =~ /^\-?(\d+)\.(\d+)$/) {
-		$integers = $1;
-		$decimals = $2;
+	# check number
+	my ($integers, $decimals, $sign);
+	if ($number =~ /^(\-)?(\d+)\.(\d+)$/) {
+		$sign     = $1;
+		$integers = $2;
+		$decimals = $3;
+	}
+	elsif ($number =~ /^(\-)?(\d+)$/) {
+		$sign     = $1;
+		$integers = $2;
 	}
 	else {
-		$integers = $number;
+		carp " the string contains characters that can't be parsed\n";
+		return $number;
 	}
 	
 	# format
@@ -207,8 +185,9 @@ sub format_with_commas {
 	}
 	
 	# finished
-	my $final = join("", @formatted);
-	$final .= $decimals if defined $decimals;
+	my $final = $sign ? $sign : '';
+	$final .= join("", @formatted);
+	$final .= '.' . $decimals if defined $decimals;
 	return $final;
 }
 
@@ -277,32 +256,125 @@ sub simplify_dataset_name {
 			}
 		}
 	}
-	elsif ($dataset =~ m|/|) {
-		# appears to have paths
-		my (undef, undef, $file_name) = File::Spec->splitpath($dataset);
-		$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-		$new_name = $file_name;
-	}
 	else {
-		# strip everything after first period, like above
-		$dataset =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-		$new_name = $dataset;
+		# a single dataset
+		# this could be either a file name or an entry in a BioPerl or BigWigSet database 
+		# remove any possible paths 
+		(undef, undef, $new_name) = File::Spec->splitpath($dataset);
+		
+		# remove any known file extensions
+		$new_name =~ s/\.(?:bw|bam|bb|useq|bigwig|bigbed|g[tf]f3?|cram|wig|bdg|bedgraph)(?:\.gz)?$//i;
+		
+		# remove common non-useful stuff
+		# trying to imagine all sorts of possible things
+		$new_name =~ s/[_\.\-](?:sort|sorted|dedup|dedupe|deduplicated|rmdup|mkdup|markdup|dup|unique|filt|filtered)\b//gi;
+		$new_name =~ s/[_\.\-](?:coverage|rpm|ext\d*|extend\d*|log2fe|log\d+|qvalue|fragment|count|lambda_control|fe|fold.?enrichment|ratio|log\d*ratio)\b//gi;
 	}
 	return $new_name;
 }
 
 
-sub open_to_read_fh {
-	return Bio::ToolBox::Data::file->open_to_read_fh(@_);
-}
-
-
-sub open_to_write_fh {
-	return Bio::ToolBox::Data::file->open_to_write_fh(@_);
-}
-
-sub check_file {
-	return Bio::ToolBox::Data::file->check_file(@_);
+sub sane_chromo_sort {
+	my @chroms = @_;
+	return unless scalar @chroms;
+	
+	# let's try and sort in some kind of rational order
+	my @numeric;
+	my @romanic;
+	my @mixed;
+	my @alphic;
+	my @sex;
+	my @mito;
+	foreach my $c (@chroms) {
+		
+		my $name;
+		if (ref($c) eq 'ARRAY') {
+			$name = $c->[0];
+		}
+		else {
+			$name = $c;
+		}
+		
+		# identify the type of chromosome name to sort
+		if ($name =~ /^(?:chr)?([wxyz])$/i) {
+			# sex chromosomes
+			push @sex, [$1, $c];
+		}
+		elsif ($name =~ /^(?:chr)?(?:m|mt|mito)(?:dna)?$/i) {
+			# mitochondrial
+			push @mito, [$name, $c];
+		}
+		elsif ($name =~ /^(?:chr)?(\d+)$/i) {
+			# standard numeric chromosome
+			push @numeric, [$1, $c];
+		} 
+		elsif ($name =~ /^(?:chr)?([IVX]+)$/) {
+			# Roman numerals - silly Saccharomyces cerevisiae
+			push @romanic, [$1, $c];
+		}
+		elsif ($name =~ /^([a-zA-Z_\-\.]+)(\d+)/) {
+			# presumed contigs and such?
+			push @mixed, [$1, $2, $name, $c];
+		}
+		else {
+			# everything else
+			push @alphic, [$name, $c];
+		}
+	}
+	
+	# check romanic 
+	if (scalar @romanic) {
+		# looks like we have romanic chromosomes
+		if (scalar @sex) {
+			# probably caught up chrX, unlikely WYZ
+			my @x = grep { $sex[$_]->[0] =~ m/^X$/ } (0 .. $#sex);
+			foreach (reverse @x) {
+				# I'm assuming and hoping there's only one chrX found
+				# but reverse the list, just in case - assuming grep returns in order
+				push @romanic, ( splice(@sex, $_, 1) );
+			}
+		}
+		if (scalar @numeric) {
+			# well, shoot, this is weird, mix of both numeric and romanic chromosomes?
+			# just merge romanic with alphic and hope for the best
+			push @alphic, @romanic;
+		}
+		else {
+			# convert the romanic to numeric 
+			while (@romanic) {
+				my $r = shift @romanic;
+				my $c = $r->[0];
+				$c =~ s/IV/4/;
+				$c =~ s/IX/9/;
+				$c =~ s/V/5/;
+				$c =~ s/I/1/g;
+				my $n = 0;
+				foreach (split q(), $c) {
+					if ($_ eq 'X') {
+						$n += 10;
+					}
+					else {
+						$n += $_;
+					}
+				}
+				push @numeric, [$n, $r->[1]];
+			}
+		}
+	}
+	
+	# sort
+	my @sorted;
+	push @sorted, map { $_->[1] } sort {$a->[0] <=> $b->[0]} @numeric;
+	push @sorted, map { $_->[1] } sort {$a->[0] cmp $b->[0]} @sex;
+	push @sorted, map { $_->[1] } sort {$a->[0] cmp $b->[0]} @mito;
+	push @sorted, map { $_->[3] } sort {
+		$a->[0] cmp $b->[0] or 
+		$a->[1] <=> $b->[1] or 
+		$a->[2] cmp $b->[2]
+	} @mixed; 
+	push @sorted, map { $_->[1] } sort { $a->[0] cmp $b->[0] } @alphic;
+	
+	return @sorted;
 }
 
 

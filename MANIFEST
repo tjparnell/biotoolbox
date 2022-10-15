@@ -52,6 +52,7 @@ scripts/merge_datasets.pl
 scripts/pull_features.pl
 scripts/split_data_file.pl
 scripts/ucsc_table2gff3.pl
+t/00.utility.t
 t/01.Data.t
 t/02.parser.t
 t/03.GeneTools.t

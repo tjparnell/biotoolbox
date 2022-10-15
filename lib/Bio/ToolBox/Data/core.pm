@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.66';
+our $VERSION = '1.69';
 
 =head1 NAME
 
@@ -58,6 +58,7 @@ sub new {
 		'comments'       => [],
 		'data_table'     => [],
 		'header_line_count' => 0,
+		'zerostart'      => 0,
 	);
 	
 	# Finished
@@ -1054,16 +1055,6 @@ sub gff {
 	my $self = shift;
 	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.[2|5]|3)$/) {
 		$self->{gff} = $_[0];
-		if ($_[0] eq '2.2' or $_[0] eq '2.5') {
-			$self->format('gtf');
-		}
-		elsif ($_[0] eq '3') {
-			$self->format('gff3');
-		}
-		else {
-			$self->format('gff');
-		}
-		
 	}
 	return $self->{gff};
 }
@@ -1098,12 +1089,17 @@ sub number_columns {
 	return $self->{number_columns};
 }
 
+sub number_rows {
+	my $self = shift;
+	carp "number_rows is a read only method" if @_;
+	return $self->{last_row};
+}
+
 sub last_column {
 	my $self = shift;
 	carp "last_column is a read only method" if @_;
 	return $self->{number_columns} - 1;
 }
-
 
 sub last_row {
 	my $self = shift;
@@ -1368,6 +1364,38 @@ sub _find_column_indices {
 	my $stop   = $self->find_column('^stop|end|txEnd');
 	my $strand = $self->find_column('^strand');
 	my $score  = $self->find_column('^score$');
+	
+	# check for coordinate string
+	my $coord  = $self->find_column('^coordinate$');
+	if (not defined $coord and not defined $chromo and not defined $start) {
+		# check if ID or name id looks like a coordinate string
+		if (defined $id and defined $self->{data_table}->[1]) {
+			if ($self->{data_table}->[1][$id] =~ /^[\w\-\.]+:\d+(?:[\-\.]{1,2}\d+)?$/) {
+				# first value looks like a coordinate string
+				$coord = $id;
+			}
+		}
+		if (
+			not defined $coord and defined $name and 
+			defined defined $self->{data_table}->[1]
+		) {
+			if ($self->{data_table}->[1][$name] =~ /^[\w\-\.]+:\d+(?:[\-\.]{1,2}\d+)?$/) {
+				# first value looks like a coordinate string
+				$coord = $name;
+			}
+		}
+	}
+	
+	# determine zero-based start coordinates
+	if (
+		$self->{zerostart} == 0 and 
+		defined $start and 
+		substr($self->name($start), -1) eq '0'
+	) {
+		$self->{zerostart} = 1;
+	}
+	
+	# cache the indexes
 	$self->{column_indices} = {
 		'name'      => $name,
 		'type'      => $type,
@@ -1379,70 +1407,158 @@ sub _find_column_indices {
 		'end'       => $stop,
 		'strand'    => $strand,
 		'score'     => $score,
+		'coord'     => $coord,
 	};
 	return 1;
 }
 
 sub chromo_column {
 	my $self = shift;
-	carp "chromo_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{chromo} = $_[0];
+		}
+		else {
+			carp sprintf("chromo_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{chromo};
 }
 
 sub start_column {
 	my $self = shift;
-	carp "start_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{start} = $_[0];
+		}
+		else {
+			carp sprintf("start_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{start};
 }
 
 sub stop_column {
 	my $self = shift;
-	carp "stop_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{stop} = $_[0];
+		}
+		else {
+			carp sprintf("stop_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{stop};
 }
+*end_column = \&stop_column;
 
-sub end_column {
-	return shift->stop_column;
+sub coord_column {
+	my $self = shift;
+	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{coord} = $_[0];
+		}
+		else {
+			carp sprintf("coord_column %s is not a valid index!", $_[0]);
+		}
+	}
+	return $self->{column_indices}{coord};
 }
 
 sub strand_column {
 	my $self = shift;
-	carp "strand_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{strand} = $_[0];
+		}
+		else {
+			carp sprintf("strand_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{strand};
 }
 
 sub name_column {
 	my $self = shift;
-	carp "name_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{name} = $_[0];
+		}
+		else {
+			carp sprintf("name_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{name};
 }
 
 sub type_column {
 	my $self = shift;
-	carp "type_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{type} = $_[0];
+		}
+		else {
+			carp sprintf("type_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{type};
 }
 
 sub id_column {
 	my $self = shift;
-	carp "id_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{id} = $_[0];
+		}
+		else {
+			carp sprintf("id_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{id};
 }
 
 sub score_column {
 	my $self = shift;
-	carp "score_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
+	if (defined $_[0]) {
+		if ($_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns}) {
+			$self->{column_indices}{score} = $_[0];
+		}
+		else {
+			carp sprintf("score_column %s is not a valid index!", $_[0]);
+		}
+	}
 	return $self->{column_indices}{score};
 }
 
+*zero_start = \&interbase;
+sub interbase {
+	my $self = shift;
+	if (@_) {
+		my $i = $self->start_column;
+		my $n = $self->name($i);
+		if ($_[0] eq '1' and $n =~ /^start$/i) {
+			$self->{zerostart} = 1;
+			$self->name($i, 'Start0');
+		}
+		elsif ($_[0] eq '0' and $n =~ /^start0$/i) {
+			$self->{zerostart} = 0;
+			$self->name($i, 'Start');
+		}
+		else {
+			carp "use 1 (true) or 0 (false) to set interbase mode";
+		}
+	}
+	return $self->{zerostart};
+}
 
 #### Special Row methods ####
 
@@ -1454,6 +1570,7 @@ sub score_column {
 # objects inherit from Data::core, this is in here.
 sub get_seqfeature {
 	my ($self, $row) = @_;
+	return unless (ref($self) eq 'Bio::ToolBox::Data');
 	return unless ($row and $row <= $self->{last_row});
 	return unless exists $self->{SeqFeatureObjects};
 	return $self->{SeqFeatureObjects}->[$row] || undef;
@@ -1543,6 +1660,11 @@ Returns or sets the short name of bam adapter being used: "sam" or "hts".
 Returns or sets the short name of the bigWig and bigBed adapter being 
 used: "ucsc" or "big".
 
+=item format
+
+Returns a text string describing the format of the file contents, such 
+as C<gff3>, C<gtf>, C<bed>, C<genePred>, C<narrowPeak>, etc.
+
 =item gff
 
 Returns or sets the GFF version value in the metadata.
@@ -1563,6 +1685,10 @@ Returns or sets the VCF version value in the metadata.
 =item number_columns
 
 Returns the number of columns in the data table.
+
+=item number_rows
+
+Returns the number of rows in the data table.
 
 =item last_column
 
@@ -1673,6 +1799,17 @@ column used in databases.
 
 Returns the index of the column that represents the Score 
 column in certain formats, such as GFF, BED, bedGraph, etc.
+
+=item zero_start
+
+=item interbase
+
+Returns true (1) or false (0) if the coordinate system appears to 
+be an interbase, half-open, or zero-based coordinate system. This is 
+based on file type, e.g. F<.bed>, or if the start coordinate column 
+name is C<start0>. The coordinate system can also be explicitly changed 
+by passing an appropriate value; note that this will also change the 
+start coordinate column name as appropriate. 
 
 =item get_seqfeature
 

@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = '1.68';
+our $VERSION = '1.691';
 
 =head1 NAME
 
@@ -175,13 +175,13 @@ names. Pass the names of the columns in the new table.
 
   $Data = Bio::ToolBox->new_data( qw(Name ID Score) );
     
-=item open_file
+=item read_file
 
 Open a generic file handle for reading. It transparently handles 
 compression as necessary. Returns an L<IO::File> object. Pass the 
 file path as an argument. 
     
-  $fh = Bio::ToolBox->open_file('mydata.txt.gz');
+  $fh = Bio::ToolBox->read_file('mydata.txt.gz');
     
 =item write_file
 
@@ -237,6 +237,7 @@ it under the terms of the Artistic License 2.0.
 =cut
 
 use strict;
+use Carp qw(cluck);
 use Bio::ToolBox::Data;
 
 1;
@@ -285,6 +286,12 @@ sub new_data {
 }
 
 sub open_file {
+	my $self = shift;
+	cluck("Bio::ToolBox->open_file has been replaced by read_file");
+	return Bio::ToolBox::Data->open_to_read_fh(@_);
+}
+
+sub read_file {
 	my $self = shift;
 	return Bio::ToolBox::Data->open_to_read_fh(@_);
 }

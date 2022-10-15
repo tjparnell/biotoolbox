@@ -57,7 +57,6 @@ my (
 	$smooth,
 	$sum,
 	$format,
-	$set_strand,
 	$groupcol,
 	$gz,
 	$cpu,
@@ -87,8 +86,6 @@ GetOptions(
 	'smooth!'        => \$smooth, # do not interpolate over missing values
 	'U|sum!'         => \$sum, # determine a final average for all the features
 	'r|format=i'     => \$format, # decimal formatting
-	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
-				# force_strand is preferred option, but respect the old option
 	'g|groups'       => \$groupcol, # write group column file
 	'z|gz!'          => \$gz, # compress the output file
 	'c|cpu=i'        => \$cpu, # number of execution threads
@@ -528,11 +525,8 @@ sub collect_binned_data {
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
 		
-		# identify the feature first
-		my $feature = $row->feature || $row;
-		
 		# define the starting and ending points based on gene length
-		my $length = defined $length_i ? $row->value($length_i) : $feature->length;
+		my $length = defined $length_i ? $row->value($length_i) : $row->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -562,14 +556,13 @@ sub collect_binned_data {
 		}
 		
 		my $regionscores = $row->get_region_position_scores(
-			'ddb'       => $ddb,
-			'dataset'   => $dataset,
-			'method'    => $method,
-			'extend'    => $extra,
-			'stranded'  => $stranded,
-			'strand'    => $set_strand ? $row->strand : $feature->strand,
+			'ddb'        => $ddb,
+			'dataset'    => $dataset,
+			'method'     => $method,
+			'extend'     => $extra,
+			'stranded'   => $stranded,
 			'subfeature' => $subfeature,
-			'length'    => $length,
+			'length'     => $length,
 		);
 		# record the scores for each bin
 		record_the_bin_values($row, $length, $regionscores);
@@ -585,11 +578,10 @@ sub collect_binned_long_data {
 	while (my $row = $stream->next_row) {
 		
 		# identify the feature or use the row
-		my $feature = $row->feature || $row;
-		my $fstart = $feature->start;
-		my $fstop = $feature->end;
-		my $strand = $set_strand ? $row->strand : $feature->strand;
-		my $length = $feature->length;
+		my $fstart = $row->start;
+		my $fstop  = $row->end;
+		my $strand = $row->strand;
+		my $length = $row->length; # subfeatures not allowed here, so use feature length
 		
 		# collect the scores to the bins in the region
 		for my $column ($startcolumn..($Data->last_column) ) {
@@ -663,10 +655,8 @@ sub collect_binned_long_data {
 			my $score = $row->get_score(
 				'ddb'         => $ddb,
 				'dataset'     => $dataset,
-				'chromo'      => $feature->seq_id,
 				'start'       => $start,
 				'stop'        => $stop,
-				'strand'      => $strand,
 				'method'      => $method,
 				'stranded'    => $stranded,
 			);
@@ -883,9 +873,6 @@ sub _set_metadata {
 	$Data->metadata($new_index, 'bin_size' , $binsize . $unit);
 	$Data->metadata($new_index, 'strand' , $stranded);
 	$Data->metadata($new_index, 'decimal_format', $format) if defined $format;
-	if ($set_strand) {
-		$Data->metadata($new_index, 'strand_implied', 1);
-	}
 	if ($data_database) {
 		$Data->metadata($new_index, 'db', $data_database);
 	}
@@ -926,7 +913,6 @@ A program to collect data in bins across a list of features.
   -t --strand [all|sense|antisense]   strand of data relative to feature (all)
   -u --subfeature [exon|cds|          collect over gene subfeatures 
         5p_utr|3p_utr] 
-  --force_strand                      use the specified strand in input file
   --long                              collect each window independently
   -r --format <integer>               number of decimal places for numbers
   
@@ -1062,16 +1048,6 @@ than one exon and you want to avoid double-counting.
 Specify whether stranded data should be collected. Three values are 
 allowed: all datasets should be collected (default), only sense 
 datasets, or only antisense datasets should be collected.
-
-=item --force_strand
-
-For features that are not inherently stranded (strand value of 0)
-or that you want to impose a different strand, set this option when
-collecting stranded data. This will reassign the specified strand for
-each feature regardless of its original orientation. This requires the
-presence of a "strand" column in the input data file. This option only
-works with input file lists of database features, not defined genomic
-regions (e.g. BED files). Default is false.
 
 =item --subfeature [ exon | cds | 5p_utr | 3p_utr ]
 

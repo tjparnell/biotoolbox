@@ -17,7 +17,6 @@ check_useq();
 check_sam();
 check_big();
 
-
 ### Build the script
 my $build = Module::Build->new(%$options);
 $build->create_build_script;
@@ -36,10 +35,10 @@ sub get_base_options {
 		dist_author       => 'Timothy Parnell <parnell.tj@gmail.com>',
 		dist_abstract     => 'Tools for querying and analysis of genomic data',
 		configure_requires => {
-			'Module::Build'           => 0,
+			'Module::Build'           => 0.42,
 		},
 		test_requires     => {
-			'Test::More'              => 0,
+			'Test::More'              => 1.302,
 		},
 		meta_merge        => {
 			resources     => {
@@ -48,19 +47,19 @@ sub get_base_options {
 		},
 		requires          => {
 			'Config::Simple'          => 4.58,
-			'Module::Load'            => 0,
+			'Module::Load'            => 0.32,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
-			'List::Util'              => 0,
-			'List::MoreUtils'         => 0,
-			'File::Which'             => 0,
+			'List::Util'              => 1.45,
+			'List::MoreUtils'         => 0.400,
+			'File::Which'             => 1.17,
 			'Getopt::Long'            => 2.24,
 		},
 		recommends        => {
 			'Net::FTP'                => 0,
 			'Parallel::ForkManager'   => 1.02,
 			'Set::IntervalTree'       => 0.10,
-			'Set::IntSpan::Fast::XS'  => 0,
+			'Set::IntSpan::Fast'      => 1.15,
 		},
 		script_files => [
 			'scripts/bam2wig.pl',
@@ -97,29 +96,36 @@ sub check_bio {
 	# plus Bio::DB::SeqFeature::Store is being split off as its own package, so need 
 	# to check for that separately
 	my $bio_ok;
-	eval {require Bio::Root::Root; $bio_ok = 1;};
+	eval {require Bio::Root::Version; $bio_ok = 1;};
 	if ($bio_ok) {
-		# version numbers gone to hell, hope for the best
-		$options->{'requires'}{'Bio::Root::Root'} = 0; # ideally 1.7.x, minimally 1.69
+		# # ideally 1.7.x, minimally 1.6.924
+		$options->{'requires'}{'Bio::Root::Version'} = 1.006924; 
 		my $sfdb;
 		eval {require Bio::DB::SeqFeature::Store; $sfdb = 1;};
 		unless ($sfdb) {
+			# Bio::DB::SeqFeature::Store is bundled with BioPerl prior to 1.7.3
+			# any bundled or non-bundled version is sufficient so long as 
+			# it meets minimum BioPerl requirements
 			$options->{'recommends'}{'Bio::DB::SeqFeature::Store'} = 0;
-			$options->{'recommends'}{'DBD::SQLite'} = 0;
 		}
 	}
 	else {
-		$options->{'recommends'}{'BioPerl'} = 0;
+		# version 1.7.2 is the last monolithic release so prefer that
+		# Bio::DB::SeqFeature::Store was split out with 1.7.3
+		# don't specify Store version since any minimal BioPerl version is sufficient
+		$options->{'recommends'}{'BioPerl'} = 1.007002;
 		$options->{'recommends'}{'Bio::DB::SeqFeature::Store'} = 0;
-		$options->{'recommends'}{'DBD::SQLite'} = 0;
 	}
+	# No longer recommend DBD::SQLite as it's only useful if using outdated custom
+	# Bio::DB::SeqFeature::Store databases, and if you're doing that, you'll install it
+	# or some other DBD database driver.
 }
 
 
 sub check_useq {
 	if ($] >= 5.010000) {
 		# Bio::DB::USeq requires perl 5.10
-		$options->{'recommends'}{'Bio::DB::USeq'} = 0.23;
+		$options->{'recommends'}{'Bio::DB::USeq'} = 0.25;
 	}
 }
 

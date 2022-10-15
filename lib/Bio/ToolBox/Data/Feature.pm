@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.68';
+our $VERSION = '1.691';
 
 =head1 NAME
 
@@ -123,6 +123,15 @@ Use the L</value> method if you don't want this to happen.
 The strand of the feature or segment. Returns -1, 0, or 1. Default is 0, 
 or unstranded.
 
+=item midpoint
+
+The calculated midpoint position of the feature.
+
+=item peak
+
+For features in a C<narrowPeak> file, this will report the peak coordinate, 
+transformed into a genomic coordinate. 
+
 =item name
 
 =item display_name
@@ -131,7 +140,9 @@ The name of the feature.
 
 =item coordinate
 
-Returns a coordinate string formatted as C<seqid:start-stop>.
+Returns a coordinate string formatted as C<seqid:start-stop>. This uses the 
+start coordinate as listed in the source file and does not convert 0-based 
+start values to 1-based values. This may confound downstream applications. 
 
 =item type
 
@@ -389,6 +400,30 @@ The following methods allow for data collection from various
 sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc. 
 
 =over 4
+
+=item calculate_reference($position)
+
+Calculates and returns the absolute genomic coordinate for a relative 
+reference position taking into account feature orientation (strand). 
+This is not explicitly data collection, but often used in conjunction
+with such. Provide an integer representing the relative position point:
+
+=over 4 
+
+=item * C<3> representing C<3'> end coordinate
+
+=item * C<4> representing mid point coordinate
+
+=item * C<5> representing C<5'> end coordinate
+
+=item * C<9> representing peak summit in F<narrowPeak> formatted files
+
+=back
+
+If necessary, an array or array reference may be provided as an 
+alternative parameter with keys including C<position>, C<strand>, 
+C<practical_start>, and C<practical_end> if alternate or adjusted 
+coordinates should be used instead of the given row feature coordinates.
 
 =item get_score
 
@@ -1068,11 +1103,11 @@ sub value {
 sub seq_id {
 	my $self = shift;
 	if ($_[0]) {
-		# update only if we have an actual column
 		my $i = $self->{data}->chromo_column;
+		# update only if we have an actual column
 		if (defined $i) {
-			my $c = $self->value($i, $_[0]);
-			return $c;
+			$self->value($i, $_[0]);
+			$self->{seqid} = $_[0];
 		}
 		elsif (exists $self->{feature}) {
 			carp "Unable to update seq_id for parsed SeqFeature objects";
@@ -1081,31 +1116,51 @@ sub seq_id {
 			carp "No Chromosome column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		my $c = $self->{feature}->seq_id;
-		return $c;
-	}
-	# collect from table
+	
+	# return cached value
+	return $self->{seqid} if exists $self->{seqid};
+	
+	# get seq_id value
+	my $c;
 	my $i = $self->{data}->chromo_column;
-	my $c = defined $i ? $self->value($i) : undef;
+	my $j = $self->{data}->coord_column;
+	if (defined $i) {
+		# collect from table
+		$c = $self->value($i);
+	}
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$c = $self->{feature}->seq_id;
+	}
+	elsif (defined $j) {
+		$self->_from_coordinate_string($j);
+		return $self->{seqid};
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$c = $f->seq_id;
+		}
+	}
+	$self->{seqid} = $c if defined $c;
 	return $c;
 }
 
 sub start {
 	my $self = shift;
 	if ($_[0]) {
-		# update only if we have an actual column
 		my $i = $self->{data}->start_column;
-		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
+		# update only if we have an actual column
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0; # looks like an integer
 		if (defined $i and $d) {
-			if (substr($self->{data}->name($i), -1) eq '0') {
+			if ($self->{data}->interbase) {
 				# compensate for 0-based, assuming we're always working with 1-based
-				my $n = $_[0] - 1;
-				return $self->value($i, $n);
+				$self->value($i, $_[0] - 1);
+				$self->{start} = $_[0];
 			}
 			else {
-				return $self->value($i, $_[0]);
+				$self->value($i, $_[0]);
+				$self->{start} = $_[0];
 			}
 		}
 		elsif (not $d) {
@@ -1118,34 +1173,50 @@ sub start {
 			carp "No Start coordinate column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		return $self->{feature}->start;
-	}
-	# collect from table
+	
+	# return cached value
+	return $self->{start} if exists $self->{start};
+	
+	# get start value
+	my $s;
 	my $i = $self->{data}->start_column;
+	my $j = $self->{data}->coord_column;
 	if (defined $i) {
-		my $s = $self->value($i);
-		if (substr($self->{data}->name($i), -1) eq '0') {
+		# collect from table
+		$s = $self->value($i);
+		if ($self->{data}->interbase) {
 			# compensate for 0-based index
-			return $s + 1;
-		}
-		else {
-			return $s;
+			$s += 1;
 		}
 	}
-	return;
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$s = $self->{feature}->start;
+	}
+	elsif (defined $j) {
+		$self->_from_coordinate_string($j);
+		return $self->{start};
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$s = $f->start;
+		}
+	}
+	$self->{start} = $s if defined $s;
+	return $s;
 }
 
 *stop = \&end;
 sub end {
 	my $self = shift;
 	if ($_[0]) {
-		# update only if we have an actual column
 		my $i = $self->{data}->stop_column;
+		# update only if we have an actual column
 		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
 		if (defined $i and $d) {
-			return $self->value($i, $_[0]);
+			$self->value($i, $_[0]);
+			$self->{end} = $_[0];
 		}
 		elsif (not $d) {
 			carp "End coordinate value is not an integer";
@@ -1157,16 +1228,33 @@ sub end {
 			carp "No End coordinate column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		my $e = $self->{feature}->end;
-		$self->{end} = $e;
-		return $e;
-	}
-	# collect from table
+	
+	# return cached value
+	return $self->{end} if exists $self->{end};
+	
+	# get end value
+	my $e;
 	my $i = $self->{data}->stop_column;
-	my $e = defined $i ? $self->value($i) : undef;
-	$self->{end} = $e;
+	my $j = $self->{data}->coord_column;
+	if (defined $i) {
+		# collect from table
+		$e = $self->value($i);
+	}
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$e = $self->{feature}->end;
+	}
+	elsif (defined $j) {
+		$self->_from_coordinate_string($j);
+		return $self->{end};
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$e = $f->end;
+		}
+	}
+	$self->{end} = $e if defined $e;
 	return $e;
 }
 
@@ -1177,7 +1265,7 @@ sub strand {
 		my $i = $self->{data}->strand_column;
 		if (defined $i) {
 			$self->value($i, $_[0]);
-			return $self->_strand($_[0]);
+			$self->{strand} = $self->_strand($_[0]);
 		}
 		elsif (exists $self->{feature}) {
 			carp "Unable to update Strand for parsed SeqFeature objects";
@@ -1186,14 +1274,28 @@ sub strand {
 			carp "No Strand column to update!";
 		}
 	}
-	# seqfeature
-	if (exists $self->{feature}) {
-		my $s = $self->{feature}->strand;
-		return $s;
+	
+	# return cached value
+	return $self->{strand} if exists $self->{strand};
+	
+	# get strand value
+	my $s = 0;
+	if (my $i = $self->{data}->strand_column) {
+		# collect from table
+		$s = $self->_strand( $self->value($i) );
 	}
-	# collect from table
-	my $i = $self->{data}->strand_column;
-	return defined $i ? $self->_strand( $self->value($i) ) : 0;
+	elsif (exists $self->{feature}) {
+		# seqfeature
+		$s = $self->{feature}->strand;
+	}
+	elsif ($self->feature_type eq 'named') {
+		my $f = $self->seqfeature;
+		if ($f) {
+			$s = $f->strand;
+		}
+	}
+	$self->{strand} = $s;
+	return $s;
 }
 
 sub _strand {
@@ -1221,6 +1323,46 @@ sub _strand {
 	}
 	else {
 		return 0;
+	}
+}
+
+sub _from_coordinate_string {
+	my ($self, $i) = shift;
+	my ($chr, $start, $end, $str) = split /(?:\-|\.\.|\s)/, $self->value($i);
+	$self->{seqid} = $chr unless exists $self->{seqid};
+	$self->{start} = $start unless exists $self->{start};
+		# we assume this is a 1-based coordinate
+	$self->{end}   = $end unless exists $self->{end};
+	if (defined $str and not exists $self->{strand}) {
+		# you never know, the strand may be added to the string
+		$self->{strand} = $self->_strand($str);
+	}
+}
+
+sub peak {
+	my $self = shift;
+	if ($self->{data}->format eq 'narrowPeak') {
+		if (exists $self->{feature} and $self->{feature}->has_tag('peak')) {
+			return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
+		}
+		else {
+			return $self->value(1) + $self->value(9) + 1;
+		}
+	}
+	else {
+		return $self->midpoint;
+	}
+}
+
+sub midpoint {
+	my $self = shift;
+	my $s = $self->start;
+	my $e = $self->end;
+	if ($s and $e) {
+		return int( ($s + $e) / 2 );
+	}
+	else {
+		return undef;
 	}
 }
 
@@ -1355,7 +1497,7 @@ sub gff_attributes {
 	return $self->{attributes} if (exists $self->{attributes});
 	$self->{attributes} = {};
 	foreach my $g (split(/\s*;\s*/, $self->value(8))) {
-		my ($tag, $value) = split /\s+/, $g;
+		my ($tag, $value) = split /\s+|=/, $g;
 		next unless ($tag and $value);
 		# unescape URL encoded values, borrowed from Bio::DB::GFF
 		$value =~ tr/+/ /;
@@ -1795,7 +1937,9 @@ sub get_relative_point_position_scores {
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# determine reference coordinate
-	$self->_calculate_reference(\%args) unless defined $args{coordinate};
+	unless (defined $args{coordinate}) {
+		$args{coordinate} = $self->calculate_reference(\%args);
+	}
 	
 	# build parameter array to pass on to the adapter
 	my @params;
@@ -1889,7 +2033,9 @@ sub get_region_position_scores {
 	}
 	else {
 		# return data converted to relative positions
-		$self->_calculate_reference(\%args) unless defined $args{coordinate};
+		unless (defined $args{coordinate}) {
+			$args{coordinate} = $self->calculate_reference(\%args);
+		}
 		return $self->_convert_to_relative_positions($pos2data, 
 			$args{coordinate}, $params[STR]);
 	}
@@ -1990,36 +2136,74 @@ sub _get_subfeature_position_scores {
 		# can no longer use original coordinates, but instead the new shifted coordinates
 		$args->{practical_start} = $practical_start;
 		$args->{practical_stop} = $current_end; 
-		$self->_calculate_reference($args);
+		my $reference = $self->calculate_reference($args);
 		return $self->_convert_to_relative_positions($pos2data, 
-			$args->{coordinate}, $fstrand);
+			$reference, $fstrand);
 	}
 }
 
-sub _calculate_reference {
-	my ($self, $args) = @_;
-	my $feature = $self->seqfeature || $self;
-	my $strand = defined $args->{strand} ? $args->{strand} : $feature->strand;
-	if ($args->{position} == 5 and $strand >= 0) {
-		$args->{coordinate} = $args->{practical_start} || $feature->start;
+sub calculate_reference {
+	# my ($self, $args) = @_;
+	# I need position
+	# optionally alternate start, stop, and/or strand
+	my $self = shift;
+	my $args;
+	if (scalar @_ == 1) {
+		# single variable passed
+		if (ref($_[0]) eq 'HASH') {
+			$args = shift @_;
+		}
+		else {
+			# assumed to be the position
+			$args = {
+				position => $_[0]
+			};
+		}
 	}
-	elsif ($args->{position} == 3 and $strand >= 0) {
-		$args->{coordinate} = $args->{practical_stop} || $feature->end;
+	else {
+		# multiple variables
+		$args = { @_ };
 	}
-	elsif ($args->{position} == 5 and $strand < 0) {
-		$args->{coordinate} = $args->{practical_stop} || $feature->end;
+	
+	# calculate reference coordinate
+	my $coordinate;
+	my $strand = defined $args->{strand} ? $args->{strand} : $self->strand;
+	if ($args->{position} == 5) {
+		if ($strand >= 0) {
+			$coordinate = $args->{practical_start} || $self->start;
+		}
+		else {
+			$coordinate = $args->{practical_stop} || $self->end;
+		}
 	}
-	elsif ($args->{position} == 3 and $strand < 0) {
-		$args->{coordinate} = $args->{practical_start} || $feature->start;
+	elsif ($args->{position} == 3) {
+		if ($strand >= 0) {
+			$coordinate = $args->{practical_stop} || $self->end;
+		}
+		else {
+			$coordinate = $args->{practical_start} || $self->start;
+		}
 	}
 	elsif ($args->{position} == 4) {
 		# strand doesn't matter here
-		my $s = $args->{practical_start} || $feature->start;
-		$args->{coordinate} = $s + int(($feature->length / 2) + 0.5);
+		# but practical coordinates do
+		if (exists $args->{practical_start}) {
+			$coordinate = int( 
+				( ($args->{practical_start} + $args->{practical_stop}) / 2 ) + 0.5
+			); 
+		}
+		else {
+			$coordinate = $self->midpoint;
+		}
+	}
+	elsif ($args->{position} == 9) {
+		# narrowPeak coordinate
+		$coordinate = $self->peak;
 	}
 	else {
-		croak "position must be one of 5, 3, or 4";
+		confess "position must be one of 5, 3, 4, or 9";
 	}
+	return $coordinate;
 }
 
 sub _avoid_positions {
@@ -2226,6 +2410,13 @@ sub bed_string {
 		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
 	}
+	if ($start > $stop) {
+		# reversed coordinates? old school way of setting reverse strand
+		my $s  = $start;
+		$start = $stop;
+		$stop  = $s;
+		$args{strand} = -1; # this will override any user provided data?
+	}
 	$start -= 1; # 0-based coordinates
 	my $string = "$chr\t$start\t$stop";
 	
@@ -2269,6 +2460,13 @@ sub gff_string {
 	if ($chr eq '.' or not CORE::length($chr) or $start eq '.' or not CORE::length($start)) {
 		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
+	}
+	if ($start > $stop) {
+		# reversed coordinates? old school way of setting reverse strand
+		my $s  = $start;
+		$start = $stop;
+		$stop  = $s;
+		$args{strand} = -1; # this will override any user provided data?
 	}
 	my $strand;
 	if (exists $args{strand} and defined $args{strand}) {

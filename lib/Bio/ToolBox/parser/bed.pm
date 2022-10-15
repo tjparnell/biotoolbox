@@ -695,7 +695,7 @@ sub _parse_gappedPeak {
 	my @new = (
 		$data[3], # name
 		$data[0], # chrom
-		'+',      # strand is typically unstranded, so just pretend to be 
+		$data[5], # strand
 		$data[1], # txStart
 		$data[2], # txStop
 		$data[6], # cdsStart
@@ -712,7 +712,6 @@ sub _parse_gappedPeak {
 	# clean up feature and add extra values
 	$feature->add_tag_value('itemRGB', $data[8]);
 	$feature->score($data[4]);
-	$feature->strand($data[5]);
 	$feature->primary_tag('region'); # it is not a RNA
 	$feature->primary_id(sprintf("%s:%d-%d", $data[0], $data[1], $data[2]));
 		# change the primary ID to match other bed file behavior, not UCSC files'
