@@ -13,7 +13,7 @@ if (eval {require Bio::SeqFeature::Lite; 1}) {
 	plan tests => 615;
 }
 else {
-	plan tests => 414;
+	plan tests => 415;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
