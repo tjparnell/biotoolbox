@@ -268,6 +268,7 @@ sub parse_headers {
 		# no real line, just empty space
 		if ($line !~ m/\w+/) {
 			$header_line_count++;
+			$line = $fh->getline; 
 			next;
 		}
 		
