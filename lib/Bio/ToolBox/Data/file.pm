@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -301,12 +301,22 @@ sub parse_headers {
 		}
 		
 		# gff version header
-		elsif ($line =~ /^##gff-version\s+([\d\.]+)$/) {
+		elsif ($line =~ /^##gff.version\s+([\d\.]+)$/) {
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			my $g = $1;
 			$self->gff($g);
+			if ($g == 3) {
+				$self->format('gff3');
+			}
+			elsif ($g > 2) {
+				$self->format('gtf');
+			}
+			else {
+				$self->format('gff');
+			}
+			# format gets properly set below when add
 			$header_line_count++;
 		}
 		
@@ -317,6 +327,7 @@ sub parse_headers {
 			# it if it is
 			my $v = $1;
 			$self->vcf($v);
+			$self->format('vcf');
 			$self->add_comment($line); # so that it is written properly
 			$header_line_count++;
 		}
@@ -1164,6 +1175,7 @@ sub add_gff_metadata {
 	my $force = shift || 0;
 	
 	# set the gff version based on the extension if it isn't already
+	# normally gff version should already be defined from pragma when parsing headers
 	if (not($self->gff) or $force) {
 		if (defined $version) {
 			$self->gff($version);
@@ -1180,9 +1192,16 @@ sub add_gff_metadata {
 	}
 	# set format based on version
 	if (not $self->format) {
-		my $v = $self->gff;
-		my $f = $v == 3 ? 'gff3' : $v > 2 ? 'gtf' : 'gff';
-		$self->format($f);
+		my $g = $self->gff;
+		if ($g == 3) {
+			$self->format('gff3');
+		}
+		elsif ($g > 2) {
+			$self->format('gtf');
+		}
+		else {
+			$self->format('gff');
+		}
 	}
 	
 	# set the metadata for the each column
@@ -1239,11 +1258,13 @@ sub add_bed_metadata {
 	# check bed type and set metadata appropriately
 	my $bed_names;
 	if ($self->format =~ /bedgraph/i or $self->extension =~ /bg|bdg|graph/i) {
+		# bedGraph format, enforce uniformity
 		$self->format('bedGraph'); # possibly redundant
 		$self->bed($column_count);
 		$bed_names = $self->standard_column_names('bdg');
 	}
 	else {
+		# other bed format
 		$self->format('bed');
 		$self->bed($column_count);
 		$bed_names = $self->standard_column_names('bed12');
