@@ -111,6 +111,12 @@ sub taste_file {
 	elsif ($Taste->ucsc) {
 		return ('ucsc', $Taste->format);
 	}
+	elsif ($Taste->vcf) {
+		return ('vcf', $Taste->format);
+	}
+	elsif ($Taste->format) {
+		return ('', $Taste->format);
+	}
 	
 	
 	# check if the number of columns match a known format, then verify
@@ -127,7 +133,9 @@ sub taste_file {
 		# possibly a genePred file
 		$Taste->ucsc(10);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 10;
+		if ($Taste->ucsc == 10) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(10,1); # force metadata
 		$Taste->verify(1);
 		if ($Taste->ucsc == 10) {
@@ -138,7 +146,9 @@ sub taste_file {
 		# possibly a refFlat file
 		$Taste->ucsc(11);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 11;
+		if ($Taste->ucsc == 11) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(11,1); # force metadata
 		$Taste->verify(1);
 		if ($Taste->ucsc == 11) {
@@ -195,7 +205,7 @@ sub taste_file {
 			return ('ucsc', $Taste->format);
 		}
 	}
-	return;
+	return (undef, undef);
 }
 
 sub sample_gff_type_list {
@@ -302,20 +312,26 @@ sub parse_headers {
 		}
 		
 		# gff version header
-		elsif ($line =~ /^##gff.version\s+([\d\.]+)$/) {
+		elsif ($line =~ /^##(g[vf]f).version\s+([\d\.]+)$/) {
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			my $g = $1;
-			$self->gff($g);
-			if ($g == 3) {
-				$self->format('gff3');
+			my $v = $2;
+			if ($g eq 'gff') {
+				$self->gff($v);
+				if ($v == 3) {
+					$self->format('gff3');
+				}
+				elsif ($v > 2 and $v < 3) {
+					$self->format('gtf');
+				}
+				else {
+					$self->format('gff');
+				}
 			}
-			elsif ($g > 2) {
-				$self->format('gtf');
-			}
-			else {
-				$self->format('gff');
+			elsif ($g eq 'gvf') {
+				$self->format('gvf');
 			}
 			# format gets properly set below when add
 			$header_line_count++;
@@ -328,7 +344,7 @@ sub parse_headers {
 			# it if it is
 			my $v = $1;
 			$self->vcf($v);
-			$self->format('vcf');
+			$self->format(sprintf "VCFv%s", $v);
 			$self->add_comment($line); # so that it is written properly
 			$header_line_count++;
 		}
@@ -373,7 +389,7 @@ sub parse_headers {
 			my $format = $self->format || $self->extension;
 			
 			### a GFF file
-			if ($format =~ /g[tf]f/i) {
+			if ($format =~ /g[tvf]f/i) {
 				$self->add_gff_metadata;
 			}
 			
@@ -1266,7 +1282,7 @@ sub add_bed_metadata {
 	}
 	else {
 		# other bed format
-		$self->format('bed');
+		$self->format(sprintf "bed%d", $column_count);
 		$self->bed($column_count);
 		$bed_names = $self->standard_column_names('bed12');
 	}
@@ -1449,7 +1465,8 @@ sub add_sgr_metadata {
 		}
 	}
 	$self->{data_table}->[0] = $self->{'column_names'};
-	$self->{'number_columns'} = 3; 
+	$self->{'number_columns'} = 3;
+	$self->format('sgr');
 
 
 	# set headers flag to false
