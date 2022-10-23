@@ -253,7 +253,7 @@ $Data = Bio::ToolBox::Data->new(file => $file);
 isa_ok($Data, 'Bio::ToolBox::Data', 'Bed Data');
 is($Data->gff, 0, 'gff version');
 is($Data->bed, 4, 'bed version');
-is($Data->format, 'bed', 'bed format');
+is($Data->format, 'bed4', 'bed format');
 is($Data->program, undef, 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
