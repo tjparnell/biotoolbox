@@ -644,12 +644,21 @@ sub write_file {
 		# try and determine one from metadata
 			
 		if ($self->gff) {
-			$extension = $self->gff == 3 ? '.gff3' : $self->gff == 2.5 ? '.gtf' : '.gff';
+			if ($self->gff == 3) {
+				$extension = '.gff3';
+			}
+			elsif ($self->gff > 2 and $self->gff < 3) {
+				$extension = '.gtf';
+			}
+			else {
+				$extension = '.gff';
+			}
 		} 
 		elsif ($self->bed) {
 			if ($self->format) {
 				# re-use the format value as the extension
-				$extension = sprintf(".%s", $self->format);
+				$extension = sprintf ".%s", $self->format;
+				$extension =~ s/\d+$//; # remove any digit after the bed format
 			}
 			elsif (
 				$self->number_columns == 4 and 
