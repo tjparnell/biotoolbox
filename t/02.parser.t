@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 615;
+	plan tests => 618;
 }
 else {
-	plan tests => 414;
+	plan tests => 418;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -84,7 +84,7 @@ sub test_gff {
 	is($gff->do_exon, 0, 'gff do_exon');
 	my $fh = $gff->fh;
 	isa_ok($fh, 'IO::File', 'IO filehandle');
-	is($gff->version, 3, 'GFF version');
+	is($gff->version, 'gff3', 'GFF version');
 	my $list = $gff->typelist;
 	# print "gff type list is $list\n";
 	# region,binding_site,CDS,repeat_region,long_terminal_repeat,gene,chromosome,nucleotide_match,ARS,telomere
@@ -101,7 +101,7 @@ sub test_gff {
 	is($f->primary_id, 'TEL01L-TR', 'feature primary_id');
 
 
-	# parse gene table
+	# reload the table to parse everything
 	undef $gff;
 	$gff = Bio::ToolBox::parser::gff->new(
 		file => $gfffile,
@@ -165,7 +165,7 @@ sub test_gtf {
 	isa_ok($gtf, 'Bio::ToolBox::parser::gff', 'gff Parser');
 	my $fh = $gtf->fh;
 	isa_ok($fh, 'IO::File', 'IO filehandle');
-	is($gtf->version, '2.5', 'GFF version');
+	is($gtf->version, 'gtf', 'GFF version');
 	is($gtf->do_gene, 1, 'gtf do_gene');
 	is($gtf->do_cds, 0, 'gtf do_cds');
 	is($gtf->do_exon, 1, 'gtf do_exon');
@@ -181,7 +181,7 @@ sub test_gtf {
 	is($f->display_name, 'ENST00000411647', 'transcript display_name');
 	is($f->primary_id, 'ENST00000411647', 'transcript primary_id');
 
-	# reload the table
+	# reload the table to parse everything
 	undef $f;
 	undef $gtf;
 	$gtf = Bio::ToolBox::parser::gff->new(
@@ -313,7 +313,7 @@ sub test_ucsc {
 	undef $t;
 	undef $e;
 
-	# reload the table
+	# reload the table to parse everything
 	my $reload = $ucsc->parse_table($ucscfile);
 	is($reload, 1, "ucsc parse table");
 
@@ -416,15 +416,15 @@ sub test_bed6 {
 	is($f->seq_id, 'chrI', 'feature seq_id');
 	is($f->start, 54989, 'feature start');
 	is($f->stop, 56857, 'feature stop');
-	is($f->primary_tag, 'region', 'feature primary_tag');
+	is($f->primary_tag, 'feature', 'feature primary_tag');
 	is($f->display_name, 'YAL047C', 'feature display_name');
 	is($f->primary_id, 'chrI:54988-56857', 'feature primary_id');
 	is($f->strand, -1, 'feature strand');
-	is($f->source, 'sample', 'feature source');
+	is($f->source, '', 'feature source');
 	my @transcripts = $f->get_SeqFeatures;
 	is(scalar(@transcripts), 0, 'number of subfeatures');
 	
-	# reload the table
+	# reload the table to parse everything
 	undef $f;
 	undef $bed;
 	$bed = Bio::ToolBox::parser::bed->new(
@@ -441,7 +441,7 @@ sub test_bed6 {
 	isa_ok($f, $sfclass, 'fetched bed6 seqfeature object');
 	is($f->start, 57950, 'feature2 start');
 	is($f->stop, 58462, 'feature2 stop');
-	is($f->primary_tag, 'region', 'feature2 primary_tag');
+	is($f->primary_tag, 'feature', 'feature2 primary_tag');
 	is($f->display_name, 'YAL044C', 'feature2 display_name');
 	is($f->primary_id, 'chrI:57949-58462', 'feature2 primary_id');
 }
@@ -476,7 +476,7 @@ sub test_bed12 {
 	is($f->display_name, 'ENST00000411647', 'transcript display_name');
 	is($f->primary_id, 'chr20:388141-398466', 'transcript primary_id');
 	is($f->strand, 1, 'transcript strand');
-	is($f->source, 'ensGene', 'transcript source');
+	is($f->source, '', 'transcript source');
 	
 	# first transcript exons
 	my @exons = sort {$a->start <=> $b} $f->get_SeqFeatures; # make sure in order
@@ -486,7 +486,7 @@ sub test_bed12 {
 	is($e->stop, 388315, 'exon stop');
 	is($e->primary_tag, 'exon', 'exon primary_tag');
 	
-	# reload the table
+	# reload the table to parse everything
 	undef $f;
 	undef $bed;
 	$bed = Bio::ToolBox::parser::bed->new(
@@ -544,18 +544,18 @@ sub test_narrowPeak {
 	is($f->seq_id, 'chr1', 'feature seq_id');
 	is($f->start, 11908311, 'feature start');
 	is($f->stop, 11909810, 'feature stop');
-	is($f->primary_tag, 'region', 'feature primary_tag');
+	is($f->primary_tag, 'peak', 'feature primary_tag');
 	is($f->display_name, 'narrowPeak207', 'feature display_name');
 	is($f->primary_id, 'chr1:11908310-11909810', 'feature primary_id');
 	is($f->strand, 0, 'feature strand');
-	is($f->source, 'H3K4me3', 'feature source');
+	is($f->source, '', 'feature source');
 	is($f->score, 1016, 'feature score');
 	is($f->get_tag_values('qValue'), '0.00000', 'feature qvalue');
 	is($f->get_tag_values('peak'), 555, 'feature peak');
 	my @transcripts = $f->get_SeqFeatures;
 	is(scalar(@transcripts), 0, 'number of subfeatures');
 	
-	# reload the table
+	# reload the table to parse everything
 	undef $f;
 	undef $bed;
 	$bed = Bio::ToolBox::parser::bed->new(
@@ -571,7 +571,7 @@ sub test_narrowPeak {
 	isa_ok($f, $sfclass, 'fetched narrowPeak object feature2');
 	is($f->start, 11979801, 'feature2 start');
 	is($f->stop, 11981570, 'feature2 stop');
-	is($f->primary_tag, 'region', 'feature2 primary_tag');
+	is($f->primary_tag, 'peak', 'feature2 primary_tag');
 	is($f->display_name, 'narrowPeak210', 'feature2 display_name');
 	is($f->primary_id, 'chr1:11979800-11981570', 'feature2 primary_id');
 }
@@ -597,11 +597,11 @@ sub test_gappedPeak {
 	is($f->seq_id, 'chr1', 'feature seq_id');
 	is($f->start, 5056, 'feature start');
 	is($f->stop, 5366, 'feature stop');
-	is($f->primary_tag, 'region', 'feature primary_tag');
+	is($f->primary_tag, 'gappedPeak', 'feature primary_tag');
 	is($f->display_name, 'peak_1', 'feature display_name');
 	is($f->primary_id, 'chr1:5055-5366', 'feature primary_id');
 	is($f->strand, 0, 'feature strand');
-	is($f->source, 'H3K27ac', 'feature source');
+	is($f->source, '', 'feature source');
 	is($f->score, 53, 'feature score');
 	is($f->get_tag_values('signalValue'), 4.21044, 'feature signalValue');
 	is($f->get_tag_values('qValue'), '5.32258', 'feature qvalue');
@@ -613,8 +613,9 @@ sub test_gappedPeak {
 	isa_ok($first, $sfclass, 'first subpeak feature object');
 	is($first->start, 5056, 'first subpeak start');
 	is($first->stop, 5056, 'first subpeak stop');
+	is($first->type, 'peak', 'first subpeak type');
 	
-	# reload the table
+	# reload the table to parse everything
 	undef $first;
 	undef @subpeaks;
 	undef $f;
@@ -632,7 +633,7 @@ sub test_gappedPeak {
 	isa_ok($f, $sfclass, 'fetched gappedPeak object peak4');
 	is($f->start, 88948, 'peak4 start');
 	is($f->stop, 89987, 'peak4 stop');
-	is($f->primary_tag, 'region', 'peak4 primary_tag');
+	is($f->primary_tag, 'gappedPeak', 'peak4 primary_tag');
 	is($f->display_name, 'peak_4', 'peak4 display_name');
 	is($f->primary_id, 'chr1:88947-89987', 'peak4 primary_id');
 	@subpeaks = $f->get_SeqFeatures;
@@ -797,8 +798,9 @@ sub test_parsed_bed6_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($bed6file);
+	my ($flavor, $format) = $Data->taste_file($bed6file);
 	is($flavor, 'bed', 'Bed file flavor');
+	is($format, 'bed6', 'Bed file format');
 	my $p = $Data->parse_table($bed6file);
 	is($p, 1, 'parsed Bed table');
 	
@@ -821,7 +823,7 @@ sub test_parsed_bed6_table {
 	my $row = $Data->get_row(5);
 	isa_ok($row, 'Bio::ToolBox::Data::Feature', 'BED6 Table fifth row Feature object');
 	is($row->name, 'YAL043C', 'Feature display name');
-	is($row->type, 'region', 'Seqfeature type through row Feature');
+	is($row->type, 'feature', 'Seqfeature type through row Feature');
 	is($row->start, 58695, 'Seqfeature start coordinate through row Feature');
 	is($row->strand, -1, 'Seqfeature strand through row Feature');
 	isnt($row->start(100000), 100000, 'Attempted change to Feature start');
@@ -848,8 +850,9 @@ sub test_parsed_bed12_table {
 	# parse
 	my $Data = Bio::ToolBox::Data->new();
 	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
-	my $flavor = $Data->taste_file($bed12file);
+	my ($flavor, $format) = $Data->taste_file($bed12file);
 	is($flavor, 'bed', 'Bed file flavor');
+	is($format, 'bed12', 'Bed file format');
 	my $p = $Data->parse_table($bed12file);
 	is($p, 1, 'parsed Bed table');
 	
