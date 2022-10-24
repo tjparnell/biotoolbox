@@ -1269,61 +1269,66 @@ sub duplicate {
 sub parse_table {
 	my $self = shift;
 	my $args = shift;
-	my ($file, $feature, $subfeature, $simplify);
-	if (ref $args) {
+	my $file;
+	if (ref($args) eq 'HASH') {
 		$file = $args->{file} || '';
-		$feature = $args->{feature} || '';
-		$subfeature = $args->{subfeature} || '';
-		$simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
-			$args->{simplify} : 1; # default is to simplify
 	}
 	else {
 		# no hash reference, assume just a file name
 		$file = $args;
-		undef $args;
-		$feature = undef;
-		$subfeature = '';
-		$simplify = 1;
+		$args = {}; # empty hash for below
 	}
 	unless ($file) {
 		carp "no annotation file provided to parse!";
 		return;
 	}
 	
-	# the file format determines the parser class
-	my ($flavor, $format) = $self->taste_file($file) or return;
-	my $class = 'Bio::ToolBox::parser::' . $flavor;
-	eval {load $class};
-	if ($@) {
-		carp "unable to load $class! cannot parse $flavor!";
-		return;
+	# taste the file and open parser object
+	my ($flavor, $format) = $self->taste_file($file);
+	my $parser;
+	if (defined $flavor) {
+		eval {
+			load 'Bio::ToolBox::Parser';
+			$parser = Bio::ToolBox::Parser->new(
+				file        => $file,
+				flavor      => $flavor,
+				'format'    => $format,
+			);
+		};
+		unless ($parser) {
+			# no parser object means no suitable parser adapter
+			return 0;
+		}
 	}
-	$self->format($format); # specify the specific format
+	else {
+		# not suitable for parsing
+		return 0;
+	}
+	$self->format($format); # specify the specific format	
 	
-	# open parser
-	my $parser = $class->new() or return;
-	$parser->open_file($file) or return;
-	my $typelist = $parser->typelist;
+	# additional user parameters
+	my $feature = $args->{feature} || '';
+	my $subfeature = $args->{subfeature} || '';
+	my $simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
+		$args->{simplify} : 1; # default is to simplify
 	
 	# set feature based on the type list from the parser
+	my $typelist = $parser->typelist;
 	unless ($feature) {
 		if ($typelist =~ /gene/i) {
 			$feature = 'gene';
 		}
-		elsif ($typelist eq 'region') {
-			$feature = 'region';
-		}
-		else {
+		elsif ($typelist =~ /rna/i) {
 			$feature = 'rna'; # generic RNA
 		}
 	}
 	
-	# set parser parameters
+	# set additional parser parameters
 	$parser->simplify($simplify);
 	if ($subfeature) {
-		$parser->do_exon(1) if $subfeature =~ /exon/i;
-		$parser->do_cds(1) if $subfeature =~ /cds/i;
-		$parser->do_utr(1) if $subfeature =~ /utr|untranslated/i;
+		$parser->do_exon(1)  if $subfeature =~ /exon/i;
+		$parser->do_cds(1)   if $subfeature =~ /cds/i;
+		$parser->do_utr(1)   if $subfeature =~ /utr|untranslated/i;
 		$parser->do_codon(1) if $subfeature =~/codon/i;
 	}
 	if ($feature =~ /gene$/i) {
@@ -1381,8 +1386,18 @@ PARSEFAIL
 			if ($chr_exclude) {
 				next if $f->seq_id =~ /$chr_exclude/i;
 			}
-			my $type = $f->type;
-			if ($f->type =~ /$feature/i or ($mrna_check and is_coding($f)) ) {
+			if ($feature) {
+				# specific features are requested, look for them
+				if (
+					($f->type =~ /$feature/i) or
+					($mrna_check and is_coding($f) )
+				) {
+					my $index = $self->add_row([ $f->primary_id, $f->display_name ]);
+					$self->store_seqfeature($index, $f);
+				}
+			}
+			else {
+				# no feature defined, take everything
 				my $index = $self->add_row([ $f->primary_id, $f->display_name ]);
 				$self->store_seqfeature($index, $f);
 			}
@@ -1402,6 +1417,7 @@ PARSEFAIL
 		undef $self->{filename};
 		undef $self->{path};
 	}
+	# successfully parsed
 	return 1;
 }
 
