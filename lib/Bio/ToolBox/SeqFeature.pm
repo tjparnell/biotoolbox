@@ -566,7 +566,7 @@ sub primary_id {
 	}
 	elsif (not defined $self->[ID]) {
 		# automatically assign a new ID
-		$self->[ID] = sprintf("%s_%09d", $self->primary_tag, $IDCOUNT++);
+		$self->[ID] = sprintf("%s:%d-%d", $self->[SEQID], $self->[START], $self->[STOP]);
 	}
 	return $self->[ID];
 }
@@ -576,8 +576,7 @@ sub primary_tag {
 	if (@_) {
 		$self->[TYPE] = $_[0];
 	}
-	$self->[TYPE] ||= 'region';
-	return $self->[TYPE];
+	return defined $self->[TYPE] ? $self->[TYPE] : 'feature';
 }
 
 sub source_tag {
@@ -585,7 +584,7 @@ sub source_tag {
 	if (@_) {
 		$self->[SRC] = $_[0];
 	}
-	return defined $self->[SRC] ? $self->[SRC] : undef;
+	return defined $self->[SRC] ? $self->[SRC] : '';
 }
 
 sub type {
