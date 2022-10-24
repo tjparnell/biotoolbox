@@ -1,5 +1,5 @@
 package Bio::ToolBox::Parser;
-my $VERSION = 1.70;
+our $VERSION = 1.70;
 
 =head1 NAME
 
@@ -113,38 +113,36 @@ sub new {
 	else {
 		%args = @_;
 	}
-	$args{file} ||= $args{table} || undef;
 	
-	# check parser flavor
-	my $flavor;
-	if (ref($class)) {
-		$class = ref($class);
-	}
-	if ($class =~ /Bio::ToolBox::parser::(\w+)/) {
-		# we got the flavor directly from a flavored parser new function
-		$flavor = $1;
-		# presume this parser is already loaded
-	}
-	elsif ($args{file}) {
-		# find the flavor from the file
-		$flavor = Bio::ToolBox::Data->taste_file($args{file}) or return;
-		$class = 'Bio::ToolBox::parser::' . $flavor;
-		eval {load $class};
-		if ($@) {
-			carp "unable to load $class! cannot parse $flavor!";
-			return;
+	# determine file, format, and parser subclass
+	my $file     = $args{file} || $args{table} || undef;
+	my $flavor   = $args{flavor} || undef;
+	my $filetype = $args{filetype} || undef;
+	if (not $flavor or not $filetype) {
+		if ($class =~ /Bio::ToolBox::parser::(\w+)/) {
+			# we got the flavor directly from a flavored parser new function
+			$flavor ||= $1;
+		}
+		if ($file) {
+			# get the flavor and file type directly by tasting the file
+			# we use this in preference over what user may have provided
+			($flavor, $filetype) = Bio::ToolBox::Data->taste_file($args{file});
 		}
 	}
+	if ($flavor and $flavor =~ m/^(?:gff|bed|ucsc)$/i) {
+		$class = 'Bio::ToolBox::parser::' . $flavor;
+		load $class;
+	}
 	else {
-		# uh oh! what flavor to use????
-		# delay dying here? 
-		confess("Unknown flavor! See documentation. ");
+		# let the caller print errors as appropriate
+		return;
 	}
 	
 	# initialize self
 	my $self = {
 		'fh'            => undef,
-		'version'       => 0,
+		'file'          => $file,
+		'filetype'      => $filetype,
 		'do_gene'       => 1, 
 		'do_exon'       => 0,
 		'do_cds'        => 0, 
@@ -165,21 +163,24 @@ sub new {
 	};
 	bless $self, $class;
 	
-	# parser specific keys
+	# parser specific object keys
 	if ($flavor eq 'bed') {
-		$self->{stream}         = undef;
-		$self->{line_count}     = 0;
-		$self->{bed}            = undef;
+		$self->{bed}        = undef;
+		$self->{line_count} = 0;
 	}
 	elsif ($flavor eq 'gff') {
-		$self->{gff3}           = 0;
-		$self->{gtf}            = 0;
+		if ($filetype and $filetype eq 'gtf') {
+			$self->{gtf}  = 1;
+		}
+		else {
+			$self->{gtf}  = 0;
+		}
 		$self->{orphans}        = [];
 		$self->{duplicate_ids}  = {};
 	}
 	elsif ($flavor eq 'ucsc') {
 		$self->{share}          = 1; # always true
-		$self->{source}         = 'UCSC';
+		$self->{source}         = 'UCSC'; # presumptive default
 		$self->{id2count}       = {};
 		$self->{counts}         = {};
 		$self->{refseqsum}      = {};
@@ -208,19 +209,19 @@ sub new {
 	if (exists $args{do_codon}) {
 		$self->do_codon($args{do_codon});
 	}
-	if (exists $args{version}) {
-		$self->{version} = $args{version};
-	}
 	if (exists $args{source}) {
 		$self->source($args{source});
 	}
 	if (exists $args{class}) {
 		my $class = $args{class};
-		if (eval "require $class; 1") {
-			$self->{sfclass} = $class;
+		eval {
+			load $class;
+		};
+		if ($@) {
+			croak $@;
 		}
 		else {
-			croak $@;
+			$self->{sfclass} = $class;
 		}
 	}
 	if ($flavor eq 'ucsc') {
@@ -255,8 +256,8 @@ sub new {
 	}
 	
 	# open the file
-	if ($args{file}) {
-		$self->open_file( $args{file} ) or croak "unable to open file!";
+	if ($file) {
+		$self->open_file;
 	}
 	
 	# finished
@@ -265,7 +266,7 @@ sub new {
 
 sub do_gene {
 	my $self = shift;
-	return 0 if ref($self) eq 'Bio::ToolBox::parser::bed';
+	return 0 if (ref($self) eq 'Bio::ToolBox::parser::bed');
 	if (@_) {
 		$self->{'do_gene'} = shift;
 	}
@@ -306,7 +307,7 @@ sub do_codon {
 
 sub do_name {
 	my $self = shift;
-	return 0 unless ref($self) eq 'Bio::ToolBox::parser::ucsc';
+	return 0 unless (ref($self) eq 'Bio::ToolBox::parser::ucsc');
 	# does nothing with gff and bed
 	if (@_) {
 		$self->{'do_name'} = shift;
@@ -316,7 +317,7 @@ sub do_name {
 
 sub share {
 	my $self = shift;
-	return 0 unless ref($self) eq 'Bio::ToolBox::parser::ucsc';
+	return 0 unless (ref($self) eq 'Bio::ToolBox::parser::ucsc');
 	# does nothing with gff and bed
 	if (@_) {
 		$self->{'share'} = shift;
@@ -326,7 +327,7 @@ sub share {
 
 sub simplify {
 	my $self = shift;
-	return 0 unless ref($self) eq 'Bio::ToolBox::parser::gff';
+	return 0 unless (ref($self) eq 'Bio::ToolBox::parser::gff');
 	# does nothing with ucsc and bed
 	if (defined $_[0]) {
 		$self->{simplify} = shift;
@@ -336,23 +337,41 @@ sub simplify {
 
 sub source {
 	my $self = shift;
-	return if ref($self) eq 'Bio::ToolBox::parser::gff';
 	if (@_) {
 		$self->{'source'} = shift;
 	}
 	return $self->{'source'};
 }
 
+sub filetype {
+	return shift->{filetype};
+}
+
 sub version {
-	return shift->{version};
+	# old method no longer used
+	return shift->filetype;
+}
+
+sub number_loaded {
+	my $self = shift;
+	return scalar keys %{$self->{loaded}};
+}
+
+sub file {
+	return shift->{file};
 }
 
 sub fh {
+	return shift->{fh};
+}
+
+sub comments {
 	my $self = shift;
-	if (@_) {
-		$self->{'fh'} = shift;
+	my @comments;
+	foreach (@{ $self->{comments} }) {
+		push @comments, $_;
 	}
-	return $self->{'fh'};
+	return wantarray ? @comments : \@comments;
 }
 
 sub seq_ids {
@@ -410,17 +429,11 @@ sub top_features {
 
 sub fetch {
 	my ($self, $id) = @_;
+	return unless $id;
 	unless ($self->{'eof'}) {
-		croak "parse file first before fetching features by ID!";
+		$self->parse_file;
 	}
 	return $self->{loaded}{$id} || undef;
-}
-
-sub find_feature_by_location {
-}
-
-sub _index_chromosome {
-
 }
 
 sub find_gene {

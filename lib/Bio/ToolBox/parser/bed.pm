@@ -293,8 +293,9 @@ L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parse
 
 use strict;
 use Carp qw(carp cluck croak confess);
-use base 'Bio::ToolBox::Parser'; 
-use Bio::ToolBox::Data::Stream; 
+use base 'Bio::ToolBox::Parser';
+use Bio::ToolBox::Data; 
+use Module::Load;
 
 1;
 
@@ -305,152 +306,121 @@ sub new {
 
 sub open_file {
 	my $self = shift;
-	
-	if ($self->{stream}) {
-		confess " Cannot open a new file with the same Bed parser object!";
-	}
+	my $filename = shift || undef;
 	
 	# check file
-	my $filename = shift;
+	if ($filename and $self->file and $filename ne $self->file) {
+		confess "Must open new files with new Parser object!";
+	}
+	$filename ||= $self->file;
 	unless ($filename) {
-		cluck("no file name passed!");
+		cluck "No file name passed!\n";
 		return;
 	}
-	
-	# Open file
-	# we are using a Stream object for simplicity to handle comment lines, 
-	# identify columns and structures, etc
-	my $Stream = Bio::ToolBox::Data::Stream->new(in => $filename) or
-		croak " cannot open file '$filename'!\n";
-	my $bed = $Stream->bed; # this is the number of bed columns observed
-	unless ($bed) {
-		croak " file '$filename' doesn't appear to be proper Bed format!\n";
+	if (defined $self->{fh}) {
+		return 1;
 	}
-	$self->{bed} = $bed;
 	
-	# check for special formats
-	my $peak = $Stream->extension =~ /peak/i ? $bed : 0;
-	my $bdg = ($bed == 4 and $Stream->extension =~ /bdg|bedgraph/i) ? 1 : 0;
-	
-	# check for a track or browser definition line
-	foreach my $c ($Stream->comments) {
-		# these may or may not be present
-		# if so, we can check for a track type which may hint at what the file is
-		if ($c =~ /^track.+type=gappedpeak/i) {
-			# looks like we have a gappedPeak file
-			$peak = 15;
+	# check file format type
+	my $filetype = $self->filetype || undef;
+	unless ($filetype) {
+		(my $flavor, $filetype) = Bio::ToolBox::Data->taste_file($filename);
+		unless ($flavor eq 'bed') {
+			confess "File is not a BED file!!! How did we get here?";
 		}
-		elsif ($c =~ /^track.+type=narrowpeak/i) {
-			# looks like we have a narrowPeak file
-			$peak = 10;
-		}
-		elsif ($c =~ /^track.+type=broadpeak/i) {
-			# looks like we have a broadPeak file
-			$peak = 9;
-		}
-		elsif ($c =~ /^track.+type=bedgraph/i) {
-			# this is unlikely to occur, but you never know
-			$bdg = 1;
-		}
-		elsif ($c =~ /^track.+type=bed\s/i) {
-			# obviously, but just in case
-		}
-		elsif ($c =~ /^track.+type=(\w+)\s/i) {
-			# something weird
-			printf "  file track definition type of '%s' is unrecognized, proceeding as bed file\n", $1;
-		}
+		$self->{filetype} = $filetype;
 	}
- 	
-	# assign source
-	$self->source( $Stream->basename );
 	
-	# assign the parsing subroutine
-	if ($peak == 15) {
-		# gappedPeak file
-		$self->{version} = 'gappedPeak';
+	# determine converter subroutine and set column expectations
+	if ($filetype eq 'gappedPeak') {
 		$self->{convertor_sub} = \&_parse_gappedPeak; 
 		$self->do_exon(1); # always parse sub peaks as exons
-		
 		# gappedPeak is essentially bed12 with extra columns
 		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		# we need more object stuff that the ucsc parser expects
-		eval "require Bio::ToolBox::parser::ucsc::builder;";
-		$self->{id2count}    = {};
-		$self->{refseqsum}   = {};
-		$self->{refseqstat}  = {};
-		$self->{kgxref}      = {};
-		$self->{ensembldata} = {};
+		load 'Bio::ToolBox::parser::ucsc::builder';
+		$self->{bed}           = 15;
+		$self->{id2count}      = {};
+		$self->{refseqsum}     = {};
+		$self->{refseqstat}    = {};
+		$self->{kgxref}        = {};
+		$self->{ensembldata}   = {};
 	}
-	elsif ($peak == 10) {
-		# narrowPeak file
-		$self->{version} = 'narrowPeak';
+	elsif ($filetype eq 'narrowPeak') {
+		$self->{bed}           = 10;
 		$self->{convertor_sub} = \&_parse_narrowPeak; 
 	}
-	elsif ($peak == 9) {
-		# broadPeak file
-		$self->{version} = 'broadPeak';
+	elsif ($filetype eq 'broadPeak') {
+		$self->{bed}           = 9;
 		$self->{convertor_sub} = \&_parse_broadPeak; 
 	}
-	elsif ($bdg) {
-		# bedGraph file
-		$self->{version} = 'bedGraph';
+	elsif ($filetype eq 'bedGraph') {
+		$self->{bed}           = 4;
 		$self->{convertor_sub} = \&_parse_bedGraph; 
 	}
-	elsif ($bed > 6) {
-		# a gene table bed 12 format
-		$self->{version} = 'bed12';
+	elsif ($filetype eq 'bed12') {
+		$self->{bed}           = 12;
 		$self->{convertor_sub} = \&_parse_bed12;
-		
 		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		# we need more object stuff that the ucsc parser expects
-		eval "require Bio::ToolBox::parser::ucsc::builder;";
-		$self->{id2count}    = {};
-		$self->{refseqsum}   = {};
-		$self->{refseqstat}  = {};
-		$self->{kgxref}      = {};
-		$self->{ensembldata} = {};
+		load 'Bio::ToolBox::parser::ucsc::builder';
+		$self->{id2count}      = {};
+		$self->{refseqsum}     = {};
+		$self->{refseqstat}    = {};
+		$self->{kgxref}        = {};
+		$self->{ensembldata}   = {};
 	}
 	else {
 		# an ordinary bed file
-		$self->{version} = sprintf("bed%d", $bed);
+		$self->{bed}           = ($filetype =~ /bed(\d+)/)[0];
 		$self->{convertor_sub} = \&_parse_bed;
 	}
 	
-	# store stuff
-	$self->{stream} = $Stream; # keep this around, but probably won't use it....
-	$self->{fh} = $Stream->{fh};
+	# Open file
+	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or 
+		croak (" Unable to open file '$filename'!");
+	
+	# finish
+	$self->{fh} = $fh;
 	return 1;
 }
 
 sub typelist {
 	my $self = shift;
-	return unless $self->{stream};
-	
-	if ($self->version eq 'bed12') {
-		# return generic list based on what I could expect
+	my $ft = $self->filetype;
+	# return generic lists based on what is expected
+	if ($ft eq 'bed12') {
 		return 'mRNA,ncRNA,exon,CDS';
+	}
+	elsif ($ft eq 'narrowPeak' or $ft eq 'broadPeak') {
+		return 'peak';
+	}
+	elsif ($ft eq 'gappedPeak') {
+		return 'gappedPeak,peak';
 	}
 	else {
 		# return generic
-		return 'region';
+		return 'feature';
 	}
 }
 
 sub next_feature {
 	my $self = shift;
 	
-	# check that we have an open filehandle
+	# check that we have an open filehandle and not finished
 	unless ($self->fh) {
 		croak("no Bed file loaded to parse!");
 	}
+	return if $self->{'eof'};
 	
-	# loop through the file
+ 	# loop through the file
 	while (my $line = $self->fh->getline) {
-		chomp $line;
 		if ($line =~ /^#/ or $line =~ /^(?:track|browser)/ or $line !~ /\w+/) {
+			push @line, @{ $self->{comments} };
 			$self->{line_count}++;
 			next;
 		}
+		chomp $line;
 		my $feature = &{$self->{convertor_sub}}($self, $line);
 		$self->{line_count}++;
 		unless ($feature) {
@@ -478,7 +448,7 @@ sub parse_file {
 	}
 	return 1 if $self->{'eof'};
 	
-	printf "  Parsing %s format file....\n", $self->version;
+	printf "  Parsing %s format file....\n", $self->filetype;
 	
 	while (my $feature = $self->next_feature) {
 		# there are possibly lots and lots of features here
@@ -527,8 +497,7 @@ sub _parse_narrowPeak {
 		-name           => $data[3],
 		-score          => $data[4],
 		-strand         => $data[5],
-		-primary_tag    => 'region',
-		-source         => $self->{source},
+		-primary_tag    => 'peak',
 		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
 	);
 	
@@ -557,8 +526,7 @@ sub _parse_broadPeak {
 		-name           => $data[3],
 		-score          => $data[4],
 		-strand         => $data[5],
-		-primary_tag    => 'region',
-		-source         => $self->{source},
+		-primary_tag    => 'peak',
 		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
 	);
 	
@@ -573,7 +541,7 @@ sub _parse_broadPeak {
 sub _parse_bedGraph {
 	my ($self, $line) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == 9) {
+	unless (scalar(@data) == 4) {
 		croak sprintf("bedGraph line %d '%s' doesn't have 4 elements!", 
 			$self->{line_count}, $line);
 	}
@@ -584,8 +552,6 @@ sub _parse_bedGraph {
 		-start          => $data[1] + 1,
 		-end            => $data[2],
 		-score          => $data[3],
-		-primary_tag    => 'region',
-		-source         => $self->{source},
 		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
 	);
 }
@@ -606,8 +572,6 @@ sub _parse_bed {
 		-name           => $data[3] || undef,
 		-score          => $data[4] || undef,
 		-strand         => $data[5] || undef,
-		-primary_tag    => 'region',
-		-source         => $self->{source},
 		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
 	);
 }
@@ -712,21 +676,17 @@ sub _parse_gappedPeak {
 	# clean up feature and add extra values
 	$feature->add_tag_value('itemRGB', $data[8]);
 	$feature->score($data[4]);
-	$feature->primary_tag('region'); # it is not a RNA
+	$feature->primary_tag('gappedPeak'); # it is not a RNA
 	$feature->primary_id(sprintf("%s:%d-%d", $data[0], $data[1], $data[2]));
 		# change the primary ID to match other bed file behavior, not UCSC files'
 	$feature->add_tag_value('signalValue', $data[12]);
 	$feature->add_tag_value('pValue', $data[13]);
 	$feature->add_tag_value('qValue', $data[14]);
+	foreach my $f ($feature->get_SeqFeatures) {
+		$f->primary_tag('peak');
+	}
 	return $feature;
 }
-
-sub comments {
-	my $self = shift;
-	return unless $self->{stream};
-	return $self->{stream}->comments;
-}
-
 
 __END__
 

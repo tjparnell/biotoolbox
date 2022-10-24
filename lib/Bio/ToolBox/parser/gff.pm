@@ -280,7 +280,7 @@ L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, L<Bio::Tools::GFF>
 =cut
 
 use strict;
-use Carp qw(carp cluck croak);
+use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser'; 
 use Bio::ToolBox::Data; 
 
@@ -294,15 +294,40 @@ sub new {
 
 sub open_file {
 	my $self = shift;
+	my $filename = shift || undef;
 	
 	# check file
-	my $filename = shift;
+	if ($filename and $self->file and $filename ne $self->file) {
+		confess "Must open new files with new Parser object!";
+	}
+	$filename ||= $self->file;
 	unless ($filename) {
-		cluck("no file name passed!\n");
+		cluck "No file name passed!\n";
 		return;
+	}
+	if (defined $self->{fh}) {
+		return 1;
+	}
+	
+	# check file format type
+	my $filetype = $self->filetype || undef;
+	unless ($filetype) {
+		(my $flavor, $filetype) = Bio::ToolBox::Data->taste_file($filename);
+		unless ($flavor eq 'gff') {
+			confess "File is not a GFF file!!! How did we get here?";
+		}
+		$self->{filetype} = $filetype;
+		if ($filetype eq 'gtf') {
+			$self->{gtf}  = 1;
+		}
+		else {
+			$self->{gtf}  = 0;
+		}
 	}
 	
 	# check type list
+	# this must be done prior to opening because it informs parsing subroutines
+	# but very limited sampling, not thorough
 	my $typelist = Bio::ToolBox::Data->sample_gff_type_list($filename);
 	if ($typelist !~ /\w+/) {
 		print "GFF file has no evident types!? $filename may not be a valid GFF file\n";
@@ -310,37 +335,40 @@ sub open_file {
 	}
 	$self->{typelist} = $typelist;
 	
+	# determine converter subroutine
+	if ($filetype eq 'gtf') {
+		if ($self->simplify) {
+			$self->{convertor_sub} = \&_gtf_to_seqf_simple;
+		}
+		else {
+			$self->{convertor_sub} = \&_gtf_to_seqf_full;
+		}
+		# double check we have transcript information
+		if ($self->typelist !~ /transcript|rna/i) {
+			# we will have to rely on exon and/or cds information to get transcript 
+			unless ($self->do_exon or $self->do_cds) {
+				$self->do_exon(1);
+			}
+		}
+		if ($self->do_gene and $self->typelist !~ /gene/i) {
+			$self->do_exon(1);
+		}
+	}
+	elsif ($filetype eq 'gff3') {
+		$self->{convertor_sub} = \&_gff3_to_seqf;
+	}
+	else {
+		$self->{convertor_sub} = \&_gff2_to_seqf;
+	}
 	# Open filehandle object 
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or
 		croak " cannot open file '$filename'!\n";
-	
-	# check gff version pragma
-	my $first = $fh->getline;
-	if ($first =~ /^##gff.version\s+([\d\.]+)\s*$/i) {
-		# override any version that may have been inferred from the extension
-		# based on the assumption that this pragma is correct
-		$self->{version} = $1;
-	}
-	else {
-		# no pragma, reopen the file
-		$fh->close;
-		$fh = Bio::ToolBox::Data->open_to_read_fh($filename);
-		# set version based on file type extension????
-		if ($filename =~ /\.gtf.*$/i) {
-			$self->{version} = '2.5';
-			$self->{gtf} = 1;
-		}
-		elsif ($filename =~ /\.gff3.*$/i) {
-			$self->{version} = '3';
-			$self->{gff3} = 1;
-		}
-	}
 	$self->{fh} = $fh;
 	return 1;
 }
 
 sub typelist {
-	return shift->{typelist};
+	return shift->{typelist} || '';
 }
 
 sub next_feature {
@@ -351,11 +379,6 @@ sub next_feature {
 		croak("no GFF file loaded to parse!");
 	}
 	return if $self->{'eof'};
-	
-	# check convertor
-	unless (defined $self->{convertor_sub}) {
-		$self->_assign_gff_converter;
-	}
 	
 	# look for the next feature line
 	while (my $line = $self->{fh}->getline) {
@@ -477,9 +500,7 @@ sub parse_file {
 	# found, it will be lost. Features without a parent are assumed to be 
 	# top-level features.
 	
-	printf "  Parsing %s format file....\n", 
-		$self->{version} eq '3' ? 'GFF3' : 
-		$self->{version} =~ /2\../ ? 'GTF' : 'GFF';
+	printf "  Parsing %s format file....\n", $self->filetype;
 	
 	
 	TOP_FEATURE_LOOP:
@@ -662,58 +683,6 @@ sub _make_rna_parent {
 	
 	$rna->add_tag_value('autogenerate', 1); # extra key for auto-generation
 	return $rna;
-}
-
-
-sub from_gff_string {
-	my ($self, $string) = @_;
-	
-	# check string
-	chomp $string;
-	unless ($string) {
-		cluck("must pass a string!\n");
-		return;
-	}
-	my @fields = split('\t', $string);
-	
-	# check convertor
-	unless (defined $self->{convertor_sub}) {
-		$self->_assign_gff_converter;
-	}
-	
-	# parse appropriately
-	return &{$self->{convertor_sub}}($self, \@fields);
-}
-
-
-sub _assign_gff_converter {
-	my $self = shift;
-	if ($self->{version} eq '3') {
-		$self->{gff3} = 1;
-		$self->{convertor_sub} = \&_gff3_to_seqf;
-	}
-	elsif ($self->{version} eq '2.5' or $self->{version} eq '2.2') {
-		$self->{gtf} = 1;
-		if ($self->simplify) {
-			$self->{convertor_sub} = \&_gtf_to_seqf_simple;
-		}
-		else {
-			$self->{convertor_sub} = \&_gtf_to_seqf_full;
-		}
-		# double check we have transcript information
-		if ($self->typelist !~ /transcript|rna/i) {
-			# we will have to rely on exon and/or cds information to get transcript 
-			unless ($self->do_exon or $self->do_cds) {
-				$self->do_exon(1);
-			}
-		}
-		if ($self->do_gene and $self->typelist !~ /gene/i) {
-			$self->do_exon(1);
-		}
-	}
-	else {
-		$self->{convertor_sub} = \&_gff2_to_seqf;
-	}
 }
 
 
@@ -1102,16 +1071,6 @@ sub orphans {
 		push @orphans, $_;
 	}
 	return wantarray ? @orphans : \@orphans;
-}
-
-
-sub comments {
-	my $self = shift;
-	my @comments;
-	foreach (@{ $self->{comments} }) {
-		push @comments, $_;
-	}
-	return wantarray ? @comments : \@comments;
 }
 
 

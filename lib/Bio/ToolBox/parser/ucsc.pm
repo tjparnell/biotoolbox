@@ -351,7 +351,7 @@ L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>
 =cut
 
 use strict;
-use Carp qw(carp cluck croak);
+use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser'; 
 use Bio::ToolBox::Data; 
 use Bio::ToolBox::parser::ucsc::builder;
@@ -365,39 +365,41 @@ sub new {
 
 sub open_file {
 	my $self = shift;
+	my $filename = shift || $self->file || undef;
 	
 	# check file
-	my $filename = shift;
+		# Unlike the gff and bed parsers, the ucsc parser can handle opening 
+		# multiple files, primarily to recycle various UCSC support files. 
+		# This is historical precedent from earlier versions, unfortunately.
+		# This may unnecessarily complicate and/or inflate memory....
 	unless ($filename) {
 		cluck("no file name passed!");
 		return;
 	}
 	
-	# Open filehandle object 
-	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or
-		croak " cannot open file '$filename'!\n";
-	
-	# check number of columns
-	my $ncol;
-	while (my $line = $fh->getline) {
-		next if $line =~ /^#/;
-		next unless $line =~ /\w+/;
-		my @fields = split "\t", $line;
-		$ncol = scalar(@fields);
-		last;
+	# Check file format type
+	my $filetype = $self->filetype || undef;
+	unless ($filetype) {
+		(my $flavor, $filetype) = Bio::ToolBox::Data->taste_file($filename);
+		unless ($flavor eq 'ucsc') {
+			confess "File is not a UCSC-format file!!! How did we get here?";
+		}
+		$self->{filetype} = $filetype;
 	}
-	unless ($ncol == 16 or $ncol == 15 or $ncol == 12 or $ncol == 11 or $ncol == 10) {
-		carp " File '$filename' doesn't have recognizable number of columns! It has $ncol.";
-		return;
-	}
-	if ($ncol == 10) {
+	if ($filetype eq 'genePred') {
 		# turn off gene processing for simple genePred which has no gene names
 		$self->do_gene(0);
 	}
 	
-	# reopen file handle
-	$fh->close;
-	$fh = Bio::ToolBox::Data->open_to_read_fh($filename);
+	# The ucsc parser does not have convertor subroutines, unlike the gff and bed 
+	# parsers. Rather, parsing is done by the number of elements in each line 
+	# and parsed accordingly in the builder object. Slightly inefficient but 
+	# functional.
+	
+	
+	# Open filehandle object 
+	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or
+		croak " cannot open file '$filename'!\n";
 	
 	# reset source as necessary
 	if ($filename =~ /ensgene/i and $self->source eq 'UCSC') {
@@ -416,15 +418,14 @@ sub open_file {
 		$self->source('knownGene');
 	}
 	
-	# check existing data
+	# Check existing data
 	# the reason this parser can handle reading a second file without having to make a 
 	# new parser object (like gff and bed) is so that we can potentially recycle the 
 	# extra UCSC information 
 	if ($self->fh) {
 		# close existing
-		$self->fh->close;
+		$self->{fh}->close;
 		# go ahead and clear out existing data
-		$self->{version}       = undef;
 		$self->{top_features}  = [];
 		$self->{loaded}        = {};
 		$self->{id2count}      = {};
@@ -433,7 +434,8 @@ sub open_file {
 		$self->{line_count}    = 0;
 	}
 	
-	$self->fh($fh);
+	# Finish
+	$self->{fh} = $fh;
 	return 1;
 }
 
@@ -572,9 +574,11 @@ sub next_feature {
 	unless ($self->fh) {
 		croak("no UCSC file loaded to parse!");
 	}
+	return if $self->{'eof'};
 	
 	while (my $line = $self->fh->getline) {
 		if ($line =~ /^#/ or $line !~ /\w+/) {
+			push @line, @{ $self->{comments} };
 			$self->{line_count}++;
 			next;
 		}
@@ -647,24 +651,6 @@ sub counts {
 	my %counts = %{ $self->{counts} };
 	return wantarray ? %counts : \%counts;
 }
-
-sub from_ucsc_string {
-	my ($self, $string) = @_;
-	return unless $string;
-	chomp $string; # just in case
-	my @linedata = split("\t", $string);
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new(\@linedata, $self);
-	return unless $builder;
-	if ($self->do_gene) {
-		return $builder->build_gene;
-	}
-	else {
-		return $builder->build_transcript;
-	}
-}
-
-
-
 
 
 
