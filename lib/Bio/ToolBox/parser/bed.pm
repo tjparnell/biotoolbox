@@ -416,7 +416,7 @@ sub next_feature {
  	# loop through the file
 	while (my $line = $self->fh->getline) {
 		if ($line =~ /^#/ or $line =~ /^(?:track|browser)/ or $line !~ /\w+/) {
-			push @line, @{ $self->{comments} };
+			push @{ $self->{comments} }, $line;
 			$self->{line_count}++;
 			next;
 		}

@@ -578,7 +578,7 @@ sub next_feature {
 	
 	while (my $line = $self->fh->getline) {
 		if ($line =~ /^#/ or $line !~ /\w+/) {
-			push @line, @{ $self->{comments} };
+			push @{ $self->{comments} }, $line;
 			$self->{line_count}++;
 			next;
 		}
