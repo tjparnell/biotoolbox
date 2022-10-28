@@ -426,6 +426,7 @@ sub open_file {
 		# close existing
 		$self->{fh}->close;
 		# go ahead and clear out existing data
+		$self->{gene2seqf}     = {};
 		$self->{top_features}  = [];
 		$self->{loaded}        = {};
 		$self->{id2count}      = {};
@@ -625,14 +626,8 @@ sub parse_table {
 		
 		# record this top feature
 		my $id = $feature->primary_id;
-		unless (exists $self->{loaded}{$id}) {
 			# the builder should have checked and made this ID unique
-			# for alternate transcripts of existing genes it will not be unique
-			# and we can safely skip it
-			# for unique gene/transcript we record it in the array
-			$self->{loaded}{$id} = $feature;
-			push @{ $self->{top_features} }, $feature;
-		}
+		$self->{loaded}{$id} = $feature;
 		
 		# check chromosome
 		my $s = $feature->seq_id;
@@ -642,7 +637,17 @@ sub parse_table {
 		$self->{seq_ids}{$s} = $feature->end if $feature->end > $self->{seq_ids}{$s};
 	}
 	
-	# finished parsing, eof should be set to true by next_feature()
+	# after parsing the entire file, add all the loaded features to a sorted 
+	# array of the top features 
+	# we pseudo-genomic sort by Schwartzian transform because UCSC tables 
+	# can't be trusted to be sorted
+	push @{ $self->{top_features} }, 
+		map { $_->[2] }
+		sort { $a->[0] cmp $b->[0] or $a->[1] <=> $b->[1] }
+		map { [$_->seq_id, $_->start, $_] }
+		values %{ $self->{loaded} };
+	
+	# finished parsing
 	return 1;
 }
 
