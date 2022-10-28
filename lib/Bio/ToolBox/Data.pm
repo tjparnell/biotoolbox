@@ -1350,7 +1350,7 @@ sub parse_table {
 	$parser->parse_file or return;
 	
 	# store the SeqFeature objects
-	if ($self->last_row > 0) {
+	if ($self->number_rows > 0) {
 		# we already have a table, presumably representing the features
 		my $count = 0;
 		$self->iterate( sub {
@@ -1402,7 +1402,7 @@ PARSEFAIL
 				$self->store_seqfeature($index, $f);
 			}
 		}
-		unless ($self->last_row) {
+		unless ($self->number_rows > 0) {
 			printf " Zero '%s' features found!\n Check your feature or try generic features like gene, mRNA, or transcript\n",
 				$feature;
 		}
