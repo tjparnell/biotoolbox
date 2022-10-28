@@ -625,7 +625,7 @@ sub parse_table {
 	return if ($self->{'eof'});
 	
 	#### Main Loop
-	print "  Parsing UCSC gene table....\n";
+	printf "  Parsing %s format file....\n", $self->filetype;
 	while (my $feature = $self->next_feature) {
 		
 		# record this top feature
