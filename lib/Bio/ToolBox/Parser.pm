@@ -152,12 +152,12 @@ sub new {
 		'share'         => 0,
 		'simplify'      => 0,
 		'source'        => undef,
-		'typelist'      => '',
-		'seq_ids'       => {},
-		'loaded'        => {},
-		'top_features'  => [],
+		'typelist'      => '',      # string list of observed feature types
+		'seq_ids'       => {},      # hash of seq_id to length
+		'loaded'        => {},      # hash of primary_id to SeqFeature object
+		'top_features'  => [],      # list of top features
 		'eof'           => 0,
-		'comments'      => [],
+		'comments'      => [],      # array of comment lines
 		'convertor_sub' => undef,
 		'sfclass'       => 'Bio::ToolBox::SeqFeature',
 	};
@@ -179,14 +179,15 @@ sub new {
 		$self->{duplicate_ids}  = {};
 	}
 	elsif ($flavor eq 'ucsc') {
-		$self->{share}          = 1; # always true
+		$self->{share}          = 1;      # always true
 		$self->{source}         = 'UCSC'; # presumptive default
-		$self->{id2count}       = {};
-		$self->{counts}         = {};
-		$self->{refseqsum}      = {};
-		$self->{refseqstat}     = {};
-		$self->{kgxref}         = {};
-		$self->{ensembldata}    = {};
+		$self->{gene2seqf}      = {};     # hash of gene names to SeqFeature objects
+		$self->{id2count}       = {};     # hash of seen IDs
+		$self->{counts}         = {};     # hash of RNA types to count
+		$self->{refseqsum}      = {};     # RefSeq Summary external data
+		$self->{refseqstat}     = {};     # RefSeq Stats external data
+		$self->{kgxref}         = {};     # knownGene RefSeq external data
+		$self->{ensembldata}    = {};     # Ensembl external data
 		$self->{line_count}     = 0;
 	}
 	
