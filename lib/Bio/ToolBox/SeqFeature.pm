@@ -421,7 +421,6 @@ use constant {
 	ATTRB   => 10,
 	SUBF    => 11,
 };
-our $IDCOUNT = 0;
 
 1;
 
