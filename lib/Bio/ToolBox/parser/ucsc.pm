@@ -7,50 +7,29 @@ Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
 
 =head1 SYNOPSIS
 
-  use Bio::ToolBox::parser::ucsc;
+  use Bio::ToolBox::Parser;
+  my $filename = 'file.refFlat';
   
-  ### A simple transcript parser
-  my $ucsc = Bio::ToolBox::parser::ucsc->new('file.genePred');
+  my $Parser = Bio::ToolBox::Parser->new(
+  	file    => $filename,
+  	do_gene => 1,
+  	do_exon => 1,
+  ) or die "unable to open file!\n";
+  # the Parser will taste the file and open the appropriate 
+  # subclass parser, ucsc in this case
   
-  ### A full fledged gene parser
-  my $ucsc = Bio::ToolBox::parser::ucsc->new(
-        file      => 'ensGene.genePred',
-        do_gene   => 1,
-        do_cds    => 1,
-        do_utr    => 1,
-        ensname   => 'ensemblToGene.txt',
-        enssrc    => 'ensemblSource.txt',
-  );
-  
-  ### Retrieve one transcript line at a time
-  my $transcript = $ucsc->next_feature;
-  
-  ### Retrieve one assembled gene at a time
-  my $gene = $ucsc->next_top_feature;
-  
-  ### Retrieve array of all assembled genes
-  my @genes = $ucsc->top_features;
-  
-  # Each gene or transcript is a SeqFeatureI compatible object
-  printf "gene %s is located at %s:%s-%s\n", 
-    $gene->display_name, $gene->seq_id, 
-    $gene->start, $gene->end;
-  
-  # Multiple transcripts can be assembled into a gene
-  foreach my $transcript ($gene->get_SeqFeatures) {
-    # each transcript has exons
-    foreach my $exon ($transcript->get_SeqFeatures) {
-      printf "exon is %sbp long\n", $exon->length;
-    }
+  while (my $feature = $Parser->next_top_feature() ) {
+	# each $feature is a parent SeqFeature object, usually a gene
+  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
+	
+	# subfeatures such as transcripts, exons, etc are nested within
+	my @children = $feature->get_SeqFeatures();
   }
-  
-  # Features can be printed in GFF3 format
-  $gene->version(3);
-  print STDOUT $gene->gff_string(1); 
-   # the 1 indicates to recurse through all subfeatures
-  
 
 =head1 DESCRIPTION
+
+This is the UCSC specific parser subclass to the L<Bio::ToolBox::Parser>
+object, and as such inherits generic methods from the parent. 
 
 This is a parser for converting UCSC-style gene prediction flat file formats into 
 BioPerl-style L<Bio::SeqFeatureI> compliant objects, complete with nested objects 
@@ -119,6 +98,9 @@ data sources, see the L<Bio::ToolBox> script L<ucsc_table2gff3.pl>.
 
 =head2 Initalize the parser object
 
+In most cases, users should initialize an object using the generic 
+L<Bio::ToolBox::Parser> object.
+
 =over 4
 
 =item new
@@ -185,48 +167,20 @@ Pass the appropriate file name for additional information.
 =item class
 
 Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
-create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>.
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
+which is lighter-weight and consumes less memory. A suitable BioPerl alternative
+is L<Bio::SeqFeature::Lite>.
 
 =back
 
 =back
 
-=head2 Modify the parser object
+=head2 Other methods
 
-These methods set or retrieve parameters, and load supplemental files and 
-new tables.
+See L<Bio::ToolBox::Parser> for generic methods for accessing the 
+features. Below are some specific methods to this subclass.
 
 =over 4
-
-=item source
-
-=item do_gene
-
-=item do_exon
-
-=item do_cds
-
-=item do_utr
-
-=item do_codon
-
-=item do_name
-
-=item share
-
-These methods retrieve or set parameters to the parsing engine, same as 
-the options to the new method.
-
-=item fh
-
-Set or retrieve the file handle of the current table. This module uses 
-L<IO::Handle> objects. Be careful manipulating file handles of open tables!
-
-=item open_file
-
-Pass the name of a new table to parse. Existing gene models loaded in 
-memory, if any, are discarded. Counts are reset to 0. Supplemental 
-tables are not discarded.
 
 =item load_extra_data($file, $type)
 
@@ -253,62 +207,6 @@ of supplemental data. Values can include the following
 The number of transcripts with information loaded from the supplemental 
 data file is returned.
 
-=back
-
-=head2 Feature retrieval
-
-The following methods parse the table lines into SeqFeature objects. 
-It is best if methods are not mixed; unexpected results may occur. 
-
-=over 4
-
-=item next_feature
-
-This will read the next line of the table and parse it into a gene or 
-transcript object. However, multiple transcripts from the same gene are 
-not assembled together under the same gene object. 
-
-=item next_top_feature
-
-This method will return all top features (typically genes), with multiple 
-transcripts of the same gene assembled under the same gene object. Transcripts 
-are assembled together if they share the same gene name and the transcripts 
-overlap. If transcripts share the same gene name but do not overlap, they 
-are placed into separate gene objects with the same name but different 
-C<primary_id> tags. Calling this method will parse the entire table into 
-memory (so that multiple transcripts may be assembled), but only one object 
-is returned at a time. Call this method repeatedly using a while loop to 
-get all features.
-
-=item top_features
-
-This method is similar to L</next_top_feature>, but instead returns an array 
-of all the top features. 
-
-=back
-
-=head2 Other methods
-
-Additional methods for working with the parser object and the parsed 
-SeqFeature objects.
-
-=over 4
-
-=item parse_table
-
-Parses the table into memory. If a table wasn't provided using the 
-L</new> or L</open_file> methods, then a filename can be passed to this 
-method and it will automatically be opened for you. 
-
-=item fetch
-
-  my $gene = $parser->fetch($primary_id) or 
-     warn "gene $display_name can not be found!";
-
-Fetch a loaded top feature from memory using the C<primary_id> tag, which 
-should be unique. Returns the SeqFeature object or C<undef> if not present.
-Only useful after </parse_table> is called. 
-
 =item counts
 
 This method will return a hash of the number of genes and RNA types that 
@@ -317,36 +215,17 @@ have been parsed.
 =item typelist
 
 This method will return a comma-delimited list of the feature types or 
-C<primary_tag>s found in the parsed file. Returns a generic list if a 
-file has not been parsed.
-
-=item from_ucsc_string
-
-A bare bones method that will convert a tab-delimited text line from a UCSC 
-formatted gene table into a SeqFeature object for you. Don't expect alternate 
-transcripts to be assembled into genes. 
-
-=item seq_ids
-
-Returns an array or array reference of the names of the chromosomes or 
-reference sequences present in the table.
-
-=item seq_id_lengths
-
-Returns a hash reference to the chromosomes or reference sequences and 
-their corresponding lengths. In this case, the length is inferred by the 
-greatest gene end position.
+C<primary_tag>s found in the parsed file. If a file has not yet been 
+parsed, it will return a generic list of expected (typical) feature 
+types. Otherwise, it will return the feature types observed in the 
+parsed file.
 
 =back
 
-=head2 Bio::ToolBox::parser::ucsc::builder
-
-This is a private module that is responsible for building SeqFeature 
-objects from UCSC table lines. It is not intended for general public use.
-
 =head1 SEE ALSO
 
-L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>
+L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, 
+L<Bio::ToolBox::SeqFeature>
 
 =cut
 

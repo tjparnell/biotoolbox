@@ -13,6 +13,82 @@ module.
 It will take a line from a UCSC-formatted gene table (refFlat, genePred, knownGene) 
 and assemble a hierarchical gene or transcript SeqFeature object.
 
+=head1 METHODS
+
+=over 4
+
+=item new
+
+Pass an ARRAY reference representing the tab-delimited fields from a line 
+read from UCSC-formatted file and the L<Bio::ToolBox::parser::ucsc> object
+itself. The method of parsing is determined by the number of elements.
+
+=item build_transcript
+
+=item build_gene
+
+Methods for building the representative transcript and gene from the line data.
+
+=item add_exons
+
+=item add_utrs
+
+=item add_cds
+
+=item add_codons
+
+Add relative subfeatures to a transcript.
+
+=item find_existing_subfeature
+
+Find the same subfeature when sharing is enabled.
+
+=item update_attributes
+
+=item add_unique_attribute
+
+Add attributes.
+
+=item name
+
+=item name2
+
+=item gene_name
+
+=item chrom
+
+=item txStart
+
+=item txEnd
+
+=item strand
+
+=item cdsStart
+
+=item cdsEnd
+
+=item exonCount
+
+=item exonStarts
+
+=item exonEnds
+
+=item type
+
+=item refseq
+
+=item note
+
+=item status
+
+=item completeness
+
+=item ucsc
+
+Read access to parsed values in the object.
+
+=back
+
 =cut
 
 use strict;

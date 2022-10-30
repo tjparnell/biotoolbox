@@ -7,38 +7,25 @@ Bio::ToolBox::parser::bed - Parser for BED-style formats
 
 =head1 SYNOPSIS
 
-  use Bio::ToolBox::parser::bed;
+  use Bio::ToolBox::Parser;
+  my $filename = 'file.bed';
   
-  ### Quick-n-easy bed parser
-  my $bed = Bio::ToolBox::parser::bed->new('file.bed');
+  my $Parser = Bio::ToolBox::Parser->new(
+  	file    => $filename,
+  ) or die "unable to open gff file!\n";
+  # the Parser will taste the file and open the appropriate 
+  # subclass parser, bed in this case
   
-  ### Full-powered bed parser, mostly for bed12 functionality
-  my $bed = Bio::ToolBox::parser::bed->new(
-        file      => 'regions.bed',
-        do_exon   => 1,
-        do_cds    => 1,
-        do_codon  => 1,
-  );
-  
-  # what type of bed file is being parsed, determined when opening file
-  my $type = $bed->version; # returns narrowPeak, bedGraph, bed12, bed6, etc
-  
-  # Retrieve one feature or line at a time
-  my $feature = $bed->next_feature;
-
-  # Retrieve array of all features
-  my @genes = $bed->top_features;
-  
-  # each returned feature is a SeqFeature object
-  foreach my $f ($bed->next_top_feature) {
-  	 printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
+  while (my $feature = $Parser->next_top_feature() ) {
+	# each $feature is parent SeqFeature object
+  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
   }
- 
 
 =head1 DESCRIPTION
 
-This is a parser for converting BED-style and related formats into SeqFeature objects. 
-File formats include the following. 
+This is the BED-style specific parser subclass to the L<Bio::ToolBox::Parser>
+object, and as such inherits generic methods from the parent. File formats 
+include the following. 
 
 =over 4 
 
@@ -105,19 +92,20 @@ stop coordinates as the C<primary_id>, for example 'chr1:0-100'.
 
 =item C<primary_tag>
 
-Bed files don't have a concept of feature type (they're all the same type), so a 
-default C<primary_tag> of 'region' is set. For bed12 files with transcript models, 
-the transcripts will be set to either 'mRNA' or 'ncRNA', depending on the presence of 
-interpreted CDS start and stop (thick coordinates).
+Bed files don't have an inherent attribute of feature type (they are all the same 
+type), so a default C<primary_tag> is assigned based on the file type. For peak 
+files (F<narrowPeak> and F<broadPeak>) this is C<peak>, for F<gappedPeak> this is 
+C<gappedPeak> and C<peak> (subfeatures), and for F<bed12> files with transcript models, 
+the transcripts will be set to either C<mRNA> or C<ncRNA>, depending on the presence 
+of interpreted CDS start and stop (thick coordinates).
 
 =item C<source_tag>
 
-Bed files don't have a concept of a source. The basename of the provided file is 
-therefore used to set the C<source_tag>.
+Bed files don't have a concept of a source; default is "".
 
 =item attribute tags
 
-Extra columns in the narrowPeak and broadPeak formats are assigned to attribute tags 
+Extra columns in the F<narrowPeak> and F<broadPeak> formats are assigned to attribute tags 
 as described above. The C<rgb> values set in bed12 files are also set to an attribute tag.
 
 =back
@@ -126,9 +114,27 @@ as described above. The C<rgb> values set in bed12 files are also set to an attr
 
 =head2 Initializing the parser object
 
+In most cases, users should initialize an object using the generic 
+L<Bio::ToolBox::Parser> object. 
+
+These are class methods to initialize the parser with an annotation file 
+and modify the parsing behavior. Most parameters can be set either upon 
+initialization or as class methods on the object. Unpredictable behavior 
+may occur if you implement these in the midst of parsing a file. 
+
+Do not open subsequent files with the same object. Always create a new 
+object to parse a new file.
+
 =over 4
 
 =item new
+
+  my $parser = Bio::ToolBox::parser::bed->new($filename);
+  my $parser = Bio::ToolBox::parser::bed->new(
+      file    => 'file.bed',
+      do_gene => 1,
+      do_cds  => 1,
+  );
 
 Initiate a new Bed file parser object. Pass a single value (the bed file name) to 
 open the file for parsing. Alternatively, pass an array of key 
@@ -144,7 +150,6 @@ Provide the path and file name for a Bed file. The file may be gzip compressed.
 =item source
 
 Pass a string to be added as the source tag value of the SeqFeature objects. 
-The default value is the basename of the file to be parsed. 
 
 =item do_exon
 
@@ -154,95 +159,18 @@ The default value is the basename of the file to be parsed.
 
 =item do_codon
 
-Pass a boolean (1 or 0) value to parse certain subfeatures, including C<exon>, 
-C<CDS>, C<five_prime_UTR>, C<three_prime_UTR>, C<stop_codon>, and C<start_codon> 
-features. Default is false.
+For Bed12 formats that represent transcripts, pass a boolean (1 or 0) value to
+parse certain subfeatures, including C<exon>, C<CDS>, C<five_prime_UTR>, 
+C<three_prime_UTR>, C<stop_codon>, and C<start_codon> features. Default is false.
 
 =item class
 
 Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
-create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>.
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
+which is lighter-weight and consumes less memory. A suitable BioPerl alternative
+is L<Bio::SeqFeature::Lite>.
 
 =back
-
-=back
-
-=head2 Modify the parser object
-
-These methods set or retrieve parameters that modify parser functionality.
-
-=over 4
-
-=item source
-
-=item do_exon
-
-=item do_cds
-
-=item do_utr
-
-=item do_codon
-
-These methods retrieve or set parameters to the parsing engine, same as 
-the options to the new method.
-
-=item open_file
-
-Pass the name of a file to parse. This function is called automatically by the 
-L</new> method if a filename was passed. This will open the file, check its format, 
-and set the parsers appropriately.
-
-=back
-
-=head2 Parser or file attributes
-
-These retrieve attributes for the parser or file.
-
-=over 4
-
-=item version
-
-This returns a string representation of the opened bed file format. For standard 
-bed files, it returns 'bed' followed by the number columns, e.g. C<bed4> or C<bed12>. 
-For recognized special bed variants, it will return C<narrowPeak>, C<broadPeak>, or 
-C<bedGraph>. 
-
-=item fh
-
-Retrieves the file handle of the current file. This module uses 
-L<IO::Handle> objects. Be careful manipulating file handles of open files!
-
-=item typelist
-
-Returns a string representation of the type of SeqFeature types to be encountered in 
-the file. Currently this returns generic strings, 'mRNA,ncRNA,exon,CDS' for bed12 
-and 'region' for everything else.
-
-=back
-
-=head2 Feature retrieval
-
-The following methods parse the table lines into SeqFeature objects. 
-It is best if methods are not mixed; unexpected results may occur. 
-
-For bed12 files, it will return a transcript model SeqFeature with appropriate subfeatures.
-
-=over 4
-
-=item next_feature
-
-This will read the next line of the table, parse it into a feature object, and 
-immediately return it. 
-
-=item next_top_feature
-
-This method will first parse the entire file into memory. It will then return each 
-feature one at a time. Call this method repeatedly using a C<while> loop to get all features.
-
-=item top_features
-
-This method is similar to L</next_top_feature>, but instead returns an array 
-of all the top features. 
 
 =back
 
@@ -253,40 +181,18 @@ SeqFeature objects.
 
 =over 4
 
-=item parse_file
+=item typelist
 
-Parses the entire file into memory without returning any objects.
-
-=item fetch
-
-  my $gene = $parser->fetch($primary_id) or 
-     warn "gene $display_name can not be found!";
-
-Fetch a loaded top feature from memory using the C<primary_id> tag, which 
-should be unique. Returns the SeqFeature object or C<undef> if not present.
-Only useful after </parse_file> is called. 
-
-=item comments
-
-This method will return an array of the comment, track, or browser lines that may have 
-been in the parsed file. These may or may not be useful.
-
-=item seq_ids
-
-Returns an array or array reference of the names of the chromosomes or 
-reference sequences present in the file. Must parse the entire file before using.
-
-=item seq_id_lengths
-
-Returns a hash reference to the chromosomes or reference sequences and 
-their corresponding lengths. In this case, the length is inferred by the 
-greatest feature end position. Must parse the entire file before using.
+Returns a string representation of the type of SeqFeature types to be encountered in 
+the file. Currently this returns generic strings, 'mRNA,ncRNA,exon,CDS' for bed12 
+and 'feature' for everything else.
 
 =back
 
 =head1 SEE ALSO
 
-L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>, 
+L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
+L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::gff>
 
 
 =cut

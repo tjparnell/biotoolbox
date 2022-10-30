@@ -23,16 +23,9 @@ Bio::ToolBox::Parser - generic parsing tool for GFF, UCSC, BED
   # do something with parser
   while (my $feature = $parser->next_top_feature() ) {
 	# each $feature is a SeqFeature object
+  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
 	my @children = $feature->get_SeqFeatures();
   }
-  
-  # alternatively open a specific parser
-  use Bio::ToolBox::parser::gff;
-  my $parser = Bio::ToolBox::parser::gff->new(
-  	file    => $filename,
-  	do_gene => 1,
-  	do_exon => 1,
-  ) or die "unable to open gff file!\n";
 
 
 =head1 DESCRIPTION
@@ -87,8 +80,221 @@ know what to open it with, use the generic Parser and let it pick for you.
     my $file; # obtained from the user, unknown format
     my $parser = Bio::ToolBox::Parser->new($file);
     
-Pass the 
+Pass either a single value being the name of a file, or a series of 
+key value pairs to inform how to parse the file. The following parameters 
+are allowed:
 
+=over 4
+
+=item file
+
+Provide the file name to be parsed. The file may be gzip compressed. It 
+will be automatically tasted to determine the file format. See 
+L<Bio::ToolBox::Data::file/taste_file>. 
+
+=item flavor
+
+=item filetype
+
+If the file has already been tasted using L<Bio::ToolBox::Data::file/taste_file>,
+then pass the C<flavor> and C<filetype> values to the constructor. This 
+bypasses the need to re-taste the file a second time.
+
+=item do_gene
+
+Pass a boolean (1 or 0) value to combine multiple transcripts with the same 
+gene name under a single gene object. Default is true for those parsers 
+expecting gene annotation (GFF and UCSC).
+
+=item do_cds
+
+=item do_exon
+
+=item do_utr
+
+=item do_codon
+
+Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
+are always parsed, but C<CDS>, C<five_prime_UTR>, C<three_prime_UTR>, C<stop_codon>, 
+and C<start_codon> features may be optionally parsed. Default is false.
+
+=item source
+
+Provide a string value to be used as the C<source> value when constructing 
+SeqFeature objects that don't have an inherent source value, namely BED 
+and UCSC.
+
+=item simplify
+
+Pass a boolean value to simplify the SeqFeature objects parsed from the GFF 
+file and ignore extraneous attributes. Ignored for other parsers.
+
+=item refseqsum
+
+=item refseqstat
+
+=item kgxref
+
+=item ensembltogene
+
+=item ensemblsource
+
+Pass the appropriate supplementary file names for UCSC-formatted files. 
+Ignored by other parser subclasses.
+
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
+which is lighter-weight and consumes less memory. A suitable BioPerl alternative
+is L<Bio::SeqFeature::Lite>.
+
+=back
+
+=back
+
+=head2 Modifying parser behavior
+
+These methods can be used to get or set values that modify the parser 
+behavior. These are Boolean methods; it sets and returns either 1 or 0.
+These are not always used by all subclasses.
+
+=over 4
+
+=item do_gene
+
+=item do_exon
+
+=item do_cds
+
+=item do_utr
+
+=item do_codon
+
+=item do_name
+
+=item do_share
+
+=item simplify
+
+=back
+
+=head2 General Parser functions
+
+These are general methods about the parser or the file being parsed.
+
+=over 4
+
+=item file
+
+The filename of the file being parsed.
+
+=item fh
+
+The L<IO::File> file object handle.
+
+=item filetype
+
+Returns a string representing the file format being parsed. Determined 
+after tasting the file. Values could include, but not limited to, 
+C<gff3>, C<gtf>, C<gff>, C<bed6>, C<bed12>, C<bedgraph>, C<narrowPeak>, 
+C<broadPeak>, C<gappedPeak>, C<genePred>, C<refFlat>, C<knownGene>.
+
+=item number_loaded
+
+Returns the number of top features parsed and loaded into memory. 
+Does not include subfeatures.
+
+=item comments
+
+Returns an array of the comment lines in the parsed file.
+
+=item seq_ids
+
+Returns an array or array reference of the names of the sequence or 
+chromosome names observed in the parsed file.
+
+=item seq_id_lengths
+
+Returns a HASH reference of sequence identifiers (keys) and the
+observed sequence length (values). In most cases and file formats, 
+the length is merely the last observed position of a feature on that
+chromosome, and should not be taken as absolute truth. Some GFF3 files
+do include sequence information, and in such cases, could be used as 
+absolute truth values.
+
+=back
+
+=head2 Feature retrieval
+
+The following methods parse the GFF file lines into SeqFeature objects. 
+It is best if these methods are not mixed; unexpected results may occur. 
+
+=over 4
+
+=item parse_file
+
+Parses the entire file into memory. This is automatically called when 
+either L</top_features> or L</next_top_feature> is called. 
+
+=item next_top_feature
+
+This method will return a top level parent SeqFeature object 
+assembled with child features as sub-features. For example, a gene 
+object with mRNA subfeatures, which in turn may have exon and/or CDS 
+subfeatures. Child features are assembled based on the existence of 
+proper Parent attributes in child features. If no Parent attributes are 
+included in the GFF file, then this will behave as L</next_feature>.
+
+Child features (those containing a C<Parent> attribute) 
+are associated with the parent feature. A warning will be issued about lost 
+children (orphans). Shared subfeatures, for example exons common to 
+multiple transcripts, are associated properly with each parent. An opportunity 
+to rescue orphans is available using the L</orphans> method.
+
+Note that subfeatures may not necessarily be in ascending genomic order 
+when associated with the feature, depending on their order in the GFF3 
+file and whether shared subfeatures are present or not. When calling 
+subfeatures in your program, you may want to sort the subfeatures. For 
+example
+
+  my @subfeatures = map { $_->[0] }
+                    sort { $a->[1] <=> $b->[1] }
+                    map { [$_, $_->start] }
+                    $parent->get_SeqFeatures;
+
+=item top_features
+
+This method will return an array of the top (parent) features defined in 
+the GFF file. This is similar to the L</next_top_feature> method except that 
+all features are returned at once. 
+
+=item next_feature
+
+This method will return a SeqFeature object representation of 
+the next feature (line) in the file. Parent - child relationships are 
+NOT assembled; however, undefined parents in a GTF file may still be 
+generated, just not returned. 
+
+This method is best used with simple annotation files where no hierarchies 
+are expected, such BED files. This may be used in a while loop until the 
+end of the file is reached.
+
+=item fetch
+
+  my $gene = $parser->fetch($primary_id) or 
+     warn "gene $display_name can not be found!";
+
+Fetch a loaded top feature from memory using the C<primary_id> tag, which 
+should be unique. Returns the SeqFeature object or C<undef> if not present.
+Only useful after </parse_file> is called. 
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>, 
+L<Bio::ToolBox::parser::bed>, L<Bio::ToolBox::SeqFeature>
 
 
 
