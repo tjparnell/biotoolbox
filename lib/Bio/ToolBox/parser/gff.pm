@@ -497,7 +497,7 @@ sub parse_file {
 	# found, it will be lost. Features without a parent are assumed to be 
 	# top-level features.
 	
-	printf "  Parsing %s %s format file %s....\n", $self->simplify ? 'simply' : 'fully', 
+	printf "  Parsing %s %s format file....\n", $self->simplify ? 'simply' : 'fully', 
 		$self->filetype;
 	
 	
