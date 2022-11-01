@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -111,6 +111,12 @@ sub taste_file {
 	elsif ($Taste->ucsc) {
 		return ('ucsc', $Taste->format);
 	}
+	elsif ($Taste->vcf) {
+		return ('vcf', $Taste->format);
+	}
+	elsif ($Taste->format) {
+		return ('', $Taste->format);
+	}
 	
 	
 	# check if the number of columns match a known format, then verify
@@ -127,7 +133,9 @@ sub taste_file {
 		# possibly a genePred file
 		$Taste->ucsc(10);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 10;
+		if ($Taste->ucsc == 10) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(10,1); # force metadata
 		$Taste->verify(1);
 		if ($Taste->ucsc == 10) {
@@ -138,7 +146,9 @@ sub taste_file {
 		# possibly a refFlat file
 		$Taste->ucsc(11);
 		$Taste->verify(1);
-		return 'ucsc' if $Taste->ucsc == 11;
+		if ($Taste->ucsc == 11) {
+			return ('ucsc', $Taste->format);
+		}
 		$Taste->add_ucsc_metadata(11,1); # force metadata
 		$Taste->verify(1);
 		if ($Taste->ucsc == 11) {
@@ -195,7 +205,7 @@ sub taste_file {
 			return ('ucsc', $Taste->format);
 		}
 	}
-	return;
+	return (undef, undef);
 }
 
 sub sample_gff_type_list {
@@ -268,6 +278,7 @@ sub parse_headers {
 		# no real line, just empty space
 		if ($line !~ m/\w+/) {
 			$header_line_count++;
+			$line = $fh->getline; 
 			next;
 		}
 		
@@ -301,12 +312,28 @@ sub parse_headers {
 		}
 		
 		# gff version header
-		elsif ($line =~ /^##gff-version\s+([\d\.]+)$/) {
+		elsif ($line =~ /^##(g[vf]f).version\s+([\d\.]+)$/) {
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			my $g = $1;
-			$self->gff($g);
+			my $v = $2;
+			if ($g eq 'gff') {
+				$self->gff($v);
+				if ($v == 3) {
+					$self->format('gff3');
+				}
+				elsif ($v > 2 and $v < 3) {
+					$self->format('gtf');
+				}
+				else {
+					$self->format('gff');
+				}
+			}
+			elsif ($g eq 'gvf') {
+				$self->format('gvf');
+			}
+			# format gets properly set below when add
 			$header_line_count++;
 		}
 		
@@ -317,6 +344,7 @@ sub parse_headers {
 			# it if it is
 			my $v = $1;
 			$self->vcf($v);
+			$self->format(sprintf "VCFv%s", $v);
 			$self->add_comment($line); # so that it is written properly
 			$header_line_count++;
 		}
@@ -361,7 +389,7 @@ sub parse_headers {
 			my $format = $self->format || $self->extension;
 			
 			### a GFF file
-			if ($format =~ /g[tf]f/i) {
+			if ($format =~ /g[tvf]f/i) {
 				$self->add_gff_metadata;
 			}
 			
@@ -616,12 +644,21 @@ sub write_file {
 		# try and determine one from metadata
 			
 		if ($self->gff) {
-			$extension = $self->gff == 3 ? '.gff3' : $self->gff == 2.5 ? '.gtf' : '.gff';
+			if ($self->gff == 3) {
+				$extension = '.gff3';
+			}
+			elsif ($self->gff > 2 and $self->gff < 3) {
+				$extension = '.gtf';
+			}
+			else {
+				$extension = '.gff';
+			}
 		} 
 		elsif ($self->bed) {
 			if ($self->format) {
 				# re-use the format value as the extension
-				$extension = sprintf(".%s", $self->format);
+				$extension = sprintf ".%s", $self->format;
+				$extension =~ s/\d+$//; # remove any digit after the bed format
 			}
 			elsif (
 				$self->number_columns == 4 and 
@@ -1164,6 +1201,7 @@ sub add_gff_metadata {
 	my $force = shift || 0;
 	
 	# set the gff version based on the extension if it isn't already
+	# normally gff version should already be defined from pragma when parsing headers
 	if (not($self->gff) or $force) {
 		if (defined $version) {
 			$self->gff($version);
@@ -1180,9 +1218,16 @@ sub add_gff_metadata {
 	}
 	# set format based on version
 	if (not $self->format) {
-		my $v = $self->gff;
-		my $f = $v == 3 ? 'gff3' : $v > 2 ? 'gtf' : 'gff';
-		$self->format($f);
+		my $g = $self->gff;
+		if ($g == 3) {
+			$self->format('gff3');
+		}
+		elsif ($g > 2) {
+			$self->format('gtf');
+		}
+		else {
+			$self->format('gff');
+		}
 	}
 	
 	# set the metadata for the each column
@@ -1239,12 +1284,14 @@ sub add_bed_metadata {
 	# check bed type and set metadata appropriately
 	my $bed_names;
 	if ($self->format =~ /bedgraph/i or $self->extension =~ /bg|bdg|graph/i) {
+		# bedGraph format, enforce uniformity
 		$self->format('bedGraph'); # possibly redundant
 		$self->bed($column_count);
 		$bed_names = $self->standard_column_names('bdg');
 	}
 	else {
-		$self->format('bed');
+		# other bed format
+		$self->format(sprintf "bed%d", $column_count);
 		$self->bed($column_count);
 		$bed_names = $self->standard_column_names('bed12');
 	}
@@ -1427,7 +1474,8 @@ sub add_sgr_metadata {
 		}
 	}
 	$self->{data_table}->[0] = $self->{'column_names'};
-	$self->{'number_columns'} = 3; 
+	$self->{'number_columns'} = 3;
+	$self->format('sgr');
 
 
 	# set headers flag to false

@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.67';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -421,7 +421,6 @@ use constant {
 	ATTRB   => 10,
 	SUBF    => 11,
 };
-our $IDCOUNT = 0;
 
 1;
 
@@ -454,8 +453,8 @@ sub new {
 	# primary options
 	$self->[SEQID] = $args{-seq_id} || $args{-seqid} || $args{'-ref'} || 
 		$args{chrom} || undef;
-	$self->[START] = $args{-start} || undef;
-	$self->[STOP] = $args{-end} || $args{-stop} || undef;
+	$self->[START] = int $args{-start} || undef;
+	$self->[STOP] = int $args{-end} || $args{-stop} || undef;
 	$self->strand($args{-strand}) if exists $args{-strand};
 	$self->[NAME] = $args{-display_name} || $args{-name} || undef;
 	$self->[ID] = $args{-primary_id} || $args{-id} || undef;
@@ -515,7 +514,7 @@ sub seq_id {
 sub start {
 	my $self = shift;
 	if (@_) {
-		$self->[START] = $_[0];
+		$self->[START] = int $_[0];
 	}
 	return defined $self->[START] ? $self->[START] : undef;
 }
@@ -523,7 +522,7 @@ sub start {
 sub end {
 	my $self = shift;
 	if (@_) {
-		$self->[STOP] = $_[0];
+		$self->[STOP] = int $_[0];
 	}
 	return defined $self->[STOP] ? $self->[STOP] : undef;
 }
@@ -566,7 +565,7 @@ sub primary_id {
 	}
 	elsif (not defined $self->[ID]) {
 		# automatically assign a new ID
-		$self->[ID] = sprintf("%s_%09d", $self->primary_tag, $IDCOUNT++);
+		$self->[ID] = sprintf("%s:%d-%d", $self->[SEQID], $self->[START], $self->[STOP]);
 	}
 	return $self->[ID];
 }
@@ -576,8 +575,7 @@ sub primary_tag {
 	if (@_) {
 		$self->[TYPE] = $_[0];
 	}
-	$self->[TYPE] ||= 'region';
-	return $self->[TYPE];
+	return defined $self->[TYPE] ? $self->[TYPE] : 'feature';
 }
 
 sub source_tag {
@@ -585,7 +583,7 @@ sub source_tag {
 	if (@_) {
 		$self->[SRC] = $_[0];
 	}
-	return defined $self->[SRC] ? $self->[SRC] : undef;
+	return defined $self->[SRC] ? $self->[SRC] : '';
 }
 
 sub type {

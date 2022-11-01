@@ -5,7 +5,7 @@ require Exporter;
 use File::Spec;
 use Carp;
 use Config::Simple;
-our $VERSION = '1.54';
+our $VERSION = '1.70';
 
 # variables
 my $default;
@@ -47,12 +47,12 @@ DEFAULT
 	my $var = $ENV{'BIOTOOLBOX'} || undef;
 	
 	# check for file possible paths
-	if (-s $default_path) {
-		$config_path = $default_path;
-	}
-	elsif (defined $var and -s $var) {
+	if (defined $var and -s $var) {
 		$config_path = $var;
 	}	
+	elsif (-s $default_path) {
+		$config_path = $default_path;
+	}
 
 	# Open the configuration file
 	if ($config_path) {

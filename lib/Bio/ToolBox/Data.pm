@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -1269,61 +1269,66 @@ sub duplicate {
 sub parse_table {
 	my $self = shift;
 	my $args = shift;
-	my ($file, $feature, $subfeature, $simplify);
-	if (ref $args) {
+	my $file;
+	if (ref($args) eq 'HASH') {
 		$file = $args->{file} || '';
-		$feature = $args->{feature} || '';
-		$subfeature = $args->{subfeature} || '';
-		$simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
-			$args->{simplify} : 1; # default is to simplify
 	}
 	else {
 		# no hash reference, assume just a file name
 		$file = $args;
-		undef $args;
-		$feature = undef;
-		$subfeature = '';
-		$simplify = 1;
+		$args = {}; # empty hash for below
 	}
 	unless ($file) {
 		carp "no annotation file provided to parse!";
 		return;
 	}
 	
-	# the file format determines the parser class
-	my ($flavor, $format) = $self->taste_file($file) or return;
-	my $class = 'Bio::ToolBox::parser::' . $flavor;
-	eval {load $class};
-	if ($@) {
-		carp "unable to load $class! cannot parse $flavor!";
-		return;
+	# taste the file and open parser object
+	my ($flavor, $format) = $self->taste_file($file);
+	my $parser;
+	if (defined $flavor) {
+		eval {
+			load 'Bio::ToolBox::Parser';
+			$parser = Bio::ToolBox::Parser->new(
+				file        => $file,
+				flavor      => $flavor,
+				'format'    => $format,
+			);
+		};
+		unless ($parser) {
+			# no parser object means no suitable parser adapter
+			return 0;
+		}
 	}
-	$self->format($format); # specify the specific format
+	else {
+		# not suitable for parsing
+		return 0;
+	}
+	$self->format($format); # specify the specific format	
 	
-	# open parser
-	my $parser = $class->new() or return;
-	$parser->open_file($file) or return;
-	my $typelist = $parser->typelist;
+	# additional user parameters
+	my $feature = $args->{feature} || '';
+	my $subfeature = $args->{subfeature} || '';
+	my $simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
+		$args->{simplify} : 1; # default is to simplify
 	
 	# set feature based on the type list from the parser
+	my $typelist = $parser->typelist;
 	unless ($feature) {
 		if ($typelist =~ /gene/i) {
 			$feature = 'gene';
 		}
-		elsif ($typelist eq 'region') {
-			$feature = 'region';
-		}
-		else {
+		elsif ($typelist =~ /rna/i) {
 			$feature = 'rna'; # generic RNA
 		}
 	}
 	
-	# set parser parameters
+	# set additional parser parameters
 	$parser->simplify($simplify);
 	if ($subfeature) {
-		$parser->do_exon(1) if $subfeature =~ /exon/i;
-		$parser->do_cds(1) if $subfeature =~ /cds/i;
-		$parser->do_utr(1) if $subfeature =~ /utr|untranslated/i;
+		$parser->do_exon(1)  if $subfeature =~ /exon/i;
+		$parser->do_cds(1)   if $subfeature =~ /cds/i;
+		$parser->do_utr(1)   if $subfeature =~ /utr|untranslated/i;
 		$parser->do_codon(1) if $subfeature =~/codon/i;
 	}
 	if ($feature =~ /gene$/i) {
@@ -1345,15 +1350,12 @@ sub parse_table {
 	$parser->parse_file or return;
 	
 	# store the SeqFeature objects
-	if ($self->last_row > 0) {
+	if ($self->number_rows > 0) {
 		# we already have a table, presumably representing the features
 		my $count = 0;
 		$self->iterate( sub {
 			my $row = shift;
-			my $f = $parser->find_gene(
-				name  => $row->name,
-				id    => $row->id,
-			);
+			my $f = $parser->fetch($row->id);
 			if ($f) {
 				$self->store_seqfeature($row->row_index, $f);
 				$count++;
@@ -1384,13 +1386,23 @@ PARSEFAIL
 			if ($chr_exclude) {
 				next if $f->seq_id =~ /$chr_exclude/i;
 			}
-			my $type = $f->type;
-			if ($f->type =~ /$feature/i or ($mrna_check and is_coding($f)) ) {
+			if ($feature) {
+				# specific features are requested, look for them
+				if (
+					($f->type =~ /$feature/i) or
+					($mrna_check and is_coding($f) )
+				) {
+					my $index = $self->add_row([ $f->primary_id, $f->display_name ]);
+					$self->store_seqfeature($index, $f);
+				}
+			}
+			else {
+				# no feature defined, take everything
 				my $index = $self->add_row([ $f->primary_id, $f->display_name ]);
 				$self->store_seqfeature($index, $f);
 			}
 		}
-		unless ($self->last_row) {
+		unless ($self->number_rows > 0) {
 			printf " Zero '%s' features found!\n Check your feature or try generic features like gene, mRNA, or transcript\n",
 				$feature;
 		}
@@ -1405,6 +1417,7 @@ PARSEFAIL
 		undef $self->{filename};
 		undef $self->{path};
 	}
+	# successfully parsed
 	return 1;
 }
 
@@ -1624,12 +1637,7 @@ sub collapse_gene_transcripts {
 	}
 	
 	# load module
-	my $class = "Bio::ToolBox::GeneTools";
-	eval {load $class, qw(collapse_transcripts)};
-	if ($@) {
-		carp "unable to load $class! cannot collapse transcripts!";
-		return;
-	}
+	load Bio::ToolBox::GeneTools, qw(collapse_transcripts);
 	
 	# collapse the transcripts
 	my $success = 0;
@@ -1673,12 +1681,8 @@ sub add_transcript_length {
 	}
 	
 	# load module
-	eval {load "Bio::ToolBox::GeneTools", qw(get_transcript_length get_transcript_cds_length
-		get_transcript_5p_utr_length get_transcript_3p_utr_length)};
-	if ($@) {
-		carp "unable to load Bio::ToolBox::GeneTools! cannot collapse transcripts!";
-		return;
-	}
+	load Bio::ToolBox::GeneTools, qw(get_transcript_length get_transcript_cds_length
+		get_transcript_5p_utr_length get_transcript_3p_utr_length);
 	
 	# determine name and calculation method
 	my $length_calculator;
@@ -2040,11 +2044,7 @@ sub reload_children {
 	
 	# prepare Stream
 	my $class = "Bio::ToolBox::Data::Stream";
-	eval {load $class};
-	if ($@) {
-		carp "unable to load $class! can't reload children!";
-		return;
-	}
+	load $class;
 	
 	# open first stream
 	my $first = shift @files;

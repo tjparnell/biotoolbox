@@ -27,7 +27,7 @@ require_ok 'Bio::ToolBox::Data' or
 ### Collect features from a database
 my $infile = File::Spec->catfile($Bin, "Data", "chrI.gff3");
 my $Data = Bio::ToolBox::Data->new(
-	'db'      => $infile,
+	'db'      => 'mem_test_file',
 	'feature' => 'gene:SGD',
 );
 isa_ok($Data, 'Bio::ToolBox::Data', 'db collected gene table');
@@ -50,7 +50,7 @@ is($Data->name_column, 1, 'identify name column');
 is($Data->type_column, 2, 'identify type column');
 
 # test database
-is($Data->database, $infile, 'database name');
+is($Data->database, 'mem_test_file', 'database name');
 my $db = $Data->open_database;
 isa_ok($db, 'Bio::DB::SeqFeature::Store', 'opened database');
 
