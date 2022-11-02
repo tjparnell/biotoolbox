@@ -408,100 +408,104 @@ L<Bio::RangeI>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>
 use strict;
 use Carp qw(carp cluck croak confess);
 use constant {
-	SEQID   => 0,
-	START   => 1,
-	STOP    => 2,
-	STRND   => 3,
-	NAME    => 4,
-	ID      => 5,
-	TYPE    => 6,
-	SRC     => 7,
-	SCORE   => 8,
-	PHASE   => 9,	
-	ATTRB   => 10,
-	SUBF    => 11,
+	SEQID => 0,
+	START => 1,
+	STOP  => 2,
+	STRND => 3,
+	NAME  => 4,
+	ID    => 5,
+	TYPE  => 6,
+	SRC   => 7,
+	SCORE => 8,
+	PHASE => 9,
+	ATTRB => 10,
+	SUBF  => 11,
 };
 
 1;
 
 #### Aliases ####
-# to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we 
+# to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we
 # put in plenty of aliases to some of the methods
-*stop = \&end;
-*name = \&display_name;
-*id = \&primary_id;
-*method = \&primary_tag;
-*source = \&source_tag;
-*add_segment = \&add_SeqFeature;
+*stop                = \&end;
+*name                = \&display_name;
+*id                  = \&primary_id;
+*method              = \&primary_tag;
+*source              = \&source_tag;
+*add_segment         = \&add_SeqFeature;
 *get_all_SeqFeatures = *segments = \&get_SeqFeatures;
-*each_tag_value = \&get_tag_values;
-*get_all_tags = \&all_tags;
-*gff3_string = \&gff_string;
-
+*each_tag_value      = \&get_tag_values;
+*get_all_tags        = \&all_tags;
+*gff3_string         = \&gff_string;
 
 #### METHODS ####
 sub new {
 	my $class = shift;
-	if (ref($class)) {
+	if ( ref($class) ) {
 		$class = ref($class);
 	}
 	my %args = @_;
-	my $self = bless [], $class; 
-		# bless ourselves early to take advantage of some methods
-		# but otherwise do what we can simply and quickly
-	
+	my $self = bless [], $class;
+
+	# bless ourselves early to take advantage of some methods
+	# but otherwise do what we can simply and quickly
+
 	# primary options
-	$self->[SEQID] = $args{-seq_id} || $args{-seqid} || $args{'-ref'} || 
-		$args{chrom} || undef;
+	$self->[SEQID] =
+		   $args{-seq_id}
+		|| $args{-seqid}
+		|| $args{'-ref'}
+		|| $args{chrom}
+		|| undef;
 	$self->[START] = int $args{-start} || undef;
-	$self->[STOP] = int $args{-end} || $args{-stop} || undef;
-	$self->strand($args{-strand}) if exists $args{-strand};
+	$self->[STOP]  = int $args{-end}   || $args{-stop} || undef;
+	$self->strand( $args{-strand} ) if exists $args{-strand};
 	$self->[NAME] = $args{-display_name} || $args{-name} || undef;
-	$self->[ID] = $args{-primary_id} || $args{-id} || undef;
-	
+	$self->[ID]   = $args{-primary_id}   || $args{-id}   || undef;
+
 	# check orientation
-	if (defined $self->[START] and defined $self->[STOP] and 
-		$self->[START] > $self->[STOP]
-	) {
+	if (    defined $self->[START]
+		and defined $self->[STOP]
+		and $self->[START] > $self->[STOP] )
+	{
 		# flip the coordinates around
-		($self->[START], $self->[STOP]) = ($self->[STOP], $self->[START]);
+		( $self->[START], $self->[STOP] ) = ( $self->[STOP], $self->[START] );
 		$self->[STRND] *= -1;
 	}
-	
+
 	# additional options
 	$args{-type} ||= $args{-primary_tag} || undef;
-	if (defined $args{-type}) {
-		$self->type($args{-type});
+	if ( defined $args{-type} ) {
+		$self->type( $args{-type} );
 	}
 	$args{-source} ||= $args{-source_tag} || undef;
-	if (defined $args{-source}) {
+	if ( defined $args{-source} ) {
 		$self->[SRC] = $args{-source};
 	}
-	if (exists $args{-score}) {
+	if ( exists $args{-score} ) {
 		$self->[SCORE] = $args{-score};
 	}
-	if (exists $args{-phase}) {
-		$self->phase($args{-phase});
+	if ( exists $args{-phase} ) {
+		$self->phase( $args{-phase} );
 	}
-	if (exists $args{-attributes} or exists $args{-tags}) {
+	if ( exists $args{-attributes} or exists $args{-tags} ) {
 		$args{-attributes} ||= $args{-tags};
-		if (ref($args{-attributes}) eq 'HASH') {
+		if ( ref( $args{-attributes} ) eq 'HASH' ) {
 			$self->[ATTRB] = $args{-attributes};
 		}
 	}
-	if (exists $args{-segments}) {
+	if ( exists $args{-segments} ) {
 		$self->[SUBF] = [];
-		foreach my $s (@{ $args{-segments} }) {
-			unless (ref($s) eq $class) {
+		foreach my $s ( @{ $args{-segments} } ) {
+			unless ( ref($s) eq $class ) {
 				croak "segments should be passed as $class objects!";
 			}
-			push @{$self->[SUBF]}, $s;
+			push @{ $self->[SUBF] }, $s;
 		}
 	}
-	
-	return $self; 
-}
 
+	return $self;
+}
 
 sub seq_id {
 	my $self = shift;
@@ -531,19 +535,19 @@ sub strand {
 	my $self = shift;
 	if (@_) {
 		my $str = $_[0];
-		if ($str eq '+') {
+		if ( $str eq '+' ) {
 			$self->[STRND] = 1;
 		}
-		elsif ($str eq '-') {
+		elsif ( $str eq '-' ) {
 			$self->[STRND] = -1;
 		}
-		elsif ($str eq '.') {
+		elsif ( $str eq '.' ) {
 			$self->[STRND] = 0;
 		}
-		elsif ($str =~ /^[\+\-]?1$/) {
+		elsif ( $str =~ /^[\+\-]?1$/ ) {
 			$self->[STRND] = $str;
 		}
-		elsif ($str eq '0') {
+		elsif ( $str eq '0' ) {
 			$self->[STRND] = 0;
 		}
 	}
@@ -563,9 +567,11 @@ sub primary_id {
 	if (@_) {
 		$self->[ID] = $_[0];
 	}
-	elsif (not defined $self->[ID]) {
+	elsif ( not defined $self->[ID] ) {
+
 		# automatically assign a new ID
-		$self->[ID] = sprintf("%s:%d-%d", $self->[SEQID], $self->[START], $self->[STOP]);
+		$self->[ID] =
+			sprintf( "%s:%d-%d", $self->[SEQID], $self->[START], $self->[STOP] );
 	}
 	return $self->[ID];
 }
@@ -590,19 +596,19 @@ sub type {
 	my $self = shift;
 	if (@_) {
 		my $type = $_[0];
-		if ($type =~ /:/) {
-			my ($t, $s) = split /:/, $type;
+		if ( $type =~ /:/ ) {
+			my ( $t, $s ) = split /:/, $type;
 			$self->[TYPE] = $t;
-			$self->[SRC] = $s;
+			$self->[SRC]  = $s;
 		}
 		else {
 			$self->[TYPE] = $type;
 		}
 	}
 	$self->[TYPE] ||= undef;
-	$self->[SRC] ||= undef;
-	if (defined $self->[SRC]) {
-		return join(':', $self->[TYPE], $self->[SRC]);
+	$self->[SRC]  ||= undef;
+	if ( defined $self->[SRC] ) {
+		return join( ':', $self->[TYPE], $self->[SRC] );
 	}
 	return $self->[TYPE];
 }
@@ -619,7 +625,7 @@ sub phase {
 	my $self = shift;
 	if (@_) {
 		my $p = $_[0];
-		unless ($p =~ /^[012\.]$/) {
+		unless ( $p =~ /^[012\.]$/ ) {
 			cluck "phase must be 0, 1, 2 or .!";
 		}
 		$self->[PHASE] = $p;
@@ -629,14 +635,14 @@ sub phase {
 
 sub duplicate {
 	my $self = shift;
-	my $n = $self->new(
-		-seq_id         => $self->[SEQID],
-		-start          => $self->[START],
-		-end            => $self->[STOP],
-		-strand         => $self->strand,
-		-type           => $self->primary_tag,
-		-source         => $self->source_tag,
-		-display_name   => $self->name
+	my $n    = $self->new(
+		-seq_id       => $self->[SEQID],
+		-start        => $self->[START],
+		-end          => $self->[STOP],
+		-strand       => $self->strand,
+		-type         => $self->primary_tag,
+		-source       => $self->source_tag,
+		-display_name => $self->name
 	);
 	$n->score( $self->[SCORE] ) if defined $self->[SCORE];
 	$n->phase( $self->[PHASE] ) if defined $self->[PHASE];
@@ -648,10 +654,10 @@ sub add_SeqFeature {
 	$self->[SUBF] ||= [];
 	my $count = 0;
 	foreach my $s (@_) {
-		if (ref($s) eq ref($self)) {
-			$s->seq_id($self->seq_id) unless ($s->seq_id);
-			$s->strand($self->strand) unless ($s->strand);
-			$s->source_tag($self->source_tag) unless ($s->source_tag);
+		if ( ref($s) eq ref($self) ) {
+			$s->seq_id( $self->seq_id )         unless ( $s->seq_id );
+			$s->strand( $self->strand )         unless ( $s->strand );
+			$s->source_tag( $self->source_tag ) unless ( $s->source_tag );
 			push @{ $self->[SUBF] }, $s;
 			$count++;
 		}
@@ -666,7 +672,7 @@ sub get_SeqFeatures {
 	my $self = shift;
 	return unless $self->[SUBF];
 	my @children;
-	foreach (@{ $self->[SUBF] }) {
+	foreach ( @{ $self->[SUBF] } ) {
 		push @children, $_;
 	}
 	return wantarray ? @children : \@children;
@@ -678,31 +684,31 @@ sub delete_SeqFeature {
 	my $id = shift;
 	my $d;
 	my $i = 0;
-	foreach (@{ $self->[SUBF] }) {
-		if ($_->[ID] eq $id) {
+	foreach ( @{ $self->[SUBF] } ) {
+		if ( $_->[ID] eq $id ) {
 			$d = $i;
 			last;
 		}
 		$i++;
 	}
-	if (defined $d) {
-		splice(@{$self->[SUBF]}, $d, 1);
+	if ( defined $d ) {
+		splice( @{ $self->[SUBF] }, $d, 1 );
 		return 1;
 	}
 	return;
 }
 
 sub add_tag_value {
-	my ($self, $key, $value) = @_;
-	return unless ($key and $value);
+	my ( $self, $key, $value ) = @_;
+	return unless ( $key and $value );
 	$self->[ATTRB] ||= {};
-	if (exists $self->[ATTRB]->{$key}) {
-		if (ref($self->[ATTRB]->{$key}) eq 'ARRAY') {
+	if ( exists $self->[ATTRB]->{$key} ) {
+		if ( ref( $self->[ATTRB]->{$key} ) eq 'ARRAY' ) {
 			push @{ $self->[ATTRB]->{$key} }, $value;
 		}
 		else {
 			my $current = $self->[ATTRB]->{$key};
-			$self->[ATTRB]->{$key} = [$current, $value];
+			$self->[ATTRB]->{$key} = [ $current, $value ];
 		}
 	}
 	else {
@@ -711,16 +717,16 @@ sub add_tag_value {
 }
 
 sub has_tag {
-	my ($self, $key) = @_;
+	my ( $self, $key ) = @_;
 	return unless $self->[ATTRB];
 	return exists $self->[ATTRB]->{$key};
 }
 
 sub get_tag_values {
-	my ($self, $key) = @_;
+	my ( $self, $key ) = @_;
 	return unless $self->[ATTRB];
-	if (exists $self->[ATTRB]->{$key}) {
-		if (ref($self->[ATTRB]->{$key}) eq 'ARRAY') {
+	if ( exists $self->[ATTRB]->{$key} ) {
+		if ( ref( $self->[ATTRB]->{$key} ) eq 'ARRAY' ) {
 			return wantarray ? @{ $self->[ATTRB]->{$key} } : $self->[ATTRB]->{$key};
 		}
 		else {
@@ -746,14 +752,12 @@ sub all_tags {
 }
 
 sub remove_tag {
-	my ($self, $key) = @_;
+	my ( $self, $key ) = @_;
 	return unless $self->[ATTRB];
-	if (exists $self->[ATTRB]->{$key}) {
+	if ( exists $self->[ATTRB]->{$key} ) {
 		delete $self->[ATTRB]->{$key};
 	}
 }
-
-
 
 ### Range Methods
 # Borrowed from Bio::RangeI, but does not do strong/weak strand checks
@@ -764,47 +768,39 @@ sub length {
 }
 
 sub overlaps {
-	my ($self, $other) = @_;
-	return unless ($other and ref($other));
-	return unless ($self->seq_id eq $other->seq_id);
-	return not (
-		$self->start > $other->end or
-		$self->end   < $other->start
-	);
+	my ( $self, $other ) = @_;
+	return unless ( $other and ref($other) );
+	return unless ( $self->seq_id eq $other->seq_id );
+	return not( $self->start > $other->end
+		or $self->end < $other->start );
 }
 
 sub contains {
-	my ($self, $other) = @_;
-	return unless ($other and ref($other));
-	return unless ($self->seq_id eq $other->seq_id);
-	return (
-		$other->start >= $self->start and
-		$other->end   <= $self->end
-	);
+	my ( $self, $other ) = @_;
+	return unless ( $other and ref($other) );
+	return unless ( $self->seq_id eq $other->seq_id );
+	return ( $other->start >= $self->start and $other->end <= $self->end );
 }
 
 sub equals {
-	my ($self, $other) = @_;
-	return unless ($other and ref($other));
-	return unless ($self->seq_id eq $other->seq_id);
-	return (
-		$other->start == $self->start and
-		$other->end   == $self->end
-	);
+	my ( $self, $other ) = @_;
+	return unless ( $other and ref($other) );
+	return unless ( $self->seq_id eq $other->seq_id );
+	return ( $other->start == $self->start and $other->end == $self->end );
 }
 
 sub intersection {
-	my ($self, $other) = @_;
-	return unless ($other and ref($other));
-	return unless ($self->seq_id eq $other->seq_id);
-	my ($start, $stop);
-	if ($self->start >= $other->start) {
+	my ( $self, $other ) = @_;
+	return unless ( $other and ref($other) );
+	return unless ( $self->seq_id eq $other->seq_id );
+	my ( $start, $stop );
+	if ( $self->start >= $other->start ) {
 		$start = $self->start;
 	}
 	else {
 		$start = $other->start;
 	}
-	if ($self->end <= $other->end) {
+	if ( $self->end <= $other->end ) {
 		$stop = $self->end;
 	}
 	else {
@@ -812,24 +808,24 @@ sub intersection {
 	}
 	return if $start > $stop;
 	return $self->new(
-		-seq_id     => $self->seq_id,
-		-start      => $start,
-		-end        => $stop,
+		-seq_id => $self->seq_id,
+		-start  => $start,
+		-end    => $stop,
 	);
 }
 
 sub union {
-	my ($self, $other) = @_;
-	return unless ($other and ref($other));
-	return unless ($self->seq_id eq $other->seq_id);
-	my ($start, $stop);
-	if ($self->start <= $other->start) {
+	my ( $self, $other ) = @_;
+	return unless ( $other and ref($other) );
+	return unless ( $self->seq_id eq $other->seq_id );
+	my ( $start, $stop );
+	if ( $self->start <= $other->start ) {
 		$start = $self->start;
 	}
 	else {
 		$start = $other->start;
 	}
-	if ($self->end >= $other->end) {
+	if ( $self->end >= $other->end ) {
 		$stop = $self->end;
 	}
 	else {
@@ -837,93 +833,102 @@ sub union {
 	}
 	return if $start > $stop;
 	return $self->new(
-		-seq_id     => $self->seq_id,
-		-start      => $start,
-		-end        => $stop,
+		-seq_id => $self->seq_id,
+		-start  => $start,
+		-end    => $stop,
 	);
 }
 
 sub subtract {
-	my ($self, $other) = @_;
-	return unless ($other and ref($other));
-	return unless ($self->seq_id eq $other->seq_id);
+	my ( $self, $other ) = @_;
+	return unless ( $other and ref($other) );
+	return unless ( $self->seq_id eq $other->seq_id );
 	return if $self->equals($other);
 	my @pieces;
-	if ($self->overlaps($other)) {
+	if ( $self->overlaps($other) ) {
 		my $int = $self->intersection($other);
-		if ($self->start < $int->start) {
-			push @pieces, $self->new(
-				-seq_id => $self->seq_id,
-				-start  => $self->start,
-				-end    => $int->start - 1,
-			);
+		if ( $self->start < $int->start ) {
+			push @pieces,
+				$self->new(
+					-seq_id => $self->seq_id,
+					-start  => $self->start,
+					-end    => $int->start - 1,
+				);
 		}
-		if ($self->end > $int->end) {
-			push @pieces, $self->new(
-				-seq_id => $self->seq_id,
-				-start  => $int->end + 1,
-				-end    => $self->end,
-			);
+		if ( $self->end > $int->end ) {
+			push @pieces,
+				$self->new(
+					-seq_id => $self->seq_id,
+					-start  => $int->end + 1,
+					-end    => $self->end,
+				);
 		}
 	}
 	else {
-		push @pieces, $self->new(
-			-seq_id     => $self->seq_id,
-			-start      => $self->start,
-			-end        => $self->end,
-		);
+		push @pieces,
+			$self->new(
+				-seq_id => $self->seq_id,
+				-start  => $self->start,
+				-end    => $self->end,
+			);
 	}
 	return wantarray ? @pieces : \@pieces;
 }
-
 
 ### Export methods
 
 sub version {
 	my $self = shift;
-	if (@_ and $_[0] ne '3') {
+	if ( @_ and $_[0] ne '3' ) {
 		carp "sorry, only GFF version 3 is currently supported!";
 	}
 	return 3;
 }
 
 sub gff_string {
+
 	# exports version 3 GFF, sorry, no mechanism for others....
-	my $self = shift;
-	my $recurse = shift || 0;
+	my $self     = shift;
+	my $recurse  = shift || 0;
 	my $childIDs = shift || undef;
-	
+
 	# skip myself if we've already printed myself
-	return if ($recurse and $childIDs and 
-		not exists $childIDs->{ $self->primary_id } );
-	
+	return if ( $recurse
+		and $childIDs
+		and not exists $childIDs->{ $self->primary_id } );
+
 	# map all parent-child relationships
-	if ($recurse and not defined $childIDs) {
+	if ( $recurse and not defined $childIDs ) {
+
 		# we have a top level SeqFeature and we need to go spelunking for IDs
 		$childIDs = {};
-		foreach my $f ($self->get_SeqFeatures) {
-			$f->_spelunk($self->primary_id, $childIDs);
+		foreach my $f ( $self->get_SeqFeatures ) {
+			$f->_spelunk( $self->primary_id, $childIDs );
 		}
 	}
-	
+
 	# basics
-	my $string = join("\t", (
-		$self->seq_id || '.',
-		$self->source_tag || '.',
-		$self->primary_tag,
-		$self->start || 1,
-		$self->end || 1,
-		defined $self->score ? $self->score : '.',
-		$self->strand > 0 ? '+' : $self->strand < 0 ? '-' : '.',
-		defined $self->phase ? $self->phase : '.',
-	) );
-	
+	my $string = join(
+		"\t",
+		(
+			$self->seq_id     || '.',
+			$self->source_tag || '.',
+			$self->primary_tag,
+			$self->start || 1,
+			$self->end   || 1,
+			defined $self->score ? $self->score : '.',
+			$self->strand > 0    ? '+' : $self->strand < 0 ? '-' : '.',
+			defined $self->phase ? $self->phase : '.',
+		)
+	);
+
 	# group attributes
 	my $attributes;
 	my $name = $self->display_name;
 	if ($name) {
+
 		# names are optional and may not exist
-		$attributes = sprintf "Name=%s;ID=%s", $self->_encode($name), 
+		$attributes = sprintf "Name=%s;ID=%s", $self->_encode($name),
 			$self->_encode( $self->primary_id );
 	}
 	else {
@@ -931,21 +936,22 @@ sub gff_string {
 		$attributes = sprintf "ID=%s", $self->_encode( $self->primary_id );
 	}
 	if ($childIDs) {
-		if (exists $childIDs->{$self->primary_id}) {
-			$attributes .= ';Parent=' . join(',', 
-				sort {$a cmp $b} 
-				map { $self->_encode($_) }
-				keys %{ $childIDs->{$self->primary_id} });
-			delete $childIDs->{$self->primary_id};
+		if ( exists $childIDs->{ $self->primary_id } ) {
+			$attributes .= ';Parent='
+				. join( ',',
+					sort { $a cmp $b }
+					map  { $self->_encode($_) }
+					keys %{ $childIDs->{ $self->primary_id } } );
+			delete $childIDs->{ $self->primary_id };
 		}
 	}
-	foreach my $tag ($self->all_tags) {
+	foreach my $tag ( $self->all_tags ) {
 		next if $tag eq 'Name';
 		next if $tag eq 'ID';
 		next if $tag eq 'Parent';
 		my $value = $self->get_tag_values($tag);
-		if (ref($value) eq 'ARRAY') {
-			$value = join(",", map { $self->_encode($_) } @$value);
+		if ( ref($value) eq 'ARRAY' ) {
+			$value = join( ",", map { $self->_encode($_) } @$value );
 		}
 		else {
 			$value = $self->_encode($value);
@@ -953,11 +959,11 @@ sub gff_string {
 		$attributes .= ";$tag=$value";
 	}
 	$string .= "\t$attributes\n";
-	
+
 	# recurse
 	if ($recurse) {
-		foreach my $f ($self->get_SeqFeatures) {
-			my $s = $f->gff_string(1, $childIDs);
+		foreach my $f ( $self->get_SeqFeatures ) {
+			my $s = $f->gff_string( 1, $childIDs );
 			$string .= $s if $s;
 		}
 	}
@@ -965,32 +971,34 @@ sub gff_string {
 }
 
 sub _encode {
-	my ($self, $value) = @_;
+	my ( $self, $value ) = @_;
 	$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 	return $value;
 }
 
 sub _spelunk {
-	my ($self, $parentID, $childIDs) = @_;
-	$childIDs->{$self->primary_id}{$parentID} += 1;
-	foreach my $f ($self->get_SeqFeatures) {
-		$f->_spelunk($self->primary_id, $childIDs);
+	my ( $self, $parentID, $childIDs ) = @_;
+	$childIDs->{ $self->primary_id }{$parentID} += 1;
+	foreach my $f ( $self->get_SeqFeatures ) {
+		$f->_spelunk( $self->primary_id, $childIDs );
 	}
 }
 
 sub bed_string {
-	my $self = shift;
-	my $string = join("\t", (
-		$self->seq_id || '.',
-		($self->start || 1) - 1,
-		$self->end || 1,
-		$self->display_name || $self->primary_id,
-		defined $self->score ? $self->score : 0,
-		$self->strand >= 0 ? '+' : '-',
-	) );
+	my $self   = shift;
+	my $string = join(
+		"\t",
+		(
+			$self->seq_id || '.',
+			( $self->start || 1 ) - 1,
+			$self->end          || 1,
+			$self->display_name || $self->primary_id,
+			defined $self->score ? $self->score : 0,
+			$self->strand >= 0   ? '+'          : '-',
+		)
+	);
 	return "$string\n";
 }
-
 
 __END__
 

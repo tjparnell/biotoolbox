@@ -12,60 +12,55 @@ use Bio::ToolBox::db_helper qw(open_db_connection);
 use Bio::DB::SeqFeature::Store;
 use Bio::DB::SeqFeature::Store::GFF3Loader;
 
-# check for additional requirements 
+# check for additional requirements
 my $sql;
 eval {
 	require DBD::SQLite;
 	$sql = 1;
 };
 
-
-
 my $VERSION = '1.60';
 
 print "\n This program will set up an annotation database\n\n";
 
 ### Quick help
-unless (@ARGV) { 
+unless (@ARGV) {
+
 	# when no command line options are present
 	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
 
-
-
 ### Get command line options and initialize values
-my (
-	$ucscdb,
-	$path,
-	$keep,
-	$verbose,
-	$help,
-	$print_version,
-);
+my ( $ucscdb, $path, $keep, $verbose, $help, $print_version, );
 my @tables;
 
 # Command line options
-GetOptions( 
-	'd|db=s'      => \$ucscdb, # the UCSC database shortname
-	'p|path=s'    => \$path, # the optional path for the database
-	't|table=s'   => \@tables, # which tables to collect
-	'k|keep!'     => \$keep, # keep the annotation files
-	'V|verbose!'  => \$verbose, # show db loading
-	'h|help'      => \$help, # request help
-	'v|version'   => \$print_version, # print the version
+GetOptions(
+	'd|db=s'     => \$ucscdb,           # the UCSC database shortname
+	'p|path=s'   => \$path,             # the optional path for the database
+	't|table=s'  => \@tables,           # which tables to collect
+	'k|keep!'    => \$keep,             # keep the annotation files
+	'V|verbose!' => \$verbose,          # show db loading
+	'h|help'     => \$help,             # request help
+	'v|version'  => \$print_version,    # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -79,41 +74,39 @@ if ($print_version) {
 	exit;
 }
 
-
-
 ### Check for requirements
 unless ($sql) {
 	die " Please install Perl module DBD::SQLite to set up a database\n";
 }
 unless ($ucscdb) {
-	$ucscdb = shift @ARGV or
-		die " no database name provided! use --help for more information\n";
+	$ucscdb = shift @ARGV
+		or die " no database name provided! use --help for more information\n";
 }
 if ($path) {
 	$path = File::Spec->rel2abs($path);
-	unless (-e $path) {
-		mkdir $path or die "unable to make database path $path\n$!\n"; 
+	unless ( -e $path ) {
+		mkdir $path or die "unable to make database path $path\n$!\n";
 	}
-	unless (-w _) {
+	unless ( -w _ ) {
 		die " $path is not writable!\n";
 	}
 }
 else {
 	# determine a path
-	if (-e File::Spec->catdir($ENV{HOME}, 'Library')) {
-		$path = File::Spec->catdir($ENV{HOME}, 'Library');
+	if ( -e File::Spec->catdir( $ENV{HOME}, 'Library' ) ) {
+		$path = File::Spec->catdir( $ENV{HOME}, 'Library' );
 	}
-	elsif (-e File::Spec->catdir($ENV{HOME}, 'lib')) {
-		$path = File::Spec->catdir($ENV{HOME}, 'lib');
+	elsif ( -e File::Spec->catdir( $ENV{HOME}, 'lib' ) ) {
+		$path = File::Spec->catdir( $ENV{HOME}, 'lib' );
 	}
 	else {
 		# make one for us
-		$path = File::Spec->catdir($ENV{HOME}, 'lib');
-		mkdir $path or die "unable to make database path $path\n$!\n"; 
+		$path = File::Spec->catdir( $ENV{HOME}, 'lib' );
+		mkdir $path or die "unable to make database path $path\n$!\n";
 	}
 }
 if (@tables) {
-	if ($tables[0] =~ /,/) {
+	if ( $tables[0] =~ /,/ ) {
 		my $t = shift @tables;
 		@tables = split /,/, $t;
 	}
@@ -123,68 +116,62 @@ else {
 }
 my $start_time = time;
 
-
-
 ### Get UCSC annotation
 print "##### Fetching annotation from UCSC. This may take a while ######\n";
-system(File::Spec->catdir($Bin, 'ucsc_table2gff3.pl'), '--db', $ucscdb, '--ftp', 
-	join(',', @tables), '--gz') == 0 or 
-	die "unable to execute ucsc_table2gff3 script!\n";
-my @gff = glob("$ucscdb*.gff3.gz");
+system( File::Spec->catdir( $Bin, 'ucsc_table2gff3.pl' ),
+	'--db', $ucscdb, '--ftp', join( ',', @tables ), '--gz' ) == 0
+	or die "unable to execute ucsc_table2gff3 script!\n";
+my @gff    = glob("$ucscdb*.gff3.gz");
 my @source = glob("$ucscdb*.txt.gz");
 unless (@gff) {
 	die "unable to find new GFF3 files!\n";
 }
 
-
-
 ### Build database
 print "##### Building database. This may take a while ######\n";
-my $database = File::Spec->catdir($path, "$ucscdb.sqlite");
-my $temp = File::Spec->tmpdir();
+my $database = File::Spec->catdir( $path, "$ucscdb.sqlite" );
+my $temp     = File::Spec->tmpdir();
 
 # create a database
 my $store = Bio::DB::SeqFeature::Store->new(
-    -dsn        => $database,
-    -adaptor    => 'DBI::SQLite',
-    -tmpdir     => $temp,
-    -write      => 1,
-    -create     => 1,
-    -compress   => 0, # compression seems to be broken, cannot read db
+	-dsn      => $database,
+	-adaptor  => 'DBI::SQLite',
+	-tmpdir   => $temp,
+	-write    => 1,
+	-create   => 1,
+	-compress => 0,               # compression seems to be broken, cannot read db
 ) or die " Cannot create a SeqFeature database connection!\n";
 
 # load the database
 my $loader = Bio::DB::SeqFeature::Store::GFF3Loader->new(
-    -store              => $store,
-    -sf_class           => 'Bio::DB::SeqFeature',
-    -verbose            => $verbose,
-    -tmpdir             => $temp,
-    -fast               => 1,
-    -ignore_seqregion   => 0,
-    -index_subfeatures  => 1,
-    -noalias_target     => 0,
-    -summary_stats      => 0,
-)or die " Cannot create a GFF3 loader for the database!\n";
+	-store             => $store,
+	-sf_class          => 'Bio::DB::SeqFeature',
+	-verbose           => $verbose,
+	-tmpdir            => $temp,
+	-fast              => 1,
+	-ignore_seqregion  => 0,
+	-index_subfeatures => 1,
+	-noalias_target    => 0,
+	-summary_stats     => 0,
+) or die " Cannot create a GFF3 loader for the database!\n";
 
 # on signals, give objects a chance to call their DESTROY methods
 # borrowed from bp_seqfeature_load.pl
-$SIG{TERM} = $SIG{INT} = sub {  undef $loader; undef $store; die "Aborted..."; };
+$SIG{TERM} = $SIG{INT} = sub { undef $loader; undef $store; die "Aborted..."; };
 $loader->load(@gff);
-
-
 
 ### Check database
 my $db;
-if (-e $database and -s _) {
+if ( -e $database and -s _ ) {
 	$db = open_db_connection($database);
 }
 if ($db) {
 	print "\n##### Created database $database ######\n";
-	printf " Finished in %.1f minutes\n\n", (time - $start_time) / 60;
+	printf " Finished in %.1f minutes\n\n", ( time - $start_time ) / 60;
 	my $a = add_database(
-		'name'      => $ucscdb,
-		'dsn'       => $database,
-		'adaptor'   => 'DBI::SQLite',
+		'name'    => $ucscdb,
+		'dsn'     => $database,
+		'adaptor' => 'DBI::SQLite',
 	);
 	if ($a) {
 		print <<SUCCESS;
@@ -203,12 +190,10 @@ else {
 }
 
 ### Clean up
-if ($db and not $keep) {
+if ( $db and not $keep ) {
 	unlink @gff;
 	unlink @source;
 }
-
-
 
 __END__
 

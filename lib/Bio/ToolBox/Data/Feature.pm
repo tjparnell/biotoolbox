@@ -1017,7 +1017,7 @@ use strict;
 use Carp qw(carp cluck croak confess);
 use Module::Load;
 use Bio::ToolBox::db_helper qw(
-	get_db_feature 
+	get_db_feature
 	get_segment_score
 	calculate_score
 	get_genomic_sequence
@@ -1028,18 +1028,17 @@ use Bio::ToolBox::db_helper::constants;
 my $GENETOOL_LOADED = 0;
 1;
 
-
-
 ### Initialization
 
 sub new {
+
 	# this should ONLY be called from Bio::ToolBox::Data* iterators
 	my $class = shift;
-	my %self = @_;
+	my %self  = @_;
+
 	# we trust that new is called properly with data and index values
 	return bless \%self, $class;
 }
-
 
 ### Set and retrieve values
 
@@ -1048,7 +1047,7 @@ sub data {
 }
 
 sub column_name {
-	my ($self, $column) = @_;
+	my ( $self, $column ) = @_;
 	return unless defined $column;
 	return $self->{data}->name($column);
 }
@@ -1068,10 +1067,10 @@ sub row_index {
 sub line_number {
 	my $self = shift;
 	carp "line_number is a read only method" if @_;
-	if (exists $self->{data}->{line_count}) {
+	if ( exists $self->{data}->{line_count} ) {
 		return $self->{data}->{line_count};
 	}
-	elsif (exists $self->{data}->{header_line_count}) {
+	elsif ( exists $self->{data}->{header_line_count} ) {
 		return $self->{data}->{header_line_count} + $self->row_index;
 	}
 	else {
@@ -1080,63 +1079,67 @@ sub line_number {
 }
 
 sub row_values {
-	my $self  = shift;
+	my $self = shift;
 	carp "row_values is a read only method" if @_;
-	my $row = $self->{'index'};
+	my $row  = $self->{'index'};
 	my @data = @{ $self->{data}->{data_table}->[$row] };
 	return wantarray ? @data : \@data;
 }
 
 sub value {
-	my ($self, $column, $value) = @_;
+	my ( $self, $column, $value ) = @_;
 	return unless defined $column;
 	my $row = $self->{'index'};
-	
-	if (defined $value) {
+
+	if ( defined $value ) {
+
 		# set a value
 		$self->{data}->{data_table}->[$row][$column] = $value;
 	}
 	my $v = $self->{data}->{data_table}->[$row][$column];
-	return length($v) ? $v : '.'; # internal null value, inherited from GFF definition
+	return length($v) ? $v : '.';    # internal null value, inherited from GFF definition
 }
 
 sub seq_id {
 	my $self = shift;
-	if ($_[0]) {
+	if ( $_[0] ) {
 		my $i = $self->{data}->chromo_column;
+
 		# update only if we have an actual column
-		if (defined $i) {
-			$self->value($i, $_[0]);
+		if ( defined $i ) {
+			$self->value( $i, $_[0] );
 			$self->{seqid} = $_[0];
 		}
-		elsif (exists $self->{feature}) {
+		elsif ( exists $self->{feature} ) {
 			carp "Unable to update seq_id for parsed SeqFeature objects";
 		}
 		else {
 			carp "No Chromosome column to update!";
 		}
 	}
-	
+
 	# return cached value
 	return $self->{seqid} if exists $self->{seqid};
-	
+
 	# get seq_id value
 	my $c;
 	my $i = $self->{data}->chromo_column;
 	my $j = $self->{data}->coord_column;
-	if (defined $i) {
+	if ( defined $i ) {
+
 		# collect from table
 		$c = $self->value($i);
 	}
-	elsif (exists $self->{feature}) {
+	elsif ( exists $self->{feature} ) {
+
 		# seqfeature
 		$c = $self->{feature}->seq_id;
 	}
-	elsif (defined $j) {
+	elsif ( defined $j ) {
 		$self->_from_coordinate_string($j);
 		return $self->{seqid};
 	}
-	elsif ($self->feature_type eq 'named') {
+	elsif ( $self->feature_type eq 'named' ) {
 		my $f = $self->seqfeature;
 		if ($f) {
 			$c = $f->seq_id;
@@ -1148,56 +1151,61 @@ sub seq_id {
 
 sub start {
 	my $self = shift;
-	if ($_[0]) {
+	if ( $_[0] ) {
 		my $i = $self->{data}->start_column;
+
 		# update only if we have an actual column
-		my $d = $_[0] =~ /^\d+$/ ? 1 : 0; # looks like an integer
-		if (defined $i and $d) {
-			if ($self->{data}->interbase) {
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;    # looks like an integer
+		if ( defined $i and $d ) {
+			if ( $self->{data}->interbase ) {
+
 				# compensate for 0-based, assuming we're always working with 1-based
-				$self->value($i, $_[0] - 1);
+				$self->value( $i, $_[0] - 1 );
 				$self->{start} = $_[0];
 			}
 			else {
-				$self->value($i, $_[0]);
+				$self->value( $i, $_[0] );
 				$self->{start} = $_[0];
 			}
 		}
-		elsif (not $d) {
+		elsif ( not $d ) {
 			carp "Start coordinate value is not an integer";
 		}
-		elsif (exists $self->{feature}) {
+		elsif ( exists $self->{feature} ) {
 			carp "Unable to update Start coordinate for parsed SeqFeature objects";
 		}
 		else {
 			carp "No Start coordinate column to update!";
 		}
 	}
-	
+
 	# return cached value
 	return $self->{start} if exists $self->{start};
-	
+
 	# get start value
 	my $s;
 	my $i = $self->{data}->start_column;
 	my $j = $self->{data}->coord_column;
-	if (defined $i) {
+	if ( defined $i ) {
+
 		# collect from table
 		$s = $self->value($i);
-		if ($self->{data}->interbase) {
+		if ( $self->{data}->interbase ) {
+
 			# compensate for 0-based index
 			$s += 1;
 		}
 	}
-	elsif (exists $self->{feature}) {
+	elsif ( exists $self->{feature} ) {
+
 		# seqfeature
 		$s = $self->{feature}->start;
 	}
-	elsif (defined $j) {
+	elsif ( defined $j ) {
 		$self->_from_coordinate_string($j);
 		return $self->{start};
 	}
-	elsif ($self->feature_type eq 'named') {
+	elsif ( $self->feature_type eq 'named' ) {
 		my $f = $self->seqfeature;
 		if ($f) {
 			$s = $f->start;
@@ -1208,47 +1216,51 @@ sub start {
 }
 
 *stop = \&end;
+
 sub end {
 	my $self = shift;
-	if ($_[0]) {
+	if ( $_[0] ) {
 		my $i = $self->{data}->stop_column;
+
 		# update only if we have an actual column
 		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
-		if (defined $i and $d) {
-			$self->value($i, $_[0]);
+		if ( defined $i and $d ) {
+			$self->value( $i, $_[0] );
 			$self->{end} = $_[0];
 		}
-		elsif (not $d) {
+		elsif ( not $d ) {
 			carp "End coordinate value is not an integer";
 		}
-		elsif (exists $self->{feature}) {
+		elsif ( exists $self->{feature} ) {
 			carp "Unable to update End coordinate for parsed SeqFeature objects";
 		}
 		else {
 			carp "No End coordinate column to update!";
 		}
 	}
-	
+
 	# return cached value
 	return $self->{end} if exists $self->{end};
-	
+
 	# get end value
 	my $e;
 	my $i = $self->{data}->stop_column;
 	my $j = $self->{data}->coord_column;
-	if (defined $i) {
+	if ( defined $i ) {
+
 		# collect from table
 		$e = $self->value($i);
 	}
-	elsif (exists $self->{feature}) {
+	elsif ( exists $self->{feature} ) {
+
 		# seqfeature
 		$e = $self->{feature}->end;
 	}
-	elsif (defined $j) {
+	elsif ( defined $j ) {
 		$self->_from_coordinate_string($j);
 		return $self->{end};
 	}
-	elsif ($self->feature_type eq 'named') {
+	elsif ( $self->feature_type eq 'named' ) {
 		my $f = $self->seqfeature;
 		if ($f) {
 			$e = $f->end;
@@ -1260,35 +1272,38 @@ sub end {
 
 sub strand {
 	my $self = shift;
-	if ($_[0]) {
+	if ( $_[0] ) {
+
 		# update only if we have an actual column
 		my $i = $self->{data}->strand_column;
-		if (defined $i) {
-			$self->value($i, $_[0]);
-			$self->{strand} = $self->_strand($_[0]);
+		if ( defined $i ) {
+			$self->value( $i, $_[0] );
+			$self->{strand} = $self->_strand( $_[0] );
 		}
-		elsif (exists $self->{feature}) {
+		elsif ( exists $self->{feature} ) {
 			carp "Unable to update Strand for parsed SeqFeature objects";
 		}
 		else {
 			carp "No Strand column to update!";
 		}
 	}
-	
+
 	# return cached value
 	return $self->{strand} if exists $self->{strand};
-	
+
 	# get strand value
 	my $s = 0;
-	if (my $i = $self->{data}->strand_column) {
+	if ( my $i = $self->{data}->strand_column ) {
+
 		# collect from table
 		$s = $self->_strand( $self->value($i) );
 	}
-	elsif (exists $self->{feature}) {
+	elsif ( exists $self->{feature} ) {
+
 		# seqfeature
 		$s = $self->{feature}->strand;
 	}
-	elsif ($self->feature_type eq 'named') {
+	elsif ( $self->feature_type eq 'named' ) {
 		my $f = $self->seqfeature;
 		if ($f) {
 			$s = $f->strand;
@@ -1300,24 +1315,26 @@ sub strand {
 
 sub _strand {
 	my $self = shift;
-	my $str = shift;
-	if ($str eq '1' or $str eq '-1' or $str eq '0') {
+	my $str  = shift;
+	if ( $str eq '1' or $str eq '-1' or $str eq '0' ) {
 		return $str;
-	} 
-	elsif ($str eq '+') {
+	}
+	elsif ( $str eq '+' ) {
 		return 1;
 	}
-	elsif ($str eq '-') {
+	elsif ( $str eq '-' ) {
 		return -1;
 	}
-	elsif ($str eq '.') {
+	elsif ( $str eq '.' ) {
 		return 0;
 	}
-	elsif ($str eq '2') {
+	elsif ( $str eq '2' ) {
+
 		# R packages use 1 for + and 2 for -
 		return -1;
 	}
-	elsif ($str eq '*') {
+	elsif ( $str eq '*' ) {
+
 		# R packages use * for .
 		return 0;
 	}
@@ -1327,13 +1344,15 @@ sub _strand {
 }
 
 sub _from_coordinate_string {
-	my ($self, $i) = shift;
-	my ($chr, $start, $end, $str) = split /(?:\-|\.\.|\s)/, $self->value($i);
-	$self->{seqid} = $chr unless exists $self->{seqid};
+	my ( $self, $i ) = shift;
+	my ( $chr, $start, $end, $str ) = split /(?:\-|\.\.|\s)/, $self->value($i);
+	$self->{seqid} = $chr   unless exists $self->{seqid};
 	$self->{start} = $start unless exists $self->{start};
-		# we assume this is a 1-based coordinate
-	$self->{end}   = $end unless exists $self->{end};
-	if (defined $str and not exists $self->{strand}) {
+
+	# we assume this is a 1-based coordinate
+	$self->{end} = $end unless exists $self->{end};
+	if ( defined $str and not exists $self->{strand} ) {
+
 		# you never know, the strand may be added to the string
 		$self->{strand} = $self->_strand($str);
 	}
@@ -1341,8 +1360,8 @@ sub _from_coordinate_string {
 
 sub peak {
 	my $self = shift;
-	if ($self->{data}->format eq 'narrowPeak') {
-		if (exists $self->{feature} and $self->{feature}->has_tag('peak')) {
+	if ( $self->{data}->format eq 'narrowPeak' ) {
+		if ( exists $self->{feature} and $self->{feature}->has_tag('peak') ) {
 			return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
 		}
 		else {
@@ -1356,10 +1375,10 @@ sub peak {
 
 sub midpoint {
 	my $self = shift;
-	my $s = $self->start;
-	my $e = $self->end;
-	if ($s and $e) {
-		return int( ($s + $e) / 2 );
+	my $s    = $self->start;
+	my $e    = $self->end;
+	if ( $s and $e ) {
+		return int( ( $s + $e ) / 2 );
 	}
 	else {
 		return undef;
@@ -1367,45 +1386,56 @@ sub midpoint {
 }
 
 *name = \&display_name;
+
 sub display_name {
 	my $self = shift;
-	if ($_[0]) {
+	if ( $_[0] ) {
+
 		# update only if we have an actual column
 		my $i = $self->{data}->name_column;
-		if (defined $i) {
-			return $self->value($i, $_[0]);
+		if ( defined $i ) {
+			return $self->value( $i, $_[0] );
 		}
-		elsif (exists $self->{feature}) {
+		elsif ( exists $self->{feature} ) {
 			carp "Unable to update display_name for parsed SeqFeature objects";
 		}
 		else {
 			carp "No Name column to update!";
 		}
 	}
+
 	# seqfeature
-	if (exists $self->{feature}) {
+	if ( exists $self->{feature} ) {
 		return $self->{feature}->display_name;
 	}
+
 	# collect from table
 	my $i = $self->{data}->name_column;
-	if (defined $i) {
+	if ( defined $i ) {
 		return $self->value($i);
 	}
-	elsif (my $att = $self->gff_attributes) {
-		return $att->{Name} || $att->{ID} || $att->{transcript_name} || 
-			$att->{gene_name} || undef;
+	elsif ( my $att = $self->gff_attributes ) {
+		return
+			   $att->{Name}
+			|| $att->{ID}
+			|| $att->{transcript_name}
+			|| $att->{gene_name}
+			|| undef;
 	}
 }
 
 sub coordinate {
 	my $self = shift;
 	carp "name is a read only method" if @_;
+
 	# to avoid auto-converting start0 coordinates, which might confuse people or programs,
 	# we will take the start value as is when it's available, otherwise calculate start
 	my $start_i = $self->{data}->start_column;
-	my $coord = sprintf("%s:%d", $self->seq_id, 
-		defined $start_i ? $self->value($start_i) : 
-		exists $self->{feature} ? $self->{feature}->start : 0);
+	my $coord   = sprintf( "%s:%d",
+		$self->seq_id,
+		defined $start_i          ? $self->value($start_i)
+		: exists $self->{feature} ? $self->{feature}->start
+		:                           0 );
 	my $end = $self->end;
 	$coord .= "-$end" if $end;
 	return CORE::length($coord) > 2 ? $coord : undef;
@@ -1413,46 +1443,51 @@ sub coordinate {
 
 sub type {
 	my $self = shift;
-	if ($_[0]) {
+	if ( $_[0] ) {
+
 		# update only if we have an actual column
 		my $i = $self->{data}->type_column;
-		if (defined $i) {
-			return $self->value($i, $_[0]);
+		if ( defined $i ) {
+			return $self->value( $i, $_[0] );
 		}
-		elsif (exists $self->{feature}) {
+		elsif ( exists $self->{feature} ) {
 			carp "Unable to update primary_tag for parsed SeqFeature objects";
 		}
 		else {
 			carp "No Type column to update!";
 		}
 	}
+
 	# collect from table
 	my $i = $self->{data}->type_column;
-	if (defined $i) {
+	if ( defined $i ) {
 		return $self->value($i);
 	}
+
 	# seqfeature
-	if (exists $self->{feature}) {
+	if ( exists $self->{feature} ) {
 		return $self->{feature}->primary_tag;
 	}
+
 	# general metadata
-	if ($self->{data}->feature) {
+	if ( $self->{data}->feature ) {
 		return $self->{data}->feature;
 	}
 	return undef;
 }
 
 *id = \&primary_id;
+
 sub primary_id {
 	my $self = shift;
 	carp "id is a read only method" if @_;
 	my $i = $self->{data}->id_column;
 	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
+	if ( defined $v and $v ne '.' ) {
 		return $v;
 	}
 	return $self->{feature}->primary_id if exists $self->{feature};
-	if (my $att = $self->gff_attributes) {
+	if ( my $att = $self->gff_attributes ) {
 		return $att->{ID} || $att->{Name} || $att->{transcript_id};
 	}
 	return undef;
@@ -1461,16 +1496,17 @@ sub primary_id {
 sub length {
 	my $self = shift;
 	carp "length is a read only method" if @_;
-	if ($self->{data}->vcf) {
+	if ( $self->{data}->vcf ) {
+
 		# special case for vcf files, measure the length of the ALT allele
-		return CORE::length($self->value(4)); 
+		return CORE::length( $self->value(4) );
 	}
 	my $s = $self->start;
 	my $e = $self->end;
-	if (defined $s and defined $e) {
+	if ( defined $s and defined $e ) {
 		return $e - $s + 1;
 	}
-	elsif (defined $s) {
+	elsif ( defined $s ) {
 		return 1;
 	}
 	else {
@@ -1480,25 +1516,26 @@ sub length {
 
 sub score {
 	my $self = shift;
-	my $c = $self->{data}->score_column;
+	my $c    = $self->{data}->score_column;
 	return defined $c ? $self->value($c) : undef;
 }
 
 sub attributes {
 	my $self = shift;
-	return $self->gff_attributes if ($self->{data}->gff);
-	return $self->vcf_attributes if ($self->{data}->vcf);
+	return $self->gff_attributes if ( $self->{data}->gff );
+	return $self->vcf_attributes if ( $self->{data}->vcf );
 	return;
 }
 
 sub gff_attributes {
 	my $self = shift;
-	return unless ($self->{data}->gff);
-	return $self->{attributes} if (exists $self->{attributes});
+	return unless ( $self->{data}->gff );
+	return $self->{attributes} if ( exists $self->{attributes} );
 	$self->{attributes} = {};
-	foreach my $g (split(/\s*;\s*/, $self->value(8))) {
-		my ($tag, $value) = split /\s+|=/, $g;
-		next unless ($tag and $value);
+	foreach my $g ( split( /\s*;\s*/, $self->value(8) ) ) {
+		my ( $tag, $value ) = split /\s+|=/, $g;
+		next unless ( $tag and $value );
+
 		# unescape URL encoded values, borrowed from Bio::DB::GFF
 		$value =~ tr/+/ /;
 		$value =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
@@ -1509,30 +1546,31 @@ sub gff_attributes {
 
 sub vcf_attributes {
 	my $self = shift;
-	return unless ($self->{data}->vcf);
-	return $self->{attributes} if (exists $self->{attributes});
+	return unless ( $self->{data}->vcf );
+	return $self->{attributes} if ( exists $self->{attributes} );
 	$self->{attributes} = {};
-	
+
 	# INFO attributes
 	my %info;
-	if ($self->{data}->name(7) eq 'INFO') {
-		%info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
-						# some tags are simple and have no value, eg SOMATIC 
-					map { [split(/=/, $_)] } 
-					split(/;/, $self->value(7));
+	if ( $self->{data}->name(7) eq 'INFO' ) {
+		%info = map { $_->[0] => defined $_->[1] ? $_->[1] : undef }
+
+			# some tags are simple and have no value, eg SOMATIC
+			map { [ split( /=/, $_ ) ] }
+			split( /;/, $self->value(7) );
 	}
 	$self->{attributes}->{INFO} = \%info;
 	$self->{attributes}->{7}    = \%info;
-	
+
 	# Sample attributes
-	if ($self->{data}->number_columns > 8) {
+	if ( $self->{data}->number_columns > 8 ) {
 		my @formatKeys = split /:/, $self->value(8);
-		foreach my $i (9 .. $self->{data}->last_column) {
-			my $name = $self->{data}->name($i);
+		foreach my $i ( 9 .. $self->{data}->last_column ) {
+			my $name       = $self->{data}->name($i);
 			my @sampleVals = split /:/, $self->value($i);
-			my %sample = map { 
-				$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef } 
-				(0 .. $#formatKeys);
+			my %sample     = map {
+				$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef
+			} ( 0 .. $#formatKeys );
 			$self->{attributes}->{$name} = \%sample;
 			$self->{attributes}->{$i}    = \%sample;
 		}
@@ -1542,77 +1580,78 @@ sub vcf_attributes {
 
 sub rewrite_attributes {
 	my $self = shift;
-	return $self->rewrite_gff_attributes if ($self->{data}->gff);
-	return $self->rewrite_vcf_attributes if ($self->{data}->vcf);
+	return $self->rewrite_gff_attributes if ( $self->{data}->gff );
+	return $self->rewrite_vcf_attributes if ( $self->{data}->vcf );
 	return;
 }
 
 sub rewrite_gff_attributes {
 	my $self = shift;
-	return unless ($self->{data}->gff);
+	return unless ( $self->{data}->gff );
 	return unless exists $self->{attributes};
-	my @pairs; # of key=value items
-	if (exists $self->{attributes}{ID}) {
+	my @pairs;    # of key=value items
+	if ( exists $self->{attributes}{ID} ) {
+
 		# I assume this does not need to be escaped!
 		push @pairs, 'ID=' . $self->{attributes}{ID};
 	}
-	if (exists $self->{attributes}{Name}) {
+	if ( exists $self->{attributes}{Name} ) {
 		my $name = $self->{attributes}{Name};
 		$name =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 		push @pairs, "Name=$name";
 	}
-	foreach my $key (sort {$a cmp $b} keys %{ $self->{attributes} }) {
+	foreach my $key ( sort { $a cmp $b } keys %{ $self->{attributes} } ) {
 		next if $key eq 'ID';
 		next if $key eq 'Name';
 		my $value = $self->{attributes}{$key};
-		$key =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		$key   =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 		$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 		push @pairs, "$key=$value";
 	}
-	$self->value(8, join("; ", @pairs));
+	$self->value( 8, join( "; ", @pairs ) );
 	return 1;
 }
 
 sub rewrite_vcf_attributes {
 	my $self = shift;
-	return unless ($self->{data}->vcf);
+	return unless ( $self->{data}->vcf );
 	return unless exists $self->{attributes};
-	
+
 	# INFO
-	my $info = join(';', 
-		map { 
-			defined $self->{attributes}->{INFO}{$_} ? 
-			join('=', $_, $self->{attributes}->{INFO}{$_}) : $_
-		} 
-		sort {$a cmp $b} 
-		keys %{$self->{attributes}->{INFO}}
+	my $info = join(
+		';',
+		map {
+			defined $self->{attributes}->{INFO}{$_}
+				? join( '=', $_, $self->{attributes}->{INFO}{$_} )
+				: $_
+		}
+			sort { $a cmp $b }
+			keys %{ $self->{attributes}->{INFO} }
 	);
-	$info ||= '.'; # sometimes we have nothing left
-	$self->value(7, $info);
-	
+	$info ||= '.';    # sometimes we have nothing left
+	$self->value( 7, $info );
+
 	# FORMAT
 	my @order;
 	push @order, 'GT' if exists $self->{attributes}{9}{GT};
-	foreach my $key (sort {$a cmp $b} keys %{ $self->{attributes}{9} } ) {
+	foreach my $key ( sort { $a cmp $b } keys %{ $self->{attributes}{9} } ) {
 		next if $key eq 'GT';
 		push @order, $key;
 	}
 	if (@order) {
-		$self->value(8, join(':', @order));
+		$self->value( 8, join( ':', @order ) );
 	}
 	else {
-		$self->value(8, '.');
+		$self->value( 8, '.' );
 	}
-	
+
 	# SAMPLES
-	foreach my $i (9 .. $self->{data}->last_column) {
+	foreach my $i ( 9 .. $self->{data}->last_column ) {
 		if (@order) {
-			$self->value($i, join(":", 
-				map { $self->{attributes}{$i}{$_} } @order 
-			) );
+			$self->value( $i, join( ":", map { $self->{attributes}{$i}{$_} } @order ) );
 		}
 		else {
-			$self->value($i, '.');
+			$self->value( $i, '.' );
 		}
 	}
 	return 1;
@@ -1621,29 +1660,31 @@ sub rewrite_vcf_attributes {
 ### Data collection convenience methods
 
 *feature = \&seqfeature;
+
 sub seqfeature {
-	my $self = shift;
+	my $self  = shift;
 	my $force = shift || 0;
 	carp "feature is a read only method" if @_;
-	return $self->{feature} if exists $self->{feature};
+	return $self->{feature}              if exists $self->{feature};
+
 	# normally this is only for named features in a data table
 	# skip this for coordinate features like bed files
 	return unless $self->feature_type eq 'named' or $force;
-	
+
 	# retrieve from main Data store
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
 	if ($f) {
 		$self->{feature} = $f;
 		return $f;
 	}
-	
+
 	# retrieve the feature from the database
 	return unless $self->{data}->database;
 	$f = get_db_feature(
-		'db'    => $self->{data}->open_meta_database,
-		'id'    => $self->id || undef,
-		'name'  => $self->name || undef, 
-		'type'  => $self->type || $self->{data}->feature,
+		'db'   => $self->{data}->open_meta_database,
+		'id'   => $self->id   || undef,
+		'name' => $self->name || undef,
+		'type' => $self->type || $self->{data}->feature,
 	);
 	return unless $f;
 	$self->{feature} = $f;
@@ -1651,17 +1692,17 @@ sub seqfeature {
 }
 
 sub segment {
-	my $self   = shift;
+	my $self = shift;
 	carp "segment is a read only method" if @_;
 	return unless $self->{data}->database;
-	if ($self->feature_type eq 'coordinate') {
+	if ( $self->feature_type eq 'coordinate' ) {
 		my $chromo = $self->seq_id;
 		my $start  = $self->start;
 		my $stop   = $self->end || $start;
-		my $db = $self->{data}->open_meta_database;
-		return $db ? $db->segment($chromo, $start, $stop) : undef;
+		my $db     = $self->{data}->open_meta_database;
+		return $db ? $db->segment( $chromo, $start, $stop ) : undef;
 	}
-	elsif ($self->feature_type eq 'named') {
+	elsif ( $self->feature_type eq 'named' ) {
 		my $f = $self->feature;
 		return $f ? $f->segment : undef;
 	}
@@ -1673,52 +1714,55 @@ sub segment {
 sub get_features {
 	my $self = shift;
 	my %args = @_;
-	my $db = $args{db} || $self->{data}->open_meta_database || undef;
+	my $db   = $args{db} || $self->{data}->open_meta_database || undef;
 	carp "no database defined to get features!" unless defined $db;
-	return unless $db->can('features');
-	
+	return                                      unless $db->can('features');
+
 	# convert the argument style for most bioperl db APIs
 	my %opts;
 	$opts{-seq_id} = $args{chromo} || $self->seq_id;
 	$opts{-start}  = $args{start}  || $self->start;
 	$opts{-end}    = $args{end}    || $self->end;
 	$opts{-type}   = $args{type}   || $self->type;
-	
+
 	return $db->features(%opts);
 }
 
 sub get_sequence {
 	my $self = shift;
 	my %args = @_;
-	my $db = $args{db} || $args{database} || $self->{data}->open_meta_database || undef;
-		# this will fail immediately if user doesn't provide valid database
-	
+	my $db   = $args{db} || $args{database} || $self->{data}->open_meta_database || undef;
+
+	# this will fail immediately if user doesn't provide valid database
+
 	# get sequence over subfeatures
 	$args{subfeature} ||= undef;
-	if ($self->feature_type eq 'named' and $args{subfeature}) {
+	if ( $self->feature_type eq 'named' and $args{subfeature} ) {
+
 		# this is more complicated so we have a dedicated method
-		return $self->_get_subfeature_sequence($db, \%args);
+		return $self->_get_subfeature_sequence( $db, \%args );
 	}
-	
+
 	# get coordinates
-	my $seqid = $args{seq_id} || $args{chromo} || $self->seq_id;
-	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->end;
+	my $seqid  = $args{seq_id} || $args{chromo} || $self->seq_id;
+	my $start  = $args{start}  || $self->start;
+	my $stop   = $args{stop}   || $args{end} || $self->end;
 	my $strand = $self->strand;
-	if (exists $args{strand}) {
+	if ( exists $args{strand} ) {
+
 		# user supplied strand, gotta check it
 		$strand = $args{strand} =~ /\-|r/i ? -1 : 1;
 	}
-	if (exists $args{extend} and $args{extend}) {
+	if ( exists $args{extend} and $args{extend} ) {
 		$start -= $args{extend};
 		$start = 1 if $start <= 0;
 		$stop += $args{extend};
 	}
-	return unless (defined $seqid and defined $start and defined $stop);
-	
+	return unless ( defined $seqid and defined $start and defined $stop );
+
 	# retrieve and return sequence
-	my $seq = get_genomic_sequence($db, $seqid, $start, $stop);
-	if ($strand == -1) {
+	my $seq = get_genomic_sequence( $db, $seqid, $start, $stop );
+	if ( $strand == -1 ) {
 		$seq =~ tr/gatcGATC/ctagCTAG/;
 		$seq = reverse $seq;
 	}
@@ -1726,34 +1770,34 @@ sub get_sequence {
 }
 
 sub _get_subfeature_sequence {
-	my ($self, $db, $args) = @_;
-	
+	my ( $self, $db, $args ) = @_;
+
 	# get the subfeatures
-	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless (@$subfeatures) {
 		carp "no subfeatures available! Returning parent sequence!";
+
 		# just return the parent
 		undef $args->{subfeature};
 		return $self->get_sequence(@$args);
 	}
-	
+
 	# sort subfeatures
 	# this should be done by GeneTools in most cases but just to be sure
 	# note that this does NOT merge redundant or overlapping exons!!!!
-	my @sorted = 	map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-					map { [$_, $_->start, $_->end] } 
-					@$subfeatures;
-	
+	my @sorted = map { $_->[0] }
+		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+		map { [ $_, $_->start, $_->end ] } @$subfeatures;
+
 	# collect sequence
 	my $sequence;
 	foreach my $subf (@sorted) {
-		my $seq = get_genomic_sequence($db, $subf->seq_id, $subf->start, $subf->stop);
+		my $seq = get_genomic_sequence( $db, $subf->seq_id, $subf->start, $subf->stop );
 		$sequence .= $seq;
 	}
-	
+
 	# flip the sequence
-	if ($self->strand == -1) {
+	if ( $self->strand == -1 ) {
 		$sequence =~ tr/gatcGATC/ctagCTAG/;
 		$sequence = reverse $sequence;
 	}
@@ -1763,11 +1807,13 @@ sub _get_subfeature_sequence {
 sub _get_subfeatures {
 	my $self = shift;
 	my $subf = lc shift;
-	
+
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs 
-			get_introns));
+		load(
+			'Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs
+				get_introns)
+		);
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1775,359 +1821,383 @@ sub _get_subfeatures {
 			$GENETOOL_LOADED = 1;
 		}
 	}
-	
+
 	# feature
 	my $feature = $self->seqfeature;
 	return unless ($feature);
-	
+
 	# get the subfeatures
 	my @subfeatures;
-	if ($subf eq 'exon') {
+	if ( $subf eq 'exon' ) {
 		@subfeatures = get_exons($feature);
 	}
-	elsif ($subf eq 'cds') {
+	elsif ( $subf eq 'cds' ) {
 		@subfeatures = get_cds($feature);
 	}
-	elsif ($subf eq '5p_utr') {
+	elsif ( $subf eq '5p_utr' ) {
 		@subfeatures = get_5p_utrs($feature);
 	}
-	elsif ($subf eq '3p_utr') {
+	elsif ( $subf eq '3p_utr' ) {
 		@subfeatures = get_3p_utrs($feature);
 	}
-	elsif ($subf eq 'intron') {
+	elsif ( $subf eq 'intron' ) {
 		@subfeatures = get_introns($feature);
 	}
 	else {
 		croak "unrecognized subfeature parameter '$subf'!";
 	}
-	
+
 	return \@subfeatures;
 }
 
 sub get_score {
 	my $self = shift;
-	my %args = @_; # passed arguments to this method
-	
+	my %args = @_;      # passed arguments to this method
+
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_meta_database || undef;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
-	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!";
+	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $db );
+	unless ( $args{dataset} ) {
+		croak
+"provided dataset was unrecognized format or otherwise could not be verified!";
 	}
-	
+
 	# get positioned scores over subfeatures only
 	$args{subfeature} ||= q();
-	if ($self->feature_type eq 'named' and $args{subfeature}) {
+	if ( $self->feature_type eq 'named' and $args{subfeature} ) {
+
 		# this is more complicated so we have a dedicated method
-		return $self->_get_subfeature_scores($db, \%args);
+		return $self->_get_subfeature_scores( $db, \%args );
 	}
-	
+
 	# build parameter array to pass on to the adapter
 	my @params;
-	
+
 	# verify coordinates based on type of feature
-	if ($self->feature_type eq 'coordinate') {
+	if ( $self->feature_type eq 'coordinate' ) {
+
 		# coordinates are already in the table, use those
 		$params[CHR]  = $args{seq_id} || $self->seq_id;
-		$params[STRT] = $args{start} || $self->start;
-		$params[STOP] = $args{stop} || $args{end} || $self->end;
-		$params[STR]  = (exists $args{strand} and defined $args{strand}) ? $args{strand} : 
-			$self->strand;
+		$params[STRT] = $args{start}  || $self->start;
+		$params[STOP] = $args{stop}   || $args{end} || $self->end;
+		$params[STR] =
+			( exists $args{strand} and defined $args{strand} )
+			? $args{strand}
+			: $self->strand;
 	}
-	elsif ($self->feature_type eq 'named') {
+	elsif ( $self->feature_type eq 'named' ) {
+
 		# must retrieve feature from the database first
 		my $f = $self->seqfeature;
 		return unless $f;
 		$params[CHR]  = $args{seq_id} || $f->seq_id;
-		$params[STRT] = $args{start} || $f->start;
-		$params[STOP] = $args{stop} || $args{end} || $f->end;
-		$params[STR]  = (exists $args{strand} and defined $args{strand}) ? $args{strand} : 
-			$f->strand;
+		$params[STRT] = $args{start}  || $f->start;
+		$params[STOP] = $args{stop}   || $args{end} || $f->end;
+		$params[STR] =
+			( exists $args{strand} and defined $args{strand} )
+			? $args{strand}
+			: $f->strand;
 	}
 	else {
-		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
+		croak
+"data table does not have identifiable coordinate or feature identification columns for score collection";
 	}
-	
+
 	# adjust coordinates as necessary
-	if (exists $args{extend} and $args{extend}) {
+	if ( exists $args{extend} and $args{extend} ) {
 		$params[STRT] -= $args{extend};
 		$params[STOP] += $args{extend};
 	}
-	
+
 	# check coordinates
 	$params[STRT] = 1 if $params[STRT] <= 0;
-	if ($params[STOP] < $params[STRT]) {
+	if ( $params[STOP] < $params[STRT] ) {
+
 		# coordinates are flipped, reverse strand
-		return if ($params[STOP] <= 0);
+		return if ( $params[STOP] <= 0 );
 		my $stop = $params[STRT];
 		$params[STRT] = $params[STOP];
 		$params[STOP] = $stop;
 		$params[STR]  = -1;
 	}
-	return unless ($params[CHR] and defined $params[STRT]);
-	
+	return unless ( $params[CHR] and defined $params[STRT] );
+
 	# score attributes
-	$params[METH] = $args{'method'} || 'mean';
+	$params[METH] = $args{'method'}     || 'mean';
 	$params[STND] = $args{strandedness} || $args{stranded} || 'all';
-	
+
 	# other parameters
-	$params[DB] = $db;
-	$params[RETT] = 0; # return type should be a calculated value
+	$params[DB]   = $db;
+	$params[RETT] = 0;                # return type should be a calculated value
 	$params[DATA] = $args{dataset};
-	
+
 	# get the score
 	return get_segment_score(@params);
 }
 
 sub _get_subfeature_scores {
-	my ($self, $db, $args) = @_;
-	
+	my ( $self, $db, $args ) = @_;
+
 	# get the subfeatures
-	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless (@$subfeatures) {
 		carp "no subfeatures available! Returning parent score data!";
+
 		# just return the parent
 		undef $args->{subfeature};
 		delete $args->{exon} if exists $args->{exon};
 		return $self->get_score(@$args);
 	}
-		
+
 	# collect over each subfeature
 	my @scores;
 	foreach my $exon (@$subfeatures) {
-		my @params; # parameters to pass on to adapter
+		my @params;            # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
 		$params[STRT] = $exon->start;
 		$params[STOP] = $exon->end;
 		$params[STR]  = defined $args->{strand} ? $args->{strand} : $exon->strand;
 		$params[STND] = $args->{strandedness} || $args->{stranded} || 'all';
 		$params[METH] = $args->{method} || 'mean';
-		$params[RETT] = 1; # return type should be an array reference of scores
+		$params[RETT] = 1;     # return type should be an array reference of scores
 		$params[DB]   = $db;
 		$params[DATA] = $args->{dataset};
-		
+
 		my $exon_scores = get_segment_score(@params);
 		push @scores, @$exon_scores if defined $exon_scores;
 	}
-	
+
 	# combine all the scores based on the requested method
-	return calculate_score($args->{method}, \@scores);
+	return calculate_score( $args->{method}, \@scores );
 }
 
 sub get_relative_point_position_scores {
 	my $self = shift;
 	my %args = @_;
-	
+
 	# get the database and verify the dataset
 	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_meta_database;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
-	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $ddb );
+	unless ( $args{dataset} ) {
+		croak
+"provided dataset was unrecognized format or otherwise could not be verified!\n";
 	}
-	
+
 	# assign some defaults
 	$args{strandedness} ||= $args{stranded} || 'all';
 	$args{position}     ||= 5;
 	$args{coordinate}   ||= undef;
 	$args{avoid}        ||= undef;
-	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
-	unless ($args{extend}) {
+	$args{'method'}     ||= 'mean';    # in most cases this doesn't do anything
+	unless ( $args{extend} ) {
 		croak "must provide an extend value!";
 	}
-	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
-	
+	$args{avoid} = undef unless ( $args{db} or $self->{data}->open_meta_database );
+
 	# determine reference coordinate
-	unless (defined $args{coordinate}) {
-		$args{coordinate} = $self->calculate_reference(\%args);
+	unless ( defined $args{coordinate} ) {
+		$args{coordinate} = $self->calculate_reference( \%args );
 	}
-	
+
 	# build parameter array to pass on to the adapter
 	my @params;
 	$params[CHR]  = $self->seq_id;
 	$params[STRT] = $args{coordinate} - $args{extend};
-	$params[STRT] = 1 if $params[STRT] < 1; # sanity check
+	$params[STRT] = 1 if $params[STRT] < 1;                                 # sanity check
 	$params[STOP] = $args{coordinate} + $args{extend};
 	$params[STR]  = defined $args{strand} ? $args{strand} : $self->strand;
 	$params[STND] = $args{strandedness};
 	$params[METH] = $args{'method'};
-	$params[RETT] = 2; # return type should be a hash reference of positioned scores
+	$params[RETT] = 2;      # return type should be a hash reference of positioned scores
 	$params[DB]   = $ddb;
 	$params[DATA] = $args{dataset};
-	
+
 	# Data collection
 	my $pos2data = get_segment_score(@params);
-	
+
 	# Avoid positions
-	if ($args{avoid}) {
-		$self->_avoid_positions($pos2data, \%args, $params[CHR], $params[STRT], $params[STOP]);
+	if ( $args{avoid} ) {
+		$self->_avoid_positions( $pos2data, \%args, $params[CHR], $params[STRT],
+			$params[STOP] );
 	}
-	
+
 	# covert to relative positions
-	if ($args{absolute}) {
+	if ( $args{absolute} ) {
+
 		# do not convert to relative positions
 		return wantarray ? %$pos2data : $pos2data;
 	}
 	else {
 		# return the collected dataset hash
-		return $self->_convert_to_relative_positions($pos2data, 
-			$args{coordinate}, $params[STR]);
+		return $self->_convert_to_relative_positions( $pos2data,
+			$args{coordinate}, $params[STR] );
 	}
 }
 
 sub get_region_position_scores {
 	my $self = shift;
 	my %args = @_;
-	
+
 	# get the database and verify the dataset
 	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_meta_database;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
-	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $ddb );
+	unless ( $args{dataset} ) {
+		croak
+"provided dataset was unrecognized format or otherwise could not be verified!\n";
 	}
-	
+
 	# assign some defaults here, in case we get passed on to subfeature method
 	$args{strandedness} ||= $args{stranded} || 'all';
 	$args{extend}       ||= 0;
 	$args{position}     ||= 5;
-	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
-	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
-	
+	$args{'method'}     ||= 'mean';    # in most cases this doesn't do anything
+	$args{avoid} = undef unless ( $args{db} or $self->{data}->open_meta_database );
+
 	# get positioned scores over subfeatures only
 	$args{subfeature} ||= q();
-	if ($self->feature_type eq 'named' and $args{subfeature}) {
+	if ( $self->feature_type eq 'named' and $args{subfeature} ) {
+
 		# this is more complicated so we have a dedicated method
-		return $self->_get_subfeature_position_scores(\%args, $ddb);
+		return $self->_get_subfeature_position_scores( \%args, $ddb );
 	}
-	
+
 	# Assign coordinates
 	# build parameter array to pass on to the adapter
 	my @params;
 	my $feature = $self->seqfeature || $self;
 	$params[CHR]  = $args{chromo} || $args{seq_id} || $feature->seq_id;
-	$params[STRT] = $args{start} || $feature->start;
-	$params[STOP] = $args{stop} || $args{end} || $feature->end;
+	$params[STRT] = $args{start}  || $feature->start;
+	$params[STOP] = $args{stop}   || $args{end} || $feature->end;
 	$params[STR]  = defined $args{strand} ? $args{strand} : $feature->strand;
-	if ($args{extend}) {
+	if ( $args{extend} ) {
 		$params[STRT] -= $args{extend};
 		$params[STOP] += $args{extend};
-		$params[STRT] = 1 if $params[STRT] < 1; # sanity check
+		$params[STRT] = 1 if $params[STRT] < 1;    # sanity check
 	}
 	$params[STND] = $args{strandedness};
 	$params[METH] = $args{method};
-	$params[RETT] = 2; # return type should be a hash reference of positioned scores
+	$params[RETT] = 2;      # return type should be a hash reference of positioned scores
 	$params[DB]   = $ddb;
 	$params[DATA] = $args{dataset};
-	
+
 	# Data collection
 	my $pos2data = get_segment_score(@params);
-	
+
 	# Avoid positions
-	if ($args{avoid}) {
-		$self->_avoid_positions($pos2data, \%args, $params[CHR], $params[STRT], $params[STOP]);
+	if ( $args{avoid} ) {
+		$self->_avoid_positions( $pos2data, \%args, $params[CHR], $params[STRT],
+			$params[STOP] );
 	}
-	
+
 	# covert to relative positions
-	if ($args{absolute}) {
+	if ( $args{absolute} ) {
+
 		# do not convert to relative positions
 		return wantarray ? %$pos2data : $pos2data;
 	}
 	else {
 		# return data converted to relative positions
-		unless (defined $args{coordinate}) {
-			$args{coordinate} = $self->calculate_reference(\%args);
+		unless ( defined $args{coordinate} ) {
+			$args{coordinate} = $self->calculate_reference( \%args );
 		}
-		return $self->_convert_to_relative_positions($pos2data, 
-			$args{coordinate}, $params[STR]);
+		return $self->_convert_to_relative_positions( $pos2data,
+			$args{coordinate}, $params[STR] );
 	}
 }
 
 sub _get_subfeature_position_scores {
-	my ($self, $args, $ddb) = @_;
-	
+	my ( $self, $args, $ddb ) = @_;
+
 	# get the subfeatures
-	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless (@$subfeatures) {
 		carp "no subfeatures available! Returning parent score data!";
+
 		# just return the parent
 		undef $args->{subfeature};
 		delete $args->{exon} if exists $args->{exon};
 		return $self->get_sequence(@$args);
 	}
-	
+
 	# reset the practical start and stop to the actual subfeatures' final start and stop
 	# we can no longer rely on the feature start and stop, consider CDS
 	# these subfeatures should already be genomic sorted by GeneTools
 	my $practical_start = $subfeatures->[0]->start;
 	my $practical_stop  = $subfeatures->[-1]->end;
-	
+
 	# collect over each exon
-	# we will adjust the positions of each reported score so that 
+	# we will adjust the positions of each reported score so that
 	# it will appear as if all the exons are adjacent to each other
 	# and no introns exist
-	my $pos2data = {};
-	my $namecheck = {}; # to check unique names when using ncount method....
+	my $pos2data    = {};
+	my $namecheck   = {};    # to check unique names when using ncount method....
 	my $current_end = $practical_start;
-	my $adjustment = 0;
-	my $fstrand = defined $args->{strand} ? $args->{strand} : $self->strand;
+	my $adjustment  = 0;
+	my $fstrand     = defined $args->{strand} ? $args->{strand} : $self->strand;
 	foreach my $exon (@$subfeatures) {
-		
-		my @params; # parameters to pass on to adapter
+
+		my @params;          # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
 		$params[STRT] = $exon->start;
 		$params[STOP] = $exon->end;
 		$params[STR]  = $fstrand;
 		$params[STND] = $args->{strandedness};
 		$params[METH] = $args->{method};
-		$params[RETT] = 2; # return type should be a hash reference of positioned scores
+		$params[RETT] = 2;   # return type should be a hash reference of positioned scores
 		$params[DB]   = $ddb;
 		$params[DATA] = $args->{dataset};
-		
+
 		# collect scores
 		my $exon_scores = get_segment_score(@params);
-		
+
 		# adjust the scores
 		$adjustment = $params[STRT] - $current_end;
-		$self->_process_exon_scores($exon_scores, $pos2data, $adjustment, $params[STRT], 
-			$params[STOP], $namecheck, $args->{method});
-		
+		$self->_process_exon_scores(
+			$exon_scores,  $pos2data,  $adjustment, $params[STRT],
+			$params[STOP], $namecheck, $args->{method}
+		);
+
 		# reset
 		$current_end += $exon->length;
 	}
-	
+
 	# collect extensions if requested
-	if ($args->{extend}) {
+	if ( $args->{extend} ) {
+
 		# left side
-		my @params; # parameters to pass on to adapter
+		my @params;          # parameters to pass on to adapter
 		$params[CHR]  = $self->seq_id;
 		$params[STRT] = $practical_start - $args->{extend};
 		$params[STOP] = $practical_start - 1;
 		$params[STR]  = $fstrand;
 		$params[STND] = $args->{strandedness};
 		$params[METH] = $args->{method};
-		$params[RETT] = 2; # return type should be a hash reference of positioned scores
+		$params[RETT] = 2;   # return type should be a hash reference of positioned scores
 		$params[DB]   = $ddb;
 		$params[DATA] = $args->{dataset};
-		
+
 		my $ext_scores = get_segment_score(@params);
 
 		# no adjustment should be needed
-		$self->_process_exon_scores($ext_scores, $pos2data, 0, $params[STRT], 
-			$params[STOP], $namecheck, $args->{method});
-		
-		
+		$self->_process_exon_scores( $ext_scores, $pos2data, 0, $params[STRT],
+			$params[STOP], $namecheck, $args->{method} );
+
 		# right side
 		# we can reuse our parameter array
 		$params[STRT] = $practical_stop + 1;
 		$params[STOP] = $practical_stop + $args->{extend};
-		$ext_scores = get_segment_score(@params);
+		$ext_scores   = get_segment_score(@params);
 
 		# the adjustment should be the same as the last exon
-		$self->_process_exon_scores($ext_scores, $pos2data, $adjustment, $params[STRT], 
-			$params[STOP], $namecheck, $args->{method});
+		$self->_process_exon_scores(
+			$ext_scores,   $pos2data,  $adjustment, $params[STRT],
+			$params[STOP], $namecheck, $args->{method}
+		);
 	}
-	
+
 	# covert to relative positions
-	if ($args->{absolute}) {
+	if ( $args->{absolute} ) {
+
 		# do not convert to relative positions
 		return wantarray ? %$pos2data : $pos2data;
 	}
@@ -2135,68 +2205,69 @@ sub _get_subfeature_position_scores {
 		# return data converted to relative positions
 		# can no longer use original coordinates, but instead the new shifted coordinates
 		$args->{practical_start} = $practical_start;
-		$args->{practical_stop} = $current_end; 
+		$args->{practical_stop}  = $current_end;
 		my $reference = $self->calculate_reference($args);
-		return $self->_convert_to_relative_positions($pos2data, 
-			$reference, $fstrand);
+		return $self->_convert_to_relative_positions( $pos2data, $reference, $fstrand );
 	}
 }
 
 sub calculate_reference {
+
 	# my ($self, $args) = @_;
 	# I need position
 	# optionally alternate start, stop, and/or strand
 	my $self = shift;
 	my $args;
-	if (scalar @_ == 1) {
+	if ( scalar @_ == 1 ) {
+
 		# single variable passed
-		if (ref($_[0]) eq 'HASH') {
+		if ( ref( $_[0] ) eq 'HASH' ) {
 			$args = shift @_;
 		}
 		else {
 			# assumed to be the position
-			$args = {
-				position => $_[0]
-			};
+			$args = { position => $_[0] };
 		}
 	}
 	else {
 		# multiple variables
-		$args = { @_ };
+		$args = {@_};
 	}
-	
+
 	# calculate reference coordinate
 	my $coordinate;
 	my $strand = defined $args->{strand} ? $args->{strand} : $self->strand;
-	if ($args->{position} == 5) {
-		if ($strand >= 0) {
+	if ( $args->{position} == 5 ) {
+		if ( $strand >= 0 ) {
 			$coordinate = $args->{practical_start} || $self->start;
 		}
 		else {
 			$coordinate = $args->{practical_stop} || $self->end;
 		}
 	}
-	elsif ($args->{position} == 3) {
-		if ($strand >= 0) {
+	elsif ( $args->{position} == 3 ) {
+		if ( $strand >= 0 ) {
 			$coordinate = $args->{practical_stop} || $self->end;
 		}
 		else {
 			$coordinate = $args->{practical_start} || $self->start;
 		}
 	}
-	elsif ($args->{position} == 4) {
+	elsif ( $args->{position} == 4 ) {
+
 		# strand doesn't matter here
 		# but practical coordinates do
-		if (exists $args->{practical_start}) {
-			$coordinate = int( 
-				( ($args->{practical_start} + $args->{practical_stop}) / 2 ) + 0.5
-			); 
+		if ( exists $args->{practical_start} ) {
+			$coordinate =
+				int( ( ( $args->{practical_start} + $args->{practical_stop} ) / 2 ) +
+					0.5 );
 		}
 		else {
 			$coordinate = $self->midpoint;
 		}
 	}
-	elsif ($args->{position} == 9) {
+	elsif ( $args->{position} == 9 ) {
+
 		# narrowPeak coordinate
 		$coordinate = $self->peak;
 	}
@@ -2207,58 +2278,64 @@ sub calculate_reference {
 }
 
 sub _avoid_positions {
-	my ($self, $pos2data, $args, $seqid, $start, $stop) = @_;
-	
+	my ( $self, $pos2data, $args, $seqid, $start, $stop ) = @_;
+
 	# first check the list of avoid types
-	if (ref $args->{avoid} eq 'ARRAY') {
+	if ( ref $args->{avoid} eq 'ARRAY' ) {
+
 		# we have types, presume they're ok
 	}
-	elsif ($args->{avoid} eq '1') {
+	elsif ( $args->{avoid} eq '1' ) {
+
 		# old style boolean value
-		if (defined $args->{type}) {
+		if ( defined $args->{type} ) {
 			$args->{avoid} = [ $args->{type} ];
 		}
 		else {
-			# no type provided, we can't avoid that which is not defined! 
+			# no type provided, we can't avoid that which is not defined!
 			# this is an error, but won't complain as we never did before
 			$args->{avoid} = $self->type;
 		}
 	}
-	elsif ($args->{avoid} =~ /w+/i) {
+	elsif ( $args->{avoid} =~ /w+/i ) {
+
 		# someone passed a string, a feature type perhaps?
 		$args->{avoid} = [ $args->{avoid} ];
 	}
-	
+
 	### Check for conflicting features
-	my $db = $args->{db} || $self->{data}->open_meta_database;
+	my $db               = $args->{db} || $self->{data}->open_meta_database;
 	my @overlap_features = $self->get_features(
-		seq_id  => $seqid,
-		start   => $start,
-		end     => $stop,
-		type    => $args->{avoid},
+		seq_id => $seqid,
+		start  => $start,
+		end    => $stop,
+		type   => $args->{avoid},
 	);
-	
+
 	# get the overlapping features of the same type
 	if (@overlap_features) {
 		my $primary = $self->primary_id;
+
 		# there are one or more feature of the type in this region
 		# one of them is likely the one we're working with
 		# but not necessarily - user may be looking outside original feature
-		# the others are not what we want and therefore need to be 
+		# the others are not what we want and therefore need to be
 		# avoided
 		foreach my $feat (@overlap_features) {
+
 			# skip the one we want
-			next if ($feat->primary_id eq $primary);
+			next if ( $feat->primary_id eq $primary );
+
 			# now eliminate those scores which overlap this feature
 			my $start = $feat->start;
 			my $stop  = $feat->end;
-			foreach my $position (keys %$pos2data) {
-				# delete the scored position if it overlaps with 
+			foreach my $position ( keys %$pos2data ) {
+
+				# delete the scored position if it overlaps with
 				# the offending feature
-				if (
-					$position >= $start and
-					$position <= $stop
-				) {
+				if (    $position >= $start
+					and $position <= $stop )
+				{
 					delete $pos2data->{$position};
 				}
 			}
@@ -2267,16 +2344,16 @@ sub _avoid_positions {
 }
 
 sub _convert_to_relative_positions {
-	my ($self, $pos2data, $position, $strand) = @_;
-	
+	my ( $self, $pos2data, $position, $strand ) = @_;
+
 	my %relative_pos2data;
-	if ($strand >= 0) {
-		foreach my $p (keys %$pos2data) {
+	if ( $strand >= 0 ) {
+		foreach my $p ( keys %$pos2data ) {
 			$relative_pos2data{ $p - $position } = $pos2data->{$p};
 		}
 	}
-	elsif ($strand < 0) {
-		foreach my $p (keys %$pos2data) {
+	elsif ( $strand < 0 ) {
+		foreach my $p ( keys %$pos2data ) {
 			$relative_pos2data{ $position - $p } = $pos2data->{$p};
 		}
 	}
@@ -2284,16 +2361,17 @@ sub _convert_to_relative_positions {
 }
 
 sub _process_exon_scores {
-	my ($self, $exon_scores, $pos2data, $adjustment, $start, $end, 
-		$namecheck, $method) = @_;
-	
+	my ( $self, $exon_scores, $pos2data, $adjustment, $start, $end, $namecheck, $method )
+		= @_;
+
 	# ncount method
-	if ($method eq 'ncount') {
+	if ( $method eq 'ncount' ) {
+
 		# we need to check both names and adjust position
-		foreach my $p (keys %$exon_scores) {
-			next unless ($p >= $start and $p <= $end); 
-			foreach my $n (@{ $exon_scores->{$p} }) {
-				if (exists $namecheck->{$n} ) {
+		foreach my $p ( keys %$exon_scores ) {
+			next unless ( $p >= $start and $p <= $end );
+			foreach my $n ( @{ $exon_scores->{$p} } ) {
+				if ( exists $namecheck->{$n} ) {
 					$namecheck->{$n}++;
 					next;
 				}
@@ -2308,8 +2386,8 @@ sub _process_exon_scores {
 	}
 	else {
 		# just adjust scores
-		foreach my $p (keys %$exon_scores) {
-			next unless ($p >= $start and $p <= $end); 
+		foreach my $p ( keys %$exon_scores ) {
+			next unless ( $p >= $start and $p <= $end );
 			$pos2data->{ $p - $adjustment } = $exon_scores->{$p};
 		}
 	}
@@ -2318,131 +2396,133 @@ sub _process_exon_scores {
 sub fetch_alignments {
 	my $self = shift;
 	my %args = @_;
-	$args{db} ||= $args{dataset} || undef;
-	$args{data} ||= undef;
-	$args{callback} ||= undef;
+	$args{db}         ||= $args{dataset} || undef;
+	$args{data}       ||= undef;
+	$args{callback}   ||= undef;
 	$args{subfeature} ||= q();
-	
+
 	# verify - trusting that these are valid, else they will fail lower down in the code
-	unless ($args{db}) {
+	unless ( $args{db} ) {
 		croak "must provide a Bam object database to fetch alignments!\n";
 	}
-	unless ($args{data} and ref($args{data}) eq 'HASH') {
+	unless ( $args{data} and ref( $args{data} ) eq 'HASH' ) {
 		croak "must provide a data HASH for the fetch callback!\n";
 	}
-	unless ($args{callback}) {
+	unless ( $args{callback} ) {
 		croak "must provide a callback code reference!\n";
 	}
-	
+
 	# array of features to iterate, probably just one or subfeatures
 	my @intervals;
-	if ($self->feature_type eq 'named' and $args{subfeature}) {
+	if ( $self->feature_type eq 'named' and $args{subfeature} ) {
+
 		# we have subfeatures to iterate over
 
 		# get the subfeatures
-		my $subfeatures = $self->_get_subfeatures($args{subfeature});
+		my $subfeatures = $self->_get_subfeatures( $args{subfeature} );
 		if (@$subfeatures) {
 			foreach my $sf (@$subfeatures) {
-				push @intervals, [
-					$sf->start - 1,
-					$sf->end
-				];
+				push @intervals, [ $sf->start - 1, $sf->end ];
 			}
 		}
 		else {
 			# zere subfeatures? just take the parent then
-			push @intervals, [
-				($args{start} || $self->start) - 1,
-				$args{stop} || $args{end} || $self->end
-			];
+			push @intervals,
+				[
+					( $args{start} || $self->start ) - 1,
+					$args{stop} || $args{end} || $self->end
+				];
 		}
 	}
 	else {
 		# take feature as is
-		push @intervals, [
-			($args{start} || $self->start) - 1,
-			$args{stop} || $args{end} || $self->end
-		];
+		push @intervals,
+			[
+				( $args{start} || $self->start ) - 1,
+				$args{stop} || $args{end} || $self->end
+			];
 	}
 
 	# get the target id for the chromosome
 	# this will fail if the user didn't provide a real bam object!!!
-	my ($tid, undef, undef) = $args{db}->header->parse_region($self->seq_id);
+	my ( $tid, undef, undef ) = $args{db}->header->parse_region( $self->seq_id );
 	return unless defined $tid;
-	
+
 	# now iterate over the intervals
 	foreach my $i (@intervals) {
 		$args{data}->{start}  = $i->[0];
 		$args{data}->{end}    = $i->[1];
 		$args{data}->{strand} = $self->strand;
-		low_level_bam_fetch(
-			$args{db}, 
-			$tid, 
-			$i->[0],
-			$i->[1], 
-			$args{callback}, 
-			$args{data}
-		);
+		low_level_bam_fetch( $args{db}, $tid, $i->[0], $i->[1], $args{callback},
+			$args{data} );
 	}
-	
+
 	# nothing to return since we're using a data reference
 	return 1;
 }
-
-
 
 ### String export
 
 sub bed_string {
 	my $self = shift;
 	my %args = @_;
-	$args{bed} ||= 6; # number of bed columns
+	$args{bed} ||= 6;    # number of bed columns
 	croak "bed count must be an integer!" unless $args{bed} =~ /^\d+$/;
 	croak "bed count must be at least 3!" unless $args{bed} >= 3;
-	
+
 	# coordinate information
-	$self->seqfeature; # retrieve the seqfeature object first
+	$self->seqfeature;    # retrieve the seqfeature object first
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
-	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop || 
-		$start + $self->length - 1 || $start;
-	if ($chr eq '.' or not CORE::length($chr) or $start eq '.' or not CORE::length($start)) {
-		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
+	my $start = $args{start}  || $self->start;
+	my $stop =
+		   $args{stop}
+		|| $args{end}
+		|| $self->stop
+		|| $start + $self->length - 1
+		|| $start;
+	if (   $chr eq '.'
+		or not CORE::length($chr)
+		or $start eq '.'
+		or not CORE::length($start) )
+	{
+		carp sprintf( "no valid seq_id or start for data line %d", $self->line_number );
 		return;
 	}
-	if ($start > $stop) {
+	if ( $start > $stop ) {
+
 		# reversed coordinates? old school way of setting reverse strand
-		my $s  = $start;
-		$start = $stop;
-		$stop  = $s;
-		$args{strand} = -1; # this will override any user provided data?
+		my $s = $start;
+		$start        = $stop;
+		$stop         = $s;
+		$args{strand} = -1;      # this will override any user provided data?
 	}
-	$start -= 1; # 0-based coordinates
+	$start -= 1;                 # 0-based coordinates
 	my $string = "$chr\t$start\t$stop";
-	
+
 	# additional information
-	if ($args{bed} >= 4) {
+	if ( $args{bed} >= 4 ) {
 		my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
 		$string .= "\t$name";
 	}
-	if ($args{bed} >= 5) {
+	if ( $args{bed} >= 5 ) {
 		my $score = exists $args{score} ? $args{score} : $self->score;
 		$score = 1 unless defined $score;
 		$string .= "\t$score";
 	}
-	if ($args{bed} >= 6) {
+	if ( $args{bed} >= 6 ) {
 		my $s;
-		if (exists $args{strand} and defined $args{strand}) {
-			$s = $self->_strand($args{strand});
+		if ( exists $args{strand} and defined $args{strand} ) {
+			$s = $self->_strand( $args{strand} );
 		}
 		else {
 			$s = $self->strand;
 		}
-		$string .= sprintf("\t%s", $s == -1 ? '-' : '+')
+		$string .= sprintf( "\t%s", $s == -1 ? '-' : '+' );
 	}
-	# we could go on with other columns, but there's no guarantee that additional 
-	# information is available, and we would have to implement user provided data 
-	
+
+	# we could go on with other columns, but there's no guarantee that additional
+	# information is available, and we would have to implement user provided data
+
 	# done
 	return $string;
 }
@@ -2450,38 +2530,47 @@ sub bed_string {
 sub gff_string {
 	my $self = shift;
 	my %args = @_;
-	
+
 	# coordinate information
-	$self->seqfeature; # retrieve the seqfeature object first
+	$self->seqfeature;    # retrieve the seqfeature object first
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
-	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop || 
-		$start + $self->length - 1 || $start;
-	if ($chr eq '.' or not CORE::length($chr) or $start eq '.' or not CORE::length($start)) {
-		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
+	my $start = $args{start}  || $self->start;
+	my $stop =
+		   $args{stop}
+		|| $args{end}
+		|| $self->stop
+		|| $start + $self->length - 1
+		|| $start;
+	if (   $chr eq '.'
+		or not CORE::length($chr)
+		or $start eq '.'
+		or not CORE::length($start) )
+	{
+		carp sprintf( "no valid seq_id or start for data line %d", $self->line_number );
 		return;
 	}
-	if ($start > $stop) {
+	if ( $start > $stop ) {
+
 		# reversed coordinates? old school way of setting reverse strand
-		my $s  = $start;
-		$start = $stop;
-		$stop  = $s;
-		$args{strand} = -1; # this will override any user provided data?
+		my $s = $start;
+		$start        = $stop;
+		$stop         = $s;
+		$args{strand} = -1;      # this will override any user provided data?
 	}
 	my $strand;
-	if (exists $args{strand} and defined $args{strand}) {
-		$strand = $self->_strand($args{strand});
+	if ( exists $args{strand} and defined $args{strand} ) {
+		$strand = $self->_strand( $args{strand} );
 	}
 	else {
 		$strand = $self->strand;
 	}
 	$strand = $strand == -1 ? '-' : $strand == 1 ? '+' : '.';
-	
+
 	# type information
 	my $type = $args{type} || $self->type || undef;
-	my ($source, $primary_tag);
-	if (defined $type and $type =~ /:/) {
-		($primary_tag, $source) = split /:/, $type;
+	my ( $source, $primary_tag );
+	if ( defined $type and $type =~ /:/ ) {
+		( $primary_tag, $source ) = split /:/, $type;
 	}
 	unless ($source) {
 		$source = $args{source} || '.';
@@ -2489,19 +2578,19 @@ sub gff_string {
 	unless ($primary_tag) {
 		$primary_tag = $args{primary_tag} || defined $type ? $type : '.';
 	}
-	
+
 	# score
 	my $score = exists $args{score} ? $args{score} : $self->score;
 	$score = '.' unless defined $score;
-	my $phase = '.'; # do not even bother!!!!
-	
+	my $phase = '.';    # do not even bother!!!!
+
 	# attributes
-	my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
+	my $name       = $args{name} || $self->name || 'Feature_' . $self->line_number;
 	my $attributes = "Name=$name";
-	my $id = $args{id} || sprintf("%08d", $self->line_number);
+	my $id         = $args{id} || sprintf( "%08d", $self->line_number );
 	$attributes .= ";ID=$id";
-	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
-		foreach my $i (@{$args{attributes}}) {
+	if ( exists $args{attributes} and ref( $args{attributes} ) eq 'ARRAY' ) {
+		foreach my $i ( @{ $args{attributes} } ) {
 			my $k = $self->{data}->name($i);
 			$k =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 			my $v = $self->value($i);
@@ -2509,13 +2598,13 @@ sub gff_string {
 			$attributes .= ";$k=$v";
 		}
 	}
-	
+
 	# done
-	my $string = join("\t", $chr, $source, $primary_tag, $start, $stop, $score, 
-		$strand, $phase, $attributes);
+	my $string = join( "\t",
+		$chr,   $source, $primary_tag, $start, $stop,
+		$score, $strand, $phase,       $attributes );
 	return $string;
 }
-
 
 __END__
 

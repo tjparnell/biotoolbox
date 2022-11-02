@@ -7,54 +7,48 @@ use Pod::Usage;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.60';
+my $VERSION = '1.60';
 
 print "\n This script will split a data file by features\n\n";
 
-
 ### Quick help
-unless (@ARGV) { 
+unless (@ARGV) {
+
 	# when no command line options are present
 	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
 
-
-
 ### Get command line options and initialize values
-my (
-	$infile, 
-	$index,
-	$tag,
-	$max,
-	$gz,
-	$prefix,
-	$help,
-	$print_version,
-);
+my ( $infile, $index, $tag, $max, $gz, $prefix, $help, $print_version, );
 
 # Command line options
-GetOptions( 
-	'i|in=s'        => \$infile, # specify the input data file
-	'x|index|col=i' => \$index, # index for the column to use for splitting
-	't|tag=s'       => \$tag, # attribute tag name
-	'm|max=i'       => \$max, # maximum number of lines per file
-	'p|prefix=s'    => \$prefix, # output file prefix
-	'z|gz!'         => \$gz, # compress output files
-	'h|help'        => \$help, # request help
-	'v|version'     => \$print_version, # print the version
+GetOptions(
+	'i|in=s'        => \$infile,           # specify the input data file
+	'x|index|col=i' => \$index,            # index for the column to use for splitting
+	't|tag=s'       => \$tag,              # attribute tag name
+	'm|max=i'       => \$max,              # maximum number of lines per file
+	'p|prefix=s'    => \$prefix,           # output file prefix
+	'z|gz!'         => \$gz,               # compress output files
+	'h|help'        => \$help,             # request help
+	'v|version'     => \$print_version,    # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -68,17 +62,14 @@ if ($print_version) {
 	exit;
 }
 
-
-
-
-
 ### Check for required values
 unless ($infile) {
-	$infile = shift @ARGV or
-		die "  No input file specified! \n use $0 --help\n";
+	$infile = shift @ARGV
+		or die "  No input file specified! \n use $0 --help\n";
 }
-unless (defined $gz) {
-	if ($infile =~ /\.gz$/) {
+unless ( defined $gz ) {
+	if ( $infile =~ /\.gz$/ ) {
+
 		# input file is compressed, so keep it that way
 		$gz = 1;
 	}
@@ -87,49 +78,48 @@ unless (defined $gz) {
 	}
 }
 
-
 ### Load Input file
-my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
-	die "Unable to open input file!\n";
+my $Input = Bio::ToolBox::Data::Stream->new( in => $infile )
+	or die "Unable to open input file!\n";
 
 # Identify the column
-unless (defined $index or defined $tag) {
-	$index = ask_user_for_index($Input, 
-		"  Enter the column index number containing the values to split by   ");
-	unless (defined $index) {
+unless ( defined $index or defined $tag ) {
+	$index = ask_user_for_index( $Input,
+		"  Enter the column index number containing the values to split by   " );
+	unless ( defined $index ) {
 		die " Must provide a valid index!\n";
 	}
 }
 if ($tag) {
-	unless ($Input->gff or $Input->vcf) {
+	unless ( $Input->gff or $Input->vcf ) {
 		die " Input file must be in GFF or VCF format to use attribute tags!";
 	}
-	if ($Input->vcf and not defined $index) {
-		die " Please provide a column index for accessing VCF attributes.\n" . 
-			" The INFO column is 0-based index 7, and sample columns begin\n" . 
-			" at index 9.\n";
+	if ( $Input->vcf and not defined $index ) {
+		die " Please provide a column index for accessing VCF attributes.\n"
+			. " The INFO column is 0-based index 7, and sample columns begin\n"
+			. " at index 9.\n";
 	}
-	elsif ($Input->gff) {
+	elsif ( $Input->gff ) {
 		$index = 8;
 	}
 }
 
-
 ### Split the file
-printf " Splitting file by elements in column %s%s...\n", 
-	$Input->name($index), 
+printf " Splitting file by elements in column %s%s...\n",
+	$Input->name($index),
 	$tag ? ", attribute tag $tag" : "";
-my %out_files; # a hash of the file names written
-	# we can't assume that all the data elements we're splitting on are 
-	# contiguous in the file
-	# if they're not, then we would be simply re-writing over the 
-	# previous block
-	# also, we're enforcing a maximum number of lines per file
-	# so we'll remember the files we've written, and re-open that file 
-	# to write the next block of data
+my %out_files;    # a hash of the file names written
+                  # we can't assume that all the data elements we're splitting on are
+                  # contiguous in the file
+                  # if they're not, then we would be simply re-writing over the
+                  # previous block
+                  # also, we're enforcing a maximum number of lines per file
+                  # so we'll remember the files we've written, and re-open that file
+                  # to write the next block of data
 my $split_count = 0;
-while (my $row = $Input->next_row) {
-	
+
+while ( my $row = $Input->next_row ) {
+
 	# Get the check value
 	my $check;
 	if ($tag) {
@@ -139,52 +129,50 @@ while (my $row = $Input->next_row) {
 	else {
 		$check = $row->value($index);
 	}
-	unless (exists $out_files{$check}{'stream'}) {
+	unless ( exists $out_files{$check}{'stream'} ) {
 		request_new_file_name($check);
 	}
-	
+
 	# write the row
 	$out_files{$check}{'stream'}->add_row($row);
 	$out_files{$check}{'number'} += 1;
-	$out_files{$check}{'total'} += 1;
-	
+	$out_files{$check}{'total'}  += 1;
+
 	# Check the number of lines collected, close if necessary
-	if (defined $max and $out_files{$check}{'number'} == $max) {
+	if ( defined $max and $out_files{$check}{'number'} == $max ) {
+
 		# we've reached the maximum number of data lines for this current data
 		$out_files{$check}{'stream'}->close_fh;
 		delete $out_files{$check}{'stream'};
 	}
 }
 
-
-
 ### Finish
 # Properly close out all file handles
 $Input->close_fh;
-foreach my $value (keys %out_files) {
+foreach my $value ( keys %out_files ) {
 	$out_files{$value}{'stream'}->close_fh if exists $out_files{$value}{'stream'};
 }
 
 # report
 print " Split '$infile' into $split_count files\n";
-foreach my $value (sort {$a cmp $b} keys %out_files) {
-	printf "  wrote %s lines in %d file%s for '$value'\n", 
-		format_with_commas( $out_files{$value}{total} ), $out_files{$value}{parts}, 
+foreach my $value ( sort { $a cmp $b } keys %out_files ) {
+	printf "  wrote %s lines in %d file%s for '$value'\n",
+		format_with_commas( $out_files{$value}{total} ), $out_files{$value}{parts},
 		$out_files{$value}{parts} > 1 ? 's' : '';
 }
 
-
-
-
 sub request_new_file_name {
+
 	# calculate a new file name based on the current check value and part number
-	my $value = shift;
+	my $value          = shift;
 	my $filename_value = $value;
-	$filename_value =~ s/[\:\|\\\/\+\*\?\#\(\)\[\]\{\} ]+/_/g; 
-		# replace unsafe characters
-	
+	$filename_value =~ s/[\:\|\\\/\+\*\?\#\(\)\[\]\{\} ]+/_/g;
+
+	# replace unsafe characters
+
 	my $file;
-	if ($prefix and $prefix eq 'none') {
+	if ( $prefix and $prefix eq 'none' ) {
 		$file = $Input->path . $filename_value;
 	}
 	elsif ($prefix) {
@@ -193,46 +181,45 @@ sub request_new_file_name {
 	else {
 		$file = $Input->path . $Input->basename . '#' . $filename_value;
 	}
-	
+
 	# add the file part number, if we're working with maximum line files
 	# padded for proper sorting
-	if (defined $max) {
-		if (defined $out_files{$value}{'parts'}) {
-			$out_files{$value}{'parts'} += 1; # increment
-			$file .= '_' . sprintf("%03d", $out_files{$value}{'parts'});
+	if ( defined $max ) {
+		if ( defined $out_files{$value}{'parts'} ) {
+			$out_files{$value}{'parts'} += 1;    # increment
+			$file .= '_' . sprintf( "%03d", $out_files{$value}{'parts'} );
 		}
 		else {
-			$out_files{$value}{'parts'} = 1; # initial
-			$file .= '_' . sprintf("%03d", $out_files{$value}{'parts'});
+			$out_files{$value}{'parts'} = 1;     # initial
+			$file .= '_' . sprintf( "%03d", $out_files{$value}{'parts'} );
 		}
 	}
 	else {
 		# only 1 part is necessary
 		$out_files{$value}{'parts'} = 1;
 	}
-	
+
 	# finish the file name
 	$file .= $Input->extension;
 	$out_files{$value}{'number'} = 0;
-	
+
 	# open an output Stream
-	if (exists $out_files{$value}{'stream'}) {
+	if ( exists $out_files{$value}{'stream'} ) {
+
 		# an open stream, close it
 		$out_files{$value}{'stream'}->close_fh;
 	}
 	my $Stream = $Input->duplicate($file);
 	$out_files{$value}{'stream'} = $Stream;
-	
+
 	# check the total
-	unless (exists $out_files{$value}{'total'}) {
-		$out_files{$value}{'total'}  = 0;
+	unless ( exists $out_files{$value}{'total'} ) {
+		$out_files{$value}{'total'} = 0;
 	}
-	
+
 	# keept track of the number of files opened
 	$split_count++;
 }
-
-
 
 __END__
 

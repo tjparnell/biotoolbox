@@ -8,21 +8,22 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use IO::Handle;
 use Bio::ToolBox;
 use Bio::ToolBox::big_helper qw(
-	open_wig_to_bigwig_fh 
+	open_wig_to_bigwig_fh
 	open_bigwig_to_wig_fh
 	generate_chromosome_file
 );
 my $VERSION = 1.69;
 
 ### Quick help
-unless (@ARGV) { # when no command line options are present
-	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+unless (@ARGV) {    # when no command line options are present
+					# print SYNOPSIS
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
-
 
 ### Options
 my $infile;
@@ -47,41 +48,41 @@ my $database;
 my $help;
 my $print_version;
 
-
-
 ### Command line options
-GetOptions( 
-	'i|input=s'       => \$infile,
-	'o|output=s'      => \$outfile,
-	'k|skip=s'        => \$skip,
-	'y|apply=s'       => \$apply,
-	'u|null!'         => \$doNull,
-	'd|delog=i'       => \$deLogValue,
-	'b|abs!'          => \$doAbsolute,
-	'm|multiply=f'    => \$multiplyValue,
-	'a|add=f'         => \$addValue,
-	'l|log=i'         => \$logValue,
-	'p|place=i'       => \$places,
-	'n|minimum=f'     => \$minValue, # 
-	'x|maximum=f'     => \$maxValue, # 
-	'z|zero'          => \$noZeroes,
-	't|stats!'        => \$doStats,
-	'bw2w=s'          => \$bw2wig_app,
-	'w2bw=s'          => \$wig2bw_app,
-	'chromo=s'        => \$chromofile,
-	'db=s'            => \$database,
-	'h|help'          => \$help, # request help
-	'v|version'       => \$print_version, # print the version
+GetOptions(
+	'i|input=s'    => \$infile,
+	'o|output=s'   => \$outfile,
+	'k|skip=s'     => \$skip,
+	'y|apply=s'    => \$apply,
+	'u|null!'      => \$doNull,
+	'd|delog=i'    => \$deLogValue,
+	'b|abs!'       => \$doAbsolute,
+	'm|multiply=f' => \$multiplyValue,
+	'a|add=f'      => \$addValue,
+	'l|log=i'      => \$logValue,
+	'p|place=i'    => \$places,
+	'n|minimum=f'  => \$minValue,         #
+	'x|maximum=f'  => \$maxValue,         #
+	'z|zero'       => \$noZeroes,
+	't|stats!'     => \$doStats,
+	'bw2w=s'       => \$bw2wig_app,
+	'w2bw=s'       => \$wig2bw_app,
+	'chromo=s'     => \$chromofile,
+	'db=s'         => \$database,
+	'h|help'       => \$help,             # request help
+	'v|version'    => \$print_version,    # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
-
 
 ### Print help if requested
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 ### Print version
@@ -91,7 +92,6 @@ if ($print_version) {
 	exit;
 }
 
-
 ### Checks
 die "no input file provided!\n" unless $infile;
 my $doMin = defined $minValue ? 1 : 0;
@@ -100,12 +100,12 @@ if ($logValue) {
 	$logValue = $logValue == 2 ? log(2) : $logValue == 10 ? log(10) : undef;
 	die "bad log value!\n" unless defined $logValue;
 }
-if (defined $places) {
+if ( defined $places ) {
 	$places = '%.' . $places . 'f';
 }
 
 # chromosome skipping regex
-my ($skip_regex, $apply_regex);
+my ( $skip_regex, $apply_regex );
 if ($skip) {
 	$skip_regex = qr($skip);
 }
@@ -113,39 +113,37 @@ if ($apply) {
 	$apply_regex = qr($apply);
 }
 
-
-
-
-
 ### Open file handles
 # Input
-my ($infh, $outfh);
-if ($infile =~ /^stdin$/i) {
+my ( $infh, $outfh );
+if ( $infile =~ /^stdin$/i ) {
 	$infh = IO::Handle->new;
-	$infh->fdopen(fileno(STDIN), 'r');
+	$infh->fdopen( fileno(STDIN), 'r' );
 }
-elsif ($infile =~ /(?:bw|bigwig)$/i and -e $infile) {
+elsif ( $infile =~ /(?:bw|bigwig)$/i and -e $infile ) {
 	$infh = open_bigwig_to_wig_fh(
 		bw        => $infile,
 		bwapppath => $bw2wig_app,
 	) or die "unable to open input bigWig file '$infile'!\n";
-} 
-elsif (-e $infile) {
-	$infh = Bio::ToolBox->read_file($infile) or 
-		die "can't open $infile! $!";
+}
+elsif ( -e $infile ) {
+	$infh = Bio::ToolBox->read_file($infile)
+		or die "can't open $infile! $!";
 }
 else {
 	die "unrecognized $infile!";
 }
 
 # Output
-if ($outfile =~ /^stdout$/i) {
+if ( $outfile =~ /^stdout$/i ) {
 	$outfh = IO::Handle->new;
-	$outfh->fdopen(fileno(STDOUT), 'w');
+	$outfh->fdopen( fileno(STDOUT), 'w' );
 }
-elsif ($outfile =~ /(?:bw|bigwig)$/i) {
+elsif ( $outfile =~ /(?:bw|bigwig)$/i ) {
+
 	# check for chromosome file
-	if ($chromofile and -e $chromofile) {
+	if ( $chromofile and -e $chromofile ) {
+
 		# user provided a chromosome file
 		$outfh = open_wig_to_bigwig_fh(
 			bw        => $outfile,
@@ -153,11 +151,12 @@ elsif ($outfile =~ /(?:bw|bigwig)$/i) {
 			bwapppath => $wig2bw_app,
 		) or die "unable to open output bigWig file '$outfile'!\n";
 	}
-	elsif ($infile =~ /(?:bw|bigwig)$/i or $database) {
+	elsif ( $infile =~ /(?:bw|bigwig)$/i or $database ) {
+
 		# we can use the input bigWig as a database source if one isn't provided
 		$database ||= $infile;
-		$chromofile = generate_chromosome_file($database, $skip) or 
-			die "unable to generate chromosome file from '$database'!\n";
+		$chromofile = generate_chromosome_file( $database, $skip )
+			or die "unable to generate chromosome file from '$database'!\n";
 		$outfh = open_wig_to_bigwig_fh(
 			bw        => $outfile,
 			chromo    => $chromofile,
@@ -167,134 +166,137 @@ elsif ($outfile =~ /(?:bw|bigwig)$/i) {
 	else {
 		die "unable to open output bigWig file handle without chromosome information!\n";
 	}
-	
-} 
-elsif ($outfile) {
-	$outfh = Bio::ToolBox->write_file($outfile) or 
-		die "can't open $outfile! $!";
+
 }
-
-
-
+elsif ($outfile) {
+	$outfh = Bio::ToolBox->write_file($outfile)
+		or die "can't open $outfile! $!";
+}
 
 ### stats hash
 my $stats = {
-	count         => 0,
-	sumData       => 0,
-	sumSquares    => 0,
-	minVal        => undef,
-	maxVal        => undef,
+	count      => 0,
+	sumData    => 0,
+	sumSquares => 0,
+	minVal     => undef,
+	maxVal     => undef,
 };
 
-
 ### Walk through the file
-my $count = 0;
-my $span = 1;
-my $chrom_skip = 0;
+my $count        = 0;
+my $span         = 1;
+my $chrom_skip   = 0;
 my $chrom_ignore = 0;
 my $wig_process_sub;
-while (my $line = $infh->getline) {
+while ( my $line = $infh->getline ) {
+
 	# look at the first characters to determine the type of line we have
-	my $prefix = lc substr($line,0,5);
-	if ($prefix eq 'track') {
+	my $prefix = lc substr( $line, 0, 5 );
+	if ( $prefix eq 'track' ) {
+
 		# track line
 		$outfh->print($line) if $outfh;
 		next;
 	}
-	elsif ($prefix eq 'brows') {
+	elsif ( $prefix eq 'brows' ) {
+
 		# browser line
 		$outfh->print($line) if $outfh;
 		next;
 	}
-	elsif ($prefix eq 'varia' or $prefix eq 'fixed') {
+	elsif ( $prefix eq 'varia' or $prefix eq 'fixed' ) {
+
 		# a step definition line
-		if ($line =~ /chrom=([\w\-\.]+)/) {
+		if ( $line =~ /chrom=([\w\-\.]+)/ ) {
+
 			# check the chromosome
 			my $chrom = $1;
-			if ($skip_regex and $chrom =~ $skip_regex) {
+			if ( $skip_regex and $chrom =~ $skip_regex ) {
 				$chrom_skip = 1;
 			}
 			else {
 				$chrom_skip = 0;
 			}
-			if ($apply and $chrom !~ $apply_regex) {
+			if ( $apply and $chrom !~ $apply_regex ) {
 				$chrom_ignore = 1;
 			}
 			else {
 				$chrom_ignore = 0;
 			}
 		}
-		if ($line =~ /span=(\d+)/i) {
+		if ( $line =~ /span=(\d+)/i ) {
+
 			# capture span size if present
 			$span = $1;
 		}
 		$outfh->print($line) if $outfh;
 		next;
-	} 
-	elsif (substr($prefix,0,1) eq '#') {
+	}
+	elsif ( substr( $prefix, 0, 1 ) eq '#' ) {
+
 		# comment line
 		$outfh->print($line) if $outfh;
 		next;
 	}
-	
+
 	# skipping current chromosome
 	next if $chrom_skip;
-	
+
 	# ignoring current chromosome
 	if ($chrom_ignore) {
 		$outfh->print($line) if $outfh;
 		next;
 	}
-	
+
 	# determine format
-	unless (defined $wig_process_sub) {
+	unless ( defined $wig_process_sub ) {
 		my @data = split /\s+/, $line;
 		my $statement;
-		if (scalar @data == 4) {
-			$statement = " processing bedGraph...\n";
+		if ( scalar @data == 4 ) {
+			$statement       = " processing bedGraph...\n";
 			$wig_process_sub = \&process_bedGraph;
 		}
-		elsif (scalar @data == 2) {
-			$statement = " processing variableStep...\n";
+		elsif ( scalar @data == 2 ) {
+			$statement       = " processing variableStep...\n";
 			$wig_process_sub = \&process_variableStep;
 		}
-		elsif (scalar @data == 1) {
-			$statement = " processing fixedStep...\n";
+		elsif ( scalar @data == 1 ) {
+			$statement       = " processing fixedStep...\n";
 			$wig_process_sub = \&process_fixedStep;
 		}
-		if ($outfile =~ /stdout/i) {
+		if ( $outfile =~ /stdout/i ) {
 			print STDERR $statement;
 		}
 		else {
 			print STDOUT $statement;
 		}
 	}
-	
+
 	# process
 	chomp $line;
 	&$wig_process_sub($line);
 }
 
-
-
 ### close filehandles
 $infh->close;
 $outfh->close if $outfh;
+
 # remove chromosome file if we generated it
-unlink $chromofile if ($outfile =~ /(?:bw|bigwig)$/i and 
-						$database and $chromofile =~ /^chr_sizes_\w{5}$/);
-
-
+unlink $chromofile
+	if (    $outfile =~ /(?:bw|bigwig)$/i
+		and $database
+		and $chromofile =~ /^chr_sizes_\w{5}$/ );
 
 ### Print final messages
 my $statMessage;
 if ($doStats) {
 	my $basecount = $stats->{count};
-	my $min   = $stats->{minVal};
-	my $max   = $stats->{maxVal};
-	my $mean  = $stats->{count} ? sprintf("%.05f", $stats->{sumData} / $stats->{count}) : 0;
-	my $stddev = sprintf("%.05f", sqrt(binVariance()) );
-	$statMessage = <<STATS; 
+	my $min       = $stats->{minVal};
+	my $max       = $stats->{maxVal};
+	my $mean =
+		$stats->{count} ? sprintf( "%.05f", $stats->{sumData} / $stats->{count} ) : 0;
+	my $stddev = sprintf( "%.05f", sqrt( binVariance() ) );
+	$statMessage = <<STATS;
 basesCovered: $basecount
 mean: $mean
 min: $min
@@ -303,38 +305,35 @@ std: $stddev
 STATS
 }
 
-if ($outfile =~ /stdout/i) {
+if ( $outfile =~ /stdout/i ) {
 	print STDERR " converted $count lines, wrote file $outfile\n" if $outfile;
-	print STDERR $statMessage if $statMessage;
+	print STDERR $statMessage                                     if $statMessage;
 }
 else {
 	print STDOUT " converted $count lines, wrote file $outfile\n" if $outfile;
-	print STDOUT $statMessage if $statMessage;
+	print STDOUT $statMessage                                     if $statMessage;
 }
-
-
-
 
 #### Subroutines
 
 sub process_bedGraph {
 	my @data = split "\t", shift;
-	return if ($skip and $data[0] =~ $skip_regex);
-	if ($apply and $data[0] !~ $apply_regex) {
-		$outfh->printf("%s\t%d\t%d\t%s\n", $data[0], $data[1], $data[2], $data[3]) 
+	return if ( $skip and $data[0] =~ $skip_regex );
+	if ( $apply and $data[0] !~ $apply_regex ) {
+		$outfh->printf( "%s\t%d\t%d\t%s\n", $data[0], $data[1], $data[2], $data[3] )
 			if $outfh;
 		return;
 	}
-	$data[3] = process_score($data[3]);
+	$data[3] = process_score( $data[3] );
 	return if not defined $data[3];
-	$outfh->printf("%s\t%d\t%d\t%s\n", $data[0], $data[1], $data[2], $data[3]) 
-		if (defined $data[3] and $outfh);
+	$outfh->printf( "%s\t%d\t%d\t%s\n", $data[0], $data[1], $data[2], $data[3] )
+		if ( defined $data[3] and $outfh );
 	$count++;
-	if ($doStats and defined $data[3]) {
+	if ( $doStats and defined $data[3] ) {
 		my $length = $data[2] - $data[1];
-		$stats->{count} += $length;
-		$stats->{sumData} += ($length * $data[3]);
-		$stats->{sumSquares} += ( ($data[3] ** 2) * $length );
+		$stats->{count}      += $length;
+		$stats->{sumData}    += ( $length * $data[3] );
+		$stats->{sumSquares} += ( ( $data[3]**2 ) * $length );
 		$stats->{minVal} = $data[3] if not defined $stats->{minVal};
 		$stats->{minVal} = $data[3] if $data[3] < $stats->{minVal};
 		$stats->{maxVal} = $data[3] if not defined $stats->{maxVal};
@@ -343,42 +342,42 @@ sub process_bedGraph {
 }
 
 sub process_variableStep {
-	my @data = split /\s+/, shift; # could be either tab or space
-	$data[1] = process_score($data[1]);
-	$outfh->printf("%d %s\n", $data[0], $data[1]) if (defined $data[1] and $outfh);
+	my @data = split /\s+/, shift;    # could be either tab or space
+	$data[1] = process_score( $data[1] );
+	$outfh->printf( "%d %s\n", $data[0], $data[1] ) if ( defined $data[1] and $outfh );
 	$count++;
-	process_step_stats($data[1]) if $doStats;
+	process_step_stats( $data[1] ) if $doStats;
 }
 
 sub process_fixedStep {
 	my $score = shift;
 	$score = process_score($score);
-	$outfh->printf("%s\n",$score) if (defined $score and $outfh);
+	$outfh->printf( "%s\n", $score ) if ( defined $score and $outfh );
 	$count++;
 	process_step_stats($score) if $doStats;
 }
 
 sub process_score {
-	my $v = shift; # score
-	if ($doNull and $v =~ /^(?:n.?[na])|(?:\-?inf)/i) {$v = 0}
-	if ($deLogValue) {$v = $deLogValue ** $v}
-	if ($doAbsolute) {$v = abs($v)}
-	if ($multiplyValue) {$v *= $multiplyValue}
-	if ($addValue) {$v += $addValue}
-	if ($logValue) {$v = $v == 0 ? 0 : log($v) / $logValue}
-	if ($doMin and $v < $minValue) {$v = $minValue}
-	if ($doMax and $v > $maxValue) {$v = $maxValue}
-	if ($places) {$v = sprintf($places, $v)};
-	return undef if ($noZeroes and $v == 0);
+	my $v = shift;    # score
+	if ( $doNull and $v =~ /^(?:n.?[na])|(?:\-?inf)/i ) { $v = 0 }
+	if ($deLogValue)                                    { $v = $deLogValue**$v }
+	if ($doAbsolute)                                    { $v = abs($v) }
+	if ($multiplyValue)                                 { $v *= $multiplyValue }
+	if ($addValue)                                      { $v += $addValue }
+	if ($logValue)                   { $v = $v == 0 ? 0 : log($v) / $logValue }
+	if ( $doMin and $v < $minValue ) { $v = $minValue }
+	if ( $doMax and $v > $maxValue ) { $v = $maxValue }
+	if ($places)                     { $v = sprintf( $places, $v ) }
+	return undef if ( $noZeroes and $v == 0 );
 	return $v;
 }
 
 sub process_step_stats {
 	return unless defined $_[0];
-	for (1 .. $span) {
-		$stats->{count} += 1;
-		$stats->{sumData} += $_[0];
-		$stats->{sumSquares} += $_[0] ** 2;
+	for ( 1 .. $span ) {
+		$stats->{count}      += 1;
+		$stats->{sumData}    += $_[0];
+		$stats->{sumSquares} += $_[0]**2;
 		$stats->{minVal} = $_[0] if not defined $stats->{minVal};
 		$stats->{maxVal} = $_[0] if not defined $stats->{maxVal};
 		$stats->{minVal} = $_[0] if $_[0] < $stats->{minVal};
@@ -387,13 +386,13 @@ sub process_step_stats {
 }
 
 sub binVariance {
-    return 0 unless $stats->{count};
-    my $var = $stats->{sumSquares} - $stats->{sumData}**2/$stats->{count};
-    if ($stats->{count} > 1) {
-	$var /= $stats->{count}-1;
-    }
-    return 0 if $var < 0;
-    return $var;
+	return 0 unless $stats->{count};
+	my $var = $stats->{sumSquares} - $stats->{sumData}**2 / $stats->{count};
+	if ( $stats->{count} > 1 ) {
+		$var /= $stats->{count} - 1;
+	}
+	return 0 if $var < 0;
+	return $var;
 }
 
 __END__

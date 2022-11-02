@@ -17,7 +17,7 @@ eval {
 our $VERSION = '1.62';
 
 # Exported names
-our @ISA = qw(Exporter);
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
 	open_bam_db
 	open_indexed_fasta
@@ -29,93 +29,97 @@ our @EXPORT = qw(
 
 # Hash of Bam chromosomes
 our %BAM_CHROMOS;
-	# sometimes user may request a chromosome that's not in the bigfile
-	# that could lead to an exception
-	# we will record the chromosomes list in this hash
-	# $BAM_CHROMOS{bamfile}{chromos}
-	# we also record the chromosome name variant with or without chr prefix
-	# to accommodate different naming conventions
+
+# sometimes user may request a chromosome that's not in the bigfile
+# that could lead to an exception
+# we will record the chromosomes list in this hash
+# $BAM_CHROMOS{bamfile}{chromos}
+# we also record the chromosome name variant with or without chr prefix
+# to accommodate different naming conventions
 
 # Opened Bam db objects
 our %OPENED_BAM;
-	# a cache for opened Bam files 
-	# caching here is only for local purposes of collecting scores
-	# db_helper also provides caching of db objects but with option to force open in
-	# the case of forking processes - we don't have that here
+
+# a cache for opened Bam files
+# caching here is only for local purposes of collecting scores
+# db_helper also provides caching of db objects but with option to force open in
+# the case of forking processes - we don't have that here
 
 # The true statement
-1; 
-
+1;
 
 ### Open a bam database connection
 sub open_bam_db {
 	my $bamfile = shift;
-	
+
 	# check the path
 	my $path = $bamfile;
-	$path =~ s/^file://; # strip the file prefix if present
-	
+	$path =~ s/^file://;    # strip the file prefix if present
+
 	# check for bam index
 	check_bam_index($path);
-	
+
 	# open the bam database object
 	my $sam;
-	eval {
-		$sam = Bio::DB::Sam->new(-bam => $path);
-	};
+	eval { $sam = Bio::DB::Sam->new( -bam => $path ); };
 	return unless $sam;
+
 	# we specifically do not cache the bam object or chromosome names here
-	
+
 	return $sam;
 }
-
 
 ### Open an indexed fasta file
 sub open_indexed_fasta {
 	my $fasta = shift;
-	if ($fasta =~ /\.gz$/) {
-		die " Bio::DB::Sam::Fai doesn't support compressed fasta files! Please decompress\n";
+	if ( $fasta =~ /\.gz$/ ) {
+		die
+" Bio::DB::Sam::Fai doesn't support compressed fasta files! Please decompress\n";
 	}
 	my $fai;
-	eval {$fai = Bio::DB::Sam::Fai->load($fasta)};
-		# this should automatically build the fai index if possible
+	eval { $fai = Bio::DB::Sam::Fai->load($fasta) };
+
+	# this should automatically build the fai index if possible
 	return $fai if defined $fai;
 }
 
-
-### Check for a bam index 
+### Check for a bam index
 sub check_bam_index {
+
 	# the old samtools always expects a .bam.bai index file
-	# I find that relying on -autoindex yields a flaky Bio::DB::Sam object that 
+	# I find that relying on -autoindex yields a flaky Bio::DB::Sam object that
 	# doesn't always work as expected. Best to create the index BEFORE opening
-	
+
 	my $bamfile = shift;
-	return if ($bamfile =~ /^(?:http|ftp)/i); # I can't do much with remote files
-	
+	return if ( $bamfile =~ /^(?:http|ftp)/i );    # I can't do much with remote files
+
 	# we will check the modification time to make sure index is newer
-	my $bam_mtime = (stat($bamfile))[9];
-	
+	my $bam_mtime = ( stat($bamfile) )[9];
+
 	# optional index names
-	my $bam_index = "$bamfile.bai"; # .bam.bai
+	my $bam_index = "$bamfile.bai";                # .bam.bai
 	my $alt_index = $bamfile;
-	$alt_index =~ s/bam$/bai/i; # picard uses .bai instead of .bam.bai as samtools does
-	
+	$alt_index =~ s/bam$/bai/i;    # picard uses .bai instead of .bam.bai as samtools does
+
 	# check for existing index
-	if (-e $bam_index) {
-		if ( (stat($bam_index))[9] < $bam_mtime) {
+	if ( -e $bam_index ) {
+		if ( ( stat($bam_index) )[9] < $bam_mtime ) {
+
 			# index is older than bam file
 			print " index $bam_index is old. Attempting to update time stamp.\n";
 			my $now = time;
-			utime($now, $now, $bam_index) || Bio::DB::Bam->reindex($bamfile);
+			utime( $now, $now, $bam_index ) || Bio::DB::Bam->reindex($bamfile);
 		}
 	}
-	elsif (-e $alt_index) {
-		if ( (stat($alt_index))[9] < $bam_mtime) {
+	elsif ( -e $alt_index ) {
+		if ( ( stat($alt_index) )[9] < $bam_mtime ) {
+
 			# index is older than bam file
 			print " index $alt_index is old.\n";
 		}
+
 		# reuse this index
-		copy($alt_index, $bam_index);
+		copy( $alt_index, $bam_index );
 	}
 	else {
 		# make a new index
@@ -123,49 +127,46 @@ sub check_bam_index {
 	}
 }
 
-
-
 ### Write a new bam file
 sub write_new_bam_file {
 	my $file = shift;
 	$file .= '.bam' unless $file =~ /\.bam$/i;
-	my $bam = Bio::DB::Bam->open($file, 'w');
+	my $bam = Bio::DB::Bam->open( $file, 'w' );
 	carp "unable to open bam file $file!\n" unless $bam;
 	return $bam;
 }
 
-
-
 ### Collect Bam scores
 sub collect_bam_scores {
-	
+
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
+
 	# initialize score structures
 	# which one is used depends on the return type variable
-	my %pos2data; # either position => count or position => [scores]
-	my $scores = []; # just scores
-	
+	my %pos2data;       # either position => count or position => [scores]
+	my $scores = [];    # just scores
+
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	for (my $b = DATA; $b < scalar @$param; $b++) {
-	
+	for ( my $b = DATA; $b < scalar @$param; $b++ ) {
+
 		## Open the Bam File
 		my $bamfile = $param->[$b];
-		my $bam = $OPENED_BAM{$bamfile} || undef;
+		my $bam     = $OPENED_BAM{$bamfile} || undef;
 		unless ($bam) {
+
 			# open and cache the bam file
-			$bam = open_bam_db($bamfile) or 
-				croak " Unable to open bam file '$bamfile'! $!\n";
+			$bam = open_bam_db($bamfile)
+				or croak " Unable to open bam file '$bamfile'! $!\n";
 			$OPENED_BAM{$bamfile} = $bam;
-	
+
 			# record the chromosomes and possible variants
 			$BAM_CHROMOS{$bamfile} = {};
-			foreach my $s ($bam->seq_ids) {
+			foreach my $s ( $bam->seq_ids ) {
 				$BAM_CHROMOS{$bamfile}{$s} = $s;
-				if ($s =~ /^chr(.+)$/) {
+				if ( $s =~ /^chr(.+)$/ ) {
 					$BAM_CHROMOS{$bamfile}{$1} = $s;
 				}
 				else {
@@ -173,52 +174,54 @@ sub collect_bam_scores {
 				}
 			}
 		}
-			
+
 		# first check that the chromosome is present
-		my $chromo = $BAM_CHROMOS{$bamfile}{$param->[CHR]} or next;
-		
+		my $chromo = $BAM_CHROMOS{$bamfile}{ $param->[CHR] } or next;
+
 		# convert coordinates into low level coordinates
 		# consumed by the low level Bam API
-		my ($tid, $zstart, $end) = $bam->header->parse_region(
-			sprintf("%s:%d-%d", $chromo, $param->[STRT], $param->[STOP]) );
-	
-		
+		my ( $tid, $zstart, $end ) = $bam->header->parse_region(
+			sprintf( "%s:%d-%d", $chromo, $param->[STRT], $param->[STOP] ) );
+
 		## Collect the data according to the requested value type
 		# we will either use simple coverage or alignments (count)
-		if ($param->[METH] =~ /count/) {
+		if ( $param->[METH] =~ /count/ ) {
+
 			# Need to collect and count alignments
-			
+
 			## Set the callback and a callback data structure
 			my $callback = assign_callback($param);
-			my %data = (
+			my %data     = (
 				'scores' => $scores,
 				'index'  => \%pos2data,
 				'start'  => $param->[STRT],
 				'stop'   => $param->[STOP],
 			);
-			
+
 			# get the alignments
 			# we are using the low level API to eke out performance
-			$bam->bam_index->fetch($bam->bam, $tid, $zstart, $end, $callback, \%data);
+			$bam->bam_index->fetch( $bam->bam, $tid, $zstart, $end, $callback, \%data );
 		}
 		else {
 			## Coverage
 			# I am assuming everything else is working with read coverage
-			
+
 			# generate the coverage, this will ignore strand
 			my $coverage = $bam->bam_index->coverage(
 				$bam->bam,
 				$tid,
-				$zstart, # 0-based coordinates
+				$zstart,    # 0-based coordinates
 				$end,
 			);
-			
+
 			# convert the coverage data
 			# by default, this should return the coverage at 1 bp resolution
-			if (scalar @$coverage) {
+			if ( scalar @$coverage ) {
+
 				# check whether we need to index the scores
-				if ($param->[RETT] == 2) {
-					for (my $i = $param->[STRT]; $i <= $param->[STOP]; $i++) {
+				if ( $param->[RETT] == 2 ) {
+					for ( my $i = $param->[STRT]; $i <= $param->[STOP]; $i++ ) {
+
 						# move the scores into the position score hash
 						$pos2data{$i} += $coverage->[ $i - $param->[STRT] ];
 					}
@@ -229,9 +232,9 @@ sub collect_bam_scores {
 			}
 		}
 	}
-	
+
 	## Return collected data
-	if ($param->[RETT] == 2) {
+	if ( $param->[RETT] == 2 ) {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
@@ -239,26 +242,25 @@ sub collect_bam_scores {
 	}
 }
 
-
 ### Determine total number of alignments in a bam file
 sub sum_total_bam_alignments {
-	
+
 	# Passed arguments;
 	my $sam_file = shift;
-	my $min_mapq = shift || 0; # by default we take all alignments
-	my $paired   = shift || 0; # by default we assume all alignments are single-end
-	my $cpu      = shift || 2; # number of forks to execute in parallel
+	my $min_mapq = shift || 0;    # by default we take all alignments
+	my $paired   = shift || 0;    # by default we assume all alignments are single-end
+	my $cpu      = shift || 2;    # number of forks to execute in parallel
 	$cpu = 1 unless ($parallel);
 	unless ($sam_file) {
 		carp " no Bam file or bam db object passed!\n";
 		return;
 	}
-	
-	
+
 	# Open Bam file if necessary
 	my $sam;
 	my $sam_ref = ref $sam_file;
-	if ($sam_ref =~ /Bio::DB::Sam/) {
+	if ( $sam_ref =~ /Bio::DB::Sam/ ) {
+
 		# we have an opened sam db object
 		$sam = $sam_file;
 	}
@@ -267,125 +269,126 @@ sub sum_total_bam_alignments {
 		$sam = open_bam_db($sam_file);
 		return unless ($sam);
 	}
-	
+
 	# prepare the counting subroutine
 	my $counter = sub {
-		my $tid = shift;
+		my $tid    = shift;
 		my $number = 0;
-		
+
 		# process the reads according to single or paired-end
 		# paired end alignments
 		if ($paired) {
 			$sam->bam_index->fetch(
-				$sam->bam, 
-				$tid, 
-				0, 
-				$sam->target_len($tid), 
+				$sam->bam,
+				$tid, 0,
+				$sam->target_len($tid),
 				sub {
-					my ($a, $number) = @_;
-					
+					my ( $a, $number ) = @_;
+
 					# check alignment
 					my $flag = $a->flag;
-					return if $flag & 0x4; # unmapped
-					return if $flag & 0x0100; # secondary alignment
-					return if $flag & 0x0400; # marked duplicate
-					return if $flag & 0x0800; # supplementary hit
-					
+					return if $flag & 0x4;       # unmapped
+					return if $flag & 0x0100;    # secondary alignment
+					return if $flag & 0x0400;    # marked duplicate
+					return if $flag & 0x0800;    # supplementary hit
+
 					# check paired alignment
-					return unless $flag & 0x2; # proper_pair;
-					return if $flag & 0x8; # mate unmapped
-					return if $flag & 0x10; # reversed, only count left alignments
+					return unless $flag & 0x2;      # proper_pair;
+					return if $flag & 0x8;          # mate unmapped
+					return if $flag & 0x10;         # reversed, only count left alignments
 					return if $a->qual < $min_mapq;
-					
+
 					# count this fragment
 					$$number++;
-				}, 
+				},
 				\$number
 			);
 		}
-		
+
 		# single end alignments
 		else {
 			$sam->bam_index->fetch(
-				$sam->bam, 
-				$tid, 
-				0, 
-				$sam->target_len($tid), 
+				$sam->bam,
+				$tid, 0,
+				$sam->target_len($tid),
 				sub {
-					my ($a, $number) = @_;
-					
+					my ( $a, $number ) = @_;
+
 					# check alignment
 					my $flag = $a->flag;
-					return if $flag & 0x4; # unmapped
-					return if $flag & 0x0100; # secondary alignment
-					return if $flag & 0x0400; # marked duplicate
-					return if $flag & 0x0800; # supplementary hit
+					return if $flag & 0x4;            # unmapped
+					return if $flag & 0x0100;         # secondary alignment
+					return if $flag & 0x0400;         # marked duplicate
+					return if $flag & 0x0800;         # supplementary hit
 					return if $a->qual < $min_mapq;
-					
+
 					# count this fragment
 					$$number++;
-				}, 
+				},
 				\$number
 			);
 		}
 		return $number;
 	};
-	
+
 	# Count the alignments on each chromosome
 	my $total_read_number = 0;
-	if ($cpu > 1) {
-		# count each chromosome in multiple parallel threads to speed things up 
-		
+	if ( $cpu > 1 ) {
+
+		# count each chromosome in multiple parallel threads to speed things up
+
 		# generate relatively equal lists of chromosome for each process based on length
 		my @chromosomes = map { $_->[0] }
 			sort { $b->[1] <=> $a->[1] }
-			map { [$_, $sam->target_len($_)] } 
-			(0 .. $sam->n_targets - 1);
-		my @list; # array of arrays, [process][chromosome id]
+			map { [ $_, $sam->target_len($_) ] } ( 0 .. $sam->n_targets - 1 );
+		my @list;    # array of arrays, [process][chromosome id]
 		my $i = 1;
 		while (@chromosomes) {
 			push @{ $list[$i] }, shift @chromosomes;
 			$i++;
 			$i = 1 if $i > $cpu;
 		}
-		
+
 		# we will use Parallel ForkManager for convenience
 		my $pm = Parallel::ForkManager->new($cpu);
-		$pm->run_on_finish( sub {
-			my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $count) = @_;
-			$total_read_number += $$count;
-		});
-		
+		$pm->run_on_finish(
+			sub {
+				my ( $pid, $exit_code, $ident, $exit_signal, $core_dump, $count ) =
+					@_;
+				$total_read_number += $$count;
+			}
+		);
+
 		# Count the chromosomes in parallel processess
-		foreach my $n (1 .. $cpu) {
+		foreach my $n ( 1 .. $cpu ) {
 			$pm->start and next;
-	
+
 			### In child
-			$sam->clone; # to make it fork safe
+			$sam->clone;    # to make it fork safe
 			my $count = 0;
-			foreach ( @{$list[$n]} ) {
+			foreach ( @{ $list[$n] } ) {
+
 				# count each chromosome in this process list
 				$count += &{$counter}($_);
 			}
-			$pm->finish(0, \$count); 
+			$pm->finish( 0, \$count );
 		}
 		$pm->wait_all_children;
 	}
-	
+
 	else {
 		# loop through all the chromosomes in one execution thread
-		for my $tid (0 .. $sam->n_targets - 1) {
-			# each chromosome is internally represented in the bam file as 
+		for my $tid ( 0 .. $sam->n_targets - 1 ) {
+
+			# each chromosome is internally represented in the bam file as
 			# a numeric target identifier
 			$total_read_number += &{$counter}($tid);
 		}
 	}
-	
+
 	# done
 	return $total_read_number;
 }
-
-
 
 __END__
 

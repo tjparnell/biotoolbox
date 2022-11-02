@@ -4,22 +4,22 @@ package Bio::ToolBox::db_helper::constants;
 require Exporter;
 use strict;
 use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	CHR  => 0,    # chromosome
+	STRT => 1,    # start
+	STOP => 2,    # stop
+	STR  => 3,    # strand
+	STND => 4,    # strandedness
+	METH => 5,    # method
+	RETT => 6,    # return type
+	DB   => 7,    # database object
+	DATA => 8,    # first dataset, additional may be present
 };
 
-our @ISA = qw(Exporter);
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(CHR STRT STOP STR STND METH RETT DB DATA);
 
 # The true statement
-1; 
+1;
 
 __END__
 

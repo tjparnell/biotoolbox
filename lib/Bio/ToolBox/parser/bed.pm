@@ -200,7 +200,7 @@ L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::gff>
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
-use Bio::ToolBox::Data; 
+use Bio::ToolBox::Data;
 use Module::Load;
 
 1;
@@ -211,11 +211,11 @@ sub new {
 }
 
 sub open_file {
-	my $self = shift;
+	my $self     = shift;
 	my $filename = shift || undef;
-	
+
 	# check file
-	if ($filename and $self->file and $filename ne $self->file) {
+	if ( $filename and $self->file and $filename ne $self->file ) {
 		confess "Must open new files with new Parser object!";
 	}
 	$filename ||= $self->file;
@@ -223,69 +223,70 @@ sub open_file {
 		cluck "No file name passed!\n";
 		return;
 	}
-	if (defined $self->{fh}) {
+	if ( defined $self->{fh} ) {
 		return 1;
 	}
-	
+
 	# check file format type
 	my $filetype = $self->filetype || undef;
 	unless ($filetype) {
-		(my $flavor, $filetype) = Bio::ToolBox::Data->taste_file($filename);
-		unless ($flavor eq 'bed') {
+		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
+		unless ( $flavor eq 'bed' ) {
 			confess "File is not a BED file!!! How did we get here?";
 		}
 		$self->{filetype} = $filetype;
 	}
-	
+
 	# determine converter subroutine and set column expectations
-	if ($filetype eq 'gappedPeak') {
-		$self->{convertor_sub} = \&_parse_gappedPeak; 
-		$self->do_exon(1); # always parse sub peaks as exons
-		# gappedPeak is essentially bed12 with extra columns
-		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
-		# we need more object stuff that the ucsc parser expects
+	if ( $filetype eq 'gappedPeak' ) {
+		$self->{convertor_sub} = \&_parse_gappedPeak;
+		$self->do_exon(1);    # always parse sub peaks as exons
+							  # gappedPeak is essentially bed12 with extra columns
+		  # we will use existing code from the ucsc parser to convert bed12 to seqfeatures
+		  # we need more object stuff that the ucsc parser expects
 		load 'Bio::ToolBox::parser::ucsc::builder';
-		$self->{bed}           = 15;
-		$self->{id2count}      = {};
-		$self->{refseqsum}     = {};
-		$self->{refseqstat}    = {};
-		$self->{kgxref}        = {};
-		$self->{ensembldata}   = {};
+		$self->{bed}         = 15;
+		$self->{id2count}    = {};
+		$self->{refseqsum}   = {};
+		$self->{refseqstat}  = {};
+		$self->{kgxref}      = {};
+		$self->{ensembldata} = {};
 	}
-	elsif ($filetype eq 'narrowPeak') {
+	elsif ( $filetype eq 'narrowPeak' ) {
 		$self->{bed}           = 10;
-		$self->{convertor_sub} = \&_parse_narrowPeak; 
+		$self->{convertor_sub} = \&_parse_narrowPeak;
 	}
-	elsif ($filetype eq 'broadPeak') {
+	elsif ( $filetype eq 'broadPeak' ) {
 		$self->{bed}           = 9;
-		$self->{convertor_sub} = \&_parse_broadPeak; 
+		$self->{convertor_sub} = \&_parse_broadPeak;
 	}
-	elsif ($filetype eq 'bedGraph') {
+	elsif ( $filetype eq 'bedGraph' ) {
 		$self->{bed}           = 4;
-		$self->{convertor_sub} = \&_parse_bedGraph; 
+		$self->{convertor_sub} = \&_parse_bedGraph;
 	}
-	elsif ($filetype eq 'bed12') {
+	elsif ( $filetype eq 'bed12' ) {
 		$self->{bed}           = 12;
 		$self->{convertor_sub} = \&_parse_bed12;
+
 		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		# we need more object stuff that the ucsc parser expects
 		load 'Bio::ToolBox::parser::ucsc::builder';
-		$self->{id2count}      = {};
-		$self->{refseqsum}     = {};
-		$self->{refseqstat}    = {};
-		$self->{kgxref}        = {};
-		$self->{ensembldata}   = {};
+		$self->{id2count}    = {};
+		$self->{refseqsum}   = {};
+		$self->{refseqstat}  = {};
+		$self->{kgxref}      = {};
+		$self->{ensembldata} = {};
 	}
 	else {
 		# an ordinary bed file
-		$self->{bed}           = ($filetype =~ /bed(\d+)/)[0];
+		$self->{bed}           = ( $filetype =~ /bed(\d+)/ )[0];
 		$self->{convertor_sub} = \&_parse_bed;
 	}
-	
+
 	# Open file
-	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or 
-		croak (" Unable to open file '$filename'!");
-	
+	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename)
+		or croak(" Unable to open file '$filename'!");
+
 	# finish
 	$self->{fh} = $fh;
 	return 1;
@@ -293,15 +294,16 @@ sub open_file {
 
 sub typelist {
 	my $self = shift;
-	my $ft = $self->filetype;
+	my $ft   = $self->filetype;
+
 	# return generic lists based on what is expected
-	if ($ft eq 'bed12') {
+	if ( $ft eq 'bed12' ) {
 		return 'mRNA,ncRNA,exon,CDS';
 	}
-	elsif ($ft eq 'narrowPeak' or $ft eq 'broadPeak') {
+	elsif ( $ft eq 'narrowPeak' or $ft eq 'broadPeak' ) {
 		return 'peak';
 	}
-	elsif ($ft eq 'gappedPeak') {
+	elsif ( $ft eq 'gappedPeak' ) {
 		return 'gappedPeak,peak';
 	}
 	else {
@@ -312,32 +314,32 @@ sub typelist {
 
 sub next_feature {
 	my $self = shift;
-	
+
 	# check that we have an open filehandle and not finished
-	unless ($self->fh) {
+	unless ( $self->fh ) {
 		croak("no Bed file loaded to parse!");
 	}
 	return if $self->{'eof'};
-	
- 	# loop through the file
-	while (my $line = $self->fh->getline) {
-		if ($line =~ /^#/ or $line =~ /^(?:track|browser)/ or $line !~ /\w+/) {
+
+	# loop through the file
+	while ( my $line = $self->fh->getline ) {
+		if ( $line =~ /^#/ or $line =~ /^(?:track|browser)/ or $line !~ /\w+/ ) {
 			push @{ $self->{comments} }, $line;
 			$self->{line_count}++;
 			next;
 		}
 		chomp $line;
-		my $feature = &{$self->{convertor_sub}}($self, $line);
+		my $feature = &{ $self->{convertor_sub} }( $self, $line );
 		$self->{line_count}++;
 		unless ($feature) {
 			printf STDERR "unable to make feature for line %d!\n", $self->{line_count};
 			next;
 		}
-		
+
 		# return the object, we do this while loop once per valid line
 		return $feature;
 	}
-	
+
 	# presumed end of file
 	$self->{'eof'} = 1;
 	$self->fh->close;
@@ -348,37 +350,40 @@ sub next_feature {
 
 sub parse_file {
 	my $self = shift;
+
 	# check that we have an open filehandle
-	unless ($self->fh) {
+	unless ( $self->fh ) {
 		confess("no file loaded to parse!");
 	}
 	return 1 if $self->{'eof'};
-	
+
 	printf "  Parsing %s format file....\n", $self->filetype;
-	
-	while (my $feature = $self->next_feature) {
+
+	while ( my $feature = $self->next_feature ) {
+
 		# there are possibly lots and lots of features here
 		# we shouldn't have to check IDs for uniqueness, but to maintain compatibility
 		# with other parsers and for consistency, we do
 		my $id = $feature->primary_id;
-		if (exists $self->{loaded}{$id}) {
+		if ( exists $self->{loaded}{$id} ) {
 			my $i = 1;
 			$id = $feature->primary_id . ".$i";
-			while (exists $self->{loaded}{$id}) {
+			while ( exists $self->{loaded}{$id} ) {
 				$i++;
 				$id = $feature->primary_id . ".$i";
 			}
+
 			# we have a unique id, now change it
 			$feature->primary_id($id);
 		}
-		
+
 		# record the feature
 		$self->{loaded}{$id} = $feature;
 		push @{ $self->{top_features} }, $feature;
-		
+
 		# check chromosome
 		my $s = $feature->seq_id;
-		unless (exists $self->{seq_ids}{$s}) {
+		unless ( exists $self->{seq_ids}{$s} ) {
 			$self->{seq_ids}{$s} = $feature->end;
 		}
 		$self->{seq_ids}{$s} = $feature->end if $feature->end > $self->{seq_ids}{$s};
@@ -386,209 +391,210 @@ sub parse_file {
 	return 1;
 }
 
-
 sub _parse_narrowPeak {
-	my ($self, $line) = @_;
+	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == 10) {
-		croak sprintf("narrowPeak line %d '%s' doesn't have 10 elements!", 
-			$self->{line_count}, $line);
+	unless ( scalar(@data) == 10 ) {
+		croak sprintf( "narrowPeak line %d '%s' doesn't have 10 elements!",
+			$self->{line_count}, $line );
 	}
-	
+
 	# generate the basic SeqFeature
 	my $feature = $self->{sfclass}->new(
-		-seq_id         => $data[0],
-		-start          => $data[1] + 1,
-		-end            => $data[2],
-		-name           => $data[3],
-		-score          => $data[4],
-		-strand         => $data[5],
-		-primary_tag    => 'peak',
-		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
+		-seq_id      => $data[0],
+		-start       => $data[1] + 1,
+		-end         => $data[2],
+		-name        => $data[3],
+		-score       => $data[4],
+		-strand      => $data[5],
+		-primary_tag => 'peak',
+		-primary_id  => sprintf( "%s:%d-%d", $data[0], $data[1], $data[2] ),
 	);
-	
+
 	# add extra columns
-	$feature->add_tag_value('signalValue', $data[6]);
-	$feature->add_tag_value('pValue', $data[7]);
-	$feature->add_tag_value('qValue', $data[8]);
-	$feature->add_tag_value('peak', $data[9]);
-	
+	$feature->add_tag_value( 'signalValue', $data[6] );
+	$feature->add_tag_value( 'pValue',      $data[7] );
+	$feature->add_tag_value( 'qValue',      $data[8] );
+	$feature->add_tag_value( 'peak',        $data[9] );
+
 	return $feature;
 }
 
 sub _parse_broadPeak {
-	my ($self, $line) = @_;
+	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == 9) {
-		croak sprintf("broadPeak line %d '%s' doesn't have 9 elements!", 
-			$self->{line_count}, $line);
+	unless ( scalar(@data) == 9 ) {
+		croak sprintf( "broadPeak line %d '%s' doesn't have 9 elements!",
+			$self->{line_count}, $line );
 	}
-	
+
 	# generate the basic SeqFeature
 	my $feature = $self->{sfclass}->new(
-		-seq_id         => $data[0],
-		-start          => $data[1] + 1,
-		-end            => $data[2],
-		-name           => $data[3],
-		-score          => $data[4],
-		-strand         => $data[5],
-		-primary_tag    => 'peak',
-		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
+		-seq_id      => $data[0],
+		-start       => $data[1] + 1,
+		-end         => $data[2],
+		-name        => $data[3],
+		-score       => $data[4],
+		-strand      => $data[5],
+		-primary_tag => 'peak',
+		-primary_id  => sprintf( "%s:%d-%d", $data[0], $data[1], $data[2] ),
 	);
-	
+
 	# add extra columns
-	$feature->add_tag_value('signalValue', $data[6]);
-	$feature->add_tag_value('pValue', $data[7]);
-	$feature->add_tag_value('qValue', $data[8]);
-	
+	$feature->add_tag_value( 'signalValue', $data[6] );
+	$feature->add_tag_value( 'pValue',      $data[7] );
+	$feature->add_tag_value( 'qValue',      $data[8] );
+
 	return $feature;
 }
 
 sub _parse_bedGraph {
-	my ($self, $line) = @_;
+	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == 4) {
-		croak sprintf("bedGraph line %d '%s' doesn't have 4 elements!", 
-			$self->{line_count}, $line);
+	unless ( scalar(@data) == 4 ) {
+		croak sprintf( "bedGraph line %d '%s' doesn't have 4 elements!",
+			$self->{line_count}, $line );
 	}
-	
+
 	# generate the basic SeqFeature
 	return $self->{sfclass}->new(
-		-seq_id         => $data[0],
-		-start          => $data[1] + 1,
-		-end            => $data[2],
-		-score          => $data[3],
-		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
+		-seq_id     => $data[0],
+		-start      => $data[1] + 1,
+		-end        => $data[2],
+		-score      => $data[3],
+		-primary_id => sprintf( "%s:%d-%d", $data[0], $data[1], $data[2] ),
 	);
 }
 
 sub _parse_bed {
-	my ($self, $line) = @_;
+	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == $self->{bed}) {
-		croak sprintf("Bed line %d '%s' doesn't have %d elements!", 
-			$self->{line_count}, $line, $self->{bed});
+	unless ( scalar(@data) == $self->{bed} ) {
+		croak sprintf( "Bed line %d '%s' doesn't have %d elements!",
+			$self->{line_count}, $line, $self->{bed} );
 	}
-	
+
 	# generate the basic SeqFeature
 	return $self->{sfclass}->new(
-		-seq_id         => $data[0],
-		-start          => $data[1] + 1,
-		-end            => $data[2],
-		-name           => $data[3] || undef,
-		-score          => $data[4] || undef,
-		-strand         => $data[5] || undef,
-		-primary_id     => sprintf("%s:%d-%d", $data[0], $data[1], $data[2]),
+		-seq_id     => $data[0],
+		-start      => $data[1] + 1,
+		-end        => $data[2],
+		-name       => $data[3] || undef,
+		-score      => $data[4] || undef,
+		-strand     => $data[5] || undef,
+		-primary_id => sprintf( "%s:%d-%d", $data[0], $data[1], $data[2] ),
 	);
 }
 
 sub _parse_bed12 {
-	my ($self, $line) = @_;
+	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == $self->{bed}) {
-		croak sprintf("Bed line %d '%s' doesn't have %d elements!", 
-			$self->{line_count}, $line, $self->{bed});
+	unless ( scalar(@data) == $self->{bed} ) {
+		croak sprintf( "Bed line %d '%s' doesn't have %d elements!",
+			$self->{line_count}, $line, $self->{bed} );
 	}
-	
-	# we will take advantage of pre-existing code in the UCSC parser to convert 
+
+	# we will take advantage of pre-existing code in the UCSC parser to convert
 	# a bed12 line to a fully-fledged processed transcript
 	# we just have to go through a genePred format first
 	# fortunately, the two are pretty similar in structure
-	
-	# now convert from bed12 
-	# Chromosome Start End Name Score Strand thickStart thickEnd itemRGB blockCount blockSizes blockStarts
-	# to genePred
-	# name chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds
-	
+
+# now convert from bed12
+# Chromosome Start End Name Score Strand thickStart thickEnd itemRGB blockCount blockSizes blockStarts
+# to genePred
+# name chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds
+
 	# add missing data
-	$data[6]  ||= $data[2]; # cdsStart
-	$data[7]  ||= $data[2]; # cdsEnd
-	$data[8]  ||= 0; # rgb values
-	$data[9]  ||= 1; # exonCount
-	$data[10] ||= $data[7] - $data[6]; # block size
-	$data[11] ||= 0; # block starts
-	
+	$data[6]  ||= $data[2];               # cdsStart
+	$data[7]  ||= $data[2];               # cdsEnd
+	$data[8]  ||= 0;                      # rgb values
+	$data[9]  ||= 1;                      # exonCount
+	$data[10] ||= $data[7] - $data[6];    # block size
+	$data[11] ||= 0;                      # block starts
+
 	# calculate exons
-	my @exonSizes  = split(',', $data[10]);
-	my @exonStarts = map {$data[1] + $_} split(',', $data[11]);
+	my @exonSizes  = split( ',', $data[10] );
+	my @exonStarts = map { $data[1] + $_ } split( ',', $data[11] );
 	my @exonEnds;
-	for (my $i = 0; $i < $data[9]; $i++) {
+	for ( my $i = 0; $i < $data[9]; $i++ ) {
 		push @exonEnds, $exonStarts[$i] + $exonSizes[$i];
 	}
-	
+
 	# calculate new genePred elements
 	my @new = (
-		$data[3], # name
-		$data[0], # chrom
-		$data[5], # strand
-		$data[1], # txStart
-		$data[2], # txStop
-		$data[6], # cdsStart
-		$data[7], # cdsEnd
-		$data[9], # exonCount
-		join(',', @exonStarts), # exonStarts
-		join(',', @exonEnds), # exonEnds
+		$data[3],                    # name
+		$data[0],                    # chrom
+		$data[5],                    # strand
+		$data[1],                    # txStart
+		$data[2],                    # txStop
+		$data[6],                    # cdsStart
+		$data[7],                    # cdsEnd
+		$data[9],                    # exonCount
+		join( ',', @exonStarts ),    # exonStarts
+		join( ',', @exonEnds ),      # exonEnds
 	);
-	
+
 	# create builder
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new(\@new, $self);
+	my $builder = Bio::ToolBox::parser::ucsc::builder->new( \@new, $self );
 	my $feature = $builder->build_transcript;
-	$feature->add_tag_value('itemRGB', $data[8]);
-	$feature->score($data[4]);
-	$feature->primary_id(sprintf("%s:%d-%d", $data[0], $data[1], $data[2]));
-		# change the primary ID to match other bed file behavior, not UCSC files'
+	$feature->add_tag_value( 'itemRGB', $data[8] );
+	$feature->score( $data[4] );
+	$feature->primary_id( sprintf( "%s:%d-%d", $data[0], $data[1], $data[2] ) );
+
+	# change the primary ID to match other bed file behavior, not UCSC files'
 	return $feature;
 }
 
 sub _parse_gappedPeak {
-	my ($self, $line) = @_;
+	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
-	unless (scalar(@data) == 15) {
-		croak sprintf("GappedPeak line %d '%s' doesn't have 15 elements!", 
-			$self->{line_count}, $line);
+	unless ( scalar(@data) == 15 ) {
+		croak sprintf( "GappedPeak line %d '%s' doesn't have 15 elements!",
+			$self->{line_count}, $line );
 	}
-	
-	# we will take advantage of pre-existing code in the UCSC parser to convert 
+
+	# we will take advantage of pre-existing code in the UCSC parser to convert
 	# a gappedPeak line into main peak with subpeaks.
 	# we just have to go through a genePred format first
 	# fortunately, the two are pretty similar in structure
-	
+
 	# calculate exons, er, sub peaks
-	my @exonSizes  = split(',', $data[10]);
-	my @exonStarts = map {$data[1] + $_} split(',', $data[11]);
+	my @exonSizes  = split( ',', $data[10] );
+	my @exonStarts = map { $data[1] + $_ } split( ',', $data[11] );
 	my @exonEnds;
-	for (my $i = 0; $i < $data[9]; $i++) {
+	for ( my $i = 0; $i < $data[9]; $i++ ) {
 		push @exonEnds, $exonStarts[$i] + $exonSizes[$i];
 	}
-	
+
 	# calculate new genePred elements
 	my @new = (
-		$data[3], # name
-		$data[0], # chrom
-		$data[5], # strand
-		$data[1], # txStart
-		$data[2], # txStop
-		$data[6], # cdsStart
-		$data[7], # cdsEnd
-		$data[9], # exonCount
-		join(',', @exonStarts), # exonStarts
-		join(',', @exonEnds), # exonEnds
+		$data[3],                    # name
+		$data[0],                    # chrom
+		$data[5],                    # strand
+		$data[1],                    # txStart
+		$data[2],                    # txStop
+		$data[6],                    # cdsStart
+		$data[7],                    # cdsEnd
+		$data[9],                    # exonCount
+		join( ',', @exonStarts ),    # exonStarts
+		join( ',', @exonEnds ),      # exonEnds
 	);
-	
+
 	# create builder and process
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new(\@new, $self);
+	my $builder = Bio::ToolBox::parser::ucsc::builder->new( \@new, $self );
 	my $feature = $builder->build_transcript;
-	
+
 	# clean up feature and add extra values
-	$feature->add_tag_value('itemRGB', $data[8]);
-	$feature->score($data[4]);
-	$feature->primary_tag('gappedPeak'); # it is not a RNA
-	$feature->primary_id(sprintf("%s:%d-%d", $data[0], $data[1], $data[2]));
-		# change the primary ID to match other bed file behavior, not UCSC files'
-	$feature->add_tag_value('signalValue', $data[12]);
-	$feature->add_tag_value('pValue', $data[13]);
-	$feature->add_tag_value('qValue', $data[14]);
-	foreach my $f ($feature->get_SeqFeatures) {
+	$feature->add_tag_value( 'itemRGB', $data[8] );
+	$feature->score( $data[4] );
+	$feature->primary_tag('gappedPeak');    # it is not a RNA
+	$feature->primary_id( sprintf( "%s:%d-%d", $data[0], $data[1], $data[2] ) );
+
+	# change the primary ID to match other bed file behavior, not UCSC files'
+	$feature->add_tag_value( 'signalValue', $data[12] );
+	$feature->add_tag_value( 'pValue',      $data[13] );
+	$feature->add_tag_value( 'qValue',      $data[14] );
+	foreach my $f ( $feature->get_SeqFeatures ) {
 		$f->primary_tag('peak');
 	}
 	return $feature;

@@ -10,64 +10,57 @@ use Bio::Range;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
-	verify_or_request_feature_types 
+	verify_or_request_feature_types
 	get_chromosome_list
 );
 use Bio::ToolBox::utility;
 my $VERSION = 1.60;
 
-
 print "\n A script to pull out overlapping features\n\n";
 
 ### Quick help
-unless (@ARGV) { 
+unless (@ARGV) {
+
 	# when no command line options are present
 	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
 
-
 ### Command line options
-my (
-	$infile, 
-	$database,
-	$search_feature,
-	$start,
-	$stop,
-	$extend,
-	$adjustment_position,
-	$reference_position,
-	$outfile,
-	$gz,
-	$help,
-	$print_version,
-);
+my ( $infile, $database, $search_feature, $start, $stop, $extend, $adjustment_position,
+	$reference_position, $outfile, $gz, $help, $print_version, );
 my @search_features;
-GetOptions( 
-	'i|in=s'          => \$infile, # the input nucleosome data file
-	'd|db=s'          => \$database, # the name of the database
-	'f|feature=s'     => \@search_features, # the feature(s) to look for
-	'b|begin|start=i' => \$start, # the relative start position
-	'e|end|stop=i'    => \$stop, # the relative stop position
-	'p|pos=s'         => \$adjustment_position, # the coordinate to make start and stop adjustments
-	'x|extend=i'      => \$extend, # extend lookup-feature by this amount
-	'r|ref=s'         => \$reference_position, # relative position when calc distance
-	'o|out=s'         => \$outfile, # output file name
-	'z|gz!'           => \$gz, # compress file
-	'h|help'          => \$help, # request help
-	'v|version'       => \$print_version, # print the version
+GetOptions(
+	'i|in=s'          => \$infile,             # the input nucleosome data file
+	'd|db=s'          => \$database,           # the name of the database
+	'f|feature=s'     => \@search_features,    # the feature(s) to look for
+	'b|begin|start=i' => \$start,              # the relative start position
+	'e|end|stop=i'    => \$stop,               # the relative stop position
+	'p|pos=s'         =>
+		\$adjustment_position,    # the coordinate to make start and stop adjustments
+	'x|extend=i' => \$extend,                # extend lookup-feature by this amount
+	'r|ref=s'    => \$reference_position,    # relative position when calc distance
+	'o|out=s'    => \$outfile,               # output file name
+	'z|gz!'      => \$gz,                    # compress file
+	'h|help'     => \$help,                  # request help
+	'v|version'  => \$print_version,         # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -81,8 +74,6 @@ if ($print_version) {
 	exit;
 }
 
-
-
 ### Check for required values and assign defaults
 unless ($infile) {
 	$infile = shift @ARGV || die " no input file specified\n";
@@ -93,71 +84,56 @@ unless ($reference_position) {
 unless ($adjustment_position) {
 	$adjustment_position = '5';
 }
-unless (defined $gz) {
+unless ( defined $gz ) {
 	$gz = 0;
 }
-if (scalar @search_features == 1 and $search_features[0] =~ /,/) {
+if ( scalar @search_features == 1 and $search_features[0] =~ /,/ ) {
+
 	# a comma-delimited list of features
 	@search_features = split /,/, shift @search_features;
 }
 
-
-
 ### Load the input file
-my $Data = Bio::ToolBox::Data->new(file => $infile) or 
-	die "  Unable to load data file!\n";
+my $Data = Bio::ToolBox::Data->new( file => $infile )
+	or die "  Unable to load data file!\n";
 printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
-
-
-
 
 ### Open database connection
 if ($database) {
-	if ($Data->database and $Data->database ne $database) {
-		warn " provided database '$database' does not match file metadata!\n" . 
-			" overriding metadata and using '$database'\n";
+	if ( $Data->database and $Data->database ne $database ) {
+		warn " provided database '$database' does not match file metadata!\n"
+			. " overriding metadata and using '$database'\n";
 	}
 	$Data->database($database);
 }
-elsif (not $Data->database) {
+elsif ( not $Data->database ) {
 	die "No database defined! See help\n";
 }
 my $db = $Data->open_database;
 
-
-
-
 ### Identify the Features to Search
 @search_features = verify_or_request_feature_types(
 	'db'      => $db,
-	'feature' => [ @search_features ],
-	'prompt'  => "Enter the number(s) to the intersecting feature(s) to" . 
-				" search.\n Enter as comma delimited list and/or range   ",
+	'feature' => [@search_features],
+	'prompt'  => "Enter the number(s) to the intersecting feature(s) to"
+		. " search.\n Enter as comma delimited list and/or range   ",
 );
-
-
-
-
 
 ### Collect the features
 # search
-print " Searching for intersecting " . join(", ", @search_features) . 
-	" features....\n";
+print " Searching for intersecting " . join( ", ", @search_features ) . " features....\n";
 find_overlapping_features();
-
-
-
-
 
 ### Write output
 # write data file
 unless ($outfile) {
+
 	# overwrite the input file
 	$outfile = $infile;
 }
 my $success = $Data->write_file(
-	'filename'  => $outfile,
-	'gz'        => $gz,
+	'filename' => $outfile,
+	'gz'       => $gz,
 );
 if ($success) {
 	print " Wrote data file '$success'\n";
@@ -166,344 +142,344 @@ else {
 	print " Unable to write data file!\n";
 }
 
-
 ### The End
-
-
-
-
 
 ############################# Subroutines #####################################
 
 ### Main starting point to find overlapping features
 sub find_overlapping_features {
-	
-	if ($Data->feature_type eq 'coordinate') {
+
+	if ( $Data->feature_type eq 'coordinate' ) {
+
 		# we're working with genomic coordinates here
 		intersect_genome_features();
 	}
-	elsif ($Data->feature_type eq 'named') {
+	elsif ( $Data->feature_type eq 'named' ) {
+
 		# we're working with named features
 		intersect_named_features();
 	}
 	else {
 		# unable to identify
-		die " unable to identify feature information columns in source file " .
-			"'$infile'\n No chromosome, start, stop, name, ID,  and/or type columns\n";
+		die " unable to identify feature information columns in source file "
+			. "'$infile'\n No chromosome, start, stop, name, ID,  and/or type columns\n";
 	}
 }
-	
-	
 
-### Working with named features 
+### Working with named features
 sub intersect_named_features {
-	# Named features 
-	
-	# prepare new metadata columns 
-	my ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = 
+
+	# Named features
+
+	# prepare new metadata columns
+	my ( $number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i ) =
 		generate_new_metadata();
-	
+
 	# iterate through table
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		
+	while ( my $row = $stream->next_row ) {
+
 		# identify feature first
 		my $feature = $row->feature;
 		unless ($feature) {
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,
+				$distance_i, $overlap_i );
 			next;
 		}
-		
+
 		# Establish the region based on the found feature
 		my $region;
-		
+
 		# extend the region
 		if ($extend) {
+
 			# we're adding an extension on either side of the feature
-			
+
 			# establish region
 			$region = $db->segment(
 				$feature->seq_id,
-				$feature->start - $extend, 
+				$feature->start - $extend,
 				$feature->end + $extend
 			);
-			# this segment will not have a strand, and I can not set it 
+
+			# this segment will not have a strand, and I can not set it
 		}
-		
+
 		# specific relative start, stop from indicated position
-		elsif (defined $start and defined $stop) {
+		elsif ( defined $start and defined $stop ) {
+
 			# we'll adjust the coordinates specifically
 			# this is relative to the indicated position
-			
+
 			# establish region based on the feature's orientation
-			if ($adjustment_position eq '5' and $feature->strand >= 0) {
+			if ( $adjustment_position eq '5' and $feature->strand >= 0 ) {
+
 				# Watson strand or unstranded
 				$region = $db->segment(
 					$feature->seq_id,
-					$feature->start + $start, 
+					$feature->start + $start,
 					$feature->start + $stop
 				);
 			}
-			elsif ($adjustment_position eq '5' and $feature->strand < 0) {
+			elsif ( $adjustment_position eq '5' and $feature->strand < 0 ) {
+
 				# Crick strand
 				$region = $db->segment(
 					$feature->seq_id,
-					$feature->end - $stop, 
+					$feature->end - $stop,
 					$feature->end - $start
 				);
-			}	
-			if ($adjustment_position eq '3' and $feature->strand >= 0) {
+			}
+			if ( $adjustment_position eq '3' and $feature->strand >= 0 ) {
+
 				# Watson strand or unstranded
 				$region = $db->segment(
 					$feature->seq_id,
-					$feature->end + $start, 
+					$feature->end + $start,
 					$feature->end + $stop
 				);
 			}
-			elsif ($adjustment_position eq '3' and $feature->strand < 0) {
+			elsif ( $adjustment_position eq '3' and $feature->strand < 0 ) {
+
 				# Crick strand
 				$region = $db->segment(
 					$feature->seq_id,
-					$feature->start - $stop, 
+					$feature->start - $stop,
 					$feature->start - $start
 				);
-			}	
-			elsif ($adjustment_position eq 'm' and $feature->strand >= 0) {
-				# midpoint
-				my $mid = int( ($feature->start + $feature->end) / 2);
-				$region = $db->segment(
-					$feature->seq_id,
-					$mid + $start, 
-					$mid + $stop
-				);
 			}
-			elsif ($adjustment_position eq 'm' and $feature->strand >= 0) {
+			elsif ( $adjustment_position eq 'm' and $feature->strand >= 0 ) {
+
 				# midpoint
-				my $mid = int( ($feature->start + $feature->end) / 2);
-				$region = $db->segment(
-					$feature->seq_id,
-					$mid - $start, 
-					$mid - $stop
-				);
+				my $mid = int( ( $feature->start + $feature->end ) / 2 );
+				$region = $db->segment( $feature->seq_id, $mid + $start, $mid + $stop );
+			}
+			elsif ( $adjustment_position eq 'm' and $feature->strand >= 0 ) {
+
+				# midpoint
+				my $mid = int( ( $feature->start + $feature->end ) / 2 );
+				$region = $db->segment( $feature->seq_id, $mid - $start, $mid - $stop );
 			}
 		}
-		
+
 		# default is entire region
 		else {
 			# establish region as is
 			$region = $feature->segment();
+
 			# this segment will have strand
 		}
-		
-		
+
 		# check region
 		if ($region) {
+
 			# succesfully established a region, find features
-			$region->start(1) if $region->start <= 0; # sanity check
+			$region->start(1) if $region->start <= 0;    # sanity check
 			process_region(
 				$region,
-				$feature->strand, 	# the region may not support strand
-									# so need to pass this separately 
-				$row, 
-				$number_i, 
-				$name_i, 
-				$type_i, 
-				$strand_i, 
-				$distance_i, 
+				$feature->strand,    # the region may not support strand
+									 # so need to pass this separately
+				$row,
+				$number_i,
+				$name_i,
+				$type_i,
+				$strand_i,
+				$distance_i,
 				$overlap_i
 			);
 		}
 		else {
 			# no region defined
-			my $w = sprintf " unable to establish region for %s %s\n", 
+			my $w = sprintf " unable to establish region for %s %s\n",
 				$row->type, $row->name;
 			warn $w;
-			
+
 			# fill in table anyway
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,
+				$distance_i, $overlap_i );
 		}
-	
+
 	}
-	
+
 	# summarize the findings
 	summarize_found_features($number_i);
 }
 
-
-
-### Working with genomic features 
+### Working with genomic features
 sub intersect_genome_features {
-	
-	# prepare new metadata columns 
-	my ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = 
+
+	# prepare new metadata columns
+	my ( $number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i ) =
 		generate_new_metadata();
-	
+
 	# get chromosome list and their lengths
 	# this is to ensure that regions don't go over length
 	my %chrom2length;
-	foreach (get_chromosome_list($db)) {
+	foreach ( get_chromosome_list($db) ) {
+
 		# each element is [name, length]
 		$chrom2length{ $_->[0] } = $_->[1];
 	}
-	
+
 	# iterate through table
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		
+	while ( my $row = $stream->next_row ) {
+
 		# adjust positions as necessary
-		my ($new_start, $new_stop);
+		my ( $new_start, $new_stop );
 		if ($extend) {
+
 			# we're adding an extension on either side of the region
 			$new_start = $row->start - $extend;
-			$new_stop = $row->end + $extend;
+			$new_stop  = $row->end + $extend;
 		}
-		elsif (defined $start and defined $stop) {
+		elsif ( defined $start and defined $stop ) {
+
 			# we'll adjust the coordinates specifically
 			# this is relative to the start position
 			$new_start = $row->start + $start;
-			$new_stop = $row->start + $stop;
+			$new_stop  = $row->start + $stop;
 		}
 		else {
 			$new_start = $row->start;
-			$new_stop = $row->end;
+			$new_stop  = $row->end;
 		}
-		
+
 		# check new positions
-		if ($new_start < 1) {
+		if ( $new_start < 1 ) {
+
 			# limit to actual start
 			$new_start = 1;
 		}
-		if ($chrom2length{ $row->seq_id } and $new_stop > $chrom2length{ $row->seq_id }) {
+		if ( $chrom2length{ $row->seq_id } and $new_stop > $chrom2length{ $row->seq_id } )
+		{
 			# limit to actual length
 			$new_stop = $chrom2length{ $row->seq_id };
 		}
-		
+
 		# establish region
-		my $region = $db->segment($row->seq_id, $new_start, $new_stop);
-		
+		my $region = $db->segment( $row->seq_id, $new_start, $new_stop );
+
 		# check region
 		if ($region) {
+
 			# succesfully established a region, find features
 			process_region(
 				$region,
-				$row->strand, # default is 0 if not defined
-				$row, 
-				$number_i, 
-				$name_i, 
-				$type_i, 
-				$strand_i, 
-				$distance_i, 
+				$row->strand,    # default is 0 if not defined
+				$row,
+				$number_i,
+				$name_i,
+				$type_i,
+				$strand_i,
+				$distance_i,
 				$overlap_i
 			);
 		}
 		else {
 			# no region defined
-			warn sprintf(" unable to establish region for %s:%s..%s\n", 
-				$row->seq_id, $row->start, $row->end);
+			warn sprintf( " unable to establish region for %s:%s..%s\n",
+				$row->seq_id, $row->start, $row->end );
+
 			# fill in table anyway
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,
+				$distance_i, $overlap_i );
 		}
 	}
-	
+
 	# summarize the findings
 	summarize_found_features($number_i);
 }
 
-
-
-
-
-
 ### Prepare new columns
 sub generate_new_metadata {
-	
+
 	# count of features column
 	my $number_i = $Data->add_column('Number_features');
-	
+
 	# Name column
 	my $name_i = $Data->add_column('Target_Name');
-	if (defined $start and defined $stop) {
-		$Data->metadata($name_i, 'Start', $start);
-		$Data->metadata($name_i, 'Stop', $stop);
+	if ( defined $start and defined $stop ) {
+		$Data->metadata( $name_i, 'Start', $start );
+		$Data->metadata( $name_i, 'Stop',  $stop );
 	}
-	if (defined $extend) {
-		$Data->metadata($name_i, 'Extend', $extend);
+	if ( defined $extend ) {
+		$Data->metadata( $name_i, 'Extend', $extend );
 	}
-	
+
 	# Type column
 	my $type_i = $Data->add_column('Target_Type');
-	
+
 	# Strand column
 	my $strand_i = $Data->add_column('Target_Strand');
-	
+
 	# Distance column
 	my $distance_i = $Data->add_column('Target_Distance');
-	$Data->metadata($distance_i, 'reference', $reference_position);
-			
+	$Data->metadata( $distance_i, 'reference', $reference_position );
+
 	# Overlap column
 	my $overlap_i = $Data->add_column('Target_Overlap');
-	$Data->metadata($overlap_i, 'reference', $reference_position);
-	
-	
-	return ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i);
+	$Data->metadata( $overlap_i, 'reference', $reference_position );
+
+	return ( $number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i );
 }
-
-
 
 ### Prepare new columns
 sub process_region {
-	
-	my ($region, $region_strand, $row, $number_i, $name_i, 
-		$type_i, $strand_i, $distance_i, $overlap_i) = @_;
-	
+
+	my (
+		$region, $region_strand, $row,        $number_i, $name_i,
+		$type_i, $strand_i,      $distance_i, $overlap_i
+	) = @_;
+
 	# look for the requested features
-	my @features = $region->features(
-		-type  => [ @search_features ],
-	);
+	my @features = $region->features( -type => [@search_features], );
+
 	#print "   found ", scalar(@features), "\n";
-	
+
 	# process depending on the number of features found
-	if (scalar @features == 0) {
+	if ( scalar @features == 0 ) {
+
 		# no features found
-		
+
 		# put in null data
-		process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-			$distance_i, $overlap_i);
+		process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,
+			$distance_i, $overlap_i );
 	}
-	
-	elsif (scalar @features == 1) {
+
+	elsif ( scalar @features == 1 ) {
+
 		# only one feature found, that's perfect
 		my $f = shift @features;
-		
+
 		# record information
-		$row->value($number_i, 1);
-		$row->value($name_i, $f->display_name);
-		$row->value($type_i, $f->type);
-		$row->value($strand_i, $f->strand);
-		$row->value($distance_i, determine_distance($region, $region_strand, $f));
-		$row->value($overlap_i, determine_overlap($region, $region_strand, $f));
+		$row->value( $number_i,   1 );
+		$row->value( $name_i,     $f->display_name );
+		$row->value( $type_i,     $f->type );
+		$row->value( $strand_i,   $f->strand );
+		$row->value( $distance_i, determine_distance( $region, $region_strand, $f ) );
+		$row->value( $overlap_i,  determine_overlap( $region, $region_strand, $f ) );
 	}
-	
-	elsif (scalar @features > 1) {
+
+	elsif ( scalar @features > 1 ) {
+
 		# more than one feature
 		# need to identify the most appropriate one
 		my $f;
-		if (scalar @features > 1) {
+		if ( scalar @features > 1 ) {
 			my %overlap2f;
 			foreach (@features) {
-				my $overlap = determine_overlap($region, $region_strand, $_);
+				my $overlap = determine_overlap( $region, $region_strand, $_ );
 				$overlap2f{$overlap} = $_;
-				# this may overwrite if two or more features have identical 
-				# amounts of overlap, but we'll simply use that as a means 
+
+				# this may overwrite if two or more features have identical
+				# amounts of overlap, but we'll simply use that as a means
 				# of "randomly" selecting one of them ;)
 				# otherwise how else to select one?
 			}
-			
+
 			# now take the feature with the greatest overlap
-			my $max = (sort {$b <=> $a} keys %overlap2f)[0];
+			my $max = ( sort { $b <=> $a } keys %overlap2f )[0];
 			$f = $overlap2f{$max};
 		}
 		else {
@@ -511,143 +487,135 @@ sub process_region {
 			# it was dubious
 			$f = $features[0];
 		}
-		
+
 		# record the information
-		$row->value($number_i, scalar(@features));
-		$row->value($name_i, $f->display_name);
-		$row->value($type_i, $f->type);
-		$row->value($strand_i, $f->strand);
-		$row->value($distance_i, determine_distance($region, $region_strand, $f));
-		$row->value($overlap_i, determine_overlap($region, $region_strand, $f));
+		$row->value( $number_i,   scalar(@features) );
+		$row->value( $name_i,     $f->display_name );
+		$row->value( $type_i,     $f->type );
+		$row->value( $strand_i,   $f->strand );
+		$row->value( $distance_i, determine_distance( $region, $region_strand, $f ) );
+		$row->value( $overlap_i,  determine_overlap( $region, $region_strand, $f ) );
 	}
-	
+
 	return;
 }
 
-
-
-
-
-
 ### Fill in data table with null data
 sub process_no_feature {
-	my ($row, $number_i, $name_i, $type_i, $strand_i, 
-		$distance_i, $overlap_i) = @_;
+	my ( $row, $number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i ) = @_;
 
-	$row->value($number_i, 0);
-	$row->value($name_i, '.');
-	$row->value($type_i, '.');
-	$row->value($strand_i, 0);
-	$row->value($distance_i, '.');
-	$row->value($overlap_i, '.');
+	$row->value( $number_i,   0 );
+	$row->value( $name_i,     '.' );
+	$row->value( $type_i,     '.' );
+	$row->value( $strand_i,   0 );
+	$row->value( $distance_i, '.' );
+	$row->value( $overlap_i,  '.' );
 }
-
-
-
-
 
 ### Calculate the distance between target and reference features
 sub determine_distance {
-	
-	my ($reference, $ref_strand, $target) = @_;
-	
+
+	my ( $reference, $ref_strand, $target ) = @_;
+
 	# determine distance
 	my $distance;
-	
+
 	# Calculating the distance between the 5' ends
-	if ($reference_position eq 'start') {
-		
+	if ( $reference_position eq 'start' ) {
+
 		# Calculation dependent on identifying the strand
 		# basically calculating distance from target 5' end to reference 5' end
-		if ($ref_strand >= 0 and $target->strand >= 0) {
+		if ( $ref_strand >= 0 and $target->strand >= 0 ) {
+
 			# Both are Watson strand or unstranded
 			$distance = $target->start - $reference->start;
 		}
-		elsif ($ref_strand >= 0 and $target->strand < 0) {
+		elsif ( $ref_strand >= 0 and $target->strand < 0 ) {
+
 			# Reference is Watson, target is Crick
 			$distance = $target->end - $reference->start;
 		}
-		elsif ($ref_strand < 0 and $target->strand >= 0) {
+		elsif ( $ref_strand < 0 and $target->strand >= 0 ) {
+
 			# Reference is Crick, target is Watson
 			$distance = $target->start - $reference->end;
 		}
-		elsif ($ref_strand < 0 and $target->strand < 0) {
+		elsif ( $ref_strand < 0 and $target->strand < 0 ) {
+
 			# Both are Crick
 			$distance = $target->end - $reference->end;
 		}
 	}
-	
+
 	# Calculating the distance between the midpoints
 	# since midpoint is equidistant from 5' and 3' ends, strand doesn't matter
-	elsif ($reference_position eq 'mid') {
-		my $reference_mid = ($reference->end + $reference->start) / 2;
-		my $target_mid = ($target->end + $target->start) / 2;
-		$distance = int($target_mid - $reference_mid + 0.5);
+	elsif ( $reference_position eq 'mid' ) {
+		my $reference_mid = ( $reference->end + $reference->start ) / 2;
+		my $target_mid    = ( $target->end + $target->start ) / 2;
+		$distance = int( $target_mid - $reference_mid + 0.5 );
 	}
-	
+
 	return $distance;
 }
 
-
-
 ### Calculate the overlap between target and reference features
 sub determine_overlap {
-	my ($reference, $ref_strand, $target) = @_;
-	
-	# apparently, using Bio::RangeI methods on a region doesn't 
-	# work (what!!!!????), intersection and overlap_extent fail to 
+	my ( $reference, $ref_strand, $target ) = @_;
+
+	# apparently, using Bio::RangeI methods on a region doesn't
+	# work (what!!!!????), intersection and overlap_extent fail to
 	# give proper end values, just returns "-end"
-	
-	# the workaround is to create a new simple Bio::Range object 
-	# using the coordinates from the reference region, and then determine the 
+
+	# the workaround is to create a new simple Bio::Range object
+	# using the coordinates from the reference region, and then determine the
 	# overlap between it and the target feature
 	my $a = Bio::Range->new(
 		-start  => $reference->start,
 		-end    => $reference->end,
 		-strand => $ref_strand,
 	);
-	
+
 	# find the overlap
 	my $int = $a->intersection($target);
 	return $int->length;
 }
 
-
-
 sub summarize_found_features {
 	my $number_i = shift;
-	
+
 	# intialize counts
 	my $none     = 0;
 	my $one      = 0;
 	my $multiple = 0;
-	
+
 	# count up
-	$Data->iterate( sub {
-		my $row = shift;
-		if ($row->value($number_i) == 0) {
-			$none++;
+	$Data->iterate(
+		sub {
+			my $row = shift;
+			if ( $row->value($number_i) == 0 ) {
+				$none++;
+			}
+			elsif ( $row->value($number_i) == 1 ) {
+				$one++;
+			}
+			elsif ( $row->value($number_i) > 1 ) {
+				$multiple++;
+			}
 		}
-		elsif ($row->value($number_i) == 1) {
-			$one++;
-		}
-		elsif ($row->value($number_i) > 1) {
-			$multiple++;
-		}
-	} );
-	
+	);
+
 	# print summary
 	printf " $one (%.1f%%) reference features intersected with unique target features\n",
-		(($one / $Data->{'last_row'}) * 100) if $one;
+		( ( $one / $Data->{'last_row'} ) * 100 )
+		if $one;
 	printf " $none (%.1f%%) reference features intersected with zero target features\n",
-		(($none / $Data->{'last_row'}) * 100) if $none;
-	printf " $multiple (%.1f%%) reference features intersected with multiple target features\n",
-		(($multiple / $Data->{'last_row'}) * 100) if $multiple;
+		( ( $none / $Data->{'last_row'} ) * 100 )
+		if $none;
+	printf
+" $multiple (%.1f%%) reference features intersected with multiple target features\n",
+		( ( $multiple / $Data->{'last_row'} ) * 100 )
+		if $multiple;
 }
-
-
-
-
 
 __END__
 

@@ -304,38 +304,40 @@ use strict;
 use Module::Load;
 use Bio::ToolBox::Data;
 use Carp qw(carp cluck croak confess);
-use Bio::ToolBox::SeqFeature; # alternative to Bio::SeqFeature::Lite
+use Bio::ToolBox::SeqFeature;    # alternative to Bio::SeqFeature::Lite
 
 1;
 
 sub new {
 	my $class = shift;
-	
+
 	# passed arguments
 	my %args;
-	if (scalar(@_) == 1) {
+	if ( scalar(@_) == 1 ) {
 		$args{file} = shift;
 	}
 	else {
 		%args = @_;
 	}
-	
+
 	# determine file, format, and parser subclass
-	my $file     = $args{file} || $args{table} || undef;
-	my $flavor   = $args{flavor} || undef;
+	my $file     = $args{file}     || $args{table} || undef;
+	my $flavor   = $args{flavor}   || undef;
 	my $filetype = $args{filetype} || undef;
-	if (not $flavor or not $filetype) {
-		if ($class =~ /Bio::ToolBox::parser::(\w+)/) {
+	if ( not $flavor or not $filetype ) {
+		if ( $class =~ /Bio::ToolBox::parser::(\w+)/ ) {
+
 			# we got the flavor directly from a flavored parser new function
 			$flavor ||= $1;
 		}
 		if ($file) {
+
 			# get the flavor and file type directly by tasting the file
 			# we use this in preference over what user may have provided
-			($flavor, $filetype) = Bio::ToolBox::Data->taste_file($args{file});
+			( $flavor, $filetype ) = Bio::ToolBox::Data->taste_file( $args{file} );
 		}
 	}
-	if ($flavor and $flavor =~ m/^(?:gff|bed|ucsc)$/i) {
+	if ( $flavor and $flavor =~ m/^(?:gff|bed|ucsc)$/i ) {
 		$class = 'Bio::ToolBox::parser::' . $flavor;
 		load $class;
 	}
@@ -343,87 +345,85 @@ sub new {
 		# let the caller print errors as appropriate
 		return;
 	}
-	
+
 	# initialize self
 	my $self = {
 		'fh'            => undef,
 		'file'          => $file,
 		'filetype'      => $filetype,
-		'do_gene'       => 1, 
+		'do_gene'       => 1,
 		'do_exon'       => 0,
-		'do_cds'        => 0, 
-		'do_utr'        => 0, 
+		'do_cds'        => 0,
+		'do_utr'        => 0,
 		'do_codon'      => 0,
 		'do_name'       => 0,
 		'share'         => 0,
 		'simplify'      => 0,
 		'source'        => undef,
-		'typelist'      => '',      # string list of observed feature types
-		'seq_ids'       => {},      # hash of seq_id to length
-		'loaded'        => {},      # hash of primary_id to SeqFeature object
-		'top_features'  => [],      # list of top features
+		'typelist'      => '',          # string list of observed feature types
+		'seq_ids'       => {},          # hash of seq_id to length
+		'loaded'        => {},          # hash of primary_id to SeqFeature object
+		'top_features'  => [],          # list of top features
 		'eof'           => 0,
-		'comments'      => [],      # array of comment lines
+		'comments'      => [],          # array of comment lines
 		'convertor_sub' => undef,
 		'sfclass'       => 'Bio::ToolBox::SeqFeature',
 	};
 	bless $self, $class;
-	
+
 	# parser specific object keys
-	if ($flavor eq 'bed') {
+	if ( $flavor eq 'bed' ) {
 		$self->{bed}        = undef;
 		$self->{line_count} = 0;
 	}
-	elsif ($flavor eq 'gff') {
-		if ($filetype and $filetype eq 'gtf') {
-			$self->{gtf}  = 1;
+	elsif ( $flavor eq 'gff' ) {
+		if ( $filetype and $filetype eq 'gtf' ) {
+			$self->{gtf} = 1;
 		}
 		else {
-			$self->{gtf}  = 0;
+			$self->{gtf} = 0;
 		}
-		$self->{orphans}        = [];
-		$self->{duplicate_ids}  = {};
+		$self->{orphans}       = [];
+		$self->{duplicate_ids} = {};
 	}
-	elsif ($flavor eq 'ucsc') {
-		$self->{share}          = 1;      # always true
-		$self->{source}         = 'UCSC'; # presumptive default
-		$self->{gene2seqf}      = {};     # hash of gene names to SeqFeature objects
-		$self->{id2count}       = {};     # hash of seen IDs
-		$self->{counts}         = {};     # hash of RNA types to count
-		$self->{refseqsum}      = {};     # RefSeq Summary external data
-		$self->{refseqstat}     = {};     # RefSeq Stats external data
-		$self->{kgxref}         = {};     # knownGene RefSeq external data
-		$self->{ensembldata}    = {};     # Ensembl external data
-		$self->{line_count}     = 0;
+	elsif ( $flavor eq 'ucsc' ) {
+		$self->{share}       = 1;         # always true
+		$self->{source}      = 'UCSC';    # presumptive default
+		$self->{gene2seqf}   = {};        # hash of gene names to SeqFeature objects
+		$self->{id2count}    = {};        # hash of seen IDs
+		$self->{counts}      = {};        # hash of RNA types to count
+		$self->{refseqsum}   = {};        # RefSeq Summary external data
+		$self->{refseqstat}  = {};        # RefSeq Stats external data
+		$self->{kgxref}      = {};        # knownGene RefSeq external data
+		$self->{ensembldata} = {};        # Ensembl external data
+		$self->{line_count}  = 0;
 	}
-	
+
 	# process remaining arguments
-	if (exists $args{simplify}) {
+	if ( exists $args{simplify} ) {
 		$self->simplify( $args{simplify} );
 	}
-	if (exists $args{do_gene}) {
-		$self->do_gene($args{do_gene});
+	if ( exists $args{do_gene} ) {
+		$self->do_gene( $args{do_gene} );
 	}
-	if (exists $args{do_exon}) {
-		$self->do_exon($args{do_exon});
+	if ( exists $args{do_exon} ) {
+		$self->do_exon( $args{do_exon} );
 	}
-	if (exists $args{do_cds}) {
-		$self->do_cds($args{do_cds});
+	if ( exists $args{do_cds} ) {
+		$self->do_cds( $args{do_cds} );
 	}
-	if (exists $args{do_utr}) {
-		$self->do_utr($args{do_utr});
+	if ( exists $args{do_utr} ) {
+		$self->do_utr( $args{do_utr} );
 	}
-	if (exists $args{do_codon}) {
-		$self->do_codon($args{do_codon});
+	if ( exists $args{do_codon} ) {
+		$self->do_codon( $args{do_codon} );
 	}
-	if (exists $args{source}) {
-		$self->source($args{source});
+	if ( exists $args{source} ) {
+		$self->source( $args{source} );
 	}
-	if (exists $args{class}) {
+	if ( exists $args{class} ) {
 		my $class = $args{class};
-		eval {
-			load $class;
-		};
+		eval { load $class; };
 		if ($@) {
 			croak $@;
 		}
@@ -431,54 +431,55 @@ sub new {
 			$self->{sfclass} = $class;
 		}
 	}
-	if ($flavor eq 'ucsc') {
+	if ( $flavor eq 'ucsc' ) {
+
 		# lots of accessory files for UCSC tables
-		if (exists $args{refseqsum}) {
-			$self->load_extra_data($args{refseqsum}, 'refseqsum');
+		if ( exists $args{refseqsum} ) {
+			$self->load_extra_data( $args{refseqsum}, 'refseqsum' );
 		}
-		elsif (exists $args{summary}) {
-			$self->load_extra_data($args{summary}, 'refseqsum');
+		elsif ( exists $args{summary} ) {
+			$self->load_extra_data( $args{summary}, 'refseqsum' );
 		}
-		if (exists $args{refseqstat}) {
-			$self->load_extra_data($args{refseqstat}, 'refseqstat');
+		if ( exists $args{refseqstat} ) {
+			$self->load_extra_data( $args{refseqstat}, 'refseqstat' );
 		}
-		elsif (exists $args{status}) {
-			$self->load_extra_data($args{status}, 'refseqstat');
+		elsif ( exists $args{status} ) {
+			$self->load_extra_data( $args{status}, 'refseqstat' );
 		}
-		if (exists $args{kgxref}) {
-			$self->load_extra_data($args{kgxref}, 'kgxref');
+		if ( exists $args{kgxref} ) {
+			$self->load_extra_data( $args{kgxref}, 'kgxref' );
 		}
-		if (exists $args{ensembltogenename}) {
-			$self->load_extra_data($args{ensembltogenename}, 'ensembltogene');
+		if ( exists $args{ensembltogenename} ) {
+			$self->load_extra_data( $args{ensembltogenename}, 'ensembltogene' );
 		}
-		elsif (exists $args{ensname}) {
-			$self->load_extra_data($args{ensname}, 'ensembltogene');
+		elsif ( exists $args{ensname} ) {
+			$self->load_extra_data( $args{ensname}, 'ensembltogene' );
 		}
-		if (exists $args{ensemblsource}) {
-			$self->load_extra_data($args{ensemblsource}, 'ensemblsource');
+		if ( exists $args{ensemblsource} ) {
+			$self->load_extra_data( $args{ensemblsource}, 'ensemblsource' );
 		}
-		elsif (exists $args{enssrc}) {
-			$self->load_extra_data($args{enssrc}, 'ensemblsource');
+		elsif ( exists $args{enssrc} ) {
+			$self->load_extra_data( $args{enssrc}, 'ensemblsource' );
 		}
 	}
-	
+
 	# open the file
 	if ($file) {
 		$self->open_file;
 	}
-	
+
 	# finished
 	return $self;
 }
 
 sub do_gene {
 	my $self = shift;
-	return 0 if (ref($self) eq 'Bio::ToolBox::parser::bed');
+	return 0 if ( ref($self) eq 'Bio::ToolBox::parser::bed' );
 	if (@_) {
 		$self->{'do_gene'} = shift;
 	}
 	return $self->{'do_gene'};
-}	
+}
 
 sub do_exon {
 	my $self = shift;
@@ -486,7 +487,7 @@ sub do_exon {
 		$self->{'do_exon'} = shift;
 	}
 	return $self->{'do_exon'};
-}	
+}
 
 sub do_cds {
 	my $self = shift;
@@ -494,7 +495,7 @@ sub do_cds {
 		$self->{'do_cds'} = shift;
 	}
 	return $self->{'do_cds'};
-}	
+}
 
 sub do_utr {
 	my $self = shift;
@@ -502,7 +503,7 @@ sub do_utr {
 		$self->{'do_utr'} = shift;
 	}
 	return $self->{'do_utr'};
-}	
+}
 
 sub do_codon {
 	my $self = shift;
@@ -510,33 +511,36 @@ sub do_codon {
 		$self->{'do_codon'} = shift;
 	}
 	return $self->{'do_codon'};
-}	
+}
 
 sub do_name {
 	my $self = shift;
-	return 0 unless (ref($self) eq 'Bio::ToolBox::parser::ucsc');
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::ucsc' );
+
 	# does nothing with gff and bed
 	if (@_) {
 		$self->{'do_name'} = shift;
 	}
 	return $self->{'do_name'};
-}	
+}
 
 sub share {
 	my $self = shift;
-	return 0 unless (ref($self) eq 'Bio::ToolBox::parser::ucsc');
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::ucsc' );
+
 	# does nothing with gff and bed
 	if (@_) {
 		$self->{'share'} = shift;
 	}
 	return $self->{'share'};
-}	
+}
 
 sub simplify {
 	my $self = shift;
-	return 0 unless (ref($self) eq 'Bio::ToolBox::parser::gff');
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::gff' );
+
 	# does nothing with ucsc and bed
-	if (defined $_[0]) {
+	if ( defined $_[0] ) {
 		$self->{simplify} = shift;
 	}
 	return $self->{simplify};
@@ -555,13 +559,14 @@ sub filetype {
 }
 
 sub version {
+
 	# old method no longer used
 	return shift->filetype;
 }
 
 sub number_loaded {
 	my $self = shift;
-	return scalar keys %{$self->{loaded}};
+	return scalar keys %{ $self->{loaded} };
 }
 
 sub file {
@@ -575,7 +580,7 @@ sub fh {
 sub comments {
 	my $self = shift;
 	my @comments;
-	foreach (@{ $self->{comments} }) {
+	foreach ( @{ $self->{comments} } ) {
 		push @comments, $_;
 	}
 	return wantarray ? @comments : \@comments;
@@ -583,7 +588,7 @@ sub comments {
 
 sub seq_ids {
 	my $self = shift;
-	my @s = keys %{$self->{seq_ids}};
+	my @s    = keys %{ $self->{seq_ids} };
 	return wantarray ? @s : \@s;
 }
 
@@ -594,11 +599,11 @@ sub seq_id_lengths {
 
 sub next_top_feature {
 	my $self = shift;
-	
+
 	# return next item
-	if (exists $self->{top_feature_index}) {
+	if ( exists $self->{top_feature_index} ) {
 		my $i = $self->{top_feature_index};
-		if ($i == $self->{last_top_feature_index}) {
+		if ( $i == $self->{last_top_feature_index} ) {
 			delete $self->{top_feature_index};
 			delete $self->{last_top_feature_index};
 			return undef;
@@ -606,38 +611,38 @@ sub next_top_feature {
 		$self->{top_feature_index} += 1;
 		return $self->{top_features}->[$i];
 	}
+
 	# otherwise, it's our first time
-	
+
 	# check that we have an open filehandle
-	unless ($self->fh) {
+	unless ( $self->fh ) {
 		croak("no annotation file loaded to parse!");
 	}
-	unless ($self->{'eof'}) {
+	unless ( $self->{'eof'} ) {
 		$self->parse_file or croak "unable to parse file!";
 	}
-	
+
 	# set up index
-	$self->{top_feature_index} = 1;
-	$self->{last_top_feature_index} = scalar(@{$self->{top_features}});
+	$self->{top_feature_index}      = 1;
+	$self->{last_top_feature_index} = scalar( @{ $self->{top_features} } );
 	return $self->{top_features}->[0];
 }
 
 sub top_features {
 	my $self = shift;
-	unless ($self->{'eof'}) {
+	unless ( $self->{'eof'} ) {
 		$self->parse_file;
 	}
 	my @features = @{ $self->{top_features} };
 	return wantarray ? @features : \@features;
 }
 
-
 *get_feature_by_id = \&fetch;
 
 sub fetch {
-	my ($self, $id) = @_;
+	my ( $self, $id ) = @_;
 	return unless $id;
-	unless ($self->{'eof'}) {
+	unless ( $self->{'eof'} ) {
 		$self->parse_file;
 	}
 	return $self->{loaded}{$id} || undef;
@@ -646,7 +651,6 @@ sub fetch {
 sub find_gene {
 	confess "The find_gene() method is deprecated. Please use fetch().";
 }
-
 
 __END__
 

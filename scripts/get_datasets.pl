@@ -25,106 +25,86 @@ eval {
 
 my $VERSION = '1.69';
 
-
 print "\n A program to collect data for a list of features\n\n";
-
 
 ### Display quick help
 unless (@ARGV) {
+
 	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
 
 ### Get command line options and initialize values
 
 # Initialize values
-my (  
-	$infile,
-	$new,
-	$parse,
-	$outfile,
-	$main_database,
-	$data_database,
-	$feature,
-	$method,
-	$stranded,
-	$subfeature,
-	$exon_subfeature,
-	$extend,
-	$start_adj,
-	$stop_adj,
-	$fstart,
-	$fstop,
-	$limit,
-	$position,
-	$fpkm_method,
-	$tpm,
-	$format,
-	$win,
-	$step,
-	$exclusion_file,
-	$chrskip,
-	$prefix_text,
-	$set_strand,
-	$discard,
-	$gz,
-	$cpu,
-	$help,
-	$verbose,
+my (
+	$infile,        $new,           $parse,           $outfile,
+	$main_database, $data_database, $feature,         $method,
+	$stranded,      $subfeature,    $exon_subfeature, $extend,
+	$start_adj,     $stop_adj,      $fstart,          $fstop,
+	$limit,         $position,      $fpkm_method,     $tpm,
+	$format,        $win,           $step,            $exclusion_file,
+	$chrskip,       $prefix_text,   $set_strand,      $discard,
+	$gz,            $cpu,           $help,            $verbose,
 	$print_version,
-); 
-my @datasets; # an array of names of dataset values to be retrieved
+);
+my @datasets;    # an array of names of dataset values to be retrieved
 
 # Command line options
-GetOptions( 
-	'i|in=s'           => \$infile, # load a pre-existing file
-	'new'              => \$new, # generate a new file
-	'parse!'           => \$parse, # parse input file
-	'o|out=s'          => \$outfile, # name of new output file 
-	'd|db=s'           => \$main_database, # main or annotation database name
-	'D|ddb=s'          => \$data_database, # data database
-	'f|feature=s'      => \$feature, # name of genomic feature to analyze
-	'm|method=s'       => \$method, # method of collecting & reporting data
-	'a|data=s'         => \@datasets, # the list of datasets to collect data from
-	't|strand=s'       => \$stranded, # indicate strandedness of data
-	'u|subfeature=s'   => \$subfeature, # indicate to restrict to subfeatures
-	'exons!'           => \$exon_subfeature, # old parameter
-	'x|extend=i'       => \$extend, # extend the size of the genomic feature
-	'b|begin|start=i'  => \$start_adj, # adjustment to relative position
-	'e|end|stop=i'     => \$stop_adj, # adjustment relative position
-	'fstart=f'         => \$fstart, # fractional start position
-	'fstop=f'          => \$fstop, # fractional stop position
-	'limit=i'          => \$limit, # size limit to fractionate a feature
-	'p|pos=s'          => \$position, # set the relative feature position
-	'fpkm|rpkm=s'      => \$fpkm_method, # set the fpkm method  
-	'tpm!'             => \$tpm, # calculate a tpm
-	'r|format=i'       => \$format, # decimal formatting
-	'win=i'            => \$win, # indicate the size of genomic intervals
-	'step=i'           => \$step, # step size for genomic intervals
-	'blacklist=s'      => \$exclusion_file, # exclusion intervals for genomic intervals
-	'chrskip=s'        => \$chrskip, # chromosome exclusion regex for genomic intervals
-	'prefix=s'         => \$prefix_text, # prefix text for naming genomic intervals
-	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
-				# force_strand is preferred option, but respect the old option
-	'discard=f'        => \$discard, # discard feature below threshold
-	'z|gz!'            => \$gz, # compress output file
-	'c|cpu=i'          => \$cpu, # number of execution threads
-	'h|help'           => \$help, # request help
-	'v|version'        => \$print_version, # print the version
-	'bam=s'            => \$BAM_ADAPTER, # explicitly set the bam adapter
-	'big=s'            => \$BIG_ADAPTER, # explicitly set the big adapter
+GetOptions(
+	'i|in=s'          => \$infile,             # load a pre-existing file
+	'new'             => \$new,                # generate a new file
+	'parse!'          => \$parse,              # parse input file
+	'o|out=s'         => \$outfile,            # name of new output file
+	'd|db=s'          => \$main_database,      # main or annotation database name
+	'D|ddb=s'         => \$data_database,      # data database
+	'f|feature=s'     => \$feature,            # name of genomic feature to analyze
+	'm|method=s'      => \$method,             # method of collecting & reporting data
+	'a|data=s'        => \@datasets,           # the list of datasets to collect data from
+	't|strand=s'      => \$stranded,           # indicate strandedness of data
+	'u|subfeature=s'  => \$subfeature,         # indicate to restrict to subfeatures
+	'exons!'          => \$exon_subfeature,    # old parameter
+	'x|extend=i'      => \$extend,             # extend the size of the genomic feature
+	'b|begin|start=i' => \$start_adj,          # adjustment to relative position
+	'e|end|stop=i'    => \$stop_adj,           # adjustment relative position
+	'fstart=f'        => \$fstart,             # fractional start position
+	'fstop=f'         => \$fstop,              # fractional stop position
+	'limit=i'         => \$limit,              # size limit to fractionate a feature
+	'p|pos=s'         => \$position,           # set the relative feature position
+	'fpkm|rpkm=s'     => \$fpkm_method,        # set the fpkm method
+	'tpm!'            => \$tpm,                # calculate a tpm
+	'r|format=i'      => \$format,             # decimal formatting
+	'win=i'           => \$win,                # indicate the size of genomic intervals
+	'step=i'          => \$step,               # step size for genomic intervals
+	'blacklist=s'     => \$exclusion_file,     # exclusion intervals for genomic intervals
+	'chrskip=s'       => \$chrskip,     # chromosome exclusion regex for genomic intervals
+	'prefix=s'        => \$prefix_text, # prefix text for naming genomic intervals
+	'force_strand|set_strand' => \$set_strand,    # enforce a specific strand
+		# force_strand is preferred option, but respect the old option
+	'discard=f' => \$discard,          # discard feature below threshold
+	'z|gz!'     => \$gz,               # compress output file
+	'c|cpu=i'   => \$cpu,              # number of execution threads
+	'h|help'    => \$help,             # request help
+	'v|version' => \$print_version,    # print the version
+	'bam=s'     => \$BAM_ADAPTER,      # explicitly set the bam adapter
+	'big=s'     => \$BIG_ADAPTER,      # explicitly set the big adapter
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # print help if requested
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -142,11 +122,7 @@ if ($print_version) {
 my $formatter;
 set_defaults();
 my $start_time = time;
-my $collapsed = 0; # global value to indicate transcripts are collapsed
-
-
-
-
+my $collapsed  = 0;      # global value to indicate transcripts are collapsed
 
 ### Initialize main data, database, and datasets
 
@@ -154,39 +130,43 @@ my $collapsed = 0; # global value to indicate transcripts are collapsed
 my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
-		file       => $infile, 
+		file       => $infile,
 		parse      => $parse,
 		feature    => $feature,
 		subfeature => $subfeature,
 	) or die " unable to load input file '$infile'\n";
-	if ($Data->last_row) {
-		printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+	if ( $Data->last_row ) {
+		printf " Loaded %s features from $infile.\n",
+			format_with_commas( $Data->last_row );
 	}
 	else {
 		die " No features loaded!\n";
 	}
-	
+
 	# update main database as necessary
 	if ($main_database) {
-		if ($main_database ne $Data->database) {
+		if ( $main_database ne $Data->database ) {
+
 			# update with new database
-			printf " updating main database name from '%s' to '%s'\n", 
+			printf " updating main database name from '%s' to '%s'\n",
 				$Data->database, $main_database;
 			$Data->database($main_database);
 		}
 	}
-	elsif ($Data->database) {
+	elsif ( $Data->database ) {
 		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
-	
+
 	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and 
-		defined $feature
-	) {
+	if (    not defined $Data->feature
+		and not defined $Data->type_column
+		and defined $feature )
+	{
 		$Data->feature($feature);
 	}
 }
 elsif ($new) {
+
 	# generate a new file
 	print " Generating a new feature list from database '$main_database'...\n";
 	$Data = Bio::ToolBox::Data->new(
@@ -197,24 +177,25 @@ elsif ($new) {
 		chrskip => $chrskip,
 		exclude => $exclusion_file
 	) or die " unable to generate new feature list\n";
-	
+
 	# add a genomic interval name
-	if ($feature eq 'genome' and $prefix_text) {
+	if ( $feature eq 'genome' and $prefix_text ) {
 		my $i = $Data->add_column('Name');
-		$Data->iterate( sub {
-			my $row = shift;
-			$row->value($i, sprintf("%s%d", $prefix_text, $row->row_index));
-		});
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				$row->value( $i, sprintf( "%s%d", $prefix_text, $row->row_index ) );
+			}
+		);
 	}
 }
 
 # update program name
 $Data->program("$0, v $VERSION");
 
-
 # Check output file name
 unless ($outfile) {
-	if ($Data->basename) {
+	if ( $Data->basename ) {
 		$outfile = $Data->path . $Data->basename;
 	}
 	else {
@@ -222,22 +203,22 @@ unless ($outfile) {
 	}
 }
 
-
 # Open data database
 my $ddb;
-if (defined $data_database) {
+if ( defined $data_database ) {
+
 	# specifically defined a data database
-	$ddb = open_db_connection($data_database) or 
-		die "unable to establish data database connection to $data_database!\n";
+	$ddb = open_db_connection($data_database)
+		or die "unable to establish data database connection to $data_database!\n";
 }
 
 # Check the datasets
-unless ($datasets[0] eq 'none') {
+unless ( $datasets[0] eq 'none' ) {
 	@datasets = verify_or_request_feature_types(
 		'db'      => $ddb || $Data->database,
-		'feature' => [ @datasets ],
-		'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
-					" to collect data. Comma delimited or range is acceptable\n",
+		'feature' => [@datasets],
+		'prompt'  => " Enter the dataset(s) or feature type(s) from which \n"
+			. " to collect data. Comma delimited or range is acceptable\n",
 	);
 }
 unless (@datasets) {
@@ -245,28 +226,26 @@ unless (@datasets) {
 }
 
 # Working with RPKM value datasets
-my %dataset2sum; # for genomic totals of reads for rpkm determination
-if ($fpkm_method eq 'genome') {
+my %dataset2sum;    # for genomic totals of reads for rpkm determination
+if ( $fpkm_method eq 'genome' ) {
 	foreach my $d (@datasets) {
 		print " Summing total reads for dataset '$d'...\n";
-		my $sum = check_dataset_for_rpm_support($d, $cpu);
+		my $sum = check_dataset_for_rpm_support( $d, $cpu );
 		if ($sum) {
 			$dataset2sum{$d} = $sum;
 			printf "   %s total features\n", format_with_commas($sum);
 		}
 		else {
-			die " $method method requested but not supported for " .
-				"dataset $d!\n FPKM is only supported with Bam and BigBed.\n";
+			die " $method method requested but not supported for "
+				. "dataset $d!\n FPKM is only supported with Bam and BigBed.\n";
 		}
 	}
 }
 
-
-
 ### Collect the data from each datasets
 
 # check that we have a dataset
-if ($datasets[0] eq 'none') {
+if ( $datasets[0] eq 'none' ) {
 	print " Nothing to collect!\n";
 	if ($new) {
 		my $success = $Data->save(
@@ -285,10 +264,11 @@ if ($datasets[0] eq 'none') {
 }
 
 # check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
-		# We need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
+if ( $cpu > 1 ) {
+	while ( $cpu > 1 and $Data->last_row / $cpu < 100 ) {
+
+		# We need at least 100 lines in each fork split to make
+		# it worthwhile to do the split, otherwise, reduce the number of
 		# splits to something more worthwhile
 		# dang it! it all depends on what we're collecting from
 		# bw mean goes super fast, but bam rpkms are really slow
@@ -297,7 +277,8 @@ if ($cpu > 1) {
 }
 
 # execute data collection in 1 or more processes
-if ($cpu > 1) {
+if ( $cpu > 1 ) {
+
 	# parallel execution
 	# print statements here before we fork, less we have duplicate statements!
 	print " Collecting $method scores from datasets @datasets\n";
@@ -309,15 +290,11 @@ else {
 	single_execution();
 }
 
-
 # filter out unwanted features
-discard_features() if defined $discard; # handle zero
-
+discard_features() if defined $discard;    # handle zero
 
 # calculate normalized values
-calculate_fpkm_values() if ($fpkm_method or $tpm);
-
-
+calculate_fpkm_values() if ( $fpkm_method or $tpm );
 
 ### Finished
 # write the output file
@@ -334,24 +311,22 @@ else {
 	# failure! the subroutine will have printed error messages
 	print " unable to write file!\n";
 }
-printf " Finished in %.1f minutes\n", (time - $start_time)/60;
-
-
+printf " Finished in %.1f minutes\n", ( time - $start_time ) / 60;
 
 ############# Subroutines ######################################################
 
-
-
 ### Set default parameters if undefined
 sub set_defaults {
+
 	# assign default values
-	# these are all global values that could've been assigned on the 
+	# these are all global values that could've been assigned on the
 	# command line
-	
+
 	# Check for required values
 	# we will let the parser set the feature value
 	unless ($infile) {
-		if (@ARGV and not $feature) {
+		if ( @ARGV and not $feature ) {
+
 			# making an assumption that first unnamed variable is input file
 			# but only if no new file feature defined
 			$infile = shift @ARGV;
@@ -361,24 +336,27 @@ sub set_defaults {
 			$new = 1;
 		}
 	}
-	$parse = 1 if ($infile and not defined $parse);
+	$parse = 1 if ( $infile and not defined $parse );
 	if ($new) {
 		unless ($outfile) {
 			die " You must define an output filename!";
 		}
+
 		# database for new files checked below
 	}
-	if (defined $start_adj or defined $stop_adj) {
+	if ( defined $start_adj or defined $stop_adj ) {
+
 		# set other to zero if not defined
 		$start_adj ||= 0;
 		$stop_adj  ||= 0;
 	}
-	if (defined $fstart or defined $fstop) {
+	if ( defined $fstart or defined $fstop ) {
+
 		# set defaults in case one is not defined
 		$fstart ||= 0;
 		$fstop  ||= 1;
 	}
-	
+
 	# check parallel support
 	if ($parallel) {
 		$cpu ||= 4;
@@ -388,26 +366,28 @@ sub set_defaults {
 		print " disabling parallel CPU execution, no support present\n" if $cpu;
 		$cpu = 0;
 	}
-	
+
 	# check datasets
-	if (not @datasets and @ARGV) {
+	if ( not @datasets and @ARGV ) {
 		@datasets = @ARGV;
 	}
-	if ($datasets[0] =~ /,/) {
+	if ( $datasets[0] =~ /,/ ) {
+
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;
 		foreach my $d (@datasets) {
-			push @list, (split /,/, $d);
+			push @list, ( split /,/, $d );
 		}
 		@datasets = @list;
 	}
-	
+
 	# check method
 	if ($method) {
+
 		# check the method that was defined on the command line
-		unless ($method =~ 
-			m/^(?:median|mean|stddev|min|max|range|sum|count|pcount|ncount)$/
-		) {
+		unless ( $method =~
+			m/^(?:median|mean|stddev|min|max|range|sum|count|pcount|ncount)$/ )
+		{
 			die " unknown method '$method'!";
 		}
 	}
@@ -415,71 +395,80 @@ sub set_defaults {
 		# set the default to use the mean
 		$method = 'mean';
 	}
-	
+
 	# check fpkm method
 	if ($fpkm_method) {
-		unless ($fpkm_method eq 'region' or $fpkm_method eq 'genome') {
+		unless ( $fpkm_method eq 'region' or $fpkm_method eq 'genome' ) {
 			die " fpkm option must be one of 'region' or 'genome'! see help\n";
 		}
-		unless ($method =~ /count|sum/) {
+		unless ( $method =~ /count|sum/ ) {
 			die " method must be a count if you use the fpkm option!\n";
 		}
 	}
-	
+
 	# check strandedness of data to collect
-	if (defined $stranded) { 
+	if ( defined $stranded ) {
+
 		# check the strand request that was defined on the command line
-		unless ($stranded =~ m/^(?:all|antisense|sense)$/i) {
+		unless ( $stranded =~ m/^(?:all|antisense|sense)$/i ) {
 			die " unknown strand '$stranded'!";
 		}
-	} 
+	}
 	else {
 		# default value
-		$stranded = 'all'; 
+		$stranded = 'all';
 	}
-	
+
 	# check the relative position
-	if (defined $position) {
+	if ( defined $position ) {
+
 		# check the position value
-		unless ($position =~ m/^(?:5|4|53|3|m|p)$/) {
+		unless ( $position =~ m/^(?:5|4|53|3|m|p)$/ ) {
 			die " Unknown relative position '$position'!\n";
 		}
+
 		# change to match internal usage as necessary
-		$position = 4 if $position eq 'm'; 
+		$position = 4 if $position eq 'm';
 		$position = 9 if $position eq 'p';
 	}
 	else {
 		# default position to use the 5' end
 		$position = 5;
 	}
-	
+
 	# check the limit when using fractional start and stop
-	if ($fstart and $fstop) {
+	if ( $fstart and $fstop ) {
+
 		# fractional start and stop requested
 		unless ($limit) {
+
 			# set a minimum size limit on sub fractionating a feature
 			$limit = 10;
 		}
-		if ($position == 4 or $position == 9) {
+		if ( $position == 4 or $position == 9 ) {
 			die " set position to 5 or 3 only when using fractional start and stop\n";
 		}
 	}
-	
+
 	# Assign database for new feature lists
-	if ($new and not defined $main_database) {
-		# creating a new feature list requires a main database 
+	if ( $new and not defined $main_database ) {
+
+		# creating a new feature list requires a main database
 		# otherwise we will postpone this till after loading the input file
-	
-		if (defined $data_database) {
+
+		if ( defined $data_database ) {
+
 			# reuse the data database
 			$main_database = $data_database;
 		}
-		elsif (@datasets and $feature eq 'genome') {
+		elsif ( @datasets and $feature eq 'genome' ) {
+
 			# we could use a dataset file only if we're collecting genome windows
 			# take the first element
 			$main_database = $datasets[0];
 		}
-		elsif (defined $infile) {
+		elsif ( defined $infile ) {
+
 			# input could be a gene table in gff or ucsc format to be parsed
 			# hope for the best here....
 		}
@@ -487,112 +476,110 @@ sub set_defaults {
 			die " You must define a database or an appropriate dataset file! see help\n";
 		}
 	}
-	
+
 	# Check subfeatures
 	if ($exon_subfeature) {
+
 		# legacy option
 		$subfeature = 'exon';
 	}
-	if ($subfeature and (defined $fstart or defined $start_adj)) {
+	if ( $subfeature and ( defined $fstart or defined $start_adj ) ) {
 		die " Cannot modify coordinates when subfeatures are requested!\n";
 	}
-	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr|intron)$/) {
-		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr 3p_utr, or intron\n";
-	} 
-	
+	if ( $subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr|intron)$/ ) {
+		die
+" unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr 3p_utr, or intron\n";
+	}
+
 	# generate formatter
-	if (defined $format) {
+	if ( defined $format ) {
 		$formatter = '%.' . $format . 'f';
 	}
-	
+
 	# discard features
-	if ($discard and $method !~ /count/) {
+	if ( $discard and $method !~ /count/ ) {
 		print " discard features best intended for count data, not $method data\n";
 	}
 }
 
-
-
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	
+
 	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
+	my $child_base_name = $outfile . ".$$";
 
 	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
+	for my $i ( 1 .. $cpu ) {
 		$pm->start and next;
-	
+
 		#### In child ####
-	
+
 		# splice the data structure
-		$Data->splice_data($i, $cpu);
-		
+		$Data->splice_data( $i, $cpu );
+
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
 		my $db = $Data->open_database(1);
 		if ($data_database) {
-			$ddb = open_db_connection($data_database, 1);
+			$ddb = open_db_connection( $data_database, 1 );
 		}
-		
+
 		# collapse transcripts if needed
-		if ($feature =~ /^gene/i and $subfeature =~ /exon|intron/) {
+		if ( $feature =~ /^gene/i and $subfeature =~ /exon|intron/ ) {
 			my $c = $Data->collapse_gene_transcripts;
-			if ($c != $Data->last_row) {
-				printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
+			if ( $c != $Data->last_row ) {
+				printf " Not all row SeqFeatures could be collapsed, %d failed\n",
 					$Data->last_row - $c;
 			}
 		}
-		
+
 		# collect the dataset
 		foreach my $dataset (@datasets) {
-			unless ($dataset eq 'none') {
+			unless ( $dataset eq 'none' ) {
 				collect_dataset($dataset);
 			}
 		}
-		
+
 		# write out result
 		my $success = $Data->save(
-			'filename' => sprintf("$child_base_name.%03s",$i),
-			'gz'       => 0, # faster to write without compression
+			'filename' => sprintf( "$child_base_name.%03s", $i ),
+			'gz'       => 0,    # faster to write without compression
 		);
 		if ($success) {
 			printf " wrote child file $success\n";
 		}
-		
+
 		# Finished
 		$pm->finish;
 	}
 	$pm->wait_all_children;
-	
+
 	# reassemble children files into output file
 	my @files = glob "$child_base_name.*";
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	unless (scalar @files == $cpu) {
+	unless ( scalar @files == $cpu ) {
 		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
 	}
 	my $count = $Data->reload_children(@files);
 	printf " reloaded %s features from children\n", format_with_commas($count);
 }
 
-
-
 sub single_execution {
-	
+
 	# collapse transcripts if needed
-	if ($feature =~ /^gene/i and $subfeature =~ /exon|intron/) {
+	if ( $feature =~ /^gene/i and $subfeature =~ /exon|intron/ ) {
 		my $c = $Data->collapse_gene_transcripts;
-		if ($c != $Data->last_row) {
-			printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
+		if ( $c != $Data->last_row ) {
+			printf " Not all row SeqFeatures could be collapsed, %d failed\n",
 				$Data->last_row - $c;
 		}
 	}
-		
+
 	# collect the datasets
 	foreach my $dataset (@datasets) {
-		unless ($dataset eq 'none') {
+		unless ( $dataset eq 'none' ) {
 			print " Collecting $method scores from dataset '$dataset'...\n";
 			collect_dataset($dataset);
 		}
@@ -600,430 +587,463 @@ sub single_execution {
 	}
 }
 
-
-
 # Dataset collection
 sub collect_dataset {
 	my $dataset = shift;
-	
+
 	# set the new metadata for this new dataset
 	my $index = add_new_dataset($dataset);
-	
+
 	# check that we have strand data if necessary
 	if ($set_strand) {
-		unless (defined $Data->strand_column) {
+		unless ( defined $Data->strand_column ) {
 			die " requested to set strand but a strand column was not found!\n";
 		}
 	}
-	
-	# collect 
-	if (defined $start_adj and defined $stop_adj) {
+
+	# collect
+	if ( defined $start_adj and defined $stop_adj ) {
+
 		# specifically defined relative start and stop positions
-		get_adjusted_dataset($dataset, $index);
+		get_adjusted_dataset( $dataset, $index );
 	}
-	elsif (defined $fstart and defined $fstop) {
+	elsif ( defined $fstart and defined $fstop ) {
+
 		# use a subfraction of the region
-		get_fractionated_dataset($dataset, $index);
+		get_fractionated_dataset( $dataset, $index );
 	}
 	else {
 		# everything else
-		get_dataset($dataset, $index);
+		get_dataset( $dataset, $index );
 	}
 }
 
-
 sub get_dataset {
-	my ($dataset, $index) = @_;
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		my $score = $row->get_score(
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'method'    => $method,
-			'stranded'  => $stranded,
-			'extend'    => $extend,
-			'subfeature' => $subfeature,
-		);
-		$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-		$row->value($index, $score);
-	} );
-}
+	my ( $dataset, $index ) = @_;
 
+	# collect the scores from the dataset for this index
+	$Data->iterate(
+		sub {
+			my $row   = shift;
+			my $score = $row->get_score(
+				'db'         => $ddb,
+				'dataset'    => $dataset,
+				'method'     => $method,
+				'stranded'   => $stranded,
+				'extend'     => $extend,
+				'subfeature' => $subfeature,
+			);
+			$score = sprintf( $formatter, $score )
+				if ( $formatter and $score ne '.' );
+			$row->value( $index, $score );
+		}
+	);
+}
 
 sub get_adjusted_dataset {
-	my ($dataset, $index) = @_;
-	
+	my ( $dataset, $index ) = @_;
+
 	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# adjust coordinates as requested
-		# depends on feature strand and relative position
-		my ($start, $stop);
-		if ($position == 5) { 
-			if ($row->strand >= 0) { 
-				# 5' end of forward strand
-				$start = $row->start + $start_adj;
-				$stop  = $row->start + $stop_adj;
+	$Data->iterate(
+		sub {
+			my $row = shift;
+
+			# adjust coordinates as requested
+			# depends on feature strand and relative position
+			my ( $start, $stop );
+			if ( $position == 5 ) {
+				if ( $row->strand >= 0 ) {
+
+					# 5' end of forward strand
+					$start = $row->start + $start_adj;
+					$stop  = $row->start + $stop_adj;
+				}
+				else {
+					# 5' end of reverse strand
+					$start = $row->end - $stop_adj;
+					$stop  = $row->end - $start_adj;
+				}
 			}
-			else { 
-				# 5' end of reverse strand
-				$start = $row->end - $stop_adj;
-				$stop  = $row->end - $start_adj;
+			elsif ( $position == 3 ) {
+				if ( $row->strand >= 0 ) {
+
+					# 3' end of forward strand
+					$start = $row->end + $start_adj;
+					$stop  = $row->end + $stop_adj;
+				}
+				else {
+					# 3' end of reverse strand
+					$start = $row->start - $stop_adj;
+					$stop  = $row->start - $start_adj;
+				}
 			}
+			elsif ( $position == 4 ) {
+
+				# middle position
+				my $middle = int( ( $row->start + $row->end ) / 2 );
+				if ( $row->strand >= 0 ) {
+					$start = $middle + $start_adj;
+					$stop  = $middle + $stop_adj;
+				}
+				else {
+					$start = $middle - $stop_adj;
+					$stop  = $middle - $start_adj;
+				}
+			}
+			elsif ( $position == 53 ) {
+				if ( $row->strand >= 0 ) {
+
+					# forward strand
+					$start = $row->start + $start_adj;
+					$stop  = $row->end + $stop_adj;
+				}
+				else {
+					# reverse strand
+					$start = $row->start - $start_adj;
+					$stop  = $row->end - $stop_adj;
+				}
+			}
+			elsif ( $position == 9 ) {
+
+				# peak summit position
+				my $middle = $row->peak;
+				if ( $row->strand >= 0 ) {
+					$start = $middle + $start_adj;
+					$stop  = $middle + $stop_adj;
+				}
+				else {
+					$start = $middle - $stop_adj;
+					$stop  = $middle - $start_adj;
+				}
+			}
+
+			# now collect score
+			my $score = $row->get_score(
+				'start'    => $start,
+				'stop'     => $stop,
+				'db'       => $ddb,
+				'dataset'  => $dataset,
+				'method'   => $method,
+				'stranded' => $stranded,
+			);
+			$score = sprintf( $formatter, $score )
+				if ( $formatter and $score ne '.' );
+			$row->value( $index, $score );
 		}
-		elsif ($position == 3) { 
-			if ($row->strand >= 0) { 
-				# 3' end of forward strand
-				$start = $row->end + $start_adj;
-				$stop  = $row->end + $stop_adj;
-			}
-			else {
-				# 3' end of reverse strand
-				$start = $row->start - $stop_adj;
-				$stop  = $row->start - $start_adj;
-			}
-		}
-		elsif ($position == 4) {
-			# middle position
-			my $middle = int( ($row->start + $row->end) / 2);
-			if ($row->strand >= 0) {
-				$start = $middle + $start_adj;
-				$stop  = $middle + $stop_adj;
-			}
-			else {
-				$start = $middle - $stop_adj;
-				$stop  = $middle - $start_adj;
-			}
-		}
-		elsif ($position == 53) {
-			if ($row->strand >= 0) { 
-				# forward strand
-				$start = $row->start + $start_adj;
-				$stop  = $row->end + $stop_adj;
-			}
-			else {
-				# reverse strand
-				$start = $row->start - $start_adj;
-				$stop  = $row->end - $stop_adj;
-			}
-		}
-		elsif ($position == 9) {
-			# peak summit position
-			my $middle = $row->peak;
-			if ($row->strand >= 0) {
-				$start = $middle + $start_adj;
-				$stop  = $middle + $stop_adj;
-			}
-			else {
-				$start = $middle - $stop_adj;
-				$stop  = $middle - $start_adj;
-			}
-		}
-		
-		# now collect score
-		my $score = $row->get_score(
-			'start'     => $start,
-			'stop'      => $stop,
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'method'    => $method,
-			'stranded'  => $stranded,
-		);
-		$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-		$row->value($index, $score);
-	} );
+	);
 }
-
-
 
 sub get_fractionated_dataset {
-	my ($dataset, $index) = @_;
-	
+	my ( $dataset, $index ) = @_;
+
 	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# make sure we work with the represented seqfeature if present
-		my $feature = $row->seqfeature || $row;
-		
-		# calculate length
-		my $length = $feature->length;
-		
-		# calculate new fractional start and stop positions
-		# the fraction depends on the length
-		# this depends on both feature orientation and the 
-		# relative position requested
-		my $relative_start = int( ($length * $fstart) + 0.5);
-		my $relative_stop  = int( ($length * $fstop) + 0.5);
-		my ($start, $stop);
-		if ($length >= $limit) {
-			# length exceeds our minimum limit
-			# we can take a fractional length
-			
-			if ($position == 5 and $feature->strand >= 0) { 
-				# 5' end of forward strand
-				$start = $feature->start + $relative_start;
-				$stop  = $feature->start + $relative_stop;
+	$Data->iterate(
+		sub {
+			my $row = shift;
+
+			# make sure we work with the represented seqfeature if present
+			my $feature = $row->seqfeature || $row;
+
+			# calculate length
+			my $length = $feature->length;
+
+			# calculate new fractional start and stop positions
+			# the fraction depends on the length
+			# this depends on both feature orientation and the
+			# relative position requested
+			my $relative_start = int( ( $length * $fstart ) + 0.5 );
+			my $relative_stop  = int( ( $length * $fstop ) + 0.5 );
+			my ( $start, $stop );
+			if ( $length >= $limit ) {
+
+				# length exceeds our minimum limit
+				# we can take a fractional length
+
+				if ( $position == 5 and $feature->strand >= 0 ) {
+
+					# 5' end of forward strand
+					$start = $feature->start + $relative_start;
+					$stop  = $feature->start + $relative_stop;
+				}
+				elsif ( $position == 5 and $feature->strand < 0 ) {
+
+					# 5' end of reverse strand
+					$start = $feature->end - $relative_stop;
+					$stop  = $feature->end - $relative_start;
+				}
+				elsif ( $position == 3 and $feature->strand >= 0 ) {
+
+					# 3' end of forward strand
+					$start = $feature->end + $relative_start;
+					$stop  = $feature->end + $relative_stop;
+				}
+				elsif ( $position == 3 and $feature->strand < 0 ) {
+
+					# 3' end of reverse strand
+					$start = $feature->start - $relative_stop;
+					$stop  = $feature->start - $relative_start;
+				}
+
+				# midpoint is not accepted
 			}
-			elsif ($position == 5 and $feature->strand < 0) { 
-				# 5' end of reverse strand
-				$start = $feature->end - $relative_stop;
-				$stop  = $feature->end - $relative_start;
+			else {
+				# length doesn't meet minimum limit
+				# simply take the whole fragment
+				$start = $feature->start;
+				$stop  = $feature->end;
 			}
-			elsif ($position == 3 and $feature->strand >= 0) { 
-				# 3' end of forward strand
-				$start = $feature->end + $relative_start;
-				$stop  = $feature->end + $relative_stop;
-			}
-			elsif ($position == 3 and $feature->strand < 0) {
-				# 3' end of reverse strand
-				$start = $feature->start - $relative_stop;
-				$stop  = $feature->start - $relative_start;
-			}
-			# midpoint is not accepted
+
+			# now collect score
+			my $score = $row->get_score(
+				'start'    => $start,
+				'stop'     => $stop,
+				'db'       => $ddb,
+				'dataset'  => $dataset,
+				'method'   => $method,
+				'stranded' => $stranded,
+			);
+			$score = sprintf( $formatter, $score )
+				if ( $formatter and $score ne '.' );
+			$row->value( $index, $score );
 		}
-		else {
-			# length doesn't meet minimum limit
-			# simply take the whole fragment
-			$start = $feature->start;
-			$stop  = $feature->end;
-		}
-		
-		# now collect score
-		my $score = $row->get_score(
-			'start'     => $start,
-			'stop'      => $stop,
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'method'    => $method,
-			'stranded'  => $stranded,
-		);
-		$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-		$row->value($index, $score);
-	} );
+	);
 }
-
-
 
 # subroutine to record the metadata for a dataset
 sub add_new_dataset {
 	my $dataset = shift;
-	
+
 	# generate column name
 	my $column_name = simplify_dataset_name($dataset);
-	
+
 	# add new column
 	my $index = $Data->add_column($column_name);
-	
-	# update metadata 
-	$Data->metadata($index, 'dataset', $dataset);
-	$Data->metadata($index, 'method', $method);
-	$Data->metadata($index, 'strand', $stranded);
-	$Data->metadata($index, 'extend', $extend)   if defined $extend;
-	$Data->metadata($index, 'start', $start_adj) if defined $start_adj;	
-	$Data->metadata($index, 'stop', $stop_adj)   if defined $stop_adj;	
-	$Data->metadata($index, 'fstart', $fstart)   if defined $fstart;	
-	$Data->metadata($index, 'fstop', $fstop)     if defined $fstop;	
-	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
-	$Data->metadata($index, 'subfeature', $subfeature) if $subfeature;	
-	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
-	$Data->metadata($index, 'decimal_format', $format) if defined $format;
-	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
-		exists $dataset2sum{$dataset};
-	if ($position == 5) {
-		$Data->metadata($index, 'relative_position', "5'end");	
+
+	# update metadata
+	$Data->metadata( $index, 'dataset',        $dataset );
+	$Data->metadata( $index, 'method',         $method );
+	$Data->metadata( $index, 'strand',         $stranded );
+	$Data->metadata( $index, 'extend',         $extend )     if defined $extend;
+	$Data->metadata( $index, 'start',          $start_adj )  if defined $start_adj;
+	$Data->metadata( $index, 'stop',           $stop_adj )   if defined $stop_adj;
+	$Data->metadata( $index, 'fstart',         $fstart )     if defined $fstart;
+	$Data->metadata( $index, 'fstop',          $fstop )      if defined $fstop;
+	$Data->metadata( $index, 'limit',          $limit )      if defined $limit;
+	$Data->metadata( $index, 'subfeature',     $subfeature ) if $subfeature;
+	$Data->metadata( $index, 'forced_strand',  'yes' )       if $set_strand;
+	$Data->metadata( $index, 'decimal_format', $format )     if defined $format;
+	$Data->metadata( $index, 'total_reads',    $dataset2sum{$dataset} )
+		if exists $dataset2sum{$dataset};
+
+	if ( $position == 5 ) {
+		$Data->metadata( $index, 'relative_position', "5'end" );
 	}
-	if ($position == 3) {
-		$Data->metadata($index, 'relative_position', "3'end");	
+	if ( $position == 3 ) {
+		$Data->metadata( $index, 'relative_position', "3'end" );
 	}
-	elsif ($position == 4) {
-		$Data->metadata($index, 'relative_position', 'middle');
+	elsif ( $position == 4 ) {
+		$Data->metadata( $index, 'relative_position', 'middle' );
 	}
-	elsif ($position == 9) {
-		$Data->metadata($index, 'relative_position', 'summit');
+	elsif ( $position == 9 ) {
+		$Data->metadata( $index, 'relative_position', 'summit' );
 	}
 
 	# add database name if different
-	if (defined $data_database) {
-		$Data->metadata($index, 'db', $data_database);
+	if ( defined $data_database ) {
+		$Data->metadata( $index, 'db', $data_database );
 	}
-	
+
 	# return the index number
 	return $index;
 }
 
-
-
 sub discard_features {
 	print " Discarding features with sum below $discard....\n";
-	
+
 	# calculate which indices;
-	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
-	
+	my @indices = ( $Data->number_columns - scalar @datasets ) .. $Data->last_column;
+
 	# identify features to delete
 	my @to_delete;
-	$Data->iterate( sub {
-		my $row = shift;
-		my $value = calculate_score('sum', [ map {$row->value($_)} @indices ]);
-		push @to_delete, $row->row_index if $value < $discard;
-	});
-	
+	$Data->iterate(
+		sub {
+			my $row = shift;
+			my $value =
+				calculate_score( 'sum', [ map { $row->value($_) } @indices ] );
+			push @to_delete, $row->row_index if $value < $discard;
+		}
+	);
+
 	# delete the features
 	if (@to_delete) {
 		$Data->delete_row(@to_delete);
-		printf "   discarded %d features, %d remaining.\n", scalar(@to_delete), 
+		printf "   discarded %d features, %d remaining.\n", scalar(@to_delete),
 			$Data->last_row;
 	}
-	
+
 	# add metadata
 	foreach my $i (@indices) {
-		$Data->metadata($i, 'discarded_below', $discard);
+		$Data->metadata( $i, 'discarded_below', $discard );
 	}
 }
-
 
 sub calculate_fpkm_values {
 	print " Calculating FPKM values....\n" if $fpkm_method;
-	print " Calculating TPM values....\n" if $tpm;
-	
+	print " Calculating TPM values....\n"  if $tpm;
+
 	# calculate which indices;
-	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
-	
+	my @indices = ( $Data->number_columns - scalar @datasets ) .. $Data->last_column;
+
 	# identify the length column as necessary
 	my $length_i;
 	if ($subfeature) {
-		if ($subfeature eq 'exon') {
+		if ( $subfeature eq 'exon' ) {
 			$length_i = $Data->find_column('Merged_Transcript_Length');
 		}
-		elsif ($subfeature eq 'cds') {
+		elsif ( $subfeature eq 'cds' ) {
 			$length_i = $Data->find_column('Transcript_CDS_Length');
 		}
-		elsif ($subfeature eq '5p_utr') {
+		elsif ( $subfeature eq '5p_utr' ) {
 			$length_i = $Data->find_column('Transcript_5pUTR_Length');
 		}
-		elsif ($subfeature eq '3p_utr') {
+		elsif ( $subfeature eq '3p_utr' ) {
 			$length_i = $Data->find_column('Transcript_3pUTR_Length');
 		}
-		unless (defined $length_i) {
+		unless ( defined $length_i ) {
 			$length_i = $Data->add_transcript_length($subfeature);
 		}
 	}
-	
+
 	# work through each collected dataset
 	foreach my $index (@indices) {
-	
+
 		# determine total number of reads for this dataset
 		my $total;
-		if ($fpkm_method eq 'genome') {
+		if ( $fpkm_method eq 'genome' ) {
+
 			# this was calculated earlier
-			$total = $dataset2sum{ $Data->metadata($index, 'dataset') };
+			$total = $dataset2sum{ $Data->metadata( $index, 'dataset' ) };
 		}
-		elsif ($fpkm_method eq 'region') {
+		elsif ( $fpkm_method eq 'region' ) {
+
 			# use the total from the counted regions or genes
 			$total = 0;
-			$Data->iterate( sub {
-				my $row = shift;
-				$total += $row->value($index);
-			} );
+			$Data->iterate(
+				sub {
+					my $row = shift;
+					$total += $row->value($index);
+				}
+			);
 		}
-		
+
 		# standard lengths
-		my ($standard_length, $fractional_length);
-		if (defined $start_adj and defined $stop_adj) {
-			$standard_length = abs($stop_adj - $start_adj);
+		my ( $standard_length, $fractional_length );
+		if ( defined $start_adj and defined $stop_adj ) {
+			$standard_length = abs( $stop_adj - $start_adj );
 		}
-		if (defined $fstart and defined $fstop) {
+		if ( defined $fstart and defined $fstop ) {
 			$fractional_length = $fstop - $fstart;
 		}
-		
+
 		# add FPKM column
 		if ($fpkm_method) {
+
 			# add new column
-			my $fpkm_index = $Data->add_column($Data->name($index) . '_FPKM');
-			$Data->metadata($fpkm_index, 'dataset', $Data->metadata($index, 'dataset'));
-			$Data->metadata($fpkm_index, 'fpkm_method', $fpkm_method);
-			$Data->metadata($fpkm_index, 'total_count', $total); 
-			
-	
+			my $fpkm_index = $Data->add_column( $Data->name($index) . '_FPKM' );
+			$Data->metadata( $fpkm_index, 'dataset',
+				$Data->metadata( $index, 'dataset' ) );
+			$Data->metadata( $fpkm_index, 'fpkm_method', $fpkm_method );
+			$Data->metadata( $fpkm_index, 'total_count', $total );
+
 			# calculate and store the fpkms
-			$Data->iterate( sub {
-				my $row = shift;
-				my $length;
-				if ($standard_length) {
-					$length = $standard_length;
-				}
-				elsif (defined $length_i) {
-					$length = $row->value($length_i);
-				}
-				else {
-					my $feature = $row->seqfeature; # force feature to be retrieved
-					$length = $row->length;
-				}
-				$length ||= 1; # why would the length be zero?
-				if ($fractional_length) {
-					if (defined $limit) {
-						$length = int($length * $fractional_length) if $length >= $limit;
+			$Data->iterate(
+				sub {
+					my $row = shift;
+					my $length;
+					if ($standard_length) {
+						$length = $standard_length;
+					}
+					elsif ( defined $length_i ) {
+						$length = $row->value($length_i);
 					}
 					else {
-						$length = int($length * $fractional_length);
+						my $feature =
+							$row->seqfeature;    # force feature to be retrieved
+						$length = $row->length;
 					}
+					$length ||= 1;               # why would the length be zero?
+					if ($fractional_length) {
+						if ( defined $limit ) {
+							$length = int( $length * $fractional_length )
+								if $length >= $limit;
+						}
+						else {
+							$length = int( $length * $fractional_length );
+						}
+					}
+
+					my $fpkm =
+						( $row->value($index) * 1_000_000_000 ) / ( $length * $total );
+
+		  # this is equivalent to traditional way: count / ( (total/1e6) * (length/1000) )
+					$row->value( $fpkm_index, sprintf( "%.3f", $fpkm ) );
 				}
-				
-				my $fpkm = ($row->value($index) * 1_000_000_000) / ($length * $total);
-				# this is equivalent to traditional way: count / ( (total/1e6) * (length/1000) )
-				$row->value($fpkm_index, sprintf("%.3f", $fpkm));
-			} );
+			);
 		}
-		
+
 		# add TPM column
 		if ($tpm) {
+
 			# add new column
-			my $tpm_index = $Data->add_column($Data->name($index) . '_TPM');
-			$Data->metadata($tpm_index, 'dataset', $Data->metadata($index, 'dataset'));
-	
+			my $tpm_index = $Data->add_column( $Data->name($index) . '_TPM' );
+			$Data->metadata( $tpm_index, 'dataset',
+				$Data->metadata( $index, 'dataset' ) );
+
 			# first calculate the length normalized counts
 			my $tpm_total = 0;
-			$Data->iterate( sub {
-				my $row = shift;
-				my $length;
-				if ($standard_length) {
-					$length = $standard_length;
-				}
-				elsif (defined $length_i) {
-					$length = $row->value($length_i);
-				}
-				else {
-					my $feature = $row->seqfeature; # force feature to be retrieved
-					$length = $row->length;
-				}
-				$length ||= 1; # why would the length be zero?
-				if ($fractional_length) {
-					if (defined $limit) {
-						$length = int($length * $fractional_length) if $length >= $limit;
+			$Data->iterate(
+				sub {
+					my $row = shift;
+					my $length;
+					if ($standard_length) {
+						$length = $standard_length;
+					}
+					elsif ( defined $length_i ) {
+						$length = $row->value($length_i);
 					}
 					else {
-						$length = int($length * $fractional_length);
+						my $feature =
+							$row->seqfeature;    # force feature to be retrieved
+						$length = $row->length;
 					}
+					$length ||= 1;               # why would the length be zero?
+					if ($fractional_length) {
+						if ( defined $limit ) {
+							$length = int( $length * $fractional_length )
+								if $length >= $limit;
+						}
+						else {
+							$length = int( $length * $fractional_length );
+						}
+					}
+					my $tpm_value = $row->value($index) / ( $length / 1000 );
+					$row->value( $tpm_index, $tpm_value );
+					$tpm_total += $tpm_value;
 				}
-				my $tpm_value = $row->value($index) / ($length / 1000);
-				$row->value($tpm_index, $tpm_value);
-				$tpm_total += $tpm_value;
-			} );
-			
+			);
+
 			# then scale to million reads
 			my $scale = $tpm_total / 1000000;
-			$Data->iterate( sub {
-				my $row = shift;
-				my $tpm_value = $row->value($tpm_index) / $scale;
-				$row->value($tpm_index, sprintf("%.3f", $tpm_value));
-			} );
+			$Data->iterate(
+				sub {
+					my $row       = shift;
+					my $tpm_value = $row->value($tpm_index) / $scale;
+					$row->value( $tpm_index, sprintf( "%.3f", $tpm_value ) );
+				}
+			);
 		}
 	}
 }
-
 
 __END__
 

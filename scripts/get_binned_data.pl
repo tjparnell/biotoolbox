@@ -25,84 +25,70 @@ my $VERSION = '1.68';
 print "\n This script will collect binned values across features\n\n";
 
 ### Quick help
-unless (@ARGV) { # when no command line options are present
-	# when no command line options are present
-	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+unless (@ARGV) {    # when no command line options are present
+					# when no command line options are present
+					# print SYNOPSIS
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
-
 
 ### Get command line options and initialize values
 
 ## Initialize values
 my (
-	$infile,
-	$parse,
-	$outfile,
-	$main_database,
-	$data_database,
-	$feature,
-	$subfeature,
-	$exon_subfeature,
-	$method,
-	$stranded,
-	$bins,
-	$extension,
-	$extension_size,
-	$min_length,
-	$long_data,
-	$smooth,
-	$sum,
-	$format,
-	$groupcol,
-	$gz,
-	$cpu,
-	$help,
-	$print_version,
-); # command line variables
+	$infile,         $parse,      $outfile,    $main_database,
+	$data_database,  $feature,    $subfeature, $exon_subfeature,
+	$method,         $stranded,   $bins,       $extension,
+	$extension_size, $min_length, $long_data,  $smooth,
+	$sum,            $format,     $groupcol,   $gz,
+	$cpu,            $help,       $print_version,
+);    # command line variables
 my @datasets;
 
 ## Command line options
-GetOptions( 
-	'i|in=s'         => \$infile, # input file
-	'parse!'         => \$parse, # parse input file
-	'o|out=s'        => \$outfile, # name of outfile
-	'd|db=s'         => \$main_database, # main or annotation database name
-	'D|ddb=s'        => \$data_database, # data database
-	'a|data=s'       => \@datasets, # dataset name
-	'f|feature=s'    => \$feature, # what type of feature to work with
-	'u|subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
-	'exons!'         => \$exon_subfeature, # old parameter
-	'm|method=s'     => \$method, # method for collecting the data
-	't|strand=s'     => \$stranded, # indicate whether stranded data should be taken
-	'b|bins=i'       => \$bins, # number of bins
-	'x|ext=i'        => \$extension, # number of bins to extend beyond the feature
+GetOptions(
+	'i|in=s'         => \$infile,             # input file
+	'parse!'         => \$parse,              # parse input file
+	'o|out=s'        => \$outfile,            # name of outfile
+	'd|db=s'         => \$main_database,      # main or annotation database name
+	'D|ddb=s'        => \$data_database,      # data database
+	'a|data=s'       => \@datasets,           # dataset name
+	'f|feature=s'    => \$feature,            # what type of feature to work with
+	'u|subfeature=s' => \$subfeature,         # indicate to restrict to subfeatures
+	'exons!'         => \$exon_subfeature,    # old parameter
+	'm|method=s'     => \$method,             # method for collecting the data
+	't|strand=s'     => \$stranded,       # indicate whether stranded data should be taken
+	'b|bins=i'       => \$bins,           # number of bins
+	'x|ext=i'        => \$extension,      # number of bins to extend beyond the feature
 	'X|extsize=i'    => \$extension_size, # explicit size of extended bins
-	'min=i'          => \$min_length, # minimum feature size
-	'long!'          => \$long_data, # collecting long data features
-	'smooth!'        => \$smooth, # do not interpolate over missing values
-	'U|sum!'         => \$sum, # determine a final average for all the features
-	'r|format=i'     => \$format, # decimal formatting
-	'g|groups'       => \$groupcol, # write group column file
-	'z|gz!'          => \$gz, # compress the output file
-	'c|cpu=i'        => \$cpu, # number of execution threads
-	'h|help'         => \$help, # print the help
-	'v|version'      => \$print_version, # print the version
-	'bam=s'          => \$BAM_ADAPTER, # explicitly set the bam adapter
-	'big=s'          => \$BIG_ADAPTER, # explicitly set the big adapter
+	'min=i'          => \$min_length,     # minimum feature size
+	'long!'          => \$long_data,      # collecting long data features
+	'smooth!'        => \$smooth,         # do not interpolate over missing values
+	'U|sum!'         => \$sum,            # determine a final average for all the features
+	'r|format=i'     => \$format,         # decimal formatting
+	'g|groups'       => \$groupcol,       # write group column file
+	'z|gz!'          => \$gz,             # compress the output file
+	'c|cpu=i'        => \$cpu,            # number of execution threads
+	'h|help'         => \$help,           # print the help
+	'v|version'      => \$print_version,  # print the version
+	'bam=s'          => \$BAM_ADAPTER,    # explicitly set the bam adapter
+	'big=s'          => \$BIG_ADAPTER,    # explicitly set the big adapter
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
-
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -116,46 +102,48 @@ if ($print_version) {
 	exit;
 }
 
-
-
 ### Check for required values
 my $formatter;
 check_defaults();
 my $start_time = time;
-my $length_i; # global value for the merged transcript length
-
+my $length_i;    # global value for the merged transcript length
 
 ### Generate or load the dataset
 my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
-		file       => $infile, 
+		file       => $infile,
 		parse      => $parse,
 		feature    => $feature,
 		subfeature => $subfeature,
 	) or die " unable to load input file '$infile'\n";
-	if ($Data->last_row) {
-		printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+	if ( $Data->last_row ) {
+		printf " Loaded %s features from $infile.\n",
+			format_with_commas( $Data->last_row );
 	}
 	else {
 		die " No features loaded!\n";
 	}
-	
+
 	# update main database as necessary
 	if ($main_database) {
-		if ($main_database ne $Data->database) {
+		if ( $main_database ne $Data->database ) {
+
 			# update with new database
-			printf " updating main database name from '%s' to '%s'\n", 
+			printf " updating main database name from '%s' to '%s'\n",
 				$Data->database, $main_database;
 			$Data->database($main_database);
 		}
 	}
-	elsif ($Data->database) {
+	elsif ( $Data->database ) {
 		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
-	
+
 	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
+	if (    not defined $Data->feature
+		and not defined $Data->type_column
+		and defined $feature )
+	{
 		$Data->feature($feature);
 	}
 }
@@ -170,13 +158,12 @@ else {
 $Data->program("$0, v $VERSION");
 
 # the number of columns already in the data array
-my $beginningcolumn = $Data->last_column; 
-my $startcolumn; # this is now calculated separately for each datasets
-
+my $beginningcolumn = $Data->last_column;
+my $startcolumn;    # this is now calculated separately for each datasets
 
 # Check output file name
 unless ($outfile) {
-	if ($Data->basename) {
+	if ( $Data->basename ) {
 		$outfile = $Data->path . $Data->basename;
 	}
 	else {
@@ -184,44 +171,44 @@ unless ($outfile) {
 	}
 }
 
-
-
 # Open data database
 my $ddb;
-if (defined $data_database) {
+if ( defined $data_database ) {
+
 	# specifically defined a data database
-	$ddb = open_db_connection($data_database) or 
-		die "unable to establish data database connection to $data_database!\n";
+	$ddb = open_db_connection($data_database)
+		or die "unable to establish data database connection to $data_database!\n";
 }
 
 # Check for the dataset
 @datasets = verify_or_request_feature_types(
 	'db'      => $ddb || $Data->database,
 	'feature' => \@datasets,
-	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
-				" to collect data. Comma delimited or range is acceptable\n",
+	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n"
+		. " to collect data. Comma delimited or range is acceptable\n",
 );
 unless (@datasets) {
-	die " No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
-} 
-
-
+	die
+" No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
+}
 
 ## Collect the relative data
 printf " Collecting $method data in %d bins from %s\n",
-	($bins + 2 * $extension), join(", ", @datasets); 
+	( $bins + 2 * $extension ), join( ", ", @datasets );
 
 # check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row/$cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
+if ( $cpu > 1 ) {
+	while ( $cpu > 1 and $Data->last_row / $cpu < 100 ) {
+
+		# I figure we need at least 100 lines in each fork split to make
+		# it worthwhile to do the split, otherwise, reduce the number of
 		# splits to something more worthwhile
 		$cpu--;
 	}
 }
 
-if ($cpu > 1) {
+if ( $cpu > 1 ) {
+
 	# parallel execution
 	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
@@ -232,15 +219,13 @@ else {
 	single_execution();
 }
 
-
-
-## Generate summed data - 
+## Generate summed data -
 # an average across all features at each position suitable for plotting
 if ($sum) {
 	print " Generating summary file....\n";
 	my $sumfile = $Data->summary_file(
-		'filename'    => $outfile,
-		'dataset'     => @datasets,
+		'filename' => $outfile,
+		'dataset'  => @datasets,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -249,8 +234,6 @@ if ($sum) {
 		print " Unable to write summary file!\n";
 	}
 }
-
-
 
 ## Write main output
 my $written_file = $Data->save(
@@ -270,8 +253,8 @@ if ($groupcol) {
 	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
 	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
 	$fh->print("Name\tDataset\n");
-	for (my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++) {
-		my $name = $Data->name($i);
+	for ( my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++ ) {
+		my $name    = $Data->name($i);
 		my $dataset = $name;
 		$dataset =~ s/:[\-\d%bp]+$//;
 		$fh->print("$name\t$dataset\n");
@@ -280,102 +263,109 @@ if ($groupcol) {
 	print " wrote group column file $groupfile\n";
 }
 
-printf " Completed in %.1f minutes\n", (time - $start_time)/60;
+printf " Completed in %.1f minutes\n", ( time - $start_time ) / 60;
+
 # done
-
-
 
 #### Subroutines #######
 
 sub check_defaults {
-	unless ($main_database or $infile) {
+	unless ( $main_database or $infile ) {
+
 		# a database must be defined
 		# a tim data file used as an input file would also define one
 		die " You must define a database or input file!\n";
 	}
-	$parse = 1 if ($infile and not defined $parse);
-	
-	unless ($outfile or $infile) {
+	$parse = 1 if ( $infile and not defined $parse );
+
+	unless ( $outfile or $infile ) {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
 
 	# check datasets
-	if (not @datasets and @ARGV) {
+	if ( not @datasets and @ARGV ) {
 		@datasets = @ARGV;
 	}
-	if ($datasets[0] =~ /,/) {
+	if ( $datasets[0] =~ /,/ ) {
+
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;
 		foreach my $d (@datasets) {
-			push @list, (split /,/, $d);
+			push @list, ( split /,/, $d );
 		}
 		@datasets = @list;
 	}
-	
+
 	# strand
 	if ($stranded) {
-		unless (
-			$stranded eq 'sense' or 
-			$stranded eq 'antisense' or 
-			$stranded eq 'all'
-		) {
-			die " '$stranded' is not recognized for strand\n Use --help for more information\n";
+		unless ( $stranded eq 'sense'
+			or $stranded eq 'antisense'
+			or $stranded eq 'all' )
+		{
+			die
+" '$stranded' is not recognized for strand\n Use --help for more information\n";
 		}
-	} 
-	else {
-		$stranded = 'all'; # default is no strand information
 	}
-	
+	else {
+		$stranded = 'all';    # default is no strand information
+	}
+
 	# method
-	if (defined $method) {
-		unless (
-			$method eq 'mean' or 
-			$method eq 'median' or 
-			$method eq 'sum' or 
-			$method eq 'min' or 
-			$method eq 'max' or 
-			$method eq 'stddev' or
-			$method =~ /^\w?count/
-		) {
-			die " '$method' is not recognized for method\n Use --help for more information\n";
+	if ( defined $method ) {
+		unless ( $method eq 'mean'
+			or $method eq 'median'
+			or $method eq 'sum'
+			or $method eq 'min'
+			or $method eq 'max'
+			or $method eq 'stddev'
+			or $method =~ /^\w?count/ )
+		{
+			die
+" '$method' is not recognized for method\n Use --help for more information\n";
 		}
-	
-	} 
+
+	}
 	else {
 		$method = 'mean';
 	}
-	
+
 	# subfeatures
-	if ($subfeature and $long_data) {
-		die " Long data collection is incompatible with subfeatures\n Use --help for more information\n";
+	if ( $subfeature and $long_data ) {
+		die
+" Long data collection is incompatible with subfeatures\n Use --help for more information\n";
 	}
 	if ($exon_subfeature) {
+
 		# legacy option
 		$subfeature = 'exon';
 	}
-	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
-		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+	if ( $subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/ ) {
+		die
+" unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
 	}
-	
+
 	# assign default window bin values
-	unless (defined $bins) {
+	unless ( defined $bins ) {
+
 		# dividing gene into 10 (10%) bins seems reasonable to me
 		$bins = 10;
-	} 
-	unless (defined $extension) {
+	}
+	unless ( defined $extension ) {
+
 		# default is no extension
 		$extension = 0;
 	}
-	unless (defined $smooth) {
+	unless ( defined $smooth ) {
+
 		# default is to not include smoothing
 		$smooth = 0;
 	}
 
 	# generate formatter
-	if (defined $format) {
+	if ( defined $format ) {
 		$formatter = '%.' . $format . 'f';
 	}
-	
+
 	if ($parallel) {
 		$cpu ||= 4;
 	}
@@ -386,69 +376,67 @@ sub check_defaults {
 	}
 }
 
-
-
 ## Parallel execution for efficiency
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	
+
 	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
+	my $child_base_name = $outfile . ".$$";
 
 	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
+	for my $i ( 1 .. $cpu ) {
 		$pm->start and next;
-	
+
 		#### In child ####
-	
+
 		# splice the data structure
-		$Data->splice_data($i, $cpu);
-		
+		$Data->splice_data( $i, $cpu );
+
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
 		my $db = $Data->open_database(1);
 		if ($data_database) {
-			$ddb = open_db_connection($data_database, 1);
+			$ddb = open_db_connection( $data_database, 1 );
 		}
-		
+
 		# collapse transcripts if needed
-		if ($feature eq 'gene' and $subfeature eq 'exon') {
+		if ( $feature eq 'gene' and $subfeature eq 'exon' ) {
 			$Data->collapse_gene_transcripts;
 		}
-		
+
 		# calculate length if necessary
 		if ($subfeature) {
 			$length_i = $Data->add_transcript_length($subfeature);
 		}
-		
+
 		# work through each dataset
 		foreach my $dataset (@datasets) {
-		
+
 			# new start column for this dataset
-			$startcolumn = $Data->number_columns; 
-		
+			$startcolumn = $Data->number_columns;
+
 			# Prepare the metadata and header names
-			my $binsize = (100/$bins); 
-			prepare_bins($binsize, $dataset);
-		
+			my $binsize = ( 100 / $bins );
+			prepare_bins( $binsize, $dataset );
+
 			# Collect the data
 			if ($long_data) {
-				collect_binned_long_data($binsize, $dataset);
+				collect_binned_long_data( $binsize, $dataset );
 			}
 			else {
-				collect_binned_data($binsize, $dataset);
+				collect_binned_data( $binsize, $dataset );
 			}
-		
+
 			# Interpolate values
 			if ($smooth) {
 				go_interpolate_values();
 			}
 		}
-		
+
 		# write out result
 		my $success = $Data->save(
-			'filename' => sprintf("$child_base_name.%03s",$i),
-			'gz'       => 0, # faster to write without compression
+			'filename' => sprintf( "$child_base_name.%03s", $i ),
+			'gz'       => 0,    # faster to write without compression
 		);
 		if ($success) {
 			printf " wrote child file $success\n";
@@ -456,58 +444,58 @@ sub parallel_execution {
 		else {
 			# failure! the subroutine will have printed error messages
 			die " unable to write file!\n";
+
 			# no need to continue
 		}
-		
+
 		# Finished
 		$pm->finish;
 	}
 	$pm->wait_all_children;
-	
+
 	# reassemble children files into output file
 	my @files = glob "$child_base_name.*";
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	unless (scalar @files == $cpu) {
+	unless ( scalar @files == $cpu ) {
 		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
 	}
 	my $count = $Data->reload_children(@files);
 	printf " reloaded %s features from children\n", format_with_commas($count);
 }
 
-
 ## Run in single thread
 sub single_execution {
-	
+
 	# collapse transcripts if needed
-	if ($feature eq 'gene' and $subfeature eq 'exon') {
+	if ( $feature eq 'gene' and $subfeature eq 'exon' ) {
 		$Data->collapse_gene_transcripts;
 	}
-	
+
 	# calculate length if necessary
 	if ($subfeature) {
 		$length_i = $Data->add_transcript_length($subfeature);
 	}
-	
+
 	# work through each dataset
 	foreach my $dataset (@datasets) {
-		
+
 		# new start column for this dataset
-		$startcolumn = $Data->number_columns; 
-	
+		$startcolumn = $Data->number_columns;
+
 		# Prepare the metadata and header names
-		my $binsize = (100/$bins); 
-		prepare_bins($binsize, $dataset);
-	
+		my $binsize = ( 100 / $bins );
+		prepare_bins( $binsize, $dataset );
+
 		# Collect the data
 		if ($long_data) {
-			collect_binned_long_data($binsize, $dataset);
+			collect_binned_long_data( $binsize, $dataset );
 		}
 		else {
-			collect_binned_data($binsize, $dataset);
+			collect_binned_data( $binsize, $dataset );
 		}
-	
+
 		# Interpolate values
 		if ($smooth) {
 			print " Smoothing data by interpolation....\n";
@@ -516,45 +504,45 @@ sub single_execution {
 	}
 }
 
+sub collect_binned_data {
+	my ( $binsize, $dataset ) = @_;
 
-
-sub collect_binned_data {	
-	my ($binsize, $dataset) = @_;
-	
 	## Collect the data
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		
+	while ( my $row = $stream->next_row ) {
+
 		# define the starting and ending points based on gene length
 		my $length = defined $length_i ? $row->value($length_i) : $row->length;
-		
+
 		# check the length
-		if (defined $min_length and $length < $min_length) {
+		if ( defined $min_length and $length < $min_length ) {
+
 			# this feature is too short to divided into bins
 			# we will skip this feature
-			
+
 			# but first, put in null values
-			for my $c ($startcolumn..($Data->last_column) ) {
-				$row->value($c, '.');
+			for my $c ( $startcolumn .. ( $Data->last_column ) ) {
+				$row->value( $c, '.' );
 			}
 			next;
 		}
-		
+
 		# calculate the actual extension in bp
 		# this is determined from the extension_size or the feature length
 		# and multiplied by the number of extensions requested
 		my $extra;
 		if ($extension) {
 			if ($extension_size) {
+
 				# extension is specific bp in size
 				$extra = $extension_size * $extension;
 			}
 			else {
 				# extension is dependent on feature length
-				$extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
+				$extra = int( ( $extension * $binsize * 0.01 * $length ) + 0.5 );
 			}
 		}
-		
+
 		my $regionscores = $row->get_region_position_scores(
 			'ddb'        => $ddb,
 			'dataset'    => $dataset,
@@ -564,220 +552,240 @@ sub collect_binned_data {
 			'subfeature' => $subfeature,
 			'length'     => $length,
 		);
+
 		# record the scores for each bin
-		record_the_bin_values($row, $length, $regionscores);
-	}	
+		record_the_bin_values( $row, $length, $regionscores );
+	}
 }
 
+sub collect_binned_long_data {
+	my ( $binsize, $dataset ) = @_;
 
-sub collect_binned_long_data {	
-	my ($binsize, $dataset) = @_;
-	
 	## Collect the data
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		
+	while ( my $row = $stream->next_row ) {
+
 		# identify the feature or use the row
 		my $fstart = $row->start;
 		my $fstop  = $row->end;
 		my $strand = $row->strand;
-		my $length = $row->length; # subfeatures not allowed here, so use feature length
-		
+		my $length = $row->length;   # subfeatures not allowed here, so use feature length
+
 		# collect the scores to the bins in the region
-		for my $column ($startcolumn..($Data->last_column) ) {
+		for my $column ( $startcolumn .. ( $Data->last_column ) ) {
+
 			# we will step through each data column, representing each window (bin)
 			# across the feature's region
-			# any scores within this window will be collected and the mean 
+			# any scores within this window will be collected and the mean
 			# value reported
-		
+
 			# convert the window start and stop coordinates (as percentages) to
 			# actual bp
 			# this depends on whether the binsize is explicitly defined in bp or
 			# is a fraction of the feature length
-			my ($start, $stop);
-			if ($Data->metadata($column, 'bin_size') =~ /bp$/) {
+			my ( $start, $stop );
+			if ( $Data->metadata( $column, 'bin_size' ) =~ /bp$/ ) {
+
 				# the bin size is explicitly defined
-			
+
 				# the start and stop points are relative to either the feature
 				# start (always 0) or the end (the feature length), depending
 				# upon whether the 5' or 3' end of the feature
-			
+
 				# determine this by the sign of the start position
-				if ($Data->metadata($column, 'start') < 0 and $strand >= 0) {
+				if ( $Data->metadata( $column, 'start' ) < 0 and $strand >= 0 ) {
+
 					# the start position is less than 0, implying the 5' end
 					# the reference position will be the feature start on plus strand
-					$start = $fstart + $Data->metadata($column, 'start');
-					$stop  = $fstart + $Data->metadata($column, 'stop');
+					$start = $fstart + $Data->metadata( $column, 'start' );
+					$stop  = $fstart + $Data->metadata( $column, 'stop' );
 				}
-				elsif ($Data->metadata($column, 'start') < 0 and $strand < 0) {
+				elsif ( $Data->metadata( $column, 'start' ) < 0 and $strand < 0 ) {
+
 					# the start position is less than 0, implying the 5' end
 					# the reference position will be the feature end on minus strand
-					$start = $fstop - $Data->metadata($column, 'start');
-					$stop  = $fstop - $Data->metadata($column, 'stop');
+					$start = $fstop - $Data->metadata( $column, 'start' );
+					$stop  = $fstop - $Data->metadata( $column, 'stop' );
 				}
-				elsif ($Data->metadata($column, 'start') >= 0 and $strand >= 0) {
+				elsif ( $Data->metadata( $column, 'start' ) >= 0 and $strand >= 0 ) {
+
 					# the start position is greather than 0, implying the 3' end
 					# the reference position will be the feature start on plus strand
-					$start = $fstop + $Data->metadata($column, 'start');
-					$stop  = $fstop + $Data->metadata($column, 'stop');
+					$start = $fstop + $Data->metadata( $column, 'start' );
+					$stop  = $fstop + $Data->metadata( $column, 'stop' );
 				}
-				elsif ($Data->metadata($column, 'start') >= 0 and $strand < 0) {
+				elsif ( $Data->metadata( $column, 'start' ) >= 0 and $strand < 0 ) {
+
 					# the start position is greather than 0, implying the 3' end
 					# the reference position will be the feature end on minus strand
-					$start = $fstart - $Data->metadata($column, 'start');
-					$stop  = $fstart - $Data->metadata($column, 'stop');
+					$start = $fstart - $Data->metadata( $column, 'start' );
+					$stop  = $fstart - $Data->metadata( $column, 'stop' );
 				}
 				else {
-					warn " unable to unable to identify region orientation: start " . 
-						$Data->metadata($column, 'start') . ", strand $strand\n";
+					warn " unable to unable to identify region orientation: start "
+						. $Data->metadata( $column, 'start' )
+						. ", strand $strand\n";
 					return;
 				}
 			}
 			else {
 				# otherwise the bin size is based on feature length
-				if ($strand >= 0) {
+				if ( $strand >= 0 ) {
+
 					# forward plus strand
-					$start = int( $fstart + 
-						($Data->metadata($column, 'start') * 0.01 * $length) + 0.5);
-					$stop  = int( $fstart + 
-						($Data->metadata($column, 'stop') * 0.01 * $length) - 1 + 0.5);
+					$start =
+						int( $fstart +
+							( $Data->metadata( $column, 'start' ) * 0.01 * $length ) +
+							0.5 );
+					$stop =
+						int( $fstart +
+							( $Data->metadata( $column, 'stop' ) * 0.01 * $length ) - 1 +
+							0.5 );
 				}
 				else {
 					# reverse minus strand
-					$start = int( $fstop - 
-						($Data->metadata($column, 'start') * 0.01 * $length) + 0.5);
-					$stop  = int( $fstop - 
-						($Data->metadata($column, 'stop') * 0.01 * $length) + 1 + 0.5);
+					$start =
+						int( $fstop -
+							( $Data->metadata( $column, 'start' ) * 0.01 * $length ) +
+							0.5 );
+					$stop =
+						int( $fstop -
+							( $Data->metadata( $column, 'stop' ) * 0.01 * $length ) + 1 +
+							0.5 );
 				}
 			}
-		
+
 			# collect the data for this bin
 			my $score = $row->get_score(
-				'ddb'         => $ddb,
-				'dataset'     => $dataset,
-				'start'       => $start,
-				'stop'        => $stop,
-				'method'      => $method,
-				'stranded'    => $stranded,
+				'ddb'      => $ddb,
+				'dataset'  => $dataset,
+				'start'    => $start,
+				'stop'     => $stop,
+				'method'   => $method,
+				'stranded' => $stranded,
 			);
-			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-			$row->value($column, $score);
+			$score = sprintf( $formatter, $score ) if ( $formatter and $score ne '.' );
+			$row->value( $column, $score );
 		}
-	}	
+	}
 }
 
-
 sub record_the_bin_values {
-	
+
 	# get the passed values
-	my ($row, $length, $regionscores) = @_;
-	
+	my ( $row, $length, $regionscores ) = @_;
+
 	# assign the scores to the bins in the region
-	for my $column ($startcolumn..($Data->last_column) ) {
+	for my $column ( $startcolumn .. ( $Data->last_column ) ) {
+
 		# we will step through each data column, representing each window (bin)
 		# across the feature's region
-		# any scores within this window will be collected and the mean 
+		# any scores within this window will be collected and the mean
 		# value reported
-		
+
 		# record nulls if no data returned
-		unless (scalar keys %$regionscores) {
-			$row->value($column, calculate_score($method, undef));
+		unless ( scalar keys %$regionscores ) {
+			$row->value( $column, calculate_score( $method, undef ) );
 			next;
 		}
-		
+
 		# convert the window start and stop coordinates (as percentages) to
 		# actual bp
 		# this depends on whether the binsize is explicitly defined in bp or
 		# is a fraction of the feature length
-		my ($start, $stop);
-		if ($Data->metadata($column, 'bin_size') =~ /bp$/) {
+		my ( $start, $stop );
+		if ( $Data->metadata( $column, 'bin_size' ) =~ /bp$/ ) {
+
 			# the bin size is explicitly defined
-			
+
 			# the start and stop points are relative to either the feature
 			# start (always 0) or the end (the feature length), depending
 			# upon whether the 5' or 3' end of the feature
-			
+
 			# determine this by the sign of the start position
-			if ($Data->metadata($column, 'start') < 0) {
+			if ( $Data->metadata( $column, 'start' ) < 0 ) {
+
 				# the start position is less than 0, implying the 5' end
 				# the reference position will be the feature start, or 0
-				$start = $Data->metadata($column, 'start');
-				$stop  = $Data->metadata($column, 'stop');
+				$start = $Data->metadata( $column, 'start' );
+				$stop  = $Data->metadata( $column, 'stop' );
 			}
 			else {
 				# the start position is greather than 0, implying the 3' end
 				# the reference position will be the feature end, or length
-				$start = $Data->metadata($column, 'start') + $length;
-				$stop  = $Data->metadata($column, 'stop') + $length;
+				$start = $Data->metadata( $column, 'start' ) + $length;
+				$stop  = $Data->metadata( $column, 'stop' ) + $length;
 			}
 		}
 		else {
 			# otherwise the bin size is based on feature length
-			$start = sprintf "%.0f", ( 
-				$Data->metadata($column, 'start') * 0.01 * $length) + 1;
-			$stop = sprintf "%.0f", ( 
-				$Data->metadata($column, 'stop') * 0.01 * $length);
+			$start = sprintf "%.0f",
+				( $Data->metadata( $column, 'start' ) * 0.01 * $length ) + 1;
+			$stop = sprintf "%.0f",
+				( $Data->metadata( $column, 'stop' ) * 0.01 * $length );
 		}
-		
+
 		# collect the scores for this window
-		my @scores = 	map { $regionscores->{$_} } 
-						grep { $_ >= $start and $_ <= $stop}
-						keys %$regionscores;
-		
+		my @scores = map { $regionscores->{$_} }
+			grep { $_ >= $start and $_ <= $stop }
+			keys %$regionscores;
+
 		# calculate the value
-		my $window_score = calculate_score($method, \@scores);
-		$window_score = sprintf($formatter, $window_score) 
-			if ($formatter and $window_score ne '.');
-		
+		my $window_score = calculate_score( $method, \@scores );
+		$window_score = sprintf( $formatter, $window_score )
+			if ( $formatter and $window_score ne '.' );
+
 		# record the value
-		$row->value($column, $window_score);
+		$row->value( $column, $window_score );
 	}
 }
 
-
-
 ## Interpolate the '.' values with the mean of the neighbors
 sub go_interpolate_values {
-	
+
 	# determine counts
-	my $lastwindow = $Data->last_column; 
-		# lastwindow is the index of the last column
-	
+	my $lastwindow = $Data->last_column;
+
+	# lastwindow is the index of the last column
+
 	# walk through each data line and then each window
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	while ( my $row = $stream->next_row ) {
 		my $col = $startcolumn + 1;
-		while ($col < $lastwindow) {
+		while ( $col < $lastwindow ) {
+
 			# walk through the windows of a data row
 			# skipping the very first and last windows (columns)
 			# we will look for null values
 			# if one is found, interpolate from neighbors
-			if ($row->value($col) eq '.' and $row->value($col - 1) ne '.') {
+			if ( $row->value($col) eq '.' and $row->value( $col - 1 ) ne '.' ) {
+
 				# we will interpolate the value from the neighbors
 				# first, need to check that the neighbors have values
-				
+
 				# find the next real value
 				my $next_i;
-				for (my $i = $col + 1; $col <= $lastwindow; $i++) {
-					if ($row->value($i) ne '.') {
+				for ( my $i = $col + 1; $col <= $lastwindow; $i++ ) {
+					if ( $row->value($i) ne '.' ) {
 						$next_i = $i;
 						last;
 					}
 				}
 				next unless defined $next_i;
-				
+
 				# determine fractional value
-				my $initial = $row->value($col - 1);
-				my $fraction = ($row->value($next_i) - $initial) / 
-					($next_i - $col + 1);
-				
+				my $initial = $row->value( $col - 1 );
+				my $fraction =
+					( $row->value($next_i) - $initial ) / ( $next_i - $col + 1 );
+
 				# apply fractional values
-				for (my $n = $col; $n < $next_i; $n++) {
-					my $score = $initial + ($fraction * ($n - $col + 1));
-					$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-					$row->value($n, $score);
+				for ( my $n = $col; $n < $next_i; $n++ ) {
+					my $score = $initial + ( $fraction * ( $n - $col + 1 ) );
+					$score = sprintf( $formatter, $score )
+						if ( $formatter and $score ne '.' );
+					$row->value( $n, $score );
 				}
-				
+
 				# jump ahead
 				$col = $next_i;
 			}
@@ -786,101 +794,99 @@ sub go_interpolate_values {
 	}
 }
 
-
 ### Prepare all of the bin columns and their metadata
 sub prepare_bins {
-	
-	my ($binsize, $dataset) = @_;
-	
+
+	my ( $binsize, $dataset ) = @_;
+
 	# the size of the bin in percentage units, default would be 10%
-	# each bin will be titled the starting and ending point for that bin in 
+	# each bin will be titled the starting and ending point for that bin in
 	# percentage units
 	# for example, -20..-10,-10..0,0..10,10..20
-	
+
 	# if $extension is defined, then it will add the appropriate flanking bins,
-	# otherwise it should skip them 
-	
+	# otherwise it should skip them
+
 	# bin(s) on 5' flank
 	if ($extension) {
+
 		# 5' bins are requested
 		if ($extension_size) {
+
 			# extended bins should be of specific bp size
-			for (my $i = $extension; $i > 0; $i--) { 
-				my $start = 0 - ($extension_size * $i);
-				my $stop = 0 - ($extension_size * ($i - 1));
-				_set_metadata($start, $stop, $extension_size, 'bp', $dataset);
+			for ( my $i = $extension; $i > 0; $i-- ) {
+				my $start = 0 - ( $extension_size * $i );
+				my $stop  = 0 - ( $extension_size * ( $i - 1 ) );
+				_set_metadata( $start, $stop, $extension_size, 'bp', $dataset );
 			}
 		}
 		else {
 			# extended bin size will be based on feature length
-			for (my $i = $extension; $i > 0; $i--) { 
-				my $start = 0 - ($binsize * $i);
-				my $stop = 0 - ($binsize * ($i - 1));
-				_set_metadata($start, $stop, $binsize, '%', $dataset);
+			for ( my $i = $extension; $i > 0; $i-- ) {
+				my $start = 0 - ( $binsize * $i );
+				my $stop  = 0 - ( $binsize * ( $i - 1 ) );
+				_set_metadata( $start, $stop, $binsize, '%', $dataset );
 			}
 		}
 	}
-	
+
 	# bins over the gene body
-	for (my $i = 0; $i < $bins; $i++) { 
-		my $start = ($i * $binsize );
-		my $stop = ($i + 1) * $binsize;
-		_set_metadata($start, $stop, $binsize, '%', $dataset);
+	for ( my $i = 0; $i < $bins; $i++ ) {
+		my $start = ( $i * $binsize );
+		my $stop  = ( $i + 1 ) * $binsize;
+		_set_metadata( $start, $stop, $binsize, '%', $dataset );
 	}
-	
+
 	# bin(s) on 3' flank
 	if ($extension) {
+
 		# 5' bins are requested
 		if ($extension_size) {
+
 			# extended bins should be of specific bp size
-			for (my $i = 0; $i < $extension; $i++) { 
-				my $start = ($extension_size * $i);
-				my $stop = ($extension_size * ($i + 1));
-				_set_metadata($start, $stop, $extension_size, 'bp', $dataset);
+			for ( my $i = 0; $i < $extension; $i++ ) {
+				my $start = ( $extension_size * $i );
+				my $stop  = ( $extension_size * ( $i + 1 ) );
+				_set_metadata( $start, $stop, $extension_size, 'bp', $dataset );
 			}
 		}
 		else {
 			# extended bin size will be based on feature length
-			for (my $i = 0; $i < $extension; $i++) { 
-				my $start = 100 + ($binsize * $i);
-				my $stop = 100 + ($binsize * ($i + 1));
-				_set_metadata($start, $stop, $binsize, '%', $dataset);
+			for ( my $i = 0; $i < $extension; $i++ ) {
+				my $start = 100 + ( $binsize * $i );
+				my $stop  = 100 + ( $binsize * ( $i + 1 ) );
+				_set_metadata( $start, $stop, $binsize, '%', $dataset );
 			}
 		}
 	}
 }
-
-
-
 
 ### Set the metadata for a new data table column (dataset)
 sub _set_metadata {
+
 	# the start and stop positions are passed
-	my ($start, $stop, $binsize, $unit, $dataset) = @_;
-	
+	my ( $start, $stop, $binsize, $unit, $dataset ) = @_;
+
 	# generate a simplified new name
 	my $new_name = simplify_dataset_name($dataset);
-	
+
 	# set new index
-	my $new_index = $Data->add_column(sprintf("%s:%d%s", $new_name, $start, $unit));
-	
+	my $new_index = $Data->add_column( sprintf( "%s:%d%s", $new_name, $start, $unit ) );
+
 	# set the metadata using passed and global variables
 	# set the metadata
-	$Data->metadata($new_index, 'start' , $start);
-	$Data->metadata($new_index, 'stop' , $stop);
-	$Data->metadata($new_index, 'dataset' , $dataset);
-	$Data->metadata($new_index, 'method' , $method);
-	$Data->metadata($new_index, 'bin_size' , $binsize . $unit);
-	$Data->metadata($new_index, 'strand' , $stranded);
-	$Data->metadata($new_index, 'decimal_format', $format) if defined $format;
+	$Data->metadata( $new_index, 'start',          $start );
+	$Data->metadata( $new_index, 'stop',           $stop );
+	$Data->metadata( $new_index, 'dataset',        $dataset );
+	$Data->metadata( $new_index, 'method',         $method );
+	$Data->metadata( $new_index, 'bin_size',       $binsize . $unit );
+	$Data->metadata( $new_index, 'strand',         $stranded );
+	$Data->metadata( $new_index, 'decimal_format', $format ) if defined $format;
+
 	if ($data_database) {
-		$Data->metadata($new_index, 'db', $data_database);
+		$Data->metadata( $new_index, 'db', $data_database );
 	}
 }
-
-
-
-
 
 __END__
 

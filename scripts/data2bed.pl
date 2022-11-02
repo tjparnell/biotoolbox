@@ -9,79 +9,67 @@ use List::MoreUtils qw(mesh);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.66';
+my $VERSION = '1.66';
 
 print "\n This program will write a BED file\n";
 
 ### Quick help
-unless (@ARGV) { 
+unless (@ARGV) {
+
 	# when no command line options are present
 	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
-
-
 
 ### Get command line options and initialize values
 my (
-	$infile,
-	$outfile,
-	$bed,
-	$chr_index,
-	$start_index,
-	$stop_index,
-	$name,
-	$score_index,
-	$strand_index,
-	$zero_based,
-	$no_header,
-	$ask,
-	$bigbed,
-	$bb_app_path,
-	$database,
-	$chromo_file,
-	$sort_data,
-	$gz,
-	$bgz,
-	$help,
+	$infile,      $outfile,   $bed,         $chr_index,    $start_index,
+	$stop_index,  $name,      $score_index, $strand_index, $zero_based,
+	$no_header,   $ask,       $bigbed,      $bb_app_path,  $database,
+	$chromo_file, $sort_data, $gz,          $bgz,          $help,
 	$print_version,
 );
 
 # Command line options
-GetOptions( 
-	'i|in=s'           => \$infile, # the solexa data file
-	'o|out=s'          => \$outfile, # name of output file 
-	'H|noheader'       => \$no_header, # source has no header line
-	'bed=i'            => \$bed, # number of bed columns
-	'a|ask'            => \$ask, # request help in assigning indices
-	'c|chr=i'          => \$chr_index, # index of the chromosome column
-	'b|begin|start=i'  => \$start_index, # index of the start position column
-	'e|stop|end=i'     => \$stop_index, # index of the stop position coloumn
-	'n|name=s'         => \$name, # index for the name column
-	's|score=i'        => \$score_index, # index for the score column
-	't|strand=i'       => \$strand_index, # index for the strand column
-	'0|zero!'          => \$zero_based, # source is 0-based numbering, convert
-	'B|bigbed|bb'      => \$bigbed, # generate a binary bigbed file
-	'd|db=s'           => \$database, # database for bigbed file generation
-	'chromof=s'        => \$chromo_file, # name of a chromosome file
-	'bbapp=s'          => \$bb_app_path, # path to bedToBigBed utility
-	'sort!'            => \$sort_data, # sort the output file
-	'z|gz!'            => \$gz, # compress output
-	'Z|bgz!'           => \$bgz, # compress with bgzip
-	'h|help'           => \$help, # request help
-	'v|version'        => \$print_version, # print the version
+GetOptions(
+	'i|in=s'          => \$infile,           # the solexa data file
+	'o|out=s'         => \$outfile,          # name of output file
+	'H|noheader'      => \$no_header,        # source has no header line
+	'bed=i'           => \$bed,              # number of bed columns
+	'a|ask'           => \$ask,              # request help in assigning indices
+	'c|chr=i'         => \$chr_index,        # index of the chromosome column
+	'b|begin|start=i' => \$start_index,      # index of the start position column
+	'e|stop|end=i'    => \$stop_index,       # index of the stop position coloumn
+	'n|name=s'        => \$name,             # index for the name column
+	's|score=i'       => \$score_index,      # index for the score column
+	't|strand=i'      => \$strand_index,     # index for the strand column
+	'0|zero!'         => \$zero_based,       # source is 0-based numbering, convert
+	'B|bigbed|bb'     => \$bigbed,           # generate a binary bigbed file
+	'd|db=s'          => \$database,         # database for bigbed file generation
+	'chromof=s'       => \$chromo_file,      # name of a chromosome file
+	'bbapp=s'         => \$bb_app_path,      # path to bedToBigBed utility
+	'sort!'           => \$sort_data,        # sort the output file
+	'z|gz!'           => \$gz,               # compress output
+	'Z|bgz!'          => \$bgz,              # compress with bgzip
+	'h|help'          => \$help,             # request help
+	'v|version'       => \$print_version,    # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -95,200 +83,209 @@ if ($print_version) {
 	exit;
 }
 
-
-
 ### Check for requirements
 unless ($infile) {
-	$infile = shift @ARGV or
-		die " no input file! use --help for more information\n";
+	$infile = shift @ARGV
+		or die " no input file! use --help for more information\n";
 }
 if ($bed) {
-	unless ($bed == 3 or $bed == 4 or $bed == 5 or $bed == 6) {
+	unless ( $bed == 3 or $bed == 4 or $bed == 5 or $bed == 6 ) {
 		die " bed must be 3, 4, 5, or 6!\n";
 	}
 }
 if ($bigbed) {
+
 	# do not allow compression when converting to bigbed
-	$gz = 0;
-	$bgz = 0;
+	$gz        = 0;
+	$bgz       = 0;
 	$sort_data = 1 if not defined $sort_data;
 }
 if ($bgz) {
-	$gz = 2;
+	$gz        = 2;
 	$sort_data = 1 if not defined $sort_data;
 }
-
 
 # define name base or index
 my $name_index;
 my $name_base;
-if (defined $name) {
-	if ($name =~ /^(\d+)$/) {
+if ( defined $name ) {
+	if ( $name =~ /^(\d+)$/ ) {
+
 		# looks like an index was provided
 		$name_index = $1;
 	}
-	elsif ($name =~ /(\w+)/i) {
+	elsif ( $name =~ /(\w+)/i ) {
+
 		# text that will be used as the name base when autogenerating
 		$name_base = $1;
 	}
 }
 
-
-
 ### Load file
 my $Input = Bio::ToolBox::Data->new(
-	in       => $infile, 
+	in       => $infile,
 	noheader => $no_header,
 	stream   => 1,
 ) or die "Unable to open file '$infile'!\n";
 
 if ($bigbed) {
+
 	# identify database if needed
-	unless ($database or $chromo_file) {
-		$database = $Input->database or 
-			die " No database name or chromosome file provided for generating bigbed file!\n";
+	unless ( $database or $chromo_file ) {
+		$database = $Input->database
+			or die
+			" No database name or chromosome file provided for generating bigbed file!\n";
 	}
 }
-
-
 
 ### Determine indices
 
 # Ask user interactively
 if ($ask) {
+
 	# the user has specified that we should ask for specific indices
 	print " Press Return to accept the suggested index\n";
-	
+
 	# request chromosome index
-	unless (defined $chr_index) {
+	unless ( defined $chr_index ) {
 		my $suggestion = $Input->chromo_column;
-		$chr_index = ask_user_for_index($Input, 
-			" Enter the index for the chromosome column [$suggestion]  ");
+		$chr_index = ask_user_for_index( $Input,
+			" Enter the index for the chromosome column [$suggestion]  " );
 		$chr_index = defined $chr_index ? $chr_index : $suggestion;
-		unless (defined $chr_index) {
+		unless ( defined $chr_index ) {
 			die " No identifiable chromosome column index!\n";
 		}
 	}
-	
+
 	# request start index
-	unless (defined $start_index) {
+	unless ( defined $start_index ) {
 		my $suggestion = $Input->start_column;
-		$start_index = ask_user_for_index($Input, 
-			" Enter the index for the start column [$suggestion]  ");
+		$start_index = ask_user_for_index( $Input,
+			" Enter the index for the start column [$suggestion]  " );
 		$start_index = defined $start_index ? $start_index : $suggestion;
-		unless (defined $start_index) {
+		unless ( defined $start_index ) {
 			die " No identifiable start position column index!\n";
 		}
 	}
-	
+
 	# request stop index
-	unless (defined $stop_index) {
+	unless ( defined $stop_index ) {
 		my $suggestion = $Input->stop_column;
-		$stop_index = ask_user_for_index($Input, 
-			" Enter the index for the stop or end column [$suggestion]  ");
+		$stop_index = ask_user_for_index( $Input,
+			" Enter the index for the stop or end column [$suggestion]  " );
 		$stop_index = defined $stop_index ? $stop_index : $suggestion;
-		unless (defined $stop_index) {
+		unless ( defined $stop_index ) {
 			die " No identifiable stop position column index!\n";
 		}
 	}
-	
+
 	# request name index or text
-	unless (defined $name) {
+	unless ( defined $name ) {
+
 		# this is a special input, can't use the ask_user_for_index sub
 		# accepts either index or text string
 		my $suggestion = $Input->name_column;
-		print " Enter the index for the feature name column or\n" . 
-			"   the base text for auto-generated names [$suggestion]  ";
+		print " Enter the index for the feature name column or\n"
+			. "   the base text for auto-generated names [$suggestion]  ";
 		my $in = <STDIN>;
-		if ($in =~ /^(\d+)$/) {
+		if ( $in =~ /^(\d+)$/ ) {
 			$name_index = $1;
 		}
-		elsif ($in =~ /(\w+)/) {
+		elsif ( $in =~ /(\w+)/ ) {
 			$name_base = $1;
 		}
-		elsif (defined $suggestion) {
+		elsif ( defined $suggestion ) {
 			$name_index = $suggestion;
 		}
 	}
-	
+
 	# request score index
-	unless (defined $score_index) {
+	unless ( defined $score_index ) {
 		my $suggestion = $Input->find_column('^score$');
-		$score_index = ask_user_for_index($Input, 
-			" Enter the index for the feature score column [$suggestion]  ");
+		$score_index = ask_user_for_index( $Input,
+			" Enter the index for the feature score column [$suggestion]  " );
 		$score_index = defined $score_index ? $score_index : $suggestion;
 	}
-	
+
 	# request strand index
-	unless (defined $strand_index) {
+	unless ( defined $strand_index ) {
 		my $suggestion = $Input->strand_column;
-		$strand_index = ask_user_for_index($Input, 
-			" Enter the index for the feature strand column [$suggestion]  ");
+		$strand_index = ask_user_for_index( $Input,
+			" Enter the index for the feature strand column [$suggestion]  " );
 		$strand_index = defined $strand_index ? $strand_index : $suggestion;
 	}
 }
 else {
 	# or else the indices need to be automatically identified
-	unless (
-		$Input->feature_type eq 'coordinate' or 
-		(defined $chr_index and defined $start_index and defined $stop_index) or 
-		($Input->feature_type eq 'named' and ($database or $Input->database)) 
-	) {
-		die "Not enough information has been provided to convert to bed file.\n" . 
-			"Coordinate column names must be recognizable or specified. Use --help\n";
+	unless ( $Input->feature_type eq 'coordinate'
+		or ( defined $chr_index and defined $start_index and defined $stop_index )
+		or ( $Input->feature_type eq 'named' and ( $database or $Input->database ) ) )
+	{
+		die "Not enough information has been provided to convert to bed file.\n"
+			. "Coordinate column names must be recognizable or specified. Use --help\n";
 	}
 }
 
-
-
-
 # print summary of columns
-printf " Converting using \n  - chromosome index %s\n  - start index %s\n" . 
-	"  - stop index %s\n  - name index %s\n  - score index %s\n  - strand index %s\n",
-	defined $chr_index ? $chr_index : defined $Input->chromo_column ? $Input->chromo_column : '-',
-	defined $start_index ? $start_index : defined $Input->start_column ? $Input->start_column : '-',
-	defined $stop_index ? $stop_index : defined $Input->stop_column ? $Input->stop_column : '-',
-	defined $name_index ? $name_index : defined $name_base ? $name_base : defined $Input->name_column ? $Input->name_column : '-',
-	defined $score_index ? $score_index : defined $Input->score_column ? $Input->score_column : '-',
-	defined $strand_index ? $strand_index : defined $Input->strand_column ? $Input->strand_column : '-';
+printf " Converting using \n  - chromosome index %s\n  - start index %s\n"
+	. "  - stop index %s\n  - name index %s\n  - score index %s\n  - strand index %s\n",
+	defined $chr_index              ? $chr_index
+	: defined $Input->chromo_column ? $Input->chromo_column
+	: '-',
+	defined $start_index           ? $start_index
+	: defined $Input->start_column ? $Input->start_column
+	: '-',
+	defined $stop_index           ? $stop_index
+	: defined $Input->stop_column ? $Input->stop_column
+	: '-',
+	defined $name_index           ? $name_index
+	: defined $name_base          ? $name_base
+	: defined $Input->name_column ? $Input->name_column
+	: '-',
+	defined $score_index           ? $score_index
+	: defined $Input->score_column ? $Input->score_column
+	: '-',
+	defined $strand_index           ? $strand_index
+	: defined $Input->strand_column ? $Input->strand_column
+	:                                 '-';
 
 # generate arguments list
 my @arg_keys;
 my @arg_indices;
-if (defined $chr_index) {
-	push @arg_keys, 'chromo';
+if ( defined $chr_index ) {
+	push @arg_keys,    'chromo';
 	push @arg_indices, $chr_index;
 }
-if (defined $start_index) {
-	push @arg_keys, 'start';
+if ( defined $start_index ) {
+	push @arg_keys,    'start';
 	push @arg_indices, $start_index;
 }
-if (defined $stop_index) {
-	push @arg_keys, 'stop';
+if ( defined $stop_index ) {
+	push @arg_keys,    'stop';
 	push @arg_indices, $stop_index;
 }
-if (defined $name_index) {
-	push @arg_keys, 'name';
+if ( defined $name_index ) {
+	push @arg_keys,    'name';
 	push @arg_indices, $name_index;
 }
-if (defined $score_index) {
-	push @arg_keys, 'score';
+if ( defined $score_index ) {
+	push @arg_keys,    'score';
 	push @arg_indices, $score_index;
 }
-if (defined $strand_index) {
-	push @arg_keys, 'strand';
+if ( defined $strand_index ) {
+	push @arg_keys,    'strand';
 	push @arg_indices, $strand_index;
 }
 
 # determine minimum bed
 unless ($bed) {
-	if (defined $strand_index or defined $Input->strand_column) {
+	if ( defined $strand_index or defined $Input->strand_column ) {
 		$bed = 6;
 	}
-	elsif (defined $score_index) {
+	elsif ( defined $score_index ) {
 		$bed = 5;
 	}
-	elsif (defined $name_index or defined $name_base or defined $Input->name_column) {
+	elsif ( defined $name_index or defined $name_base or defined $Input->name_column ) {
 		$bed = 4;
 	}
 	else {
@@ -298,51 +295,46 @@ unless ($bed) {
 printf " Writing as bed%d\n", $bed;
 
 # check for zero start
-if (defined $start_index and substr($Input->name($start_index), -1) eq '0') {
-	$zero_based = 1; # name suggests 0-based indexing
+if ( defined $start_index and substr( $Input->name($start_index), -1 ) eq '0' ) {
+	$zero_based = 1;    # name suggests 0-based indexing
 }
 
 # check for named features
-my $do_feature = $Input->feature_type eq 'named' ? 1 : 0; # get features from db?
-
-
-
+my $do_feature = $Input->feature_type eq 'named' ? 1 : 0;    # get features from db?
 
 ### Convert the input stream
 # Open output data
-my $Output = Bio::ToolBox::Data->new(
-	bed     => $bed,
-) or die " unable to create output data strucutre!\n";
+my $Output = Bio::ToolBox::Data->new( bed => $bed, )
+	or die " unable to create output data strucutre!\n";
 
-my $count = 0; # the number of lines processed
-while (my $row = $Input->next_row) {
-	
+my $count = 0;    # the number of lines processed
+while ( my $row = $Input->next_row ) {
+
 	# get the feature from the db if necessary
 	my $f = $row->feature if $do_feature;
-	
+
 	# build the arguments
 	# retrieve information from row object if indices were provided
-	my @values = map {$row->value($_)} @arg_indices;
-	my %args = mesh(@arg_keys, @values);
+	my @values = map { $row->value($_) } @arg_indices;
+	my %args   = mesh( @arg_keys, @values );
 	$args{bed} = $bed;
-	
+
 	# extras
-	if (defined $name_base) {
-		$args{name} = sprintf("%s_%07d", $name_base, $count);
+	if ( defined $name_base ) {
+		$args{name} = sprintf( "%s_%07d", $name_base, $count );
 	}
-	if ($zero_based and defined $start_index) {
+	if ( $zero_based and defined $start_index ) {
 		$args{start} += 1;
 	}
-	
+
 	# write
 	my $string = $row->bed_string(%args);
 	$Output->add_row($string) if length($string);
-		# weirdly, this should work, as the add_row will split the columns of 
-		# the gff string automatically
+
+	# weirdly, this should work, as the add_row will split the columns of
+	# the gff string automatically
 	$count++;
 }
-
-
 
 ### Finish
 $Input->close_fh;
@@ -354,42 +346,39 @@ unless ($outfile) {
 	$outfile = $Input->path . $Input->basename;
 }
 $outfile = $Output->write_file(
-	filename => $outfile, 
+	filename => $outfile,
 	gz       => $gz,
 );
 
-
-
 ### Convert to BigBed format
 if ($bigbed) {
+
 	# requested to continue and generate a binary bigbed file
-	printf " wrote %s lines to temporary bed file '%s'\n", 
+	printf " wrote %s lines to temporary bed file '%s'\n",
 		format_with_commas($count), $Output->filename;
 	print " converting to bigbed file....\n";
-	
+
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion(
-			'bed'       => $Output->filename,
-			'db'        => $database,
-			'chromo'    => $chromo_file,
-			'bbapppath' => $bb_app_path,
+		'bed'       => $Output->filename,
+		'db'        => $database,
+		'chromo'    => $chromo_file,
+		'bbapppath' => $bb_app_path,
 	);
 
 	# confirm
 	if ($bb_file) {
 		print " BigBed file '$bb_file' generated\n";
-		unlink $outfile; # remove the bed file
+		unlink $outfile;    # remove the bed file
 	}
 	else {
 		die " BigBed file not generated! see standard error\n";
 	}
-	
+
 }
 else {
-	printf " wrote %s lines to BED file '%s'\n", format_with_commas($count), 
-		$outfile;
+	printf " wrote %s lines to BED file '%s'\n", format_with_commas($count), $outfile;
 }
-
 
 __END__
 

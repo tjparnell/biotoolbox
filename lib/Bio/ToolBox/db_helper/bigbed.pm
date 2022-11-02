@@ -10,9 +10,8 @@ use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigBed;
 our $VERSION = '1.51';
 
-
 # Exported names
-our @ISA = qw(Exporter);
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
 	collect_bigbed_scores
 	collect_bigbed_position_scores
@@ -22,82 +21,83 @@ our @EXPORT = qw(
 
 # Hash of Bigfile chromosomes
 our %BIGBED_CHROMOS;
-	# sometimes user may request a chromosome that's not in the bigfile
-	# that could lead to an exception
-	# we will record the chromosomes list in this hash
-	# $BIGBED_CHROMOS{bigfile}{chromos}
-	# we also record the chromosome name variant with or without chr prefix
-	# to accommodate different naming conventions
+
+# sometimes user may request a chromosome that's not in the bigfile
+# that could lead to an exception
+# we will record the chromosomes list in this hash
+# $BIGBED_CHROMOS{bigfile}{chromos}
+# we also record the chromosome name variant with or without chr prefix
+# to accommodate different naming conventions
 
 # Opened bigBed db objects
 our %OPENED_BB;
-	# a cache for opened BigBed databases, primarily for collecting scores
-	# caching here is only for local purposes of collecting scores
-	# db_helper also provides caching of db objects but with option to force open in
-	# the case of forking processes - we don't have that here
+
+# a cache for opened BigBed databases, primarily for collecting scores
+# caching here is only for local purposes of collecting scores
+# db_helper also provides caching of db objects but with option to force open in
+# the case of forking processes - we don't have that here
 
 # The true statement
-1; 
-
+1;
 
 ### Collect BigBed scores only
 sub collect_bigbed_scores {
-	
+
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
+
 	# look at each bedfile
-	# usually there is only one, but for stranded data there may be 
+	# usually there is only one, but for stranded data there may be
 	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	my @scores;
-	for (my $d = DATA; $d < scalar @$param; $d++) {
-	
+	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+
 		# open the bedfile
-		my $bb = _get_bb($param->[$d]);
-			
+		my $bb = _get_bb( $param->[$d] );
+
 		# first check that the chromosome is present
-		my $chromo = $BIGBED_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
-		
+		my $chromo = $BIGBED_CHROMOS{ $param->[$d] }{ $param->[CHR] } or next;
+
 		# collect the features overlapping the region
-			# we are using the high level API rather than the low-level
-			# since we getting the individual scores from each bed element
+		# we are using the high level API rather than the low-level
+		# since we getting the individual scores from each bed element
 		my $bb_stream = $bb->features(
-			-seq_id   => $chromo, 
-			-start    => $param->[STRT], 
+			-seq_id   => $chromo,
+			-start    => $param->[STRT],
 			-end      => $param->[STOP],
 			-iterator => 1,
 		);
-		
+
 		# process each feature
-		while (my $bed = $bb_stream->next_seq) {
-			
+		while ( my $bed = $bb_stream->next_seq ) {
+
 			# First check whether the strand is acceptable
 			if (
-				$param->[STND] eq 'all' # all data is requested
-				or $bed->strand == 0 # unstranded data
-				or ( 
+				$param->[STND] eq 'all'    # all data is requested
+				or $bed->strand == 0       # unstranded data
+				or (
 					# sense data
-					$param->[STR] == $bed->strand 
-					and $param->[STND] eq 'sense'
-				) 
+					$param->[STR] == $bed->strand and $param->[STND] eq 'sense'
+				)
 				or (
 					# antisense data
-					$param->[STR] != $bed->strand  
-					and $param->[STND] eq 'antisense'
+					$param->[STR] != $bed->strand and $param->[STND] eq 'antisense'
 				)
-			) {
+				)
+			{
 				# we have acceptable data to collect
-			
+
 				# store the appropriate datapoint
-				if ($param->[METH] eq 'count') {
+				if ( $param->[METH] eq 'count' ) {
 					push @scores, 1;
 				}
-				elsif ($param->[METH] eq 'pcount') {
-					push @scores, 1 if ($bed->start >= $param->[STRT] and 
-						$bed->end <= $param->[STOP]);
+				elsif ( $param->[METH] eq 'pcount' ) {
+					push @scores, 1
+						if (    $bed->start >= $param->[STRT]
+							and $bed->end <= $param->[STOP] );
 				}
-				elsif ($param->[METH] eq 'ncount') {
+				elsif ( $param->[METH] eq 'ncount' ) {
 					push @scores, $bed->display_name || $bed->primary_id;
 				}
 				else {
@@ -108,93 +108,90 @@ sub collect_bigbed_scores {
 	}
 
 	# return collected data
-	
+
 	return wantarray ? @scores : \@scores;
 }
 
-
-
-
 ### Collect positioned BigBed scores
 sub collect_bigbed_position_scores {
-	
+
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
+
 	# look at each bedfile
 	# usually there is only one, but there may be more
 	my %pos2data;
-	for (my $i = DATA; $i < scalar @$param; $i++) {
-	
+	for ( my $i = DATA; $i < scalar @$param; $i++ ) {
+
 		# open the bedfile
-		my $bb = _get_bb($param->[$i]);
-			
+		my $bb = _get_bb( $param->[$i] );
+
 		# first check that the chromosome is present
-		my $chromo = $BIGBED_CHROMOS{$param->[$i]}{$param->[CHR]} or next;
-		
+		my $chromo = $BIGBED_CHROMOS{ $param->[$i] }{ $param->[CHR] } or next;
+
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
-			-seq_id   => $chromo, 
-			-start    => $param->[STRT], 
+			-seq_id   => $chromo,
+			-start    => $param->[STRT],
 			-end      => $param->[STOP],
 			-iterator => 1,
 		);
-		
+
 		# process each feature
-		while (my $bed = $bb_stream->next_seq) {
-			
+		while ( my $bed = $bb_stream->next_seq ) {
+
 			# First check whether the strand is acceptable
 			if (
-				$param->[STND] eq 'all' # all data is requested
-				or $bed->strand == 0 # unstranded data
-				or ( 
+				$param->[STND] eq 'all'    # all data is requested
+				or $bed->strand == 0       # unstranded data
+				or (
 					# sense data
-					$param->[STR] == $bed->strand 
-					and $param->[STND] eq 'sense'
-				) 
+					$param->[STR] == $bed->strand and $param->[STND] eq 'sense'
+				)
 				or (
 					# antisense data
-					$param->[STR] != $bed->strand  
-					and $param->[STND] eq 'antisense'
+					$param->[STR] != $bed->strand and $param->[STND] eq 'antisense'
 				)
-			) {
+				)
+			{
 				# we have acceptable data to collect
-			
+
 				# determine position to record
 				my $position;
-				if ($bed->start == $bed->end) {
+				if ( $bed->start == $bed->end ) {
+
 					# just one position recorded
 					$position = $bed->start;
 				}
 				else {
 					# calculate the midpoint
-					$position = int( 
-						( ($bed->start + $bed->end) / 2) + 0.5
-					);
+					$position = int( ( ( $bed->start + $bed->end ) / 2 ) + 0.5 );
 				}
-				
+
 				# check the position
-				next unless (
-					# want to avoid those whose midpoint are not technically 
-					# within the region of interest
-					$position >= $param->[STRT] and $position <= $param->[STOP]
-				);
-				
+				next
+					unless (
+						# want to avoid those whose midpoint are not technically
+						# within the region of interest
+						$position >= $param->[STRT] and $position <= $param->[STOP]
+					);
+
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
-				if ($param->[METH] eq 'count') {
+				if ( $param->[METH] eq 'count' ) {
 					$pos2data{$position} += 1;
 				}
-				elsif ($param->[METH] eq 'pcount') {
-					$pos2data{$position} += 1 if 
-						($bed->start <= $param->[STRT] and $bed->end <= $param->[STOP]);
+				elsif ( $param->[METH] eq 'pcount' ) {
+					$pos2data{$position} += 1
+						if (    $bed->start <= $param->[STRT]
+							and $bed->end <= $param->[STOP] );
 				}
-				elsif ($param->[METH] eq 'ncount') {
+				elsif ( $param->[METH] eq 'ncount' ) {
 					$pos2data{$position} ||= [];
-					push @{ $pos2data{$position} }, $bed->display_name || 
-						$bed->primary_id;
- 				}
+					push @{ $pos2data{$position} }, $bed->display_name
+						|| $bed->primary_id;
+				}
 				else {
 					# everything else we just take the score
 					push @{ $pos2data{$position} }, $bed->score + 0;
@@ -204,91 +201,86 @@ sub collect_bigbed_position_scores {
 	}
 
 	# combine multiple datapoints at the same position
-	if ($param->[METH] eq 'ncount') {
-		foreach my $position (keys %pos2data) {
+	if ( $param->[METH] eq 'ncount' ) {
+		foreach my $position ( keys %pos2data ) {
 			my %name2count;
-			foreach (@{$pos2data{$position}}) { $name2count{$_} += 1 }
-			$pos2data{$position} = scalar(keys %name2count);
+			foreach ( @{ $pos2data{$position} } ) { $name2count{$_} += 1 }
+			$pos2data{$position} = scalar( keys %name2count );
 		}
 	}
-	elsif ($param->[METH] eq 'count' or $param->[METH] eq 'pcount') {
+	elsif ( $param->[METH] eq 'count' or $param->[METH] eq 'pcount' ) {
+
 		# do nothing, these aren't arrays
 	}
-	elsif ($param->[METH] eq 'mean') {
-		foreach my $position (keys %pos2data) {
-			$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
-									scalar( @{$pos2data{$position}} );
+	elsif ( $param->[METH] eq 'mean' ) {
+		foreach my $position ( keys %pos2data ) {
+			$pos2data{$position} =
+				sum( @{ $pos2data{$position} } ) / scalar( @{ $pos2data{$position} } );
 		}
 	}
-	elsif ($param->[METH] eq 'median') {
-		foreach my $position (keys %pos2data) {
-			$pos2data{$position} = median( @{$pos2data{$position}} );
+	elsif ( $param->[METH] eq 'median' ) {
+		foreach my $position ( keys %pos2data ) {
+			$pos2data{$position} = median( @{ $pos2data{$position} } );
 		}
 	}
-	elsif ($param->[METH] eq 'min') {
-		foreach my $position (keys %pos2data) {
-			$pos2data{$position} = min( @{$pos2data{$position}} );
+	elsif ( $param->[METH] eq 'min' ) {
+		foreach my $position ( keys %pos2data ) {
+			$pos2data{$position} = min( @{ $pos2data{$position} } );
 		}
 	}
-	elsif ($param->[METH] eq 'max') {
-		foreach my $position (keys %pos2data) {
-			$pos2data{$position} = max( @{$pos2data{$position}} );
+	elsif ( $param->[METH] eq 'max' ) {
+		foreach my $position ( keys %pos2data ) {
+			$pos2data{$position} = max( @{ $pos2data{$position} } );
 		}
 	}
-	elsif ($param->[METH] eq 'sum') {
-		foreach my $position (keys %pos2data) {
-			$pos2data{$position} = sum( @{$pos2data{$position}} );
+	elsif ( $param->[METH] eq 'sum' ) {
+		foreach my $position ( keys %pos2data ) {
+			$pos2data{$position} = sum( @{ $pos2data{$position} } );
 		}
 	}
 	else {
 		# just take the mean for everything else
-		foreach my $position (keys %pos2data) {
-			$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
-									scalar( @{$pos2data{$position}} );
+		foreach my $position ( keys %pos2data ) {
+			$pos2data{$position} =
+				sum( @{ $pos2data{$position} } ) / scalar( @{ $pos2data{$position} } );
 		}
 	}
-	
+
 	# return collected data
 	return wantarray ? %pos2data : \%pos2data;
 }
 
-
-
 ### Open a bigBed database connection
 sub open_bigbed_db {
-	
+
 	# check path
 	my $bedfile = shift;
-	my $path = $bedfile;
-	$path =~ s/^file://; # clean up file prefix if present
-	
+	my $path    = $bedfile;
+	$path =~ s/^file://;    # clean up file prefix if present
+
 	# open
 	my $bb;
-	eval {
-		$bb = Bio::DB::BigBed->new($path);
-	};
+	eval { $bb = Bio::DB::BigBed->new($path); };
 	return unless $bb;
-	
+
 	return $bb;
 }
 
-
-
 ### Sum the total number of features in the bigBed file
 sub sum_total_bigbed_features {
-	
+
 	# Passed arguments;
 	my $bb_file = shift;
 	unless ($bb_file) {
 		carp " no BigBed file or BigBed db object passed!\n";
 		return;
 	}
-	
-	
+
 	# Open BigBed file if necessary
 	my $bb;
 	my $bb_ref = ref $bb_file;
-	if ($bb_ref =~ /Bio::DB::BigBed/) {
+	if ( $bb_ref =~ /Bio::DB::BigBed/ ) {
+
 		# we have an opened bigbed db object
 		$bb = $bb_file;
 	}
@@ -298,32 +290,32 @@ sub sum_total_bigbed_features {
 		$bb = open_bigbed_db($bb_file);
 		return unless ($bb);
 	}
-	
+
 	# Return the item count for the bigBed
 	# wow, this is easy!
 	return $bb->bf->bigBedItemCount;
-		# this is the itemCount available to the low level bigFile object
-		# the validCount method from summary or bin features simple records
-		# the number of covered bases, not entirely useful here
-}
 
+	# this is the itemCount available to the low level bigFile object
+	# the validCount method from summary or bin features simple records
+	# the number of covered bases, not entirely useful here
+}
 
 ### Internal subroutine for getting the cached bigbed object
 sub _get_bb {
 	my $bbfile = shift;
-	
+
 	return $OPENED_BB{$bbfile} if exists $OPENED_BB{$bbfile};
-	
+
 	# open and cache the bigWig object
-	my $bb = open_bigbed_db($bbfile) or 
-		croak " Unable to open bigBed file '$bbfile'! $!\n";
+	my $bb = open_bigbed_db($bbfile)
+		or croak " Unable to open bigBed file '$bbfile'! $!\n";
 	$OPENED_BB{$bbfile} = $bb;
-	
+
 	# record the chromosomes and possible variants
 	$BIGBED_CHROMOS{$bbfile} = {};
-	foreach my $s ($bb->seq_ids) {
+	foreach my $s ( $bb->seq_ids ) {
 		$BIGBED_CHROMOS{$bbfile}{$s} = $s;
-		if ($s =~ /^chr(.+)$/) {
+		if ( $s =~ /^chr(.+)$/ ) {
 			$BIGBED_CHROMOS{$bbfile}{$1} = $s;
 		}
 		else {
@@ -332,7 +324,6 @@ sub _get_bb {
 	}
 	return $bb;
 }
-
 
 __END__
 

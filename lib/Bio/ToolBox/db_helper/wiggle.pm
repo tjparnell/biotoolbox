@@ -8,158 +8,158 @@ use Bio::ToolBox::db_helper::constants;
 use Bio::Graphics::Wiggle;
 our $VERSION = '1.51';
 
-
 # Exported names
-our @ISA = qw(Exporter);
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
 	collect_wig_scores
 	collect_wig_position_scores
 );
 
-
 # Hashes of opened file objects
-our %OPENED_WIGFILES; # opened wigfile objects
-	# in empirical testing, this doesn't really seem to speed things up
-	# like I thought it would
-	# oh well, keep it anyway????
-	# I think this is safe to keep opened wigfiles cached, even across forks,
-	# since they are being opened only during data collection, which should 
-	# only occur within child processes, and there is no explicit db open
+our %OPENED_WIGFILES;  # opened wigfile objects
+                       # in empirical testing, this doesn't really seem to speed things up
+                       # like I thought it would
+                       # oh well, keep it anyway????
+    # I think this is safe to keep opened wigfiles cached, even across forks,
+    # since they are being opened only during data collection, which should
+    # only occur within child processes, and there is no explicit db open
 
 # The true statement
-1; 
-
-
+1;
 
 ### Modules ###
 
 sub collect_wig_scores {
+
 	# we will actually call collect_wig_position_scores()
 	# but only return the values
 	my $wig_data = collect_wig_position_scores(shift);
 	return unless $wig_data;
-	
+
 	# return the values
 	my @values = values %$wig_data;
 	return wantarray ? @values : \@values;
 }
 
-
-
 sub collect_wig_position_scores {
-	
+
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
+
 	# look at each wigfile
-	# usually there is only one, but for stranded data there may be 
+	# usually there is only one, but for stranded data there may be
 	# two wigfiles (+ and -), so we'll check each wig file for strand info
-	my %pos2score; # position => score
-	for (my $d = DATA; $d < scalar @$param; $d++) {
-		
+	my %pos2score;    # position => score
+	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+
 		my $feature = $param->[$d];
-		confess "dataset is not a seqfeature object!" unless ref($feature) =~ /seqfeature/i;
-		
+		confess "dataset is not a seqfeature object!"
+			unless ref($feature) =~ /seqfeature/i;
+
 		# Check which data to take based on strand
 		if (
-			$param->[STND] eq 'all' # all data is requested
-			or $feature->strand == 0 # unstranded data
-			or ( 
+			$param->[STND] eq 'all'     # all data is requested
+			or $feature->strand == 0    # unstranded data
+			or (
 				# sense data
-				$param->[STR] == $feature->strand 
-				and $param->[STND] eq 'sense'
-			) 
+				$param->[STR] == $feature->strand and $param->[STND] eq 'sense'
+			)
 			or (
 				# antisense data
-				$param->[STR] != $feature->strand  
-				and $param->[STND] eq 'antisense'
+				$param->[STR] != $feature->strand and $param->[STND] eq 'antisense'
 			)
-		) {
+			)
+		{
 			# we have acceptable data to collect
-			
+
 			# collect from wigfile if present
-			if ($feature->has_tag('wigfile') ) {
-				
+			if ( $feature->has_tag('wigfile') ) {
+
 				# get wigfile name
 				my @wigfiles = $feature->get_tag_values('wigfile');
-				my $wigfile = shift @wigfiles; # there should only be one wigfile
+				my $wigfile  = shift @wigfiles;    # there should only be one wigfile
 				confess " no wigfile passed!\n" unless $wigfile;
-				
+
 				# check for opened wigfile
 				my $wig;
-				if (exists $OPENED_WIGFILES{$wigfile} ) {
+				if ( exists $OPENED_WIGFILES{$wigfile} ) {
+
 					# this file is already opened, use it
 					$wig = $OPENED_WIGFILES{$wigfile};
 				}
 				else {
 					# this file has not been opened yet, open it
-					unless (-e $wigfile) {
+					unless ( -e $wigfile ) {
 						confess " Binary wiggle file '$wigfile' does not exist!\n";
 					}
-					$wig = Bio::Graphics::Wiggle->new($wigfile,0);
+					$wig = Bio::Graphics::Wiggle->new( $wigfile, 0 );
 					unless ($wig) {
 						confess " unable to open data wigfile '$wigfile'";
 					}
-					
+
 					# store the opened object for later use
 					$OPENED_WIGFILES{$wigfile} = $wig;
 				}
-				
+
 				# adjust as necessary to avoid wig errors
-				if ($param->[STRT] < $wig->start) {
+				if ( $param->[STRT] < $wig->start ) {
+
 					# adjust the start position
 					$param->[STRT] = $wig->start;
 				}
-				elsif ($param->[STRT] > $wig->end) {
+				elsif ( $param->[STRT] > $wig->end ) {
+
 					# nothing we can do here, no values
 					return;
 				}
-				if ($param->[STOP] > $wig->end) {
+				if ( $param->[STOP] > $wig->end ) {
+
 					# adjust the end position
 					$param->[STOP] = $wig->end;
 				}
-				elsif ($param->[STOP] < $wig->start) {
+				elsif ( $param->[STOP] < $wig->start ) {
+
 					# nothing we can do here, no values
 					return;
 				}
-				
+
 				# collect the wig values
-				my $scores_ref = $wig->values($param->[STRT] => $param->[STOP]);
-				
+				my $scores_ref = $wig->values( $param->[STRT] => $param->[STOP] );
+
 				# re-associate position with the scores
-				my $step = $wig->step || 1; # step should always be defined but just in case
+				my $step =
+					$wig->step || 1;    # step should always be defined but just in case
 				my $pos = $param->[STRT];
-				foreach my $s (@{ $scores_ref }) {
+				foreach my $s ( @{$scores_ref} ) {
+
 					#print Dumper($s);
-					if (defined $s) {
-						# the binary wig file (.wib) is usually set up with 
+					if ( defined $s ) {
+
+						# the binary wig file (.wib) is usually set up with
 						# a step of 1 bp, even if the original wig file was not
-						# this can result in lots of undefined values at the 
+						# this can result in lots of undefined values at the
 						# positions where there was no original data
 						# hence the defined check here
 						# store a real value in the hash keyed under the position
-						if ($param->[METH] eq 'count') {
+						if ( $param->[METH] eq 'count' ) {
 							$pos2score{$pos} = 1;
 						}
 						else {
 							$pos2score{$pos} = $s;
 						}
 					}
-					
-					# adjust position by the step size, 
+
+					# adjust position by the step size,
 					$pos += $step;
 				}
 			}
 		}
-	}	
-	
+	}
+
 	# return the wig data hash
 	return wantarray ? %pos2score : \%pos2score;
 }
-
-
-
 
 __END__
 

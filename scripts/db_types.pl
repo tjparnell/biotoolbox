@@ -14,32 +14,29 @@ my $VERSION = '1.19';
 
 print "\n A script to print all available feature types in a database\n\n";
 
-
 ### Quick help
-# 
-
+#
 
 ### Get command line options and initialize values
-my (
-	$dbname,
-	$help,
-	$print_version,
-);
+my ( $dbname, $help, $print_version, );
 
 # Command line options
-GetOptions( 
-	'db=s'      => \$dbname, # the database name
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+GetOptions(
+	'db=s'    => \$dbname,           # the database name
+	'help'    => \$help,             # request help
+	'version' => \$print_version,    # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -53,10 +50,6 @@ if ($print_version) {
 	exit;
 }
 
-
-
-
-
 # Check for database
 unless ($dbname) {
 	if (@ARGV) {
@@ -66,17 +59,17 @@ unless ($dbname) {
 		$dbname = request_db_from_user();
 	}
 }
-unless ($dbname) { 
+unless ($dbname) {
+
 	# when no databases are available, print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 	exit;
 }
-
-
-
 
 # Initialize
 my $count = 0;
@@ -84,25 +77,26 @@ my %source2type;
 
 # Get the features
 my @types = get_dataset_list($dbname);
-	# this returns an array of database types
-	
+
+# this returns an array of database types
+
 foreach my $type (@types) {
-	
+
 	# each type is usually comprised of primary_tag:source_tag
 	# although sometimes it is just the primary_tag
-	
+
 	# get individual tags
-	my ($primary, $source);
-	if ($type =~ /:/) {
-		($primary, $source) = split /:/, $type;
+	my ( $primary, $source );
+	if ( $type =~ /:/ ) {
+		( $primary, $source ) = split /:/, $type;
 	}
 	else {
 		$primary = $type;
 		$source  = 'NONE';
 	}
-	
+
 	# store the type in an array under the source
-	if (exists $source2type{$source}) {
+	if ( exists $source2type{$source} ) {
 		push @{ $source2type{$source} }, $primary;
 	}
 	else {
@@ -112,35 +106,31 @@ foreach my $type (@types) {
 }
 print " Found $count feature types in database '$dbname'\n";
 
-
 # Print the database types by source type
-foreach my $source (sort {$a cmp $b} keys %source2type) {
-	print "  There are ", scalar @{$source2type{$source}}, " feature types ", 
+foreach my $source ( sort { $a cmp $b } keys %source2type ) {
+	print "  There are ", scalar @{ $source2type{$source} }, " feature types ",
 		"with source '$source'\n";
-	foreach (sort {$a cmp $b} @{$source2type{$source}} ) {
+	foreach ( sort { $a cmp $b } @{ $source2type{$source} } ) {
 		print "     $_\n";
 	}
 }
 
-
 print "That's all\n";
-
-
 
 sub request_db_from_user {
 	my %num2db;
 	my $n = 1;
-	foreach my $key ($BTB_CONFIG->param()) {
-		if ($key =~ /^(.+)\.dsn$/) {
+	foreach my $key ( $BTB_CONFIG->param() ) {
+		if ( $key =~ /^(.+)\.dsn$/ ) {
 			next if $1 =~ /example/;
 			$num2db{$n} = $1;
 			$n++;
 		}
 	}
 	return unless $n > 1;
-	
+
 	print " These are the known databases:\n";
-	foreach (sort {$a <=> $b} keys %num2db) {
+	foreach ( sort { $a <=> $b } keys %num2db ) {
 		print "   $_\t$num2db{$_}\n";
 	}
 	print " Enter the number of the database to examine   ";
@@ -149,7 +139,6 @@ sub request_db_from_user {
 	return unless exists $num2db{$number};
 	return $num2db{$number};
 }
-
 
 __END__
 

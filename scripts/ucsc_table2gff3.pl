@@ -14,78 +14,64 @@ my $VERSION = '1.69';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
-
-
-
 ### Quick help
-unless (@ARGV) { 
+unless (@ARGV) {
+
 	# when no command line options are present
 	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
-
-
 
 ### Command line options
 my (
-	$ftp_file,
-	$database,
-	$host,
-	$do_chromo,
-	$refseqstatusf,
-	$refseqsumf,
-	$ensemblnamef,
-	$ensemblsourcef,
-	$kgxreff,
-	$chromof,
-	$user_source,
-	$do_gene,
-	$do_cds,
-	$do_utr,
-	$do_codon,
-	$share,
-	$do_name,
-	$do_gtf,
-	$gz,
-	$help,
+	$ftp_file,      $database,   $host,         $do_chromo,
+	$refseqstatusf, $refseqsumf, $ensemblnamef, $ensemblsourcef,
+	$kgxreff,       $chromof,    $user_source,  $do_gene,
+	$do_cds,        $do_utr,     $do_codon,     $share,
+	$do_name,       $do_gtf,     $gz,           $help,
 	$print_version,
 );
 my @genetables;
-GetOptions( 
-	'f|ftp=s'      => \$ftp_file, # which database table to retrieve
-	'd|db=s'       => \$database, # which ucsc genome to use
-	'h|host=s'     => \$host, # the ftp server to connect to
-	'chr!'         => \$do_chromo, # include the chromosome file from ftp
-	't|table=s'    => \@genetables, # the input gene table files
-	'a|status=s'   => \$refseqstatusf, # the refseqstatus file
-	's|sum=s'      => \$refseqsumf, # the refseqsummary file
-	'k|kgxref=s'   => \$kgxreff, # the kgXref info file
-	'n|ensname=s'  => \$ensemblnamef, # the ensemblToGeneName file
-	'r|enssrc=s'   => \$ensemblsourcef, # the ensemblSource file
-	'c|chromo=s'   => \$chromof, # a chromosome file
-	'source=s'     => \$user_source, # user provided source
-	'gene!'        => \$do_gene, # include genes in output
-	'cds!'         => \$do_cds, # include CDS in output
-	'utr!'         => \$do_utr, # include UTRs in output
-	'codon!'       => \$do_codon, # include start & stop codons in output
-	'share!'       => \$share, # share common exons and UTRs
-	'name!'        => \$do_name, # assign names to CDSs, UTRs, and exons
-	'g|gtf!'       => \$do_gtf, # write a gtf file instead
-	'z|gz!'        => \$gz, # compress file
-	'h|help'       => \$help, # request help
-	'v|version'    => \$print_version, # print the version
+GetOptions(
+	'f|ftp=s'     => \$ftp_file,          # which database table to retrieve
+	'd|db=s'      => \$database,          # which ucsc genome to use
+	'h|host=s'    => \$host,              # the ftp server to connect to
+	'chr!'        => \$do_chromo,         # include the chromosome file from ftp
+	't|table=s'   => \@genetables,        # the input gene table files
+	'a|status=s'  => \$refseqstatusf,     # the refseqstatus file
+	's|sum=s'     => \$refseqsumf,        # the refseqsummary file
+	'k|kgxref=s'  => \$kgxreff,           # the kgXref info file
+	'n|ensname=s' => \$ensemblnamef,      # the ensemblToGeneName file
+	'r|enssrc=s'  => \$ensemblsourcef,    # the ensemblSource file
+	'c|chromo=s'  => \$chromof,           # a chromosome file
+	'source=s'    => \$user_source,       # user provided source
+	'gene!'       => \$do_gene,           # include genes in output
+	'cds!'        => \$do_cds,            # include CDS in output
+	'utr!'        => \$do_utr,            # include UTRs in output
+	'codon!'      => \$do_codon,          # include start & stop codons in output
+	'share!'      => \$share,             # share common exons and UTRs
+	'name!'       => \$do_name,           # assign names to CDSs, UTRs, and exons
+	'g|gtf!'      => \$do_gtf,            # write a gtf file instead
+	'z|gz!'       => \$gz,                # compress file
+	'h|help'      => \$help,              # request help
+	'v|version'   => \$print_version,     # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -96,95 +82,85 @@ if ($print_version) {
 	exit;
 }
 
-
-
-
-
 ### Check requirements and defaults
-unless (@genetables or $ftp_file or $chromof) {
+unless ( @genetables or $ftp_file or $chromof ) {
 	die " Specify either an input table file, chromosome file, or a FTP table!\n";
 }
 if ($ftp_file) {
-	unless ($ftp_file =~ m/^refgene|ensgene|xenorefgene|known|all$/i) {
+	unless ( $ftp_file =~ m/^refgene|ensgene|xenorefgene|known|all$/i ) {
 		die " requested table '$ftp_file' by FTP not supported! see help\n";
 	}
-	unless (defined $database) {
+	unless ( defined $database ) {
 		die " a UCSC genome database must be provided! see help\n";
 	}
-	unless (defined $do_chromo) {
+	unless ( defined $do_chromo ) {
 		$do_chromo = 1;
 	}
-	unless (defined $host) {
+	unless ( defined $host ) {
 		$host = 'hgdownload.cse.ucsc.edu';
 	}
 }
-unless (defined $do_gene) {
+unless ( defined $do_gene ) {
 	$do_gene = 1;
 }
-unless (defined $do_utr) {
+unless ( defined $do_utr ) {
 	$do_utr = 0;
 }
-unless (defined $do_cds) {
+unless ( defined $do_cds ) {
 	$do_cds = 1;
-	unless (defined $do_codon) {
+	unless ( defined $do_codon ) {
 		$do_codon = 0;
 	}
 }
-unless (defined $share) {
+unless ( defined $share ) {
 	$share = 1;
 }
-unless (defined $do_name) {
+unless ( defined $do_name ) {
 	$do_name = 0;
 }
 my $start_time = time;
 
-
-
-
 ### Fetch files if requested
 if ($ftp_file) {
-	
+
 	# collect the requested files by ftp
 	my @files = fetch_files_by_ftp();
-	
+
 	# push file names into appropriate variables
 	foreach my $file (@files) {
-		if ($file =~ /refgene|ensgene|knowngene/i) {
+		if ( $file =~ /refgene|ensgene|knowngene/i ) {
 			push @genetables, $file;
 		}
-		elsif ($file =~ /summary/i) {
+		elsif ( $file =~ /summary/i ) {
 			$refseqsumf = $file;
 		}
-		elsif ($file =~ /status/i) {
+		elsif ( $file =~ /status/i ) {
 			$refseqstatusf = $file;
 		}
-		elsif ($file =~ /ensembltogene/i) {
+		elsif ( $file =~ /ensembltogene/i ) {
 			$ensemblnamef = $file;
 		}
-		elsif ($file =~ /ensemblsource/i) {
+		elsif ( $file =~ /ensemblsource/i ) {
 			$ensemblsourcef = $file;
 		}
-		elsif ($file =~ /kgxref/i) {
+		elsif ( $file =~ /kgxref/i ) {
 			$kgxreff = $file;
 		}
-		elsif ($file =~ /chrom/i) {
+		elsif ( $file =~ /chrom/i ) {
 			$chromof = $file;
 		}
 	}
 }
 
-
-
-
 ### Initiate the parser
 my $ucsc = Bio::ToolBox::parser::ucsc->new(
-	do_gene     => $do_gene,
-	do_exon     => 1, # always
-	do_cds      => $do_cds,
-	do_utr      => $do_utr,
-	do_codon    => $do_codon,
-	do_name     => $do_name,
-	share       => $share,
+	do_gene  => $do_gene,
+	do_exon  => 1,           # always
+	do_cds   => $do_cds,
+	do_utr   => $do_utr,
+	do_codon => $do_codon,
+	do_name  => $do_name,
+	share    => $share,
 ) or die "cannot initialize ucsc parser!";
 
 # add options
@@ -192,103 +168,93 @@ if ($user_source) {
 	$ucsc->source($user_source);
 }
 if ($refseqsumf) {
-	my $c = $ucsc->load_extra_data($refseqsumf, 'refseqsummary');
-	printf " Loaded %s transcripts from supplemental data file '$refseqsumf'\n", 
+	my $c = $ucsc->load_extra_data( $refseqsumf, 'refseqsummary' );
+	printf " Loaded %s transcripts from supplemental data file '$refseqsumf'\n",
 		format_with_commas($c);
 }
 if ($refseqstatusf) {
-	my $c = $ucsc->load_extra_data($refseqstatusf, 'refseqstatus');
-	printf " Loaded %s transcripts from supplemental data file '$refseqstatusf'\n", 
+	my $c = $ucsc->load_extra_data( $refseqstatusf, 'refseqstatus' );
+	printf " Loaded %s transcripts from supplemental data file '$refseqstatusf'\n",
 		format_with_commas($c);
 }
 if ($ensemblnamef) {
-	my $c = $ucsc->load_extra_data($ensemblnamef, 'ensembltogene');
-	printf " Loaded %s transcripts from supplemental data file '$ensemblnamef'\n", 
+	my $c = $ucsc->load_extra_data( $ensemblnamef, 'ensembltogene' );
+	printf " Loaded %s transcripts from supplemental data file '$ensemblnamef'\n",
 		format_with_commas($c);
 }
 if ($ensemblsourcef) {
-	my $c = $ucsc->load_extra_data($ensemblsourcef, 'ensemblsource');
-	printf " Loaded %s transcripts from supplemental data file '$ensemblsourcef'\n", 
+	my $c = $ucsc->load_extra_data( $ensemblsourcef, 'ensemblsource' );
+	printf " Loaded %s transcripts from supplemental data file '$ensemblsourcef'\n",
 		format_with_commas($c);
 }
 if ($kgxreff) {
-	my $c = $ucsc->load_extra_data($kgxreff, 'kgxref');
-	printf " Loaded %s transcripts from supplemental data file '$kgxreff'\n", 
+	my $c = $ucsc->load_extra_data( $kgxreff, 'kgxref' );
+	printf " Loaded %s transcripts from supplemental data file '$kgxreff'\n",
 		format_with_commas($c);
 }
 
-
-
-
 # walk through the input tables
 foreach my $file (@genetables) {
-	
+
 	# open output file
-	my ($outfile, $gff_fh) = open_output_gff($file);
-	
+	my ( $outfile, $gff_fh ) = open_output_gff($file);
+
 	# process chromosome
 	if ($chromof) {
+
 		# we will write sequence-region pragmas for every gff file automatically
 		# the current gff parser and Bio::DB::SeqFeature will correctly parse them
 		print_chromosomes($gff_fh);
-	}	
-	
+	}
+
 	# convert the table
 	print " Converting gene table '$file' features....\n";
-	unless ($ucsc->open_file($file)) {
+	unless ( $ucsc->open_file($file) ) {
 		warn " Unable to open file!\n";
 		next;
 	}
 	my $tops = $ucsc->top_features;
-	print_current_gene_list($gff_fh, $tops);
-	
-	
+	print_current_gene_list( $gff_fh, $tops );
+
 	# report outcomes
 	my $count = $ucsc->counts;
-	print "  converted ", format_with_commas($count->{gene}), 
-		" gene features\n" if $count->{gene} > 0;
-	print "  converted ", format_with_commas($count->{mrna}), 
-		" mRNA transcripts\n" if $count->{mrna} > 0;
-	print "  converted ", format_with_commas($count->{pseudogene}), 
-		" pseudogene transcripts\n" if $count->{pseudogene} > 0;
-	print "  converted ", format_with_commas($count->{ncrna}), 
-		" ncRNA transcripts\n" if $count->{ncrna} > 0;
-	print "  converted ", format_with_commas($count->{mirna}), 
-		" miRNA transcripts\n" if $count->{mirna} > 0;
-	print "  converted ", format_with_commas($count->{snrna}), 
-		" snRNA transcripts\n" if $count->{snrna} > 0;
-	print "  converted ", format_with_commas($count->{snorna}), 
-		" snoRNA transcripts\n" if $count->{snorna} > 0;
-	print "  converted ", format_with_commas($count->{trna}), 
-		" tRNA transcripts\n" if $count->{trna} > 0;
-	print "  converted ", format_with_commas($count->{rrna}), 
-		" rRNA transcripts\n" if $count->{rrna} > 0;
-	print "  converted ", format_with_commas($count->{other}), 
-		" other transcripts\n" if $count->{other} > 0;
-	
+	print "  converted ", format_with_commas( $count->{gene} ), " gene features\n"
+		if $count->{gene} > 0;
+	print "  converted ", format_with_commas( $count->{mrna} ), " mRNA transcripts\n"
+		if $count->{mrna} > 0;
+	print "  converted ", format_with_commas( $count->{pseudogene} ),
+		" pseudogene transcripts\n"
+		if $count->{pseudogene} > 0;
+	print "  converted ", format_with_commas( $count->{ncrna} ), " ncRNA transcripts\n"
+		if $count->{ncrna} > 0;
+	print "  converted ", format_with_commas( $count->{mirna} ), " miRNA transcripts\n"
+		if $count->{mirna} > 0;
+	print "  converted ", format_with_commas( $count->{snrna} ), " snRNA transcripts\n"
+		if $count->{snrna} > 0;
+	print "  converted ", format_with_commas( $count->{snorna} ), " snoRNA transcripts\n"
+		if $count->{snorna} > 0;
+	print "  converted ", format_with_commas( $count->{trna} ), " tRNA transcripts\n"
+		if $count->{trna} > 0;
+	print "  converted ", format_with_commas( $count->{rrna} ), " rRNA transcripts\n"
+		if $count->{rrna} > 0;
+	print "  converted ", format_with_commas( $count->{other} ), " other transcripts\n"
+		if $count->{other} > 0;
+
 	# Finished
-	printf "  wrote file '$outfile' in %.1f minutes\n", 
-		(time - $start_time)/60;
-	
+	printf "  wrote file '$outfile' in %.1f minutes\n", ( time - $start_time ) / 60;
+
 }
-
-
 
 ### Finish
 exit;
 
-
-
-
-
 #########################  Subroutines  #######################################
 
 sub fetch_files_by_ftp {
-	
-	
+
 	# generate ftp request list
 	my @ftp_files;
-	if ($ftp_file eq 'all') {
+	if ( $ftp_file eq 'all' ) {
 		@ftp_files = qw(
 			refgene
 			ensgene
@@ -296,86 +262,88 @@ sub fetch_files_by_ftp {
 			known
 		);
 	}
-	elsif ($ftp_file =~ /,/) {
+	elsif ( $ftp_file =~ /,/ ) {
 		@ftp_files = split /,/, $ftp_file;
 	}
 	else {
 		push @ftp_files, $ftp_file;
 	}
-	
+
 	# generate list of files
 	my @files;
 	foreach my $item (@ftp_files) {
-		if ($item =~ m/^xeno/i) {
+		if ( $item =~ m/^xeno/i ) {
 			push @files, qw(
-				xenoRefGene.txt.gz 
-				refSeqStatus.txt.gz 
+				xenoRefGene.txt.gz
+				refSeqStatus.txt.gz
 				refSeqSummary.txt.gz
 			);
 		}
-		elsif ($item =~ m/refgene/i) {
+		elsif ( $item =~ m/refgene/i ) {
 			push @files, qw(
-				refGene.txt.gz 
-				refSeqStatus.txt.gz 
+				refGene.txt.gz
+				refSeqStatus.txt.gz
 				refSeqSummary.txt.gz
 			);
 		}
-		elsif ($item =~ m/ensgene/i) {
+		elsif ( $item =~ m/ensgene/i ) {
 			push @files, qw(
-				ensGene.txt.gz 
+				ensGene.txt.gz
 				ensemblToGeneName.txt.gz
 				ensemblSource.txt.gz
 			);
 		}
-		elsif ($item =~ m/known/i) {
+		elsif ( $item =~ m/known/i ) {
 			push @files, qw(
-				knownGene.txt.gz 
-				kgXref.txt.gz 
+				knownGene.txt.gz
+				kgXref.txt.gz
 			);
 		}
 	}
+
 	# this might seem convulated....
 	# but we're putting all the file names in a single array
 	# instead of specific global variables
 	# to make retrieving through FTP a little easier
 	# plus, not all files may be available for each species, e.g. knownGene
 	# we also rename the files after downloading them
-	
-	# we will sort out the list of downloaded files later and assign them 
+
+	# we will sort out the list of downloaded files later and assign them
 	# to specific global filename variables
-	
+
 	# add chromosome file if requested
 	if ($do_chromo) {
 		push @files, 'chromInfo.txt.gz';
 	}
-	
+
 	# set the path based on user provided database
 	my $path = 'goldenPath/' . $database . '/database/';
-	
+
 	# initiate connection
 	print " Connecting to $host....\n";
 	my $ftp = Net::FTP->new($host) or die "Cannot connect! $@";
-	$ftp->login or die "Cannot login! " . $ftp->message;
-	
+	$ftp->login                    or die "Cannot login! " . $ftp->message;
+
 	# prepare for download
-	$ftp->cwd($path) or 
-		die "Cannot change working directory to '$path'! " . $ftp->message;
+	$ftp->cwd($path)
+		or die "Cannot change working directory to '$path'! " . $ftp->message;
 	$ftp->binary;
-	
+
 	# download requested files
 	my @fetched_files;
 	foreach my $file (@files) {
 		print "  fetching $file....\n";
+
 		# prepend the local file name with the database
 		my $new_file = $database . '_' . $file;
-		
+
 		# fetch
-		if ($ftp->get($file, $new_file) ) { 
+		if ( $ftp->get( $file, $new_file ) ) {
 			push @fetched_files, $new_file;
 		}
-		else {	
+		else {
 			my $message = $ftp->message;
-			if ($message =~ /no such file/i) {
+			if ( $message =~ /no such file/i ) {
 				print "   file unavailable\n";
 			}
 			else {
@@ -384,61 +352,59 @@ sub fetch_files_by_ftp {
 		}
 	}
 	$ftp->quit;
-	
+
 	print " Finished\n";
 	return @fetched_files;
 }
 
-
-
-
 sub open_output_gff {
-	
+
 	# prepare output file name
-	my $file = shift;
+	my $file    = shift;
 	my $outfile = $file;
-	$outfile =~ s/\.txt(?:\.gz)?$//i; # remove the extension
+	$outfile =~ s/\.txt(?:\.gz)?$//i;    # remove the extension
 	$outfile .= $do_gtf ? '.gtf' : '.gff3';
 	if ($gz) {
 		$outfile .= '.gz';
 	}
-	
+
 	# open file handle
-	my $fh = Bio::ToolBox->write_file($outfile, $gz) or
-		die " unable to open file '$outfile' for writing!\n";
-	
+	my $fh = Bio::ToolBox->write_file( $outfile, $gz )
+		or die " unable to open file '$outfile' for writing!\n";
+
 	# print comments
-	$fh->printf("##gff-version %s\n", $do_gtf ? '2.5' : '3');
+	$fh->printf( "##gff-version %s\n", $do_gtf ? '2.5' : '3' );
 	$fh->print("##genome-build UCSC $database\n") if $database;
 	$fh->print("# UCSC table file $file\n");
-	
+
 	# finish
-	return ($outfile, $fh);
+	return ( $outfile, $fh );
 }
 
-
 sub print_current_gene_list {
-	my ($gff_fh, $top_features) = @_;
-	
+	my ( $gff_fh, $top_features ) = @_;
+
 	# we need to sort the genes in genomic order before writing the GFF
-	printf "  Sorting %s top features....\n", format_with_commas(scalar(@$top_features));
+	printf "  Sorting %s top features....\n",
+		format_with_commas( scalar(@$top_features) );
 	my %pos2seqf;
 	foreach my $gene (@$top_features) {
+
 		# get coordinates
 		my $start = $gene->start;
 		my $chr;
 		my $key;
-		
+
 		# identify which key to put under
-		if ($gene->seq_id =~ /^chr(\d+)$/i) {
+		if ( $gene->seq_id =~ /^chr(\d+)$/i ) {
 			$chr = $1;
 			$key = 'numeric_chr';
 		}
-		elsif ($gene->seq_id =~ /^chr(\w+)$/i) {
+		elsif ( $gene->seq_id =~ /^chr(\w+)$/i ) {
 			$chr = $1;
 			$key = 'other_chr';
 		}
-		elsif ($gene->seq_id =~ /(\d+)$/) {
+		elsif ( $gene->seq_id =~ /(\d+)$/ ) {
 			$chr = $1;
 			$key = 'other_numeric';
 		}
@@ -446,102 +412,101 @@ sub print_current_gene_list {
 			$chr = $gene->seq_id;
 			$key = 'other';
 		}
-		
+
 		# make sure start positions are unique, just in case
 		# these modifications won't make it into seqfeature object
-		while (exists $pos2seqf{$key}{$chr}{$start}) {
+		while ( exists $pos2seqf{$key}{$chr}{$start} ) {
 			$start++;
 		}
-		
+
 		# store the seqfeature
 		$pos2seqf{$key}{$chr}{$start} = $gene;
 	}
-	
+
 	# print in genomic order
-	# the gff_string method is undocumented in the POD, but is a 
-	# valid method. Passing 1 should force a recursive action to 
+	# the gff_string method is undocumented in the POD, but is a
+	# valid method. Passing 1 should force a recursive action to
 	# print both parent and children.
 	print "  Writing features to GFF....\n";
-	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'numeric_chr'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'numeric_chr'}{$chr} }) {
+	foreach my $chr ( sort { $a <=> $b } keys %{ $pos2seqf{'numeric_chr'} } ) {
+		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'numeric_chr'}{$chr} } )
+		{
 			# print the seqfeature recursively
 			if ($do_gtf) {
-				$gff_fh->print(gtf_string($pos2seqf{'numeric_chr'}{$chr}{$start}));
+				$gff_fh->print( gtf_string( $pos2seqf{'numeric_chr'}{$chr}{$start} ) );
 			}
 			else {
-				$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1) );
 				$gff_fh->print("###\n");
-			} 
+			}
 		}
 	}
-	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other_chr'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_chr'}{$chr} }) {
+	foreach my $chr ( sort { $a cmp $b } keys %{ $pos2seqf{'other_chr'} } ) {
+		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'other_chr'}{$chr} } ) {
 			if ($do_gtf) {
-				$gff_fh->print(gtf_string($pos2seqf{'other_chr'}{$chr}{$start}));
+				$gff_fh->print( gtf_string( $pos2seqf{'other_chr'}{$chr}{$start} ) );
 			}
 			else {
-				$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1) );
 				$gff_fh->print("###\n");
-			} 
+			}
 		}
 	}
-	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'other_numeric'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_numeric'}{$chr} }) {
+	foreach my $chr ( sort { $a <=> $b } keys %{ $pos2seqf{'other_numeric'} } ) {
+		foreach
+			my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'other_numeric'}{$chr} } )
+		{
 			if ($do_gtf) {
-				$gff_fh->print(gtf_string($pos2seqf{'other_numeric'}{$chr}{$start}));
+				$gff_fh->print( gtf_string( $pos2seqf{'other_numeric'}{$chr}{$start} ) );
 			}
 			else {
-				$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print(
+					$pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1) );
 				$gff_fh->print("###\n");
-			} 
+			}
 		}
 	}
-	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other'}{$chr} }) {
+	foreach my $chr ( sort { $a cmp $b } keys %{ $pos2seqf{'other'} } ) {
+		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'other'}{$chr} } ) {
 			if ($do_gtf) {
-				$gff_fh->print(gtf_string($pos2seqf{'other'}{$chr}{$start}));
+				$gff_fh->print( gtf_string( $pos2seqf{'other'}{$chr}{$start} ) );
 			}
 			else {
-				$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1) );
 				$gff_fh->print("###\n");
-			} 
+			}
 		}
 	}
 }
 
-
-
 sub print_chromosomes {
-	
+
 	my $out_fh = shift;
-	
+
 	# open the chromosome file
-	my $chromo_fh = Bio::ToolBox->read_file($chromof) or die 
-		"unable to open specified chromosome file '$chromof'!\n";
-	
+	my $chromo_fh = Bio::ToolBox->read_file($chromof)
+		or die "unable to open specified chromosome file '$chromof'!\n";
+
 	# convert the chromosomes into GFF features
 	my @chromosomes;
-	while (my $line = $chromo_fh->getline) {
-		next if ($line =~ /^#/);
+	while ( my $line = $chromo_fh->getline ) {
+		next if ( $line =~ /^#/ );
 		chomp $line;
-		my ($chr, $end, $path) = split /\t/, $line;
-		unless (defined $chr and $end =~ m/^\d+$/) {
+		my ( $chr, $end, $path ) = split /\t/, $line;
+		unless ( defined $chr and $end =~ m/^\d+$/ ) {
 			die " format of chromsome doesn't seem right! Are you sure?\n";
 		}
-		push @chromosomes, [$chr, $end];
+		push @chromosomes, [ $chr, $end ];
 	}
 	$chromo_fh->close;
-	
+
 	# print the chromosomes
 	# UCSC orders their chromosomes by chromosome length
 	# I would prefer to order by ID if possible
-	foreach my $chr (sane_chromo_sort(@chromosomes)) {
-		$out_fh->printf("##sequence-region  %s 1 %d\n", $chr->[0], $chr->[1]);
+	foreach my $chr ( sane_chromo_sort(@chromosomes) ) {
+		$out_fh->printf( "##sequence-region  %s 1 %d\n", $chr->[0], $chr->[1] );
 	}
 }
-
-
-
 
 __END__
 

@@ -8,7 +8,7 @@ use Bio::ToolBox::db_helper::constants;
 our $VERSION = '1.62';
 
 # Exported names
-our @ISA = qw(Exporter);
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
 	assign_callback
 	_all_count_indexed
@@ -35,319 +35,286 @@ our @EXPORT = qw(
 our %CALLBACKS;
 
 # The true statement
-1; 
-
-
+1;
 
 ### Generate callback subroutine for walking through Bam alignments
 sub assign_callback {
-	# generate the callback code depending on whether we want to look at 
+
+	# generate the callback code depending on whether we want to look at
 	# stranded data, collecting counts or length, or whether indexed data
 	# is wanted.
-	
-	# we perform a check of whether the alignment midpoint is within the 
+
+	# we perform a check of whether the alignment midpoint is within the
 	# search region for indexed data only
-	
+
 	# these subroutines are designed to work with the low level fetch API
-	
-	# there are so many different subroutines because I want to increase 
+
+	# there are so many different subroutines because I want to increase
 	# efficiency by limiting the number of conditional tests in one generic subroutine
-	
+
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	my $param = shift;
-	
-	
+
 	# check the current list of calculated callbacks
-		# cache the calculated callback method to speed up subsequent data 
-		# collections it's likely only one method is ever employed in an 
-		# execution, but just in case we will cache all that we calculate
-	my $string = sprintf "%s_%s_%s_%d", $param->[STND], $param->[STR], 
+	# cache the calculated callback method to speed up subsequent data
+	# collections it's likely only one method is ever employed in an
+	# execution, but just in case we will cache all that we calculate
+	my $string = sprintf "%s_%s_%s_%d", $param->[STND], $param->[STR],
 		$param->[METH], $param->[RETT];
 	return $CALLBACKS{$string} if exists $CALLBACKS{$string};
-	
+
 	# determine the callback method based on requested criteria
 	my $callback;
-	
+
 	# all reads, either strand
-	if (
-		$param->[STND] eq 'all' and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] == 2
-	) {
+	if (    $param->[STND] eq 'all'
+		and $param->[METH] eq 'count'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_all_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'all' and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'all'
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_all_precise_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'all' and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'all'
+		and $param->[METH] eq 'count'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_all_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'all' and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'all'
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_all_precise_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'all' and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'all'
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_all_name_array;
 	}
-	elsif (
-		$param->[STND] eq 'all' and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'all'
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_all_name_indexed;
 	}
-	
-	
-	# sense, forward strand 
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] == 2
-	) {
+
+	# sense, forward strand
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'count'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_forward_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_forward_precise_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'count'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_forward_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_forward_precise_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_forward_name_array;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_forward_name_indexed;
 	}
-	
-	
+
 	# sense, reverse strand
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'count'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_reverse_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_reverse_precise_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_reverse_name_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'count'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_reverse_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_reverse_precise_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'sense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_reverse_name_array;
 	}
-	
-	
-	# anti-sense, forward strand 
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] == 2
-	) {
+
+	# anti-sense, forward strand
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'count'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_reverse_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_reverse_precise_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_reverse_name_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'count'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_reverse_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_reverse_precise_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] >= 0
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_reverse_name_array;
 	}
-	
-	
+
 	# anti-sense, reverse strand
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'count'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_forward_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_forward_precise_count_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] == 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] == 2 )
+	{
 		$callback = \&_forward_name_indexed;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'count' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'count'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_forward_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'pcount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'pcount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_forward_precise_count_array;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[METH] eq 'ncount' and 
-		$param->[RETT] != 2
-	) {
+	elsif ( $param->[STND] eq 'antisense'
+		and $param->[STR] == -1
+		and $param->[METH] eq 'ncount'
+		and $param->[RETT] != 2 )
+	{
 		$callback = \&_forward_name_array;
 	}
-	
+
 	# I goofed
 	else {
-		confess sprintf "Programmer error: stranded %s, strand %s, method %s, do_index %d", 
+		confess sprintf
+			"Programmer error: stranded %s, strand %s, method %s, do_index %d",
 			$param->[STND], $param->[STR], $param->[METH], $param->[RETT];
 	}
-	
-	# remember next time 
+
+	# remember next time
 	$CALLBACKS{$string} = $callback;
-	
+
 	return $callback;
 }
 
-
-#### Callback subroutines 
-# the following are all of the callback subroutines 
+#### Callback subroutines
+# the following are all of the callback subroutines
 
 # we explicitly check that alignment start and/or stop overlap the search coordinates
-# to avoid e.g. weird alignments with massive splice junctions that would nevertheless 
+# to avoid e.g. weird alignments with massive splice junctions that would nevertheless
 # be pulled out by the bam index search
 
 sub _all_count_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
+	return if $flag & 0x0100;    # secondary alignment
+	return if $flag & 0x0400;    # marked duplicate
+	return if $flag & 0x0800;    # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($flag & 0x10) { 
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
+
+	if ( $flag & 0x10 ) {
+
 		# reversed
 		$data->{'index'}{$e}++;
 	}
@@ -357,38 +324,43 @@ sub _all_count_indexed {
 }
 
 sub _all_precise_count_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
+	return if $flag & 0x0100;    # secondary alignment
+	return if $flag & 0x0400;    # marked duplicate
+	return if $flag & 0x0800;    # supplementary hit
 	my $s = $a->pos + 1;
-	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
-	if ($flag & 0x10) {
+	return unless ( $s >= $data->{start} and $a->calend <= $data->{stop} );
+	if ( $flag & 0x10 ) {
+
 		# reversed
 		$data->{'index'}{$s}++;
 	}
 	else {
-		$data->{'index'}{$a->calend}++;
+		$data->{'index'}{ $a->calend }++;
 	}
 }
 
 sub _all_name_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
+	return if $flag & 0x0100;    # secondary alignment
+	return if $flag & 0x0400;    # marked duplicate
+	return if $flag & 0x0800;    # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($flag & 0x10) { 
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
+
+	if ( $flag & 0x10 ) {
+
 		# reversed
 		# since we're working with names, only record the 5' end of fragment
-		return if (($flag & 0x1) and ($flag & 0x2)); 
-			# paired and proper
-			# not the end we're looking for
+		return if ( ( $flag & 0x1 ) and ( $flag & 0x2 ) );
+
+		# paired and proper
+		# not the end we're looking for
 		$data->{'index'}{$e} ||= [];
 		push @{ $data->{'index'}{$e} }, $a->qname;
 	}
@@ -399,61 +371,65 @@ sub _all_name_indexed {
 }
 
 sub _all_count_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
+	return if $flag & 0x0100;    # secondary alignment
+	return if $flag & 0x0400;    # marked duplicate
+	return if $flag & 0x0800;    # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
-	push @{$data->{scores}}, 1;
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
+	push @{ $data->{scores} }, 1;
 }
 
 sub _all_precise_count_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
-	push @{$data->{scores}}, 1;
+	return if $flag & 0x0100;    # secondary alignment
+	return if $flag & 0x0400;    # marked duplicate
+	return if $flag & 0x0800;    # supplementary hit
+	return unless ( $a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
+	push @{ $data->{scores} }, 1;
 }
 
 sub _all_name_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
+	return if $flag & 0x0100;    # secondary alignment
+	return if $flag & 0x0400;    # marked duplicate
+	return if $flag & 0x0800;    # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	push @{ $data->{scores} }, $a->qname;
 }
 
 sub _forward_count_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed
-	if ($flag & 0x1) { 
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $flag & 0x40; # true if FIRST_MATE
-		return if ($first and $reversed);
-		return if (not $first and not $reversed);
+		my $first = $flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and $reversed );
+		return if ( not $first and not $reversed );
 	}
 	else {
 		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	if ($reversed) {
 		$data->{'index'}{$e}++;
 	}
@@ -463,51 +439,54 @@ sub _forward_count_indexed {
 }
 
 sub _forward_precise_count_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $flag & 0x40; # true if FIRST_MATE
-		return if ($first and $reversed);
-		return if (not $first and not $reversed);
+		my $first = $flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and $reversed );
+		return if ( not $first and not $reversed );
 	}
 	else {
 		return if $reversed;
 	}
 	my $s = $a->pos + 1;
-	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
+	return unless ( $s >= $data->{start} and $a->calend <= $data->{stop} );
 	if ($reversed) {
 		$data->{'index'}{$s}++;
 	}
 	else {
-		$data->{'index'}{$a->calend}++;
+		$data->{'index'}{ $a->calend }++;
 	}
 }
 
 sub _forward_name_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $reversed);
-		return if (not $first and not $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and $reversed );
+		return if ( not $first and not $reversed );
 	}
 	else {
 		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	if ($reversed) {
 		$data->{'index'}{$e} ||= [];
 		push @{ $data->{'index'}{$e} }, $a->qname;
@@ -519,91 +498,98 @@ sub _forward_name_indexed {
 }
 
 sub _forward_count_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $reversed);
-		return if (not $first and not $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and $reversed );
+		return if ( not $first and not $reversed );
 	}
 	else {
 		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
-	push @{$data->{scores}}, 1;
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
+	push @{ $data->{scores} }, 1;
 }
 
 sub _forward_precise_count_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $reversed);
-		return if (not $first and not $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and $reversed );
+		return if ( not $first and not $reversed );
 	}
 	else {
 		return if $reversed;
 	}
-	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
-	push @{$data->{scores}}, 1;
+	return unless ( $a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
+	push @{ $data->{scores} }, 1;
 }
 
 sub _forward_name_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $reversed);
-		return if (not $first and not $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and $reversed );
+		return if ( not $first and not $reversed );
 	}
 	else {
 		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	push @{ $data->{scores} }, $a->qname;
 }
 
 sub _reverse_count_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $reversed);
-		return if (not $first and $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and not $reversed );
+		return if ( not $first and $reversed );
 	}
 	else {
 		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	if ($reversed) {
 		$data->{'index'}{$e}++;
 	}
@@ -613,51 +599,54 @@ sub _reverse_count_indexed {
 }
 
 sub _reverse_precise_count_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $reversed);
-		return if (not $first and $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and not $reversed );
+		return if ( not $first and $reversed );
 	}
 	else {
 		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
-	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
+	return unless ( $s >= $data->{start} and $a->calend <= $data->{stop} );
 	if ($reversed) {
 		$data->{'index'}{$s}++;
 	}
 	else {
-		$data->{'index'}{$a->calend}++;
+		$data->{'index'}{ $a->calend }++;
 	}
 }
 
 sub _reverse_name_indexed {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $reversed);
-		return if (not $first and $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and not $reversed );
+		return if ( not $first and $reversed );
 	}
 	else {
 		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	if ($reversed) {
 		$data->{'index'}{$e} ||= [];
 		push @{ $data->{'index'}{$e} }, $a->qname;
@@ -669,68 +658,73 @@ sub _reverse_name_indexed {
 }
 
 sub _reverse_count_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $reversed);
-		return if (not $first and $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and not $reversed );
+		return if ( not $first and $reversed );
 	}
 	else {
 		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
-	push @{$data->{scores}}, 1;
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
+	push @{ $data->{scores} }, 1;
 }
 
 sub _reverse_precise_count_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $reversed);
-		return if (not $first and $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and not $reversed );
+		return if ( not $first and $reversed );
 	}
 	else {
 		return unless $reversed;
 	}
-	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
-	push @{$data->{scores}}, 1;
+	return unless ( $a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
+	push @{ $data->{scores} }, 1;
 }
 
 sub _reverse_name_array {
-	my ($a, $data) = @_;
+	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100; # secondary alignment
-	return if $flag & 0x0400; # marked duplicate
-	return if $flag & 0x0800; # supplementary hit
-	my $reversed = $flag & 0x10; # reversed;
-	if ($flag & 0x1) {
+	return if $flag & 0x0100;       # secondary alignment
+	return if $flag & 0x0400;       # marked duplicate
+	return if $flag & 0x0800;       # supplementary hit
+	my $reversed = $flag & 0x10;    # reversed;
+	if ( $flag & 0x1 ) {
+
 		# paired
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $reversed);
-		return if (not $first and $reversed);
+		my $first = $a->flag & 0x40;    # true if FIRST_MATE
+		return if ( $first     and not $reversed );
+		return if ( not $first and $reversed );
 	}
 	else {
 		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
-	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
-					($e >= $data->{start} and $e <= $data->{stop}) );
+	return
+		unless ( ( $s >= $data->{start} and $s <= $data->{stop} )
+			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	push @{ $data->{scores} }, $a->qname;
 }
 

@@ -506,8 +506,8 @@ use Carp qw(carp cluck croak confess);
 require Exporter;
 
 ### Export
-our @ISA = qw(Exporter);
-our @EXPORT = qw();
+our @ISA       = qw(Exporter);
+our @EXPORT    = qw();
 our @EXPORT_OK = qw(
 	get_exons
 	get_alt_exons
@@ -544,153 +544,166 @@ our @EXPORT_OK = qw(
 	filter_transcript_biotype
 );
 our %EXPORT_TAGS = (
-	all => \@EXPORT_OK,
-	exon => [ qw(
-		get_exons
-		get_alt_exons
-		get_common_exons
-		get_uncommon_exons
-		get_alt_common_exons
-	) ],
-	intron => [ qw(
-		get_introns
-		get_alt_introns
-		get_common_introns
-		get_uncommon_introns
-		get_alt_common_introns
-	) ],
-	transcript => [ qw(
-		get_transcripts
-		collapse_transcripts
-		get_transcript_length
-	) ],
-	cds => [ qw(
-		is_coding
-		get_cds
-		get_cdsStart
-		get_cdsEnd
-		get_start_codon
-		get_stop_codon
-		get_transcript_cds_length
-	) ],
-	utr => [ qw(
-		get_utrs
-		get_5p_utrs
-		get_3p_utrs
-		get_transcript_utr_length
-		get_transcript_5p_utr_length
-		get_transcript_3p_utr_length
-	) ],
-	export => [ qw(
-		gff_string
-		gtf_string
-		ucsc_string
-		bed_string
-	) ],
-	filter => [ qw(
-		filter_transcript_biotype
-		filter_transcript_gencode_basic
-		filter_transcript_support_level
-	)]
+	all  => \@EXPORT_OK,
+	exon => [
+		qw(
+			get_exons
+			get_alt_exons
+			get_common_exons
+			get_uncommon_exons
+			get_alt_common_exons
+		)
+	],
+	intron => [
+		qw(
+			get_introns
+			get_alt_introns
+			get_common_introns
+			get_uncommon_introns
+			get_alt_common_introns
+		)
+	],
+	transcript => [
+		qw(
+			get_transcripts
+			collapse_transcripts
+			get_transcript_length
+		)
+	],
+	cds => [
+		qw(
+			is_coding
+			get_cds
+			get_cdsStart
+			get_cdsEnd
+			get_start_codon
+			get_stop_codon
+			get_transcript_cds_length
+		)
+	],
+	utr => [
+		qw(
+			get_utrs
+			get_5p_utrs
+			get_3p_utrs
+			get_transcript_utr_length
+			get_transcript_5p_utr_length
+			get_transcript_3p_utr_length
+		)
+	],
+	export => [
+		qw(
+			gff_string
+			gtf_string
+			ucsc_string
+			bed_string
+		)
+	],
+	filter => [
+		qw(
+			filter_transcript_biotype
+			filter_transcript_gencode_basic
+			filter_transcript_support_level
+		)
+	]
 );
 
-
 ### The True Statement
-1; 
-
-
+1;
 
 ######## Exon Methods
 
 sub get_exons {
+
 	# initialize
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @exons;
 	my @cdss;
 	my @transcripts;
-	
+
 	# go through the subfeatures
-	foreach my $subfeat ($transcript->get_SeqFeatures) {
+	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
 		my $type = $subfeat->primary_tag;
-		if ($type =~ /exon/i) {
+		if ( $type =~ /exon/i ) {
 			push @exons, $subfeat;
 		}
-		elsif ($type =~ /cds|utr|untranslated/i) {
+		elsif ( $type =~ /cds|utr|untranslated/i ) {
 			push @cdss, $subfeat;
 		}
-		elsif ($type =~ /rna|transcript/i) {
+		elsif ( $type =~ /rna|transcript/i ) {
 			push @transcripts, $subfeat;
 		}
 	}
-	
+
 	# check which array we'll use
 	# prefer to use actual exon subfeatures, but those may not be defined
 	my @list;
 	if (@exons) {
-		@list = map { $_->[0] } 
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
-				@exons;
+		@list = map { $_->[0] }
+			sort { $a->[1] <=> $b->[1] }
+			map { [ $_, $_->start ] } @exons;
 	}
 	elsif (@cdss) {
+
 		# duplicate the CDSs as exons
 		foreach (@cdss) {
 			my $e = $_->duplicate;
-			$e->primary_tag('exon'); # reset tag
-			$e->phase('.'); # no phase
+			$e->primary_tag('exon');    # reset tag
+			$e->phase('.');             # no phase
 			push @list, $e;
 		}
-		
+
 		# make sure to merge adjacent exons
-		@list = map { $_->[0] } # must sort first
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
-				@list;
-		for (my $i = 0; $i < scalar @list; $i++) {
-			if (defined ($list[ $i + 1 ]) ) {
-				if ($list[$i+1]->start - $list[$i]->end <= 1) {
+		@list = map { $_->[0] }         # must sort first
+			sort { $a->[1] <=> $b->[1] }
+			map { [ $_, $_->start ] } @list;
+		for ( my $i = 0; $i < scalar @list; $i++ ) {
+			if ( defined( $list[ $i + 1 ] ) ) {
+				if ( $list[ $i + 1 ]->start - $list[$i]->end <= 1 ) {
+
 					# need to merge
-					$list[$i]->end( $list[$i+1]->end );
-					splice(@list, $i + 1, 1); # remove the merged
+					$list[$i]->end( $list[ $i + 1 ]->end );
+					splice( @list, $i + 1, 1 );    # remove the merged
 					$i--;
-				} 
+				}
 			}
 		}
 	}
 	elsif (@transcripts) {
 		foreach my $t (@transcripts) {
+
 			# there are possibly duplicates in here if there are alternate transcripts
 			# should we remove them?
 			my @e = get_exons($t);
 			push @list, @e;
 		}
-		@list = map { $_->[0] } 
-				sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-				map { [$_, $_->start, $_->end] } 
-				@list;
+		@list = map { $_->[0] }
+			sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+			map { [ $_, $_->start, $_->end ] } @list;
 	}
 	else {
 		# nothing found!
 		return;
 	}
-	
+
 	return wantarray ? @list : \@list;
 }
 
 sub get_alt_exons {
 	my $ac_exons = get_alt_common_exons(@_);
 	my @alts;
-	foreach my $k (keys %$ac_exons) {
+	foreach my $k ( keys %$ac_exons ) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
 		push @alts, @{ $ac_exons->{$k} };
 	}
 	if (@alts) {
+
 		# re-sort in genomic order
-		@alts = map {$_->[1]}
-				sort {$a->[0] <=> $b->[0]}
-				map { [$_->start, $_] } @alts;
+		@alts = map { $_->[1] }
+			sort { $a->[0] <=> $b->[0] }
+			map { [ $_->start, $_ ] } @alts;
 	}
 	return wantarray ? @alts : \@alts;
 }
@@ -706,9 +719,8 @@ sub get_uncommon_exons {
 }
 
 sub get_alt_common_exons {
-	return _get_alt_common_things(1, @_);
+	return _get_alt_common_things( 1, @_ );
 }
-
 
 ######## Intron Methods
 
@@ -716,24 +728,25 @@ sub get_introns {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @introns;
-	
+
 	# find the exons and/or CDSs
 	my @exons = get_exons($transcript);
 	return unless @exons;
-	return if (scalar(@exons) == 1);
-	
+	return if ( scalar(@exons) == 1 );
+
 	# identify the last exon index position
 	my $last = scalar(@exons) - 1;
-	
+
 	# forward strand
-	if ($transcript->strand >= 0) {
+	if ( $transcript->strand >= 0 ) {
+
 		# each intron is created based on the previous exon
-		for (my $i = 0; $i < $last; $i++) {
+		for ( my $i = 0; $i < $last; $i++ ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
 				-seq_id       => $e->seq_id,
 				-start        => $e->end + 1,
-				-end          => $exons[$i + 1]->start - 1, # up to start of next exon
+				-end          => $exons[ $i + 1 ]->start - 1,   # up to start of next exon
 				-strand       => $transcript->strand,
 				-primary_tag  => 'intron',
 				-source_tag   => $transcript->source_tag,
@@ -743,35 +756,34 @@ sub get_introns {
 			push @introns, $i;
 		}
 	}
-	
+
 	# reverse strand
 	else {
 		# each intron is created based on the previous exon
 		# ordering from 5' to 3' end direction for convenience in naming
-		for (my $i = $last; $i > 0; $i--) {
+		for ( my $i = $last; $i > 0; $i-- ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
-				-seq_id       => $e->seq_id,
-				-start        => $exons[$i - 1]->end + 1, # end of next exon
-				-end          => $e->start - 1,
-				-strand       => $transcript->strand,
-				-primary_tag  => 'intron',
-				-source_tag   => $transcript->source_tag,
-				-primary_id   => $transcript->display_name . ".intron$i",
+				-seq_id      => $e->seq_id,
+				-start       => $exons[ $i - 1 ]->end + 1,              # end of next exon
+				-end         => $e->start - 1,
+				-strand      => $transcript->strand,
+				-primary_tag => 'intron',
+				-source_tag  => $transcript->source_tag,
+				-primary_id  => $transcript->display_name . ".intron$i",
 				-display_name => $transcript->display_name . ".intron$i",
 			);
 			push @introns, $i;
 		}
-		
+
 		# reorder the introns based on start position
 		if (@introns) {
 			@introns = map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-					map { [$_, $_->start, $_->end] } 
-					@introns;
+				sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+				map { [ $_, $_->start, $_->end ] } @introns;
 		}
 	}
-	
+
 	# finished
 	return wantarray ? @introns : \@introns;
 }
@@ -779,16 +791,17 @@ sub get_introns {
 sub get_alt_introns {
 	my $ac_introns = get_alt_common_introns(@_);
 	my @alts;
-	foreach my $k (keys %$ac_introns) {
+	foreach my $k ( keys %$ac_introns ) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
 		push @alts, @{ $ac_introns->{$k} };
 	}
 	if (@alts) {
+
 		# re-sort in genomic order
-		@alts = map {$_->[1]}
-				sort {$a->[0] <=> $b->[0]}
-				map { [$_->start, $_] } @alts;
+		@alts = map { $_->[1] }
+			sort { $a->[0] <=> $b->[0] }
+			map { [ $_->start, $_ ] } @alts;
 	}
 	return wantarray ? @alts : \@alts;
 }
@@ -804,93 +817,98 @@ sub get_uncommon_introns {
 }
 
 sub get_alt_common_introns {
-	return _get_alt_common_things(0, @_);
+	return _get_alt_common_things( 0, @_ );
 }
 
 sub _get_alt_common_things {
+
 	# internal subroutine to get either exons or introns
-	my $do_exon = shift; # true for exon, false for intron
+	my $do_exon = shift;    # true for exon, false for intron
 	my @transcripts;
 	return unless @_;
-	if (scalar @_ == 1) {
+	if ( scalar @_ == 1 ) {
+
 		# someone passed a gene, get the transcripts
-		confess "not a SeqFeature object!" unless ref($_[0]) =~ /seqfeature/i;
-		@transcripts = get_transcripts($_[0]);
+		confess "not a SeqFeature object!" unless ref( $_[0] ) =~ /seqfeature/i;
+		@transcripts = get_transcripts( $_[0] );
 	}
-	elsif (scalar @_ > 1) {
+	elsif ( scalar @_ > 1 ) {
+
 		# presume these are transcripts?
 		@transcripts = @_;
 	}
-	
+
 	# hash of transcript to things
 	my %tx2things = (
-		common => [],
+		common   => [],
 		uncommon => []
 	);
-	
+
 	# no transcripts provided?
 	return \%tx2things unless @transcripts;
-	
+
 	# only one transcript provided?
-	if (scalar @transcripts == 1) {
+	if ( scalar @transcripts == 1 ) {
+
 		# all exons are common by definition
-# 		my $name = $transcripts[0]->display_name;
-		my @things = $do_exon ? get_exons($transcripts[0]) : get_introns($transcripts[0]);
+		# 		my $name = $transcripts[0]->display_name;
+		my @things =
+			$do_exon ? get_exons( $transcripts[0] ) : get_introns( $transcripts[0] );
 		$tx2things{common} = \@things;
 		return \%tx2things;
 	}
-	
+
 	# get things and put them in has based on coordinates
 	my %pos2things;
 	foreach my $t (@transcripts) {
 		my @things = $do_exon ? get_exons($t) : get_introns($t);
 		foreach my $e (@things) {
-			my $new_e =  $e->duplicate;
-			$pos2things{$e->start}{$e->end}{$t->display_name} = $new_e;
+			my $new_e = $e->duplicate;
+			$pos2things{ $e->start }{ $e->end }{ $t->display_name } = $new_e;
 		}
 		$tx2things{ $t->display_name } = [];
 	}
-	
+
 	# put things into categories based on commonality
 	# associate things with unique transcripts, common, or uncommon sets
 	my $trx_number = scalar @transcripts;
-	foreach my $s (sort {$a <=> $b} keys %pos2things) {               # sort on start
-		foreach my $e (sort {$a <=> $b} keys %{ $pos2things{$s} }) {  # sort on stop
+	foreach my $s ( sort { $a <=> $b } keys %pos2things ) {    # sort on start
+		foreach my $e ( sort { $a <=> $b } keys %{ $pos2things{$s} } ) {    # sort on stop
 			my @names = keys %{ $pos2things{$s}{$e} };
-			if (scalar @names == 1) {
+			if ( scalar @names == 1 ) {
+
 				# only 1 thing, must be an alternate
-				push @{ $tx2things{$names[0]} }, $pos2things{$s}{$e}{$names[0]};
+				push @{ $tx2things{ $names[0] } }, $pos2things{$s}{$e}{ $names[0] };
 			}
-			elsif (scalar @names == $trx_number) {
+			elsif ( scalar @names == $trx_number ) {
+
 				# common to all transcripts, take the first one as example
-				push @{ $tx2things{common} }, $pos2things{$s}{$e}{$names[0]};
+				push @{ $tx2things{common} }, $pos2things{$s}{$e}{ $names[0] };
 			}
 			else {
 				# common to some but not all transcripts, so uncommon
-				push @{ $tx2things{uncommon} }, $pos2things{$s}{$e}{$names[0]};
+				push @{ $tx2things{uncommon} }, $pos2things{$s}{$e}{ $names[0] };
 			}
 		}
 	}
 	return \%tx2things;
 }
 
-
-
 ######## Transcript Methods
 
 sub get_transcripts {
 	my $gene = shift;
-	return unless $gene;
+	return                             unless $gene;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
-	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
+	return $gene if ( $gene->primary_tag =~ /rna|transcript/i );
 	my @transcripts;
 	my @exons;
 	my @other;
-	foreach my $subf ($gene->get_SeqFeatures) {
-		if ($subf->primary_tag =~ /rna|transcript|\bprocessed/i) {
+	foreach my $subf ( $gene->get_SeqFeatures ) {
+		if ( $subf->primary_tag =~ /rna|transcript|\bprocessed/i ) {
 			push @transcripts, $subf;
 		}
-		elsif ($subf->primary_tag =~ /^(?:cds|exon|\w+codon)$/i) {
+		elsif ( $subf->primary_tag =~ /^(?:cds|exon|\w+codon)$/i ) {
 			push @exons, $subf;
 		}
 		else {
@@ -898,45 +916,46 @@ sub get_transcripts {
 			push @other, $subf;
 		}
 	}
-	if (not @transcripts and @exons) {
+	if ( not @transcripts and @exons ) {
+
 		# some weirdly formatted annotation files skip the transcript
 		# looking at you SGD
 		my $transcript = $gene->new(
-			-seq_id         => $gene->seq_id,
-			-start          => $gene->start,
-			-end            => $gene->end,
-			-strand         => $gene->strand,
-			-primary_tag    => 'transcript',
-			-source         => $gene->source_tag,
-			-name           => $gene->display_name,
-			-segments       => \@exons,
+			-seq_id      => $gene->seq_id,
+			-start       => $gene->start,
+			-end         => $gene->end,
+			-strand      => $gene->strand,
+			-primary_tag => 'transcript',
+			-source      => $gene->source_tag,
+			-name        => $gene->display_name,
+			-segments    => \@exons,
 		);
 		push @transcripts, $transcript;
 	}
-	elsif (not @transcripts and not @exons and @other) {
-		# well, what choice do we have? 
+	elsif ( not @transcripts and not @exons and @other ) {
+
+		# well, what choice do we have?
 		# we can assume these are transcripts, because what else could they be?
 		@transcripts = @other;
-	} 
+	}
 	@transcripts = map { $_->[0] }
 		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-		map { [$_, $_->start, $_->length] } 
-		@transcripts;
+		map { [ $_, $_->start, $_->length ] } @transcripts;
 	return wantarray ? @transcripts : \@transcripts;
 }
-
 
 sub collapse_transcripts {
 	my @transcripts;
 	return unless @_;
-	my $example = $_[0]; # parent transcript seqfeature to model new transcript on
-	if (scalar @_ == 1) {
+	my $example = $_[0];    # parent transcript seqfeature to model new transcript on
+	if ( scalar @_ == 1 ) {
+
 		# someone passed a gene, get the transcripts
-		@transcripts = get_transcripts($_[0]);
+		@transcripts = get_transcripts( $_[0] );
 		return unless @transcripts;
 		return $transcripts[0] if scalar @transcripts == 1;
 	}
-	elsif (scalar @_ > 1) {
+	elsif ( scalar @_ > 1 ) {
 		@transcripts = @_;
 	}
 
@@ -946,7 +965,7 @@ sub collapse_transcripts {
 		my @e = get_exons($t);
 		push @exons, @e;
 	}
-	
+
 	# check that we have exons - weirdo files may just have CDS!!!????
 	unless (@exons) {
 		foreach my $t (@transcripts) {
@@ -955,118 +974,127 @@ sub collapse_transcripts {
 		}
 	}
 	return unless (@exons);
-	
+
 	# sort all the exons
-	my @sorted = 	map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-					map { [$_, $_->start, $_->end] } 
-					@exons;
-	
+	my @sorted = map { $_->[0] }
+		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+		map { [ $_, $_->start, $_->end ] } @exons;
+
 	# build new exons from the original - don't keep cruft
 	my $next = shift @sorted;
 	my @new;
 	$new[0] = $next->new(
-		-seq_id         => $next->seq_id,
-		-start 			=> $next->start,
-		-end   			=> $next->end,
-		-strand         => $next->strand,
-		-primary_tag  	=> 'exon',
+		-seq_id      => $next->seq_id,
+		-start       => $next->start,
+		-end         => $next->end,
+		-strand      => $next->strand,
+		-primary_tag => 'exon',
 	);
-	
+
 	# work through remaining exons, adding and merging as necessary
 	while (@sorted) {
 		$next = shift @sorted;
-		my ($ns, $ne) = ($next->start, $next->end); # new start & end
-		my ($os, $oe) = ($new[-1]->start, $new[-1]->end); # old start & end
-		if ($ns == $os and $ne > $oe) {
+		my ( $ns, $ne ) = ( $next->start, $next->end );          # new start & end
+		my ( $os, $oe ) = ( $new[-1]->start, $new[-1]->end );    # old start & end
+		if ( $ns == $os and $ne > $oe ) {
+
 			# same beginning, further end
 			$new[-1]->end($ne);
 		}
-		elsif ($ns > $os and $ns < $oe and $ne > $oe) {
+		elsif ( $ns > $os and $ns < $oe and $ne > $oe ) {
+
 			# overlapping start, further end
 			$new[-1]->end($ne);
 		}
-		elsif ($ns > $oe) {
+		elsif ( $ns > $oe ) {
+
 			# completely new exon
-			push @new, $next->new(
-				-seq_id         => $next->seq_id,
-				-start 			=> $ns,
-				-end   			=> $ne,
-				-strand         => $next->strand,
-				-primary_tag  	=> 'exon',
-			);
+			push @new,
+				$next->new(
+					-seq_id      => $next->seq_id,
+					-start       => $ns,
+					-end         => $ne,
+					-strand      => $next->strand,
+					-primary_tag => 'exon',
+				);
 		}
+
 		# all other possibilities we can skip
 	}
-	
+
 	# return the assembled transcript
 	return $example->new(
-		-seq_id         => $example->seq_id,
-		-start          => $new[0]->start,
-		-end            => $new[-1]->end,
-		-strand         => $example->strand,
-		-primary_tag    => 'transcript',
-		-source         => $example->source_tag,
-		-name           => $example->display_name,
-		-segments       => \@new,
+		-seq_id      => $example->seq_id,
+		-start       => $new[0]->start,
+		-end         => $new[-1]->end,
+		-strand      => $example->strand,
+		-primary_tag => 'transcript',
+		-source      => $example->source_tag,
+		-name        => $example->display_name,
+		-segments    => \@new,
 	);
 }
 
 sub get_transcript_length {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	if ($transcript->primary_tag =~ /gene$/i) {
+	if ( $transcript->primary_tag =~ /gene$/i ) {
+
 		# someone passed a gene object!!!!
 		my @lengths;
-		foreach my $t (get_transcripts($transcript)) {
+		foreach my $t ( get_transcripts($transcript) ) {
 			push @lengths, get_transcript_length($t);
 		}
+
 		# return the longest transcript length
-		return  (sort {$b <=> $a} @lengths)[0];
+		return ( sort { $b <=> $a } @lengths )[0];
 	}
 	my $total = 0;
-	foreach my $e (get_exons($transcript)) {
+	foreach my $e ( get_exons($transcript) ) {
 		$total += $e->length;
 	}
 	return $total;
 }
 
-
-
 ######## CDS Methods
 
 sub is_coding {
 	my $transcript = shift;
-	return unless $transcript;
+	return                             unless $transcript;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	if ($transcript->primary_tag =~ /gene$/i) {
+	if ( $transcript->primary_tag =~ /gene$/i ) {
+
 		# someone passed a gene, check its subfeatures
 		my $code_potential = 0;
-		foreach ($transcript->get_SeqFeatures) {
+		foreach ( $transcript->get_SeqFeatures ) {
 			$code_potential += is_coding($_);
 		}
 		return $code_potential;
 	}
-	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
-	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('transcript_biotype')) {
+	return 1 if $transcript->primary_tag =~ /mrna/i;              # assumption
+	return 1 if $transcript->source      =~ /protein.?coding/i;
+	if ( $transcript->has_tag('transcript_biotype') ) {
+
 		# ensembl type GTFs
 		my ($biotype) = $transcript->get_tag_values('transcript_biotype');
 		return $biotype =~ /protein.?coding/i ? 1 : 0;
 	}
-	elsif ($transcript->has_tag('biotype')) {
+	elsif ( $transcript->has_tag('biotype') ) {
+
 		# ensembl type GFFs
 		my ($biotype) = $transcript->get_tag_values('biotype');
 		return $biotype =~ /protein.?coding/i ? 1 : 0;
 	}
-	elsif ($transcript->has_tag('gene_biotype')) {
+	elsif ( $transcript->has_tag('gene_biotype') ) {
+
 		# ensembl type GTFs
-		# must be careful here, gene_biotype of course pertains to gene, 
+		# must be careful here, gene_biotype of course pertains to gene,
 		# and not necessarily this particular transcript
 		my ($biotype) = $transcript->get_tag_values('gene_biotype');
 		return 1 if $biotype =~ /protein.?coding/i;
 	}
-	foreach ($transcript->get_SeqFeatures) {
+	foreach ( $transcript->get_SeqFeatures ) {
+
 		# old fashioned way
 		return 1 if $_->primary_tag eq 'CDS';
 	}
@@ -1075,17 +1103,16 @@ sub is_coding {
 
 sub get_cds {
 	my $transcript = shift;
-	return unless $transcript;
+	return                             unless $transcript;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @cds;
-	foreach my $subfeat ($transcript->get_SeqFeatures) {
+	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
 		push @cds, $subfeat if $subfeat->primary_tag eq 'CDS';
 	}
 	return unless @cds;
-	@cds = map { $_->[0] } 
-			sort { $a->[1] <=> $b->[1] }
-			map { [$_, $_->start] } 
-			@cds;
+	@cds = map { $_->[0] }
+		sort { $a->[1] <=> $b->[1] }
+		map { [ $_, $_->start ] } @cds;
 	return wantarray ? @cds : \@cds;
 }
 
@@ -1094,15 +1121,14 @@ sub get_cdsStart {
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
-	if ($transcript->strand >= 0) {
+	if ( $transcript->strand >= 0 ) {
 		return $cds->[0]->start;
 	}
 	else {
 		# stop codons may or may not be not included
 		my $codon = get_stop_codon($transcript);
 		if ($codon) {
-			return $codon->start < $cds->[0]->start ? 
-				$codon->start : $cds->[0]->start;
+			return $codon->start < $cds->[0]->start ? $codon->start : $cds->[0]->start;
 		}
 		else {
 			return $cds->[0]->start;
@@ -1115,7 +1141,7 @@ sub get_cdsEnd {
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
-	if ($transcript->strand >= 0) {
+	if ( $transcript->strand >= 0 ) {
 		my $codon = get_stop_codon($transcript);
 		if ($codon) {
 			return $codon->end > $cds->[-1]->end ? $codon->end : $cds->[-1]->end;
@@ -1133,7 +1159,7 @@ sub get_transcript_cds_length {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $total = 0;
-	foreach my $subf ($transcript->get_SeqFeatures) {
+	foreach my $subf ( $transcript->get_SeqFeatures ) {
 		next unless $subf->primary_tag eq 'CDS';
 		$total += $subf->length;
 	}
@@ -1144,38 +1170,38 @@ sub get_start_codon {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $start_codon;
-	
+
 	# look for existing one
-	foreach my $subfeat ($transcript->get_SeqFeatures) {
-		$start_codon =  $subfeat if $subfeat->primary_tag =~ /start.?codon/i;
+	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
+		$start_codon = $subfeat if $subfeat->primary_tag =~ /start.?codon/i;
 	}
 	return $start_codon if $start_codon;
-	
+
 	# otherwise we have to build one
 	my $cdss = get_cds($transcript);
 	return unless $cdss;
-	if ($transcript->strand >= 0) {
+	if ( $transcript->strand >= 0 ) {
 		$start_codon = $transcript->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'start_codon',
-				-start         => $cdss->[0]->start,
-				-end           => $cdss->[0]->start + 2,
-				-strand        => 1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.start_codon',
+			-seq_id      => $transcript->seq_id,
+			-source      => $transcript->source,
+			-primary_tag => 'start_codon',
+			-start       => $cdss->[0]->start,
+			-end         => $cdss->[0]->start + 2,
+			-strand      => 1,
+			-phase       => 0,
+			-primary_id  => $transcript->primary_id . '.start_codon',
 		);
 	}
 	else {
 		$start_codon = $transcript->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'start_codon',
-				-start         => $cdss->[-1]->end - 2,
-				-end           => $cdss->[-1]->end,
-				-strand        => -1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.start_codon',
+			-seq_id      => $transcript->seq_id,
+			-source      => $transcript->source,
+			-primary_tag => 'start_codon',
+			-start       => $cdss->[-1]->end - 2,
+			-end         => $cdss->[-1]->end,
+			-strand      => -1,
+			-phase       => 0,
+			-primary_id  => $transcript->primary_id . '.start_codon',
 		);
 	}
 	return $start_codon;
@@ -1185,40 +1211,40 @@ sub get_stop_codon {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $stop_codon;
-	
+
 	# look for existing one
-	foreach my $subfeat ($transcript->get_SeqFeatures) {
-		$stop_codon =  $subfeat if $subfeat->primary_tag =~ /stop.?codon/i;
+	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
+		$stop_codon = $subfeat if $subfeat->primary_tag =~ /stop.?codon/i;
 	}
 	return $stop_codon if $stop_codon;
-	
+
 	# otherwise we have to build one
 	# this entirely presumes that the stop codon is inclusive to the last cds
 	# this is the case with GFF3 and UCSC tables, but not GTF
 	my $cdss = get_cds($transcript);
 	return unless $cdss;
-	if ($transcript->strand >= 0) {
+	if ( $transcript->strand >= 0 ) {
 		$stop_codon = $transcript->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[-1]->end - 2,
-				-end           => $cdss->[-1]->end,
-				-strand        => 1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.stop_codon',
+			-seq_id      => $transcript->seq_id,
+			-source      => $transcript->source,
+			-primary_tag => 'stop_codon',
+			-start       => $cdss->[-1]->end - 2,
+			-end         => $cdss->[-1]->end,
+			-strand      => 1,
+			-phase       => 0,
+			-primary_id  => $transcript->primary_id . '.stop_codon',
 		);
 	}
 	else {
 		$stop_codon = $transcript->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[0]->start,
-				-end           => $cdss->[0]->start + 2,
-				-strand        => -1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.stop_codon',
+			-seq_id      => $transcript->seq_id,
+			-source      => $transcript->source,
+			-primary_tag => 'stop_codon',
+			-start       => $cdss->[0]->start,
+			-end         => $cdss->[0]->start + 2,
+			-strand      => -1,
+			-phase       => 0,
+			-primary_id  => $transcript->primary_id . '.stop_codon',
 		);
 	}
 	return $stop_codon;
@@ -1227,96 +1253,102 @@ sub get_stop_codon {
 sub get_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	
+
 	# collect the various types of subfeatures
 	my @exons;
 	my @cdss;
 	my @utrs;
 	my @transcripts;
-	foreach my $subfeat ($transcript->get_SeqFeatures) {
+	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
 		my $type = $subfeat->primary_tag;
-		if ($type =~ /exon/i) {
+		if ( $type =~ /exon/i ) {
 			push @exons, $subfeat;
 		}
-		elsif ($type =~ /cds/i) {
+		elsif ( $type =~ /cds/i ) {
 			push @cdss, $subfeat;
 		}
-		elsif ($type =~ /utr|untranslated/i) {
+		elsif ( $type =~ /utr|untranslated/i ) {
 			push @utrs, $subfeat;
 		}
-		elsif ($type =~ /rna|transcript/i) {
+		elsif ( $type =~ /rna|transcript/i ) {
 			push @transcripts, $subfeat;
 		}
 	}
-	
+
 	# collect the utrs into final list
 	my @list;
 	if (@utrs) {
+
 		# good, we don't have to do any work
 		@list = @utrs;
 	}
 	elsif (@transcripts) {
+
 		# someone must've passed us a gene
 		foreach my $t (@transcripts) {
 			my @u = get_utrs($t);
 			push @list, @u;
 		}
 	}
-	elsif (@exons and @cdss) {
+	elsif ( @exons and @cdss ) {
+
 		# calculate the utrs ourselves
-		
+
 		@exons = map { $_->[0] }
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
-				@exons;
+			sort { $a->[1] <=> $b->[1] }
+			map { [ $_, $_->start ] } @exons;
 		@cdss = map { $_->[0] }
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
-				@cdss;
+			sort { $a->[1] <=> $b->[1] }
+			map { [ $_, $_->start ] } @cdss;
 		my $firstCDS = $cdss[0];
 		my $lastCDS  = $cdss[-1];
 		while (@exons) {
 			my $exon = shift @exons;
-			if ($exon->end < $firstCDS->start) {
+			if ( $exon->end < $firstCDS->start ) {
+
 				# whole exon is UTR
 				my $utr = $exon->duplicate;
-				$utr->primary_tag( 
+				$utr->primary_tag(
 					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
 				$utr->display_name( $exon->display_name . '.utr' );
 				push @list, $utr;
 			}
-			elsif ($exon->overlaps($firstCDS)) {
+			elsif ( $exon->overlaps($firstCDS) ) {
+
 				# partial UTR on left side
-				my $pieces = $exon->subtract($firstCDS); # array ref of pieces
+				my $pieces = $exon->subtract($firstCDS);    # array ref of pieces
 				next unless $pieces;
-				my $utr = $pieces->[0]; # we will want the first one if there are two
-				$utr->primary_tag( 
+				my $utr = $pieces->[0];    # we will want the first one if there are two
+				$utr->primary_tag(
 					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
-				$utr->display_name($exon->display_name . '.utr');
-				$utr->strand($exon->strand);
-				$utr->source($exon->strand);
+				$utr->display_name( $exon->display_name . '.utr' );
+				$utr->strand( $exon->strand );
+				$utr->source( $exon->strand );
 				push @list, $utr;
 			}
-			elsif ($exon->start > $firstCDS->end and $exon->end < $lastCDS->start) {
+			elsif ( $exon->start > $firstCDS->end and $exon->end < $lastCDS->start ) {
+
 				# CDS exon
 				next;
 			}
-			elsif ($exon->overlaps($lastCDS)) {
+			elsif ( $exon->overlaps($lastCDS) ) {
+
 				# partial UTR
-				my $pieces = $exon->subtract($lastCDS); # array ref of pieces
+				my $pieces = $exon->subtract($lastCDS);    # array ref of pieces
 				next unless $pieces;
-				my $utr = $pieces->[-1]; # we will want the second one if there are two
-				$utr->primary_tag( 
+				my $utr = $pieces->[-1];    # we will want the second one if there are two
+				$utr->primary_tag(
 					$transcript->strand >= 0 ? 'three_prime_UTR' : 'five_prime_UTR' );
-				$utr->display_name($exon->display_name . '.utr');
-				$utr->strand($exon->strand);
-				$utr->source($exon->strand);
+				$utr->display_name( $exon->display_name . '.utr' );
+				$utr->strand( $exon->strand );
+				$utr->source( $exon->strand );
 				push @list, $utr;
 			}
-			elsif ($exon->start > $lastCDS->end) {
+			elsif ( $exon->start > $lastCDS->end ) {
+
 				# whole exon is UTR
 				my $utr = $exon->duplicate;
-				$utr->primary_tag( 
+				$utr->primary_tag(
 					$transcript->strand >= 0 ? 'three_prime_UTR' : 'five_prime_UTR' );
 				$utr->display_name( $exon->display_name . '.utr' );
 				push @list, $utr;
@@ -1331,7 +1363,7 @@ sub get_utrs {
 		# nothing usable found to identify UTRs
 		return;
 	}
-	
+
 	# we have our list
 	return wantarray ? @list : \@list;
 }
@@ -1339,7 +1371,7 @@ sub get_utrs {
 sub get_transcript_utr_length {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	my $utrs = get_utrs($transcript);
+	my $utrs  = get_utrs($transcript);
 	my $total = 0;
 	foreach my $utr (@$utrs) {
 		$total += $utr->length;
@@ -1350,11 +1382,11 @@ sub get_transcript_utr_length {
 sub get_5p_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	
+
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
 	return unless scalar(@$utrs);
-	
+
 	my @fivers = grep { $_->primary_tag =~ /5|five/i } @$utrs;
 	return wantarray ? @fivers : \@fivers;
 }
@@ -1362,19 +1394,19 @@ sub get_5p_utrs {
 sub get_3p_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	
+
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
 	return unless scalar(@$utrs);
-	
+
 	my @threes = grep { $_->primary_tag =~ /3|three/i } @$utrs;
 	return wantarray ? @threes : \@threes;
 }
 
 sub get_transcript_5p_utr_length {
 	my $transcript = shift;
-	my $utrs = get_5p_utrs($transcript);
-	my $total = 0;
+	my $utrs       = get_5p_utrs($transcript);
+	my $total      = 0;
 	foreach my $utr (@$utrs) {
 		$total += $utr->length;
 	}
@@ -1383,18 +1415,18 @@ sub get_transcript_5p_utr_length {
 
 sub get_transcript_3p_utr_length {
 	my $transcript = shift;
-	my $utrs = get_3p_utrs($transcript);
-	my $total = 0;
+	my $utrs       = get_3p_utrs($transcript);
+	my $total      = 0;
 	foreach my $utr (@$utrs) {
 		$total += $utr->length;
 	}
 	return $total;
 }
 
-
 #### Export methods
 
 sub gff_string {
+
 	# Bio::ToolBox::SeqFeature and Bio::SeqFeature::Lite objects have this method
 	# otherwise this will die
 	return shift->gff_string(@_);
@@ -1402,80 +1434,85 @@ sub gff_string {
 
 sub gtf_string {
 	my $feature = shift;
-	my $gene = shift || undef; # only present when recursing
+	my $gene    = shift || undef;    # only present when recursing
 	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
-	
-	# process a gene 
-	if ($feature->primary_tag =~ /gene$/i and not defined $gene) {
+
+	# process a gene
+	if ( $feature->primary_tag =~ /gene$/i and not defined $gene ) {
 		my $string;
-		foreach my $t (get_transcripts($feature)) {
-			$string .= gtf_string($t, $feature);
+		foreach my $t ( get_transcripts($feature) ) {
+			$string .= gtf_string( $t, $feature );
 		}
 		return $string;
 	}
-	
+
 	# check that we have transcribed feature with exons
 	my @exons = get_exons($feature);
-	return unless @exons; # no exon subfeatures? must not be a transcript....
-	
+	return unless @exons;    # no exon subfeatures? must not be a transcript....
+
 	# mandatory identifiers
-	my ($gene_id, $gene_name, $gene_biotype);
+	my ( $gene_id, $gene_name, $gene_biotype );
 	if ($gene) {
-		$gene_id = $gene->primary_id || $gene->display_name;
+		$gene_id   = $gene->primary_id || $gene->display_name;
 		$gene_name = $gene->display_name;
-		($gene_biotype) = $gene->get_tag_values('gene_biotype') || 
-			$gene->get_tag_values('biotype') || undef;
+		($gene_biotype) =
+			   $gene->get_tag_values('gene_biotype')
+			|| $gene->get_tag_values('biotype')
+			|| undef;
 	}
 	else {
 		# these attributes might still be present for transcripts
-		($gene_id) = $feature->get_tag_values('gene_id') || undef;
-		($gene_name) = $feature->get_tag_values('gene_name') || undef;
+		($gene_id)      = $feature->get_tag_values('gene_id')      || undef;
+		($gene_name)    = $feature->get_tag_values('gene_name')    || undef;
 		($gene_biotype) = $feature->get_tag_values('gene_biotype') || undef;
 	}
-	my $trx_id = $feature->primary_id || $feature->display_name;
+	my $trx_id   = $feature->primary_id || $feature->display_name;
 	my $trx_name = $feature->display_name;
-	my $group = sprintf(
+	my $group    = sprintf(
 		"gene_id \"%s\"; transcript_id \"%s\"; gene_name \"%s\"; transcript_name \"%s\";",
-		$gene_id, $trx_id, $gene_name, $trx_name);
-	
+		$gene_id, $trx_id, $gene_name, $trx_name );
+
 	# add additional transcript attributes that might be interesting to keep
 	if ($gene_biotype) {
 		$group .= " gene_biotype \"$gene_biotype\";";
 	}
-	my ($biotype) = $feature->get_tag_values('transcript_biotype') || 
-		$feature->get_tag_values('biotype');
+	my ($biotype) = $feature->get_tag_values('transcript_biotype')
+		|| $feature->get_tag_values('biotype');
 	if ($biotype) {
-		$group .= " transcript_biotype \"$biotype\";" ;
+		$group .= " transcript_biotype \"$biotype\";";
 	}
 	my ($tsl) = $feature->get_tag_values('transcript_support_level');
 	if ($tsl) {
 		$group .= " transcript_support_level \"$tsl\";";
 	}
-	
+
 	# skip transcript as it is technically not part of the GTF standard....
-	
+
 	# convert exon subfeatures collected above
 	my $string;
 	my @cds = get_cds($feature);
 	push @cds, get_stop_codon($feature);
 	push @cds, get_start_codon($feature);
-	@exons = map { $_->[0] } 
+	@exons = map { $_->[0] }
 		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-		map { [$_, $_->start, $_->end] } ( @exons, @cds );
+		map { [ $_, $_->start, $_->end ] } ( @exons, @cds );
 	foreach my $subf (@exons) {
-		$string .= join("\t", (
-			$subf->seq_id || '.',
-			$subf->source_tag || '.',
-			$subf->primary_tag,
-			$subf->start,
-			$subf->end,
-			defined $subf->score ? $subf->score : '.',
-			$subf->strand < 0 ? '-' : '+',
-			defined $subf->phase ? $subf->phase : '.',
-			"$group\n"
-		) );
+		$string .= join(
+			"\t",
+			(
+				$subf->seq_id     || '.',
+				$subf->source_tag || '.',
+				$subf->primary_tag,
+				$subf->start,
+				$subf->end,
+				defined $subf->score ? $subf->score : '.',
+				$subf->strand < 0    ? '-'          : '+',
+				defined $subf->phase ? $subf->phase : '.',
+				"$group\n"
+			)
+		);
 	}
-	
+
 	# finished
 	return $string;
 }
@@ -1484,16 +1521,18 @@ sub ucsc_string {
 	my $feature = shift;
 	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
 	my @ucsc_list;
-	
+
 	# process according to type
-	if ($feature->primary_tag =~ /gene$/i) {
+	if ( $feature->primary_tag =~ /gene$/i ) {
+
 		# a gene object, we will need to process it's transcript subfeatures
-		foreach my $transcript (get_transcripts($feature)) {
-			my $ucsc = _process_ucsc_transcript($transcript, $feature);
+		foreach my $transcript ( get_transcripts($feature) ) {
+			my $ucsc = _process_ucsc_transcript( $transcript, $feature );
 			push @ucsc_list, $ucsc if $ucsc;
 		}
 	}
-	elsif ($feature->primary_tag =~ /rna|transcript/i) {
+	elsif ( $feature->primary_tag =~ /rna|transcript/i ) {
+
 		# some sort of RNA transcript
 		my $ucsc = _process_ucsc_transcript($feature);
 		push @ucsc_list, $ucsc if $ucsc;
@@ -1501,11 +1540,12 @@ sub ucsc_string {
 	else {
 		return;
 	}
-	
+
 	# return strings
 	my $string;
 	foreach my $ucsc (@ucsc_list) {
-		$string .= sprintf("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\n", 
+		$string .= sprintf(
+			"%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\n",
 			$ucsc->{'name2'},
 			$ucsc->{'name'},
 			$ucsc->{'chr'},
@@ -1515,8 +1555,8 @@ sub ucsc_string {
 			$ucsc->{'cdsStart'},
 			$ucsc->{'cdsEnd'},
 			$ucsc->{'exonCount'},
-			join(",", @{$ucsc->{'exonStarts'}} ) . ',', 
-			join(",", @{$ucsc->{'exonEnds'}} ) . ',',
+			join( ",", @{ $ucsc->{'exonStarts'} } ) . ',',
+			join( ",", @{ $ucsc->{'exonEnds'} } ) . ',',
 		);
 	}
 	return $string;
@@ -1526,16 +1566,18 @@ sub bed_string {
 	my $feature = shift;
 	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
 	my @ucsc_list;
-	
+
 	# process according to type
-	if ($feature->primary_tag =~ /gene$/i) {
+	if ( $feature->primary_tag =~ /gene$/i ) {
+
 		# a gene object, we will need to process it's transcript subfeatures
-		foreach my $transcript (get_transcripts($feature)) {
-			my $ucsc = _process_ucsc_transcript($transcript, $feature);
+		foreach my $transcript ( get_transcripts($feature) ) {
+			my $ucsc = _process_ucsc_transcript( $transcript, $feature );
 			push @ucsc_list, $ucsc if $ucsc;
 		}
 	}
-	elsif ($feature->primary_tag =~ /rna|transcript/i) {
+	elsif ( $feature->primary_tag =~ /rna|transcript/i ) {
+
 		# some sort of RNA transcript
 		my $ucsc = _process_ucsc_transcript($feature);
 		push @ucsc_list, $ucsc if $ucsc;
@@ -1543,16 +1585,18 @@ sub bed_string {
 	else {
 		return;
 	}
-	
+
 	# return strings
 	my $string;
 	foreach my $ucsc (@ucsc_list) {
+
 		# exon sizes
 		my @sizes;
-		for (my $i = 0; $i < scalar( @{$ucsc->{'exonStarts'}} ); $i++) {
+		for ( my $i = 0; $i < scalar( @{ $ucsc->{'exonStarts'} } ); $i++ ) {
 			push @sizes, $ucsc->{'exonEnds'}->[$i] - $ucsc->{'exonStarts'}->[$i];
 		}
-		$string .= sprintf("%s\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\t%s\n", 
+		$string .= sprintf(
+			"%s\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\t%s\n",
 			$ucsc->{'chr'},
 			$ucsc->{'txStart'},
 			$ucsc->{'txEnd'},
@@ -1563,81 +1607,86 @@ sub bed_string {
 			$ucsc->{'cdsEnd'},
 			0,
 			$ucsc->{'exonCount'},
-			join(",", @sizes), 
-			join(",", map {$_ - $ucsc->{'txStart'} } @{$ucsc->{'exonStarts'}} ),
+			join( ",", @sizes ),
+			join( ",", map { $_ - $ucsc->{'txStart'} } @{ $ucsc->{'exonStarts'} } ),
 		);
 	}
 	return $string;
 }
-
 
 #### filter methods
 
 sub filter_transcript_support_level {
 	my $gene = shift;
 	return unless $gene;
-	my $min_tsl = shift || 'best'; 
-	my @list = qw(1 2 3 4 5 NA Missing);
-	
+	my $min_tsl = shift || 'best';
+	my @list    = qw(1 2 3 4 5 NA Missing);
+
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i) {
+	if ( ref($gene) =~ /seqfeature/i ) {
 		@transcripts = get_transcripts($gene);
 	}
-	elsif (ref($gene) eq 'ARRAY') {
+	elsif ( ref($gene) eq 'ARRAY' ) {
 		@transcripts = @$gene;
 	}
 	else {
 		return;
 	}
 	return unless @transcripts;
-	
+
 	# categorize transcripts
 	my %results = map { $_ => [] } @list;
 	foreach my $t (@transcripts) {
 		my ($tsl) = $t->get_tag_values('transcript_support_level');
-		$tsl ||= 'Missing'; # default in case nothing is present
+		$tsl ||= 'Missing';    # default in case nothing is present
 		push @{ $results{$tsl} }, $t;
 	}
-	
+
 	# take appropriate transcripts
 	my @keepers;
-	if ($min_tsl eq 'best') {
+	if ( $min_tsl eq 'best' ) {
+
 		# progress through all levels and keep only the highest set
 		foreach my $tsl (@list) {
-			if (scalar @{ $results{$tsl} }) {
+			if ( scalar @{ $results{$tsl} } ) {
 				@keepers = @{ $results{$tsl} };
 				last;
 			}
 		}
 	}
-	elsif ($min_tsl =~ /^best(\d)$/) {
+	elsif ( $min_tsl =~ /^best(\d)$/ ) {
+
 		# progress through all levels and take all up to specified max
 		my $max = $1;
-		foreach my $tsl (1 .. 5) {
-			if (scalar @{ $results{$tsl} }) {
-				if ($tsl <= $max) {
+		foreach my $tsl ( 1 .. 5 ) {
+			if ( scalar @{ $results{$tsl} } ) {
+				if ( $tsl <= $max ) {
 					push @keepers, @{ $results{$tsl} };
 				}
-				elsif (not @keepers and $tsl > $max) {
+				elsif ( not @keepers and $tsl > $max ) {
+
 					# go ahead and take it if we have no other option
 					push @keepers, @{ $results{$tsl} };
 				}
 			}
 		}
+
 		# still take the NA and Missing if nothing else
-		if (scalar @keepers == 0 and scalar @{ $results{'NA'} }) {
+		if ( scalar @keepers == 0 and scalar @{ $results{'NA'} } ) {
 			@keepers = @{ $results{'NA'} };
 		}
-		elsif (scalar @keepers == 0 and scalar @{ $results{'Missing'} }) {
+		elsif ( scalar @keepers == 0 and scalar @{ $results{'Missing'} } ) {
 			@keepers = @{ $results{'Missing'} };
 		}
 	}
-	elsif ($min_tsl =~ /^\d$/) {
+	elsif ( $min_tsl =~ /^\d$/ ) {
+
 		# take only the specified level
 		@keepers = @{ $results{$min_tsl} };
 	}
-	elsif ($min_tsl eq 'NA') {
+	elsif ( $min_tsl eq 'NA' ) {
+
 		# take only the NA guys
 		@keepers = @{ $results{'NA'} };
 	}
@@ -1645,9 +1694,9 @@ sub filter_transcript_support_level {
 		confess "unrecognized minimum TSL value '$min_tsl' Check the documentation!";
 	}
 	@keepers = @{ $results{'Missing'} } unless @keepers;
-	
+
 	# return
-	return _return_filtered_transcripts($gene, \@keepers);
+	return _return_filtered_transcripts( $gene, \@keepers );
 }
 
 sub filter_transcript_gencode_basic {
@@ -1656,92 +1705,89 @@ sub filter_transcript_gencode_basic {
 
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i) {
+	if ( ref($gene) =~ /seqfeature/i ) {
 		@transcripts = get_transcripts($gene);
 	}
-	elsif (ref($gene) eq 'ARRAY') {
+	elsif ( ref($gene) eq 'ARRAY' ) {
 		@transcripts = @$gene;
 	}
 	else {
 		return;
 	}
 	return unless @transcripts;
-	
+
 	# take appropriate transcripts
 	my @keepers;
 	foreach my $t (@transcripts) {
 		my ($basic) = $t->get_tag_values('tag');
-		if ($basic and $basic eq 'basic') {
+		if ( $basic and $basic eq 'basic' ) {
 			push @keepers, $t;
 		}
 	}
-	
-	# return
-	return _return_filtered_transcripts($gene, \@keepers);
-}
 
+	# return
+	return _return_filtered_transcripts( $gene, \@keepers );
+}
 
 sub filter_transcript_biotype {
 	my $gene = shift;
 	return unless $gene;
-	my $check = shift; 
+	my $check = shift;
 	confess "no biotype value to check provided!" unless $check;
-	
+
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i) {
+	if ( ref($gene) =~ /seqfeature/i ) {
 		@transcripts = get_transcripts($gene);
 	}
-	elsif (ref($gene) eq 'ARRAY') {
+	elsif ( ref($gene) eq 'ARRAY' ) {
 		@transcripts = @$gene;
 	}
 	else {
 		return;
 	}
 	return unless @transcripts;
-	
+
 	# take appropriate transcripts
 	my @keepers;
 	foreach my $t (@transcripts) {
-		my ($value) = $t->get_tag_values('transcript_biotype') || 
-			$t->get_tag_values('biotype');
+		my ($value) = $t->get_tag_values('transcript_biotype')
+			|| $t->get_tag_values('biotype');
 		$value ||= $t->primary_tag;
-		if ($value and $value =~ /$check/i) {
+		if ( $value and $value =~ /$check/i ) {
 			push @keepers, $t;
 		}
 	}
-	
+
 	# return
-	return _return_filtered_transcripts($gene, \@keepers);
+	return _return_filtered_transcripts( $gene, \@keepers );
 }
-
-
-
 
 #### internal methods
 
 sub _process_ucsc_transcript {
 	my $transcript = shift;
-	my $gene = shift || undef;
-	
+	my $gene       = shift || undef;
+
 	# initialize ucsc hash
 	my $ucsc = {
-		'name'         => $transcript->display_name || $transcript->primary_id,
-		'name2'        => undef,
-		'chr'          => $transcript->seq_id,
-		'strand'       => $transcript->strand < 0 ? '-' : '+', 
-		'txStart'      => $transcript->start - 1,
-		'txEnd'        => $transcript->end,
-		'cdsStart'     => undef,
-		'cdsEnd'       => undef,
-		'exonCount'    => 0,
-		'exonStarts'   => [],
-		'exonEnds'     => [],
-		'score'        => $transcript->score || 1000,
+		'name'       => $transcript->display_name || $transcript->primary_id,
+		'name2'      => undef,
+		'chr'        => $transcript->seq_id,
+		'strand'     => $transcript->strand < 0 ? '-' : '+',
+		'txStart'    => $transcript->start - 1,
+		'txEnd'      => $transcript->end,
+		'cdsStart'   => undef,
+		'cdsEnd'     => undef,
+		'exonCount'  => 0,
+		'exonStarts' => [],
+		'exonEnds'   => [],
+		'score'      => $transcript->score || 1000,
 	};
-	
+
 	# determine gene name
 	if ($gene) {
+
 		# use provided gene name
 		$ucsc->{'name2'} = $gene->display_name || $gene->primary_id;
 	}
@@ -1749,17 +1795,17 @@ sub _process_ucsc_transcript {
 		# reuse the name
 		$ucsc->{'name2'} = $ucsc->{'name'};
 	}
-	
+
 	# record CDS points
-	if (is_coding($transcript)) {
+	if ( is_coding($transcript) ) {
 		my $start = get_cdsStart($transcript);
 		my $stop  = get_cdsEnd($transcript);
-		if ($start and $stop) {
+		if ( $start and $stop ) {
 			$ucsc->{cdsStart} = $start - 1;
 			$ucsc->{cdsEnd}   = $stop;
 		}
 		else {
-			# if we don't have cds start/stop, then assign to transcript end 
+			# if we don't have cds start/stop, then assign to transcript end
 			# as if it is a noncoding transcript, regardless of primary_tag
 			$ucsc->{cdsStart} = $transcript->end;
 			$ucsc->{cdsEnd}   = $transcript->end;
@@ -1770,50 +1816,50 @@ sub _process_ucsc_transcript {
 		$ucsc->{cdsStart} = $transcript->end;
 		$ucsc->{cdsEnd}   = $transcript->end;
 	}
-	
+
 	# record the exons
-	foreach my $exon (get_exons($transcript)) {
+	foreach my $exon ( get_exons($transcript) ) {
 		push @{ $ucsc->{'exonStarts'} }, $exon->start - 1;
-		push @{ $ucsc->{'exonEnds'} }, $exon->end;
+		push @{ $ucsc->{'exonEnds'} },   $exon->end;
 		$ucsc->{'exonCount'} += 1;
 	}
-	
+
 	return $ucsc;
 }
 
 sub _return_filtered_transcripts {
-	my ($gene, $keepers) = @_;
-	
-	if (ref($gene) =~ /seqfeature/i) {
-		# first check if we were only given a transcript 
-		if ($gene->primary_tag =~ /transcript|rna/i) {
+	my ( $gene, $keepers ) = @_;
+
+	if ( ref($gene) =~ /seqfeature/i ) {
+
+		# first check if we were only given a transcript
+		if ( $gene->primary_tag =~ /transcript|rna/i ) {
+
 			# we must have been given a single transcript to check, so return it
 			$keepers->[0] ||= undef;
 			return $keepers->[0];
 		}
-		
-		# we can't delete subfeatures, so we're forced to create a new 
+
+		# we can't delete subfeatures, so we're forced to create a new
 		# parent gene and reattach the filtered transcripts
 		my %attributes = $gene->attributes;
 		return $gene->new(
-			-seq_id         => $gene->seq_id,
-			-start          => $gene->start,
-			-end            => $gene->end,
-			-strand         => $gene->strand,
-			-primary_tag    => $gene->primary_tag,
-			-source         => $gene->source_tag,
-			-name           => $gene->display_name,
-			-id             => $gene->primary_id,
-			-attributes     => \%attributes,
-			-segments       => $keepers,
+			-seq_id      => $gene->seq_id,
+			-start       => $gene->start,
+			-end         => $gene->end,
+			-strand      => $gene->strand,
+			-primary_tag => $gene->primary_tag,
+			-source      => $gene->source_tag,
+			-name        => $gene->display_name,
+			-id          => $gene->primary_id,
+			-attributes  => \%attributes,
+			-segments    => $keepers,
 		);
 	}
 	else {
 		return $keepers;
 	}
 }
-
-
 
 __END__
 

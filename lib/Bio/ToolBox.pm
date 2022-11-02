@@ -244,10 +244,8 @@ use Bio::ToolBox::Data;
 
 sub load_file {
 	my $self = shift;
-	if (scalar(@_) == 1) {
-		return Bio::ToolBox::Data->new(
-			file   => $_[0],
-		);
+	if ( scalar(@_) == 1 ) {
+		return Bio::ToolBox::Data->new( file => $_[0], );
 	}
 	else {
 		return Bio::ToolBox::Data->new(@_);
@@ -256,7 +254,7 @@ sub load_file {
 
 sub parse_file {
 	my $self = shift;
-	if (scalar(@_) == 1) {
+	if ( scalar(@_) == 1 ) {
 		return Bio::ToolBox::Data->new(
 			file       => $_[0],
 			parse      => 1,
@@ -266,22 +264,21 @@ sub parse_file {
 	}
 	else {
 		my %args = @_;
-		$args{parse} ||= 1; # make sure this is present
+		$args{parse} ||= 1;    # make sure this is present
 		return Bio::ToolBox::Data->new(%args);
 	}
 }
 
 sub new_data {
 	my $self = shift;
-	if ($_[0] =~ /^(?:columns|datasets)$/) {
+	if ( $_[0] =~ /^(?:columns|datasets)$/ ) {
+
 		# looks like a correctly formatted list
 		return Bio::ToolBox::Data->new(@_);
 	}
 	else {
 		# put provided list into an array
-		return Bio::ToolBox::Data->new(
-			columns => [@_]
-		);
+		return Bio::ToolBox::Data->new( columns => [@_] );
 	}
 }
 

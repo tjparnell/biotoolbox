@@ -14,53 +14,45 @@ my $VERSION = '1.67';
 
 print "\n This script will collect information for a list of features\n\n";
 
-
-
 ### Quick help
-unless (@ARGV) { # when no command line options are present
-	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+unless (@ARGV) {    # when no command line options are present
+					# print SYNOPSIS
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
-
-
 
 ### Get command line options and initialize values
 
 # Initialize values
-my (
-	$infile,
-	$outfile,
-	$database,
-	$attrib_request,
-	$use_type,
-	$gz,
-	$help,
-	$print_version,
-); 
+my ( $infile, $outfile, $database, $attrib_request, $use_type, $gz, $help,
+	$print_version, );
 
 # Command line options
-GetOptions( 
-	'i|in=s'     => \$infile, # input file
-	'a|attrib=s' => \$attrib_request, # attribute
-	'o|out=s'    => \$outfile, # output filename
-	'd|db=s'     => \$database, # database name
-	't|type=s'   => \$use_type, # force a type
-	'z|gz!'      => \$gz, # gzip status
-	'h|help'     => \$help, # help
-	'v|version'  => \$print_version, # print the version
+GetOptions(
+	'i|in=s'     => \$infile,            # input file
+	'a|attrib=s' => \$attrib_request,    # attribute
+	'o|out=s'    => \$outfile,           # output filename
+	'd|db=s'     => \$database,          # database name
+	't|type=s'   => \$use_type,          # force a type
+	'z|gz!'      => \$gz,                # gzip status
+	'h|help'     => \$help,              # help
+	'v|version'  => \$print_version,     # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
-
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -74,29 +66,25 @@ if ($print_version) {
 	exit;
 }
 
-
-
 # Check for required values
 unless ($infile) {
 	$infile = shift @ARGV;
 }
-unless (defined $gz) {$gz = 0}
-
-
-
+unless ( defined $gz ) { $gz = 0 }
 
 ### Load the feature list
 
 # load file
-my $Data = Bio::ToolBox::Data->new(file => $infile) or
-	die " Unable to load data file!\n";
+my $Data = Bio::ToolBox::Data->new( file => $infile )
+	or die " Unable to load data file!\n";
 printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 
 if ($use_type) {
-	# set the general feature type, which will be used as a proxy for individual 
+
+	# set the general feature type, which will be used as a proxy for individual
 	# feature types in the Data method that looks for the database features.
 	my $f = $Data->feature;
-	if (defined $f) {
+	if ( defined $f ) {
 		print " Resetting feature type '$f' to requested '$use_type'\n";
 	}
 	$Data->feature($use_type);
@@ -107,38 +95,45 @@ if ($use_type) {
 	my $name_i = $Data->name_column;
 	my $id_i   = $Data->id_column;
 	my $type_i = $Data->type_column;
-	unless (defined $name_i or defined $id_i) {
+	unless ( defined $name_i or defined $id_i ) {
 		die " unable to identify a name or ID column. Database lookup unlikely to work\n";
 	}
-	unless (defined $type_i or $use_type) {
-		warn " No type column present or type specified. Database lookup may have problems\n";
+	unless ( defined $type_i or $use_type ) {
+		warn
+" No type column present or type specified. Database lookup may have problems\n";
 	}
 }
-
 
 ### Establish database connection
 my $db;
 if ($database) {
-	if ($Data->database and $Data->database ne $database) {
-		print " Using provided database '$database' instead of metadata-specified database\n";
+	if ( $Data->database and $Data->database ne $database ) {
+		print
+" Using provided database '$database' instead of metadata-specified database\n";
 	}
-	
+
 	# check if we have a real file
-	if (-e $database) {
-		if ($database =~ /(?:db|database|sqlite)$/i) {
+	if ( -e $database ) {
+		if ( $database =~ /(?:db|database|sqlite)$/i ) {
+
 			# looks like maybe a SQLite file
 			$Data->database($database);
 			$db = $Data->open_meta_database or die "unable to open database!\n";
 		}
-		elsif ($Data->taste_file($database)) {
+		elsif ( $Data->taste_file($database) ) {
+
 			# looks like a parsable annotation file
 			# parse the file and associate with the table
-			$Data->parse_table( {
-				file     => $database,
-				feature  => $Data->feature, # may be explicitly set by use_type above
-				simplify => 0,
-				subfeature => 'exon,cds,utr,codon',
-			} ) or die " unable to parse annotation file '$database'!\n";
+			$Data->parse_table(
+				{
+					file    => $database,
+					feature =>
+						$Data->feature,    # may be explicitly set by use_type above
+					simplify   => 0,
+					subfeature => 'exon,cds,utr,codon',
+				}
+			) or die " unable to parse annotation file '$database'!\n";
+
 			# this may fail if not everything can be loaded
 		}
 		else {
@@ -152,16 +147,23 @@ if ($database) {
 		$db = $Data->open_meta_database or die "unable to open database!\n";
 	}
 }
-elsif ($Data->database) {
+elsif ( $Data->database ) {
+
 	# use metadata-specified database
-	if ($Data->database =~ /^Parsed:(.+)$/) {
+	if ( $Data->database =~ /^Parsed:(.+)$/ ) {
+
 		# there was a parsed annotation file, try and re-parse it
-		$Data->parse_table( {
-			file     => $1,
-			feature  => $Data->feature, # may be explicitly set by use_type above
-			simplify => 0,
-			subfeature => 'exon,cds,utr,codon',
-		} ) or die " unable to parse annotation file '$1' in metadata!\n try specifying a new database or annoation file\n";
+		$Data->parse_table(
+			{
+				file       => $1,
+				feature    => $Data->feature,    # may be explicitly set by use_type above
+				simplify   => 0,
+				subfeature => 'exon,cds,utr,codon',
+			}
+			)
+			or die
+" unable to parse annotation file '$1' in metadata!\n try specifying a new database or annoation file\n";
+
 		# this may fail if not everything can be loaded
 	}
 	else {
@@ -172,10 +174,6 @@ else {
 	die "No database defined! See help\n";
 }
 
-
-
-
-
 ### Determine the attribute to collect
 
 # get the attribute list from the user
@@ -183,12 +181,6 @@ my @attribute_list = get_attribute_list_from_user();
 
 # process the requests
 collect_attributes_for_list(@attribute_list);
-
-
-
-
-
-
 
 ### Output the data
 # assign file name if necessary
@@ -198,10 +190,11 @@ unless ($outfile) {
 
 # write the file
 my $file_success = $Data->write_file(
-	'filename'  => $outfile,
-	'gz'        => $gz,
+	'filename' => $outfile,
+	'gz'       => $gz,
 );
 if ($file_success) {
+
 	# success
 	print " Wrote file '$file_success'\n";
 }
@@ -211,79 +204,77 @@ else {
 }
 print " That's it!\n";
 
-
-
-
-
-
-
 ### Subroutines
 
-
 sub get_attribute_list_from_user {
+
 	# get the list from the user
 	# either as a command line option or interactively
-	
+
 	my @list;
-	
+
 	# provided by command line argument
 	if ($attrib_request) {
 		@list = split /,/, $attrib_request;
 	}
-	
+
 	# request interactively from user
 	else {
-		
+
 		# get the list of features to check for examples
 		print " Collecting sample features to generate list of attributes....\n";
-		
+
 		# get the attributes for a sample of features
 		# store the tag keys in an example hash
 		my %tagexamples;
 		my $stream = $Data->row_stream;
-		for (1 .. 50) {
+		for ( 1 .. 50 ) {
 			my $row = $stream->next_row;
 			last unless $row;
 			my $f = $row->feature;
 			next unless $f;
 			my %taghash = $f->attributes();
-			foreach (keys %taghash) {
+			foreach ( keys %taghash ) {
 				$tagexamples{$_} += 1;
 			}
 		}
-		
+
 		# present list to user
 		print " These are the attributes which may be collected:\n";
 		my $i = 1;
 		my %index2att;
+
 		# standard attributes for any user
-		foreach ( 
-			qw(Chromosome Start Stop Strand Score Name Alias Note Type Primary_tag Source 
-				Length Midpoint Phase RNA_count Exon_count Gene_length Transcript_length 
-				Parent Primary_ID 
-			) 
-		) {
+		foreach (
+			qw(Chromosome Start Stop Strand Score Name Alias Note Type Primary_tag Source
+			Length Midpoint Phase RNA_count Exon_count Gene_length Transcript_length
+			Parent Primary_ID
+			)
+			)
+		{
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
 		}
+
 		# specific attributes for these features
-		foreach (sort {$a cmp $b} keys %tagexamples) {
+		foreach ( sort { $a cmp $b } keys %tagexamples ) {
+
 			# all other attributes
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
 		}
-		
+
 		# collect the user response
 		print " Enter the attribute number(s) to collect, comma-delimited or range  ";
 		my $answer = <STDIN>;
 		chomp $answer;
 		my @answers = parse_list($answer);
-		
+
 		# check the answers
 		foreach (@answers) {
-			if (exists $index2att{$_}) {
+			if ( exists $index2att{$_} ) {
 				push @list, $index2att{$_};
 			}
 			else {
@@ -291,126 +282,124 @@ sub get_attribute_list_from_user {
 			}
 		}
 	}
-	
+
 	return @list;
 }
 
-
-
 sub get_attribute_method {
+
 	# a subroutine to get the appropriate subroutine method
-	
+
 	my $attrib = shift;
-	
+
 	# set the appropriate attribute collection subroutine
 	my $method;
-	if ($attrib =~ /^chromo/i) {
+	if ( $attrib =~ /^chromo/i ) {
 		$method = \&get_chromo;
-	} 
-	elsif ($attrib =~ /^start$/i) {
+	}
+	elsif ( $attrib =~ /^start$/i ) {
 		$method = \&get_start;
-	} 
-	elsif ($attrib =~ /^stop$/i) {
+	}
+	elsif ( $attrib =~ /^stop$/i ) {
 		$method = \&get_stop;
-	} 
-	elsif ($attrib =~ /^midpoint$/i) {
+	}
+	elsif ( $attrib =~ /^midpoint$/i ) {
 		$method = \&get_midpoint;
-	} 
-	elsif ($attrib =~ /^length$/i) {
+	}
+	elsif ( $attrib =~ /^length$/i ) {
 		$method = \&get_length;
-	} 
-	elsif ($attrib =~ /^gene.?length$/i) {
+	}
+	elsif ( $attrib =~ /^gene.?length$/i ) {
 		$method = \&get_gene_length;
-	} 
-	elsif ($attrib =~ /^transcript.?length$/i) {
+	}
+	elsif ( $attrib =~ /^transcript.?length$/i ) {
 		$method = \&get_transcript_length;
-	} 
-	elsif ($attrib =~ /^strand$/i) {
+	}
+	elsif ( $attrib =~ /^strand$/i ) {
 		$method = \&get_strand;
-	} 
-	elsif ($attrib =~ /^phase$/i) {
+	}
+	elsif ( $attrib =~ /^phase$/i ) {
 		$method = \&get_phase;
-	} 
-	elsif ($attrib =~ /^score$/i) {
+	}
+	elsif ( $attrib =~ /^score$/i ) {
 		$method = \&get_score;
-	} 
-	elsif ($attrib =~ /^rna.?count$/i) {
+	}
+	elsif ( $attrib =~ /^rna.?count$/i ) {
 		$method = \&get_rna_number;
-	} 
-	elsif ($attrib =~ /^exon.?count$/i) {
+	}
+	elsif ( $attrib =~ /^exon.?count$/i ) {
 		$method = \&get_exon_number;
-	} 
-	elsif ($attrib =~ /^parent$/i) {
+	}
+	elsif ( $attrib =~ /^parent$/i ) {
 		$method = \&get_parent;
-	} 
-	elsif ($attrib =~ /^primary.?id$/i) {
+	}
+	elsif ( $attrib =~ /^primary.?id$/i ) {
 		$method = \&get_primary_id;
-	} 
-	elsif ($attrib =~ /^name$/i) {
+	}
+	elsif ( $attrib =~ /^name$/i ) {
 		$method = \&get_display_name;
-	} 
-	elsif ($attrib =~ /^source$/i) {
+	}
+	elsif ( $attrib =~ /^source$/i ) {
 		$method = \&get_source;
-	} 
-	elsif ($attrib =~ /^type$/i) {
+	}
+	elsif ( $attrib =~ /^type$/i ) {
 		$method = \&get_type;
-	} 
-	elsif ($attrib =~ /^primary.?tag$/i) {
+	}
+	elsif ( $attrib =~ /^primary.?tag$/i ) {
 		$method = \&get_primary_tag;
-	} 
+	}
 	else {
 		# unrecognized, must be tag key
 		$method = \&get_tag_value;
 	}
-		
+
 	return $method;
 }
 
-
 sub collect_attributes_for_list {
-	
+
 	my @list = @_;
-	
+
 	# get the attribute method(s)
-	my @methods; # the methods are references to appropriate subroutines
+	my @methods;    # the methods are references to appropriate subroutines
 	foreach (@list) {
 		push @methods, get_attribute_method($_);
 	}
-	
+
 	# prepare columns
 	my @indices;
 	foreach (@list) {
 		my $i = $Data->add_column($_);
 		push @indices, $i;
 	}
-	
-	print " Retrieving ", join(", ", @list), "\n";
+
+	print " Retrieving ", join( ", ", @list ), "\n";
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		
+	while ( my $row = $stream->next_row ) {
+
 		my $feature = $row->feature(1);
-			# pass a true value to force the seqfeature lookup
+
+		# pass a true value to force the seqfeature lookup
 		if ($feature) {
+
 			# get the attribute(s)
-			for (my $i = 0; $i < scalar @list; $i++) {
+			for ( my $i = 0; $i < scalar @list; $i++ ) {
+
 				# for each request in the list, we will collect the attribute
 				# we'll use the method sub defined in the methods
 				# pass both the feature and the name of the attribute
 				# only the tag value actually needs the name of the attribute
-				my $v = &{ $methods[$i] }($feature, $list[$i]);
-				$row->value($indices[$i], $v);
+				my $v = &{ $methods[$i] }( $feature, $list[$i] );
+				$row->value( $indices[$i], $v );
 			}
 		}
 		else {
 			# no feature found, cannot collect attributes
 			# record nulls
-			foreach (@indices) { $row->value($_, '.') }
+			foreach (@indices) { $row->value( $_, '.' ) }
 		}
 	}
 }
-
-
-
 
 sub get_chromo {
 	my $feature = shift;
@@ -418,14 +407,11 @@ sub get_chromo {
 	return $feature->seq_id || '.';
 }
 
-
 sub get_start {
 	my $feature = shift;
 	return '.' unless $feature;
 	return $feature->start || '.';
 }
-
-
 
 sub get_stop {
 	my $feature = shift;
@@ -433,48 +419,48 @@ sub get_stop {
 	return $feature->end || '.';
 }
 
-
 sub get_length {
 	my $feature = shift;
 	return 0 unless $feature;
 	return $feature->length || 0;
 }
 
-
 sub get_gene_length {
 	my $feature = shift;
 	return 0 unless $feature;
-	
+
 	# collect all exons or CDSs for every transcript
 	my @exons;
 	my @cdss;
 	foreach my $subfeat ( $feature->get_SeqFeatures() ) {
+
 		# feature may consist of multiple transcripts
-		if ($subfeat->primary_tag =~ /exon/i) {
+		if ( $subfeat->primary_tag =~ /exon/i ) {
 			push @exons, $subfeat;
 		}
-		elsif ($subfeat->primary_tag =~ /utr|untranslated/i) {
+		elsif ( $subfeat->primary_tag =~ /utr|untranslated/i ) {
 			push @cdss, $subfeat;
 		}
-		elsif ($subfeat->primary_tag =~ /cds/i) {
+		elsif ( $subfeat->primary_tag =~ /cds/i ) {
 			push @cdss, $subfeat;
 		}
-		elsif ($subfeat->primary_tag =~ /rna|transcript/i) {
+		elsif ( $subfeat->primary_tag =~ /rna|transcript/i ) {
+
 			# an RNA subfeature, keep going down another level
-			foreach my $f ($subfeat->get_SeqFeatures) {
-				if ($f->primary_tag =~ /exon/i) {
+			foreach my $f ( $subfeat->get_SeqFeatures ) {
+				if ( $f->primary_tag =~ /exon/i ) {
 					push @exons, $f;
 				}
-				elsif ($f->primary_tag =~ /utr|untranslated/i) {
+				elsif ( $f->primary_tag =~ /utr|untranslated/i ) {
 					push @cdss, $f;
 				}
-				elsif ($f->primary_tag =~ /cds/i) {
+				elsif ( $f->primary_tag =~ /cds/i ) {
 					push @cdss, $f;
 				}
 			}
 		}
 	}
-	
+
 	# Determine which subfeatures to collect
 	# we prefer to use exons because they are easier
 	# if exons are not defined then we'll infer them from CDSs and UTRs
@@ -491,22 +477,21 @@ sub get_gene_length {
 		# in this case we just take the whole thing
 		push @features_to_check, $feature;
 	}
-	
-	
+
 	# Order and collapse the subfeatures
 	# we don't want overlapping features
-	my @sorted_features =   map {$_->[1]} 
-							sort {$a->[0] <=> $b->[0]} 
-							map { [$_->start, $_] } 
-							@features_to_check;
+	my @sorted_features = map { $_->[1] }
+		sort { $a->[0] <=> $b->[0] }
+		map { [ $_->start, $_ ] } @features_to_check;
 	my @merged;
 	my $current = shift @sorted_features;
 	while ($current) {
 		if (@sorted_features) {
 			my $next = shift @sorted_features;
-			if ($current->overlaps($next) ) {
+			if ( $current->overlaps($next) ) {
+
 				# overlapping features, so reassign the end point to that of the next
-				$current->end($next->end);
+				$current->end( $next->end );
 			}
 			else {
 				# no overlap, keep current, next becomes current
@@ -520,17 +505,16 @@ sub get_gene_length {
 			undef $current;
 		}
 	}
-	
+
 	# calculate the length
 	my $gene_length = 0;
 	foreach my $f (@merged) {
 		$gene_length += $f->length;
 	}
-	
+
 	# return most appropriate number
 	return $gene_length;
 }
-
 
 sub get_transcript_length {
 	my $feature = shift;
@@ -538,31 +522,32 @@ sub get_transcript_length {
 	my $exon_total = 0;
 	my $cds_total  = 0;
 	foreach my $subf ( $feature->get_SeqFeatures() ) {
+
 		# feature may consist of multiple subfeature types
 		# we're only interested in the exon subfeatures, or if those don't
 		# exist, then the CDS subfeatures
 		# ignore all other subfeatures
-		
+
 		# exon subfeature
-		if ($subf->primary_tag eq 'exon') {
+		if ( $subf->primary_tag eq 'exon' ) {
 			$exon_total += $subf->length;
 		}
+
 		# cds subfeature
-		elsif ($subf->primary_tag eq 'CDS') {
+		elsif ( $subf->primary_tag eq 'CDS' ) {
 			$cds_total += $subf->length;
 		}
 	}
+
 	# return most appropriate number
 	return $exon_total > 0 ? $exon_total : $cds_total;
 }
 
-
 sub get_midpoint {
 	my $feature = shift;
 	return '.' unless $feature;
-	return ($feature->start + int( $feature->length / 2) ) || '.';
+	return ( $feature->start + int( $feature->length / 2 ) ) || '.';
 }
-
 
 sub get_strand {
 	my $feature = shift;
@@ -570,13 +555,11 @@ sub get_strand {
 	return $feature->strand || 0;
 }
 
-
 sub get_phase {
 	my $feature = shift;
 	return '.' unless $feature;
 	return $feature->phase || '.';
 }
-
 
 sub get_score {
 	my $feature = shift;
@@ -584,13 +567,13 @@ sub get_score {
 	return $feature->score || '.';
 }
 
-
 sub get_rna_number {
 	my $feature = shift;
 	return 0 unless $feature;
 	my $rna_count = 0;
-	foreach my $f ($feature->get_SeqFeatures) {
-		if ($f->primary_tag =~ /rna|transcript/i) {
+	foreach my $f ( $feature->get_SeqFeatures ) {
+		if ( $f->primary_tag =~ /rna|transcript/i ) {
+
 			# an RNA transcript
 			$rna_count++;
 		}
@@ -598,91 +581,90 @@ sub get_rna_number {
 	return $rna_count;
 }
 
-
 sub get_exon_number {
 	my $feature = shift;
 	return 0 unless $feature;
 	my $exon_count = 0;
-	my $cds_count = 0;
-	foreach my $f ($feature->get_SeqFeatures) {
+	my $cds_count  = 0;
+	foreach my $f ( $feature->get_SeqFeatures ) {
+
 		# count both exons and CDSs
-		if ($f->primary_tag =~ /exon/i) {
+		if ( $f->primary_tag =~ /exon/i ) {
 			$exon_count++;
 		}
-		elsif ($f->primary_tag =~ /cds/i) {
+		elsif ( $f->primary_tag =~ /cds/i ) {
 			$cds_count++;
 		}
-		elsif ($f->primary_tag =~ /rna|transcript/i) {
+		elsif ( $f->primary_tag =~ /rna|transcript/i ) {
+
 			# an RNA transcript, go one more level
-			foreach my $sf ($f->get_SeqFeatures) {
-				if ($sf->primary_tag =~ /exon/i) {
+			foreach my $sf ( $f->get_SeqFeatures ) {
+				if ( $sf->primary_tag =~ /exon/i ) {
 					$exon_count++;
 				}
-				elsif ($sf->primary_tag =~ /cds/i) {
+				elsif ( $sf->primary_tag =~ /cds/i ) {
 					$cds_count++;
 				}
 			}
 		}
 	}
+
 	# return exon_count if non-zero, else return cds_count, zero or non-zero
 	return $exon_count ? $exon_count : $cds_count;
 }
 
-
 sub get_parent {
 	my $feature = shift;
 	return '.' unless $feature;
+
 	# this is tricky, because it's not always recorded in the SeqFeature object itself
-	# and we can't easily recurse in memory an object and what it is linked to 
-	# 
-	if ($feature->has_tag('parent_id')) {
+	# and we can't easily recurse in memory an object and what it is linked to
+	#
+	if ( $feature->has_tag('parent_id') ) {
+
 		# feature has a parent in a database
 		my @parent_ids = $feature->get_tag_values('parent_id');
 		if ($db) {
+
 			# looks like we have SeqFeature database
-			# unfortunately we have to do a slow lookup through the database 
+			# unfortunately we have to do a slow lookup through the database
 			# using the attribute load_id
 			# this seems to be the only way to get to the parent name
 			my @parents;
 			foreach my $id (@parent_ids) {
-				foreach my $p ($db->get_features_by_attribute('load_id' => $id)) {
+				foreach my $p ( $db->get_features_by_attribute( 'load_id' => $id ) ) {
 					push @parents, $p->display_name;
 				}
 			}
-			return join(',', @parents);
+			return join( ',', @parents );
 		}
 	}
-	if ($feature->has_tag('Parent')) {
+	if ( $feature->has_tag('Parent') ) {
 		my @parents = $feature->get_tag_values('Parent');
-		return join(',', @parents);
+		return join( ',', @parents );
 	}
 	return '.';
 }
-
 
 sub get_primary_id {
 	my $feature = shift;
 	return $feature->primary_id || '.';
 }
 
-
 sub get_display_name {
 	my $feature = shift;
 	return $feature->display_name || '.';
 }
-
 
 sub get_type {
 	my $feature = shift;
 	return $feature->type || $feature->primary_tag || '.';
 }
 
-
 sub get_primary_tag {
 	my $feature = shift;
 	return $feature->primary_tag || $feature->type || '.';
 }
-
 
 sub get_source {
 	my $feature = shift;
@@ -691,19 +673,15 @@ sub get_source {
 
 sub get_tag_value {
 	my $feature = shift;
-	my $attrib = shift;
+	my $attrib  = shift;
 	return '.' unless $feature;
-	if ($feature->has_tag($attrib)) {
-		return join(';', ($feature->get_tag_values($attrib)) );
+	if ( $feature->has_tag($attrib) ) {
+		return join( ';', ( $feature->get_tag_values($attrib) ) );
 	}
 	else {
 		return '.';
 	}
 }
-
-
-
-
 
 __END__
 

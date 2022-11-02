@@ -3,7 +3,7 @@ package Bio::ToolBox::db_helper::seqfasta;
 require Exporter;
 use Carp;
 use strict;
-use Module::Load; # for dynamic loading during runtime
+use Module::Load;    # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
@@ -11,13 +11,13 @@ use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 
-our $VERSION = '1.54';
+our $VERSION   = '1.54';
 our $WIGGLE_OK = 0;
 our $CONFIG_OK = 0;
 our $BTB_CONFIG;
 
 # Exported names
-our @ISA = qw(Exporter);
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
 	open_fasta_db
 	open_store_db
@@ -29,31 +29,31 @@ our @EXPORT = qw(
 sub open_fasta_db {
 	my $database = shift;
 	my $db;
-	
+
 	eval {
 		# to prevent annoying error messages, we silence warnings
 		# we are often trying to open without absolute confirmation this will work
 		# hence working inside an eval
-		local $SIG{__WARN__} = sub {}; 
+		local $SIG{__WARN__} = sub { };
 		$db = Bio::DB::Fasta->new($database);
 	};
 	unless ($db) {
-		warn "unable to open fasta file as database! Make sure the file's directory\n" .
-			"writable, and if a *.index file exists, try deleting it so it can be rebuilt\n";
+		warn "unable to open fasta file as database! Make sure the file's directory\n"
+			. "writable, and if a *.index file exists, try deleting it so it can be rebuilt\n";
 	}
 	return $db;
 }
 
-
 sub open_store_db {
 	my $database = shift;
 	my $db;
-	
+
 	# first determine type of database we're dealing with
 	# by checking for an extension
-	
+
 	# GFF3 file to be loaded into memory
-	if ($database =~ /\.gff3?(?:\.gz)?$/i) {
+	if ( $database =~ /\.gff3?(?:\.gz)?$/i ) {
+
 		# gff3 file can be gzipped
 		# this might take a while, so print a statement
 		print " Loading file into memory database...\n";
@@ -64,46 +64,49 @@ sub open_store_db {
 			);
 		};
 	}
-	
-	elsif ($database =~ /\.(?:db|sqlite)$/i) {
+
+	elsif ( $database =~ /\.(?:db|sqlite)$/i ) {
 		eval {
 			$db = Bio::DB::SeqFeature::Store->new(
-				-adaptor  => 'DBI::SQLite',
-				-dsn      => $database,
+				-adaptor => 'DBI::SQLite',
+				-dsn     => $database,
 			);
 		};
 	}
-	
+
 	else {
 		# open the connection using parameters from the configuration file
-		# we'll try to use database specific parameters first, else use 
+		# we'll try to use database specific parameters first, else use
 		# the db_default parameters
-		my $adaptor = $BTB_CONFIG->param($database . '.adaptor') || 
-			$BTB_CONFIG->param('default_db.adaptor');
-		my $user = $BTB_CONFIG->param($database . '.user') || 
-			$BTB_CONFIG->param('default_db.user');
-		my $pass = $BTB_CONFIG->param($database . '.pass') ||
-			$BTB_CONFIG->param('default_db.pass') || undef;
-		
+		my $adaptor = $BTB_CONFIG->param( $database . '.adaptor' )
+			|| $BTB_CONFIG->param('default_db.adaptor');
+		my $user = $BTB_CONFIG->param( $database . '.user' )
+			|| $BTB_CONFIG->param('default_db.user');
+		my $pass =
+			   $BTB_CONFIG->param( $database . '.pass' )
+			|| $BTB_CONFIG->param('default_db.pass')
+			|| undef;
+
 		# check for empty passwords
 		# config::simple passes an empty array when nothing was defined
-		if (ref $pass eq 'ARRAY' and scalar @$pass == 0) {$pass = undef}
-		
+		if ( ref $pass eq 'ARRAY' and scalar @$pass == 0 ) { $pass = undef }
+
 		# set up the dsn
 		# it can be specifically defined
-		my $dsn = $BTB_CONFIG->param($database . '.dsn') || undef;
-		unless (defined $dsn) {
+		my $dsn = $BTB_CONFIG->param( $database . '.dsn' ) || undef;
+		unless ( defined $dsn ) {
+
 			# or dsn can be generated with the dsn_prefix
-			$dsn = $BTB_CONFIG->param($database . '.dsn_prefix') || 
-				$BTB_CONFIG->param('default_db.dsn_prefix');
+			$dsn = $BTB_CONFIG->param( $database . '.dsn_prefix' )
+				|| $BTB_CONFIG->param('default_db.dsn_prefix');
 			$dsn .= $database;
 		}
-		
+
 		# establish the database connection
 		eval {
 			# to prevent annoying error messages from B:DB:SF:S
-			local $SIG{__WARN__} = sub {}; 
-		
+			local $SIG{__WARN__} = sub { };
+
 			# attempt a connection
 			$db = Bio::DB::SeqFeature::Store->new(
 				-adaptor => $adaptor,
@@ -113,23 +116,22 @@ sub open_store_db {
 			);
 		};
 	}
-	
-	# return opened database object or nothing if unsuccessful 
-	return unless $db;	
+
+	# return opened database object or nothing if unsuccessful
+	return unless $db;
 	return $db;
 }
 
-
-
 sub collect_store_scores {
+
 	# pass the required information
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
+
 	# database feature types
-	my @types = splice(@$param, DATA);
-	
+	my @types = splice( @$param, DATA );
+
 	# set up iterator from database
 	my $iterator = $param->[DB]->get_seq_stream(
 		-seq_id      => $param->[CHR],
@@ -137,14 +139,15 @@ sub collect_store_scores {
 		-end         => $param->[STOP],
 		-primary_tag => \@types,
 	);
-	return unless $iterator; # we should always get an iterator back, even if the 
-		# iterator returns nothing useful for us
-	
+	return unless $iterator;    # we should always get an iterator back, even if the
+								# iterator returns nothing useful for us
+
 	# collect the first feature
 	my $feature = $iterator->next_seq;
 	unless ($feature) {
+
 		# that's odd, we should get a feature
-		# try rebuilding the iterator with an alternate chromosome name 
+		# try rebuilding the iterator with an alternate chromosome name
 		my $chromo = $param->[CHR] =~ /^chr(.+)$/i ? $1 : 'chr' . $param->[CHR];
 		$iterator = $param->[DB]->get_seq_stream(
 			-seq_id      => $chromo,
@@ -154,33 +157,35 @@ sub collect_store_scores {
 		);
 		$feature = $iterator->next_seq or return;
 	}
-	
+
 	# places to stick the scores
 	my @scores;
 	my %pos2data;
-	
+
 	## First check for potential Wig Data
-	# the legacy wiggle adaptor uses a GFF seqfeature db to store file paths 
+	# the legacy wiggle adaptor uses a GFF seqfeature db to store file paths
 	# to the individual chromosome wib files
 	# if this is the case, we must pass this on to the wiggle adaptor
 	if ( $feature->has_tag('wigfile') ) {
+
 		# data is in wig format, or at least the first datapoint is
-		
+
 		# determine the type of wigfile
 		my ($wigfile) = $feature->get_tag_values('wigfile');
-		
+
 		## Bio::Graphics wib file
-		if ($wigfile =~ /\.wib$/) {
+		if ( $wigfile =~ /\.wib$/ ) {
+
 			# data is in old-style binary wiggle format
 			# based on the Bio::Graphics::Wiggle adaptor
-			
-			# get the full list of features to pass off to the 
+
+			# get the full list of features to pass off to the
 			# helper subroutine
 			push @$param, $feature;
-			while (my $f = $iterator->next_seq) {
+			while ( my $f = $iterator->next_seq ) {
 				push @$param, $f;
 			}
-			
+
 			# check that we have wiggle support
 			unless ($WIGGLE_OK) {
 				eval {
@@ -191,9 +196,11 @@ sub collect_store_scores {
 				};
 			}
 			if ($WIGGLE_OK) {
+
 				# get the dataset scores using Bio::ToolBox::db_helper::wiggle
-				
-				if ($param->[RETT] == 2) {
+
+				if ( $param->[RETT] == 2 ) {
+
 					# warn " using collect_wig_position_scores() from tag\n";
 					return collect_wig_position_scores($param);
 				}
@@ -203,173 +210,174 @@ sub collect_store_scores {
 				}
 			}
 			else {
-				croak " Wiggle support is not enabled! $@\n" . 
-					"Is Bio::Graphics::Wiggle installed?\n";
+				croak " Wiggle support is not enabled! $@\n"
+					. "Is Bio::Graphics::Wiggle installed?\n";
 			}
 		}
-		
+
 		## BigWig file
-		elsif ($wigfile =~ /\.bw$/) {
+		elsif ( $wigfile =~ /\.bw$/ ) {
+
 			# data is in bigwig format
 			# we are abandoning this support
-			die " Supporting bigWig files via seqfeature attribute is no longer " . 
-				"supported.\n Please use bigWig files directly\n";
-		}	
+			die " Supporting bigWig files via seqfeature attribute is no longer "
+				. "supported.\n Please use bigWig files directly\n";
+		}
 		else {
-			croak " Unrecognized wigfile attribute '$wigfile'!" . 
-				" Unable to continue!\n";
+			croak " Unrecognized wigfile attribute '$wigfile'!"
+				. " Unable to continue!\n";
 		}
 	}
-	
-	
+
 	## Database Data
 	# Working with data stored directly in the database
 	# this is more straight forward in collection
-	
+
 	# Walk through the datapoints
 	while ($feature) {
-	
+
 		# Check which data to take based on strand
 		if (
-			$param->[STND] eq 'all' # all data is requested
-			or $feature->strand == 0 # unstranded data
-			or ( 
+			$param->[STND] eq 'all'     # all data is requested
+			or $feature->strand == 0    # unstranded data
+			or (
 				# sense data
-				$param->[STR] == $feature->strand 
-				and $param->[STND] eq 'sense'
-			) 
+				$param->[STR] == $feature->strand and $param->[STND] eq 'sense'
+			)
 			or (
 				# antisense data
-				$param->[STR] != $feature->strand  
-				and $param->[STND] eq 'antisense'
+				$param->[STR] != $feature->strand and $param->[STND] eq 'antisense'
 			)
-		) {
+			)
+		{
 			# we have acceptable data to collect
-		
+
 			# data is in the database
 			# much easier to collect
-			
+
 			# store data in either indexed hash or score array
-			if ($param->[RETT] == 2) {
-			
+			if ( $param->[RETT] == 2 ) {
+
 				# determine position to record
 				my $position;
-				if ($feature->start == $feature->end) {
+				if ( $feature->start == $feature->end ) {
+
 					# just one position recorded
 					$position = $feature->start;
 				}
 				else {
 					# calculate the midpoint
-					$position = int( 
-						($feature->start + $feature->end) / 2
-					);
+					$position = int( ( $feature->start + $feature->end ) / 2 );
 				}
-				
+
 				# store the appropriate value
-				if ($param->[METH] eq 'count') {
+				if ( $param->[METH] eq 'count' ) {
 					$pos2data{$position} += 1;
 				}
-				elsif ($param->[METH] eq 'pcount') {
-					$pos2data{$position} += 1 if 
-						($feature->start >= $param->[STRT] and 
-						$feature->end <= $param->[STOP]);
+				elsif ( $param->[METH] eq 'pcount' ) {
+					$pos2data{$position} += 1
+						if (    $feature->start >= $param->[STRT]
+							and $feature->end <= $param->[STOP] );
 				}
-				elsif ($param->[METH] eq 'ncount') {
-					push @{ $pos2data{$position} }, 
-						$feature->display_name || $feature->primary_id ||
-						sprintf("%s:%s-%s:%s", $feature->seq_id, $feature->start,
-						$feature->end, $feature->strand);
+				elsif ( $param->[METH] eq 'ncount' ) {
+					push @{ $pos2data{$position} },
+						   $feature->display_name
+						|| $feature->primary_id
+						|| sprintf( "%s:%s-%s:%s",
+							$feature->seq_id, $feature->start,
+							$feature->end,    $feature->strand );
 				}
 				else {
 					push @{ $pos2data{$position} }, $feature->score;
 				}
 			}
-			
+
 			else {
 				# just store the score in the array
 				# store the appropriate value
-				if ($param->[METH] eq 'count') {
+				if ( $param->[METH] eq 'count' ) {
 					push @scores, 1;
 				}
-				elsif ($param->[METH] eq 'pcount') {
-					push @scores, 1 if 
-						($feature->start >= $param->[STRT] and 
-						$feature->end <= $param->[STOP]);
+				elsif ( $param->[METH] eq 'pcount' ) {
+					push @scores, 1
+						if (    $feature->start >= $param->[STRT]
+							and $feature->end <= $param->[STOP] );
 				}
-				elsif ($param->[METH] eq 'ncount') {
-					push @scores, $feature->display_name || 
-						$feature->primary_id ||
-						sprintf("%s:%s-%s:%s", $feature->seq_id, $feature->start,
-						$feature->end, $feature->strand);
+				elsif ( $param->[METH] eq 'ncount' ) {
+					push @scores,
+						   $feature->display_name
+						|| $feature->primary_id
+						|| sprintf( "%s:%s-%s:%s",
+							$feature->seq_id, $feature->start,
+							$feature->end,    $feature->strand );
 				}
 				else {
 					push @scores, $feature->score;
 				}
 			}
 		}
-		
+
 		# prepare for next
 		$feature = $iterator->next_seq || undef;
 	}
-	
-	# post-process the collected position->score values 
+
+	# post-process the collected position->score values
 	# combine multiple values recorded at the same position
-	if ($param->[RETT] == 2) {
-		if ($param->[METH] eq 'ncount') {
-			foreach my $position (keys %pos2data) {
+	if ( $param->[RETT] == 2 ) {
+		if ( $param->[METH] eq 'ncount' ) {
+			foreach my $position ( keys %pos2data ) {
 				my %name2count;
-				foreach (@{$pos2data{$position}}) { $name2count{$_} += 1 }
-				$pos2data{$position} = scalar(keys %name2count);
+				foreach ( @{ $pos2data{$position} } ) { $name2count{$_} += 1 }
+				$pos2data{$position} = scalar( keys %name2count );
 			}
 		}
-		elsif ($param->[METH] eq 'count' or $param->[METH] eq 'pcount') {
+		elsif ( $param->[METH] eq 'count' or $param->[METH] eq 'pcount' ) {
+
 			# do nothing, these aren't arrays
 		}
-		elsif ($param->[METH] eq 'mean') {
-			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
-										scalar( @{$pos2data{$position}} );
+		elsif ( $param->[METH] eq 'mean' ) {
+			foreach my $position ( keys %pos2data ) {
+				$pos2data{$position} = sum( @{ $pos2data{$position} } ) /
+					scalar( @{ $pos2data{$position} } );
 			}
 		}
-		elsif ($param->[METH] eq 'median') {
-			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = median( @{$pos2data{$position}} );
+		elsif ( $param->[METH] eq 'median' ) {
+			foreach my $position ( keys %pos2data ) {
+				$pos2data{$position} = median( @{ $pos2data{$position} } );
 			}
 		}
-		elsif ($param->[METH] eq 'min') {
-			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = min( @{$pos2data{$position}} );
+		elsif ( $param->[METH] eq 'min' ) {
+			foreach my $position ( keys %pos2data ) {
+				$pos2data{$position} = min( @{ $pos2data{$position} } );
 			}
 		}
-		elsif ($param->[METH] eq 'max') {
-			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = max( @{$pos2data{$position}} );
+		elsif ( $param->[METH] eq 'max' ) {
+			foreach my $position ( keys %pos2data ) {
+				$pos2data{$position} = max( @{ $pos2data{$position} } );
 			}
 		}
-		elsif ($param->[METH] eq 'sum') {
-			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = sum( @{$pos2data{$position}} );
+		elsif ( $param->[METH] eq 'sum' ) {
+			foreach my $position ( keys %pos2data ) {
+				$pos2data{$position} = sum( @{ $pos2data{$position} } );
 			}
 		}
 		else {
 			# just take the mean for everything else
-			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
-										scalar( @{$pos2data{$position}} );
+			foreach my $position ( keys %pos2data ) {
+				$pos2data{$position} = sum( @{ $pos2data{$position} } ) /
+					scalar( @{ $pos2data{$position} } );
 			}
 		}
 	}
-	
-	# return the appropriate data	
-	if ($param->[RETT] == 2) {
+
+	# return the appropriate data
+	if ( $param->[RETT] == 2 ) {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
 		return wantarray ? @scores : \@scores;
 	}
 }
-
-
 
 __END__
 

@@ -21,101 +21,85 @@ eval {
 	$parallel = 1;
 };
 use constant DATASET_HASH_LIMIT => 4999;
-		# This constant determines the maximum size of the dataset hash to be 
-		# returned from the get_region_dataset_hash(). To increase performance, 
-		# the program normally queries the database once for each feature or 
-		# region, and a hash returned with potentially a score for each basepair. 
-		# This may become unwieldy for very large regions, which may be better 
-		# served by separate database queries for each window.
+
+# This constant determines the maximum size of the dataset hash to be
+# returned from the get_region_dataset_hash(). To increase performance,
+# the program normally queries the database once for each feature or
+# region, and a hash returned with potentially a score for each basepair.
+# This may become unwieldy for very large regions, which may be better
+# served by separate database queries for each window.
 my $VERSION = 'v1.691';
 
-print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
-  
+print
+	"\n A script to collect windowed data flanking a relative position of a feature\n\n";
 
 ### Quick help
-unless (@ARGV) { # when no command line options are present
-	# when no command line options are present
-	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+unless (@ARGV) {    # when no command line options are present
+					# when no command line options are present
+					# print SYNOPSIS
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
-
 
 ### Get command line options and initialize values
 
 ## Initialize values
 my (
-	$infile, 
-	$parse,
-	$outfile, 
-	$main_database, 
-	$data_database,
-	$feature, 
-	$method,
-	$win, 
-	$number,
-	$up_number,
-	$down_number,
-	$position, 
-	$strand_sense,
-	$set_strand,
-	$avoid,
-	$avoidtype,
-	$long_data,
-	$smooth,
-	$sum,
-	$format,
-	$groupcol,
-	$gz,
-	$cpu,
-	$help,
-	$print_version,
-); # command line variables
+	$infile,      $parse,     $outfile,      $main_database, $data_database,
+	$feature,     $method,    $win,          $number,        $up_number,
+	$down_number, $position,  $strand_sense, $set_strand,    $avoid,
+	$avoidtype,   $long_data, $smooth,       $sum,           $format,
+	$groupcol,    $gz,        $cpu,          $help,          $print_version,
+);    # command line variables
 my @datasets;
 
 ## Command line options
-GetOptions( 
-	'o|out=s'      => \$outfile, # output file name
-	'i|in=s'       => \$infile, # input file name
-	'parse!'       => \$parse, # parse input file
-	'd|db=s'       => \$main_database, # main or annotation database name
-	'D|ddb=s'      => \$data_database, # data database
-	'a|data=s'     => \@datasets, # dataset name
-	'f|feature=s'  => \$feature, # type of feature
-	'm|method=s'   => \$method, # method to combine data
-	'w|window=i'   => \$win, # window size
-	'n|number=i'   => \$number, # number of windows
-	'up=i'         => \$up_number, # number of windows upstream
-	'down=i'       => \$down_number, # number of windows downstream
-	'p|position=s' => \$position, # indicate relative location of the feature
-	't|strand=s'   => \$strand_sense, # collected stranded data
-	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
-				# force_strand is preferred option, but respect the old option
-	'avoid!'       => \$avoid, # avoid conflicting features
-	'avtype=s'     => \$avoidtype, # type of feature to avoid
-	'long!'        => \$long_data, # collecting long data features
-	'smooth!'      => \$smooth, # smooth by interpolation
-	'U|sum!'       => \$sum, # generate average profile
-	'r|format=i'   => \$format, # decimal formatting
-	'g|groups'     => \$groupcol, # write group column file
-	'z|gz!'        => \$gz, # compress the output file
-	'c|cpu=i'      => \$cpu, # number of execution threads
-	'h|help'       => \$help, # print help
-	'v|version'    => \$print_version, # print the version
-	'bam=s'        => \$BAM_ADAPTER, # explicitly set the bam adapter
-	'big=s'        => \$BIG_ADAPTER, # explicitly set the big adapter
+GetOptions(
+	'o|out=s'      => \$outfile,          # output file name
+	'i|in=s'       => \$infile,           # input file name
+	'parse!'       => \$parse,            # parse input file
+	'd|db=s'       => \$main_database,    # main or annotation database name
+	'D|ddb=s'      => \$data_database,    # data database
+	'a|data=s'     => \@datasets,         # dataset name
+	'f|feature=s'  => \$feature,          # type of feature
+	'm|method=s'   => \$method,           # method to combine data
+	'w|window=i'   => \$win,              # window size
+	'n|number=i'   => \$number,           # number of windows
+	'up=i'         => \$up_number,        # number of windows upstream
+	'down=i'       => \$down_number,      # number of windows downstream
+	'p|position=s' => \$position,         # indicate relative location of the feature
+	't|strand=s'   => \$strand_sense,     # collected stranded data
+	'force_strand|set_strand' => \$set_strand,    # enforce an artificial strand
+		# force_strand is preferred option, but respect the old option
+	'avoid!'     => \$avoid,            # avoid conflicting features
+	'avtype=s'   => \$avoidtype,        # type of feature to avoid
+	'long!'      => \$long_data,        # collecting long data features
+	'smooth!'    => \$smooth,           # smooth by interpolation
+	'U|sum!'     => \$sum,              # generate average profile
+	'r|format=i' => \$format,           # decimal formatting
+	'g|groups'   => \$groupcol,         # write group column file
+	'z|gz!'      => \$gz,               # compress the output file
+	'c|cpu=i'    => \$cpu,              # number of execution threads
+	'h|help'     => \$help,             # print help
+	'v|version'  => \$print_version,    # print the version
+	'bam=s'      => \$BAM_ADAPTER,      # explicitly set the bam adapter
+	'big=s'      => \$BIG_ADAPTER,      # explicitly set the big adapter
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
-
 
 # Print help
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -129,49 +113,46 @@ if ($print_version) {
 	exit;
 }
 
-
-
-
-
-
 ## Check for required values
 my $formatter;
 check_defaults();
 my $start_time = time;
 
-
-
-
 ## Generate or load the input dataset
 my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
-		file       => $infile, 
-		parse      => $parse,
-		feature    => $feature,
+		file    => $infile,
+		parse   => $parse,
+		feature => $feature,
 	) or die " unable to load input file '$infile'\n";
-	if ($Data->last_row) {
-		printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+	if ( $Data->last_row ) {
+		printf " Loaded %s features from $infile.\n",
+			format_with_commas( $Data->last_row );
 	}
 	else {
 		die " No features loaded!\n";
 	}
-	
+
 	# update main database as necessary
 	if ($main_database) {
-		if ($main_database ne $Data->database) {
+		if ( $main_database ne $Data->database ) {
+
 			# update with new database
-			printf " updating main database name from '%s' to '%s'\n", 
+			printf " updating main database name from '%s' to '%s'\n",
 				$Data->database, $main_database;
 			$Data->database($main_database);
 		}
 	}
-	elsif ($Data->database) {
+	elsif ( $Data->database ) {
 		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
-	
+
 	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
+	if (    not defined $Data->feature
+		and not defined $Data->type_column
+		and defined $feature )
+	{
 		$Data->feature($feature);
 	}
 }
@@ -186,21 +167,20 @@ else {
 $Data->program("$0, v $VERSION");
 
 # check peak summit
-if ($position == 9 and $Data->format ne 'narrowPeak') {
-	print " Peak summit indicated as reference point, but input file is not narrowPeak!\n";
+if ( $position == 9 and $Data->format ne 'narrowPeak' ) {
+	print
+		" Peak summit indicated as reference point, but input file is not narrowPeak!\n";
 	print "  using interval midpoint instead\n";
 	$position = 4;
 }
 
-
 # the number of columns already in the data array
-my $beginningcolumn = $Data->last_column; 
-my $startcolumn; # this is now calculated separately for each dataset
-
+my $beginningcolumn = $Data->last_column;
+my $startcolumn;    # this is now calculated separately for each dataset
 
 # Check output file name
 unless ($outfile) {
-	if ($Data->basename) {
+	if ( $Data->basename ) {
 		$outfile = $Data->path . $Data->basename;
 	}
 	else {
@@ -208,75 +188,79 @@ unless ($outfile) {
 	}
 }
 
-
 # make sure data table supports avoid option
 if ($avoid) {
 	unless ($main_database) {
 		warn " avoid option not supported without an annotation database! Disabling\n";
-		undef $avoid; # 0 complicates things, leave undefined
+		undef $avoid;    # 0 complicates things, leave undefined
 	}
 	if ($avoidtype) {
-		if ($avoidtype =~ /,/) {
+		if ( $avoidtype =~ /,/ ) {
+
 			# a comma delimited list
-			$avoid = [ split(',', $avoidtype) ];
+			$avoid = [ split( ',', $avoidtype ) ];
 		}
 		else {
 			# presume a single feature type, take it as is
-			$avoid = [ $avoidtype ];
+			$avoid = [$avoidtype];
 		}
 	}
 }
 
-
 ## Prepare to collect data
 # Open data database
 my $ddb;
-if (defined $data_database) {
+if ( defined $data_database ) {
+
 	# specifically defined a data database
-	$ddb = open_db_connection($data_database) or 
-		die "unable to establish data database connection to $data_database!\n";
+	$ddb = open_db_connection($data_database)
+		or die "unable to establish data database connection to $data_database!\n";
 }
 
 # Check the dataset
 @datasets = verify_or_request_feature_types(
 	'db'      => $ddb || $Data->database,
 	'feature' => \@datasets,
-	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
-				" to collect data. Comma delimited or range is acceptable\n",
+	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n"
+		. " to collect data. Comma delimited or range is acceptable\n",
 );
 unless (@datasets) {
-	die " No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
-} 
-
-
+	die
+" No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
+}
 
 ## Collect the relative data
 
 # Determine starting and ending points
-my $starting_point = 0 - ($win * $up_number); 
-	# default values will give startingpoint of -1000
-my $ending_point = $win * $down_number; 
-	# likewise default values will give endingpoint of 1000
+my $starting_point = 0 - ( $win * $up_number );
+
+# default values will give startingpoint of -1000
+my $ending_point = $win * $down_number;
+
+# likewise default values will give endingpoint of 1000
 
 # Print collection statement
-printf " Collecting $method data between %d..%d from the %s in %d bp windows from %s\n", 
-	$starting_point, $ending_point, 
-	$position == 5 ? "5' end" : $position == 4 ? "midpoint" : 
-	$position == 9 ? "peak summit" : "3' end", 
-	$win, join(', ', @datasets), ;
-
+printf " Collecting $method data between %d..%d from the %s in %d bp windows from %s\n",
+	$starting_point, $ending_point,
+	$position == 5   ? "5' end"
+	: $position == 4 ? "midpoint"
+	: $position == 9 ? "peak summit"
+	: "3' end",
+	$win, join( ', ', @datasets ),;
 
 # check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
+if ( $cpu > 1 ) {
+	while ( $cpu > 1 and $Data->last_row / $cpu < 100 ) {
+
+		# I figure we need at least 100 lines in each fork split to make
+		# it worthwhile to do the split, otherwise, reduce the number of
 		# splits to something more worthwhile
 		$cpu--;
 	}
 }
 
-if ($cpu > 1) {
+if ( $cpu > 1 ) {
+
 	# parallel execution
 	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
@@ -286,14 +270,13 @@ else {
 	single_execution();
 }
 
-
-## Generate summed data 
+## Generate summed data
 # an average across all features at each position suitable for plotting
 if ($sum) {
 	print " Generating summary file....\n";
 	my $sumfile = $Data->summary_file(
-		'filename'    => $outfile,
-		'dataset'     => \@datasets,
+		'filename' => $outfile,
+		'dataset'  => \@datasets,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -303,13 +286,13 @@ if ($sum) {
 	}
 }
 
-
 ## Output the data
 my $written_file = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
 );
 if ($written_file) {
+
 	# success!
 	print " wrote file $written_file\n";
 }
@@ -324,8 +307,8 @@ if ($groupcol) {
 	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
 	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
 	$fh->print("Name\tDataset\n");
-	for (my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++) {
-		my $name = $Data->name($i);
+	for ( my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++ ) {
+		my $name    = $Data->name($i);
 		my $dataset = $name;
 		$dataset =~ s/:[\-\d]+$//;
 		$fh->print("$name\t$dataset\n");
@@ -334,71 +317,70 @@ if ($groupcol) {
 	print " wrote group column file $groupfile\n";
 }
 
-printf " Completed in %.1f minutes\n", (time - $start_time)/60;
-
-
-
-
+printf " Completed in %.1f minutes\n", ( time - $start_time ) / 60;
 
 #### Subroutines #######
 
 ## check required variables and assign default values
 sub check_defaults {
-	unless ($main_database or $infile) {
-		die " You must define a database or input file!\n Use --help for more information\n";
+	unless ( $main_database or $infile ) {
+		die
+" You must define a database or input file!\n Use --help for more information\n";
 	}
-	$parse = 1 if ($infile and not defined $parse);
+	$parse = 1 if ( $infile and not defined $parse );
 
-	unless ($outfile or $infile) {
+	unless ( $outfile or $infile ) {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
-	
+
 	# check datasets
-	if (not @datasets and @ARGV) {
+	if ( not @datasets and @ARGV ) {
 		@datasets = @ARGV;
 	}
-	if ($datasets[0] =~ /,/) {
+	if ( $datasets[0] =~ /,/ ) {
+
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;
 		foreach my $d (@datasets) {
-			push @list, (split /,/, $d);
+			push @list, ( split /,/, $d );
 		}
 		@datasets = @list;
 	}
-	
+
 	# window size
 	unless ($win) {
 		print " Using default window size of 50 bp\n";
 		$win = 50;
 	}
-	
+
 	# number of windows
-	if ($up_number or $down_number) {
+	if ( $up_number or $down_number ) {
+
 		# either one could be set, assume the other is zero
-		$up_number ||= 0;
+		$up_number   ||= 0;
 		$down_number ||= 0;
 	}
 	elsif ($number) {
-		$up_number = $number;
+		$up_number   = $number;
 		$down_number = $number;
 	}
 	else {
 		print " Using default window number of 20 per side\n";
-		$up_number = 20;
+		$up_number   = 20;
 		$down_number = 20;
 	}
 
-	if (defined $method) {
+	if ( defined $method ) {
+
 		# check the requested method
-		unless (
-				$method eq 'mean' or
-				$method eq 'median' or
-				$method eq 'sum' or
-				$method eq 'min' or
-				$method eq 'max' or
-				$method eq 'stddev' or
-				$method =~ /^\w?count$/
-		) {
+		unless ( $method eq 'mean'
+			or $method eq 'median'
+			or $method eq 'sum'
+			or $method eq 'min'
+			or $method eq 'max'
+			or $method eq 'stddev'
+			or $method =~ /^\w?count$/ )
+		{
 			die " Unknown method '$method'!\n Use --help for more information\n";
 		}
 	}
@@ -406,23 +388,24 @@ sub check_defaults {
 		$method = 'mean';
 	}
 
-	if (defined $position) {
+	if ( defined $position ) {
+
 		# check the position value
-		unless (
-			$position == 5 or
-			$position == 3 or
-			$position == 4 or
-			$position eq 'm' or 
-			$position eq 'p'
-		) {
+		unless ( $position == 5
+			or $position == 3
+			or $position == 4
+			or $position eq 'm'
+			or $position eq 'p' )
+		{
 			die " Unknown relative position '$position'!\n";
 		}
+
 		# change to match internal usage
-		if ($position eq 'm') {
-			$position = 4; # midpoint
+		if ( $position eq 'm' ) {
+			$position = 4;    # midpoint
 		}
-		elsif ($position eq 'p') {
-			$position = 9; # narrowPeak summit
+		elsif ( $position eq 'p' ) {
+			$position = 9;    # narrowPeak summit
 		}
 	}
 	else {
@@ -430,12 +413,11 @@ sub check_defaults {
 		$position = 5;
 	}
 
-	if (defined $strand_sense) {
-		unless (
-			$strand_sense eq 'sense' or
-			$strand_sense eq 'antisense' or
-			$strand_sense eq 'all'
-		) {
+	if ( defined $strand_sense ) {
+		unless ( $strand_sense eq 'sense'
+			or $strand_sense eq 'antisense'
+			or $strand_sense eq 'all' )
+		{
 			die " Unknown strand value '$strand_sense'!\n";
 		}
 	}
@@ -444,16 +426,17 @@ sub check_defaults {
 		$strand_sense = 'all';
 	}
 
-	unless (defined $sum) {
+	unless ( defined $sum ) {
+
 		# assume to write a summary file, nearly always want this, at least I do
 		$sum = 1;
 	}
 
 	# generate formatter
-	if (defined $format) {
+	if ( defined $format ) {
 		$formatter = '%.' . $format . 'f';
 	}
-	
+
 	if ($parallel) {
 		$cpu ||= 4;
 	}
@@ -464,45 +447,44 @@ sub check_defaults {
 	}
 }
 
-
 ## Run in parallel
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	
+
 	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
+	my $child_base_name = $outfile . ".$$";
 
 	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
+	for my $i ( 1 .. $cpu ) {
 		$pm->start and next;
-		
+
 		#### In child ####
-	
+
 		# splice the data structure
-		$Data->splice_data($i, $cpu);
-		
+		$Data->splice_data( $i, $cpu );
+
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
 		my $db = $Data->open_database(1);
 		if ($data_database) {
-			$ddb = open_db_connection($data_database, 1);
+			$ddb = open_db_connection( $data_database, 1 );
 		}
-	
+
 		# work through each dataset
 		foreach my $dataset (@datasets) {
-		
+
 			# new start column for this dataset
-			$startcolumn = $Data->number_columns; 
-		
-			# Add the columns for each window 
+			$startcolumn = $Data->number_columns;
+
+			# Add the columns for each window
 			# and calculate the relative starting and ending points
 			prepare_window_datasets($dataset);
-	
+
 			# determine long data collection for very large regions
-			if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+			if ( $ending_point - $starting_point > DATASET_HASH_LIMIT ) {
 				$long_data = 1;
 			}
-	
+
 			# Select the appropriate method for data collection
 			if ($long_data) {
 				map_relative_long_data($dataset);
@@ -516,11 +498,11 @@ sub parallel_execution {
 				go_interpolate_values();
 			}
 		}
-		
+
 		# write out result
 		my $success = $Data->save(
-			'filename' => sprintf("$child_base_name.%03s",$i),
-			'gz'       => 0, # faster to write without compression
+			'filename' => sprintf( "$child_base_name.%03s", $i ),
+			'gz'       => 0,    # faster to write without compression
 		);
 		if ($success) {
 			printf " wrote child file $success\n";
@@ -528,42 +510,42 @@ sub parallel_execution {
 		else {
 			# failure! the subroutine will have printed error messages
 			die " unable to write file!\n";
+
 			# no need to continue
 		}
-		
+
 		# Finished
 		$pm->finish;
 	}
 	$pm->wait_all_children;
-		
+
 	# reassemble children files into output file
 	my @files = glob "$child_base_name.*";
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	unless (scalar @files == $cpu) {
+	unless ( scalar @files == $cpu ) {
 		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
 	}
 	my $count = $Data->reload_children(@files);
 	printf " reloaded %s features from children\n", format_with_commas($count);
 }
 
-
 ## Run in single thread
 sub single_execution {
-	
+
 	# work through each dataset
 	foreach my $dataset (@datasets) {
-	
+
 		# new start column for this dataset
-		$startcolumn = $Data->number_columns; 
-	
-		# Add the columns for each window 
+		$startcolumn = $Data->number_columns;
+
+		# Add the columns for each window
 		# and calculate the relative starting and ending points
 		prepare_window_datasets($dataset);
 
 		# determine long data collection for very large regions
-		if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+		if ( $ending_point - $starting_point > DATASET_HASH_LIMIT ) {
 			$long_data = 1;
 		}
 
@@ -583,38 +565,37 @@ sub single_execution {
 	}
 }
 
-
 ## Prepare columns for each window
 sub prepare_window_datasets {
 	my $dataset = shift;
-	
-	
+
 	# generate a simplified new name
 	my $new_name = simplify_dataset_name($dataset);
-	
-	
+
 	# Prepare and annotate the header names and metadata
-	for (my $start = $starting_point; $start < $ending_point; $start += $win) {
+	for ( my $start = $starting_point; $start < $ending_point; $start += $win ) {
+
 		# we will be progressing from the starting to ending point
 		# in increments of window size
-		
+
 		# set the stop position
 		my $stop = $start + $win - 1;
-		
+
 		# deal with the pesky 0 value
-		# since we're working with 1-base coordinates, we don't really have 
+		# since we're working with 1-base coordinates, we don't really have
 		# a real 0 coordinate, so need to skip it as it doesn't really exist
 		my $zero_check;
-		for my $i ($start .. $stop) {
+		for my $i ( $start .. $stop ) {
 			$zero_check = 1 if $i == 0;
 		}
 		if ($zero_check) {
+
 			# adjust the coordinates accordingly
-			if ($start == 0) {
+			if ( $start == 0 ) {
 				$start += 1;
-				$stop += 1;
+				$stop  += 1;
 			}
-			elsif ($stop == 0) {
+			elsif ( $stop == 0 ) {
 				$stop += 1;
 			}
 			else {
@@ -622,183 +603,178 @@ sub prepare_window_datasets {
 				$stop += 1;
 			}
 		}
-		
+
 		# add new column
-		my $new_index = $Data->add_column(sprintf("%s:%d", $new_name, $start));
-		
+		my $new_index = $Data->add_column( sprintf( "%s:%d", $new_name, $start ) );
+
 		# set the metadata
-		$Data->metadata($new_index, 'start' , $start);
-		$Data->metadata($new_index, 'stop' , $stop);
-		$Data->metadata($new_index, 'window' , $win);
-		$Data->metadata($new_index, 'dataset' , $dataset);
-		$Data->metadata($new_index, 'method' , $method);
-		$Data->metadata($new_index, 'decimal_format', $format) if defined $format;
-		if ($position == 5) {
-			$Data->metadata($new_index, 'relative_position', '5prime_end');
+		$Data->metadata( $new_index, 'start',          $start );
+		$Data->metadata( $new_index, 'stop',           $stop );
+		$Data->metadata( $new_index, 'window',         $win );
+		$Data->metadata( $new_index, 'dataset',        $dataset );
+		$Data->metadata( $new_index, 'method',         $method );
+		$Data->metadata( $new_index, 'decimal_format', $format ) if defined $format;
+		if ( $position == 5 ) {
+			$Data->metadata( $new_index, 'relative_position', '5prime_end' );
 		}
-		elsif ($position == 4) { # midpoint
-			$Data->metadata($new_index, 'relative_position', 'center');
+		elsif ( $position == 4 ) {    # midpoint
+			$Data->metadata( $new_index, 'relative_position', 'center' );
 		}
-		elsif ($position == 9) {
-			$Data->metadata($new_index, 'relative_position', 'peak_summit');
+		elsif ( $position == 9 ) {
+			$Data->metadata( $new_index, 'relative_position', 'peak_summit' );
 		}
 		else {
-			$Data->metadata($new_index, 'relative_position', '3prime_end');
+			$Data->metadata( $new_index, 'relative_position', '3prime_end' );
 		}
 		if ($set_strand) {
-			$Data->metadata($new_index, 'strand_implied', 1);
+			$Data->metadata( $new_index, 'strand_implied', 1 );
 		}
-		if ($strand_sense =~ /sense/) {
-			$Data->metadata($new_index, 'strand',  $strand_sense);
+		if ( $strand_sense =~ /sense/ ) {
+			$Data->metadata( $new_index, 'strand', $strand_sense );
 		}
 		if ($data_database) {
-			$Data->metadata($new_index, 'db', $data_database);
+			$Data->metadata( $new_index, 'db', $data_database );
 		}
 		if ($avoid) {
-			$Data->metadata($new_index, 'avoid', 
-				ref($avoid) eq 'ARRAY' ? join(',', @$avoid) : $avoid
-			);
+			$Data->metadata( $new_index, 'avoid',
+				ref($avoid) eq 'ARRAY' ? join( ',', @$avoid ) : $avoid );
 		}
 	}
 }
-
 
 ## Collect relative scores using single database call
 sub map_relative_data {
 	my $dataset = shift;
-	
+
 	# Collect the data
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	while ( my $row = $stream->next_row ) {
 		my $regionscores = $row->get_relative_point_position_scores(
-			'ddb'         => $ddb,
-			'dataset'     => $dataset,
-			'position'    => $position,
-			'extend'      => $ending_point, # equivalent to the extension
-			'stranded'    => $strand_sense,
-			'strand'      => $set_strand ? $row->strand : undef, 
-			'avoid'       => $avoid,
-			'method'      => $method # only really matters for count
+			'ddb'      => $ddb,
+			'dataset'  => $dataset,
+			'position' => $position,
+			'extend'   => $ending_point,                     # equivalent to the extension
+			'stranded' => $strand_sense,
+			'strand'   => $set_strand ? $row->strand : undef,
+			'avoid'    => $avoid,
+			'method'   => $method    # only really matters for count
 		);
-		
+
 		# assign the scores to the windows in the region
 		for (
 			# we will process each window one at a time
 			# proceed by the column index for each window
-			my $column = $startcolumn; 
-			$column < $Data->number_columns; 
-			$column++
-		) {
-		
+			my $column = $startcolumn; $column < $Data->number_columns; $column++
+			)
+		{
+
 			# record nulls if no data returned
-			unless (scalar keys %$regionscores) {
-				$row->value($column, '.');
+			unless ( scalar keys %$regionscores ) {
+				$row->value( $column, '.' );
 				next;
 			}
-		
+
 			# get start and stop
-			my $start = $Data->metadata($column, 'start');
-			my $stop = $Data->metadata($column, 'stop');
-		
+			my $start = $Data->metadata( $column, 'start' );
+			my $stop  = $Data->metadata( $column, 'stop' );
+
 			# collect a score at each position in the window
-			my @scores = 	map { $regionscores->{$_} } 
-							grep { $_ >= $start and $_ <= $stop}
-							keys %$regionscores;
-			
+			my @scores = map { $regionscores->{$_} }
+				grep { $_ >= $start and $_ <= $stop }
+				keys %$regionscores;
+
 			# put the value into the data table
-			my $score = calculate_score($method, \@scores);
-			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-			$row->value($column, $score);
+			my $score = calculate_score( $method, \@scores );
+			$score = sprintf( $formatter, $score ) if ( $formatter and $score ne '.' );
+			$row->value( $column, $score );
 		}
 	}
 }
-
 
 ## Collect relative data using individual window database calls
 sub map_relative_long_data {
 	my $dataset = shift;
-	
+
 	# Collect the data
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		
+	while ( my $row = $stream->next_row ) {
+
 		# calculate a reference point using an internal feature method
 		my $reference = $row->calculate_reference($position);
-		
-		# collect the data for every window 
-		for (
-			my $column = $startcolumn; 
-			$column < $Data->number_columns; 
-			$column++
-		) {
+
+		# collect the data for every window
+		for ( my $column = $startcolumn; $column < $Data->number_columns; $column++ ) {
+
 			# we must modify the start and stop position with the adjustments
 			# recorded in the current column metadata
 			my $score = $row->get_score(
-				'db'          => $ddb,
-				'dataset'     => $dataset,
-				'chromo'      => $row->seq_id,
-				'start'       => $row->strand >= 0 ? 
-									$reference + $Data->metadata($column, 'start') :
-									$reference - $Data->metadata($column, 'start'),
-				'stop'        => $row->strand >= 0 ? 
-									$reference + $Data->metadata($column, 'stop') : 
-									$reference - $Data->metadata($column, 'stop'),
-				'strand'      => $row->strand,
-				'method'      => $method,
-				'stranded'    => $strand_sense,
+				'db'      => $ddb,
+				'dataset' => $dataset,
+				'chromo'  => $row->seq_id,
+				'start'   => $row->strand >= 0
+				? $reference + $Data->metadata( $column, 'start' )
+				: $reference - $Data->metadata( $column, 'start' ),
+				'stop' => $row->strand >= 0
+				? $reference + $Data->metadata( $column, 'stop' )
+				: $reference - $Data->metadata( $column, 'stop' ),
+				'strand'   => $row->strand,
+				'method'   => $method,
+				'stranded' => $strand_sense,
 			);
-			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-			$row->value($column, $score);
+			$score = sprintf( $formatter, $score ) if ( $formatter and $score ne '.' );
+			$row->value( $column, $score );
 		}
 	}
 }
 
-
-
 ## Interpolate the '.' values with the mean of the neighbors
 sub go_interpolate_values {
-	
+
 	# determine counts
-	my $lastwindow = $Data->last_column; 
-		# lastwindow is the index of the last column
+	my $lastwindow = $Data->last_column;
+
+	# lastwindow is the index of the last column
 	# walk through each data line and then each window
 	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	while ( my $row = $stream->next_row ) {
 		my $col = $startcolumn + 1;
-		while ($col < $lastwindow) {
+		while ( $col < $lastwindow ) {
+
 			# walk through the windows of a data row
 			# skipping the very first and last windows (columns)
 			# we will look for null values
 			# if one is found, interpolate from neighbors
-			if ($row->value($col) eq '.' and $row->value($col - 1) ne '.') {
+			if ( $row->value($col) eq '.' and $row->value( $col - 1 ) ne '.' ) {
+
 				# we will interpolate the value from the neighbors
 				# first, need to check that the neighbors have values
-				
+
 				# find the next real value
 				my $next_i;
-				for (my $i = $col + 1; $i <= $lastwindow; $i++) {
-					if ($row->value($i) ne '.') {
+				for ( my $i = $col + 1; $i <= $lastwindow; $i++ ) {
+					if ( $row->value($i) ne '.' ) {
 						$next_i = $i;
 						last;
 					}
 				}
-				unless (defined $next_i) {
+				unless ( defined $next_i ) {
 					$col++;
 					next;
 				}
-				
+
 				# determine fractional value
-				my $initial = $row->value($col - 1);
-				my $fraction = ($row->value($next_i) - $initial) / 
-					($next_i - $col + 1);
-				
+				my $initial = $row->value( $col - 1 );
+				my $fraction =
+					( $row->value($next_i) - $initial ) / ( $next_i - $col + 1 );
+
 				# apply fractional values
-				for (my $n = $col; $n < $next_i; $n++) {
-					my $score = $initial + ($fraction * ($n - $col + 1));
-					$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
-					$row->value($n, $score);
+				for ( my $n = $col; $n < $next_i; $n++ ) {
+					my $score = $initial + ( $fraction * ( $n - $col + 1 ) );
+					$score = sprintf( $formatter, $score )
+						if ( $formatter and $score ne '.' );
+					$row->value( $n, $score );
 				}
-				
+
 				# jump ahead
 				$col = $next_i;
 			}
@@ -806,8 +782,6 @@ sub go_interpolate_values {
 		}
 	}
 }
-
-
 
 __END__
 

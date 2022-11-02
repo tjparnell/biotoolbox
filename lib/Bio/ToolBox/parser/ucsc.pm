@@ -231,8 +231,8 @@ L<Bio::ToolBox::SeqFeature>
 
 use strict;
 use Carp qw(carp cluck croak confess);
-use base 'Bio::ToolBox::Parser'; 
-use Bio::ToolBox::Data; 
+use base 'Bio::ToolBox::Parser';
+use Bio::ToolBox::Data;
 use Bio::ToolBox::parser::ucsc::builder;
 
 1;
@@ -243,155 +243,159 @@ sub new {
 }
 
 sub open_file {
-	my $self = shift;
+	my $self     = shift;
 	my $filename = shift || $self->file || undef;
-	
+
 	# check file
-		# Unlike the gff and bed parsers, the ucsc parser can handle opening 
-		# multiple files, primarily to recycle various UCSC support files. 
-		# This is historical precedent from earlier versions, unfortunately.
-		# This may unnecessarily complicate and/or inflate memory....
+	# Unlike the gff and bed parsers, the ucsc parser can handle opening
+	# multiple files, primarily to recycle various UCSC support files.
+	# This is historical precedent from earlier versions, unfortunately.
+	# This may unnecessarily complicate and/or inflate memory....
 	unless ($filename) {
 		cluck("no file name passed!");
 		return;
 	}
-	
+
 	# Check file format type
 	my $filetype = $self->filetype || undef;
 	unless ($filetype) {
-		(my $flavor, $filetype) = Bio::ToolBox::Data->taste_file($filename);
-		unless ($flavor eq 'ucsc') {
+		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
+		unless ( $flavor eq 'ucsc' ) {
 			confess "File is not a UCSC-format file!!! How did we get here?";
 		}
 		$self->{filetype} = $filetype;
 	}
-	if ($filetype eq 'genePred') {
+	if ( $filetype eq 'genePred' ) {
+
 		# turn off gene processing for simple genePred which has no gene names
 		$self->do_gene(0);
 	}
-	
-	# The ucsc parser does not have convertor subroutines, unlike the gff and bed 
-	# parsers. Rather, parsing is done by the number of elements in each line 
-	# and parsed accordingly in the builder object. Slightly inefficient but 
+
+	# The ucsc parser does not have convertor subroutines, unlike the gff and bed
+	# parsers. Rather, parsing is done by the number of elements in each line
+	# and parsed accordingly in the builder object. Slightly inefficient but
 	# functional.
-	
-	
-	# Open filehandle object 
-	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or
-		croak " cannot open file '$filename'!\n";
-	
+
+	# Open filehandle object
+	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename)
+		or croak " cannot open file '$filename'!\n";
+
 	# reset source as necessary
-	if ($filename =~ /ensgene/i and $self->source eq 'UCSC') {
+	if ( $filename =~ /ensgene/i and $self->source eq 'UCSC' ) {
 		$self->source('EnsGene');
 	}
-	elsif ($filename =~ /xenorefgene/i and $self->source eq 'UCSC') {
+	elsif ( $filename =~ /xenorefgene/i and $self->source eq 'UCSC' ) {
 		$self->source('xenoRefGene');
 	}
-	elsif ($filename =~ /refgene/i and $self->source eq 'UCSC') {
+	elsif ( $filename =~ /refgene/i and $self->source eq 'UCSC' ) {
 		$self->source('refGene');
 	}
-	elsif ($filename =~ /refseq/i and $self->source eq 'UCSC') {
+	elsif ( $filename =~ /refseq/i and $self->source eq 'UCSC' ) {
 		$self->source('refSeq');
 	}
-	elsif ($filename =~ /knowngene/i and $self->source eq 'UCSC') {
+	elsif ( $filename =~ /knowngene/i and $self->source eq 'UCSC' ) {
 		$self->source('knownGene');
 	}
-	
+
 	# Check existing data
-	# the reason this parser can handle reading a second file without having to make a 
-	# new parser object (like gff and bed) is so that we can potentially recycle the 
-	# extra UCSC information 
-	if ($self->fh) {
+	# the reason this parser can handle reading a second file without having to make a
+	# new parser object (like gff and bed) is so that we can potentially recycle the
+	# extra UCSC information
+	if ( $self->fh ) {
+
 		# close existing
 		$self->{fh}->close;
+
 		# go ahead and clear out existing data
-		$self->{gene2seqf}     = {};
-		$self->{top_features}  = [];
-		$self->{loaded}        = {};
-		$self->{id2count}      = {};
-		$self->{counts}        = {};
-		$self->{'eof'}         = 0;
-		$self->{line_count}    = 0;
+		$self->{gene2seqf}    = {};
+		$self->{top_features} = [];
+		$self->{loaded}       = {};
+		$self->{id2count}     = {};
+		$self->{counts}       = {};
+		$self->{'eof'}        = 0;
+		$self->{line_count}   = 0;
 	}
-	
+
 	# Finish
 	$self->{fh} = $fh;
 	return 1;
 }
 
 sub load_extra_data {
-	my ($self, $file, $type) = @_;
+	my ( $self, $file, $type ) = @_;
 	unless ($file) {
 		cluck "no file name passed!";
 		return;
 	}
-	
-	# check the type 
-	if ($type =~ /ensembltogene|ensname/i) {
+
+	# check the type
+	if ( $type =~ /ensembltogene|ensname/i ) {
 		$type = 'ensembltogene';
 	}
-	elsif ($type =~ /ensemblsource|enssrc/i) {
+	elsif ( $type =~ /ensemblsource|enssrc/i ) {
 		$type = 'ensemblsource';
 	}
-	elsif ($type =~ /refseqstat|status/i) {
+	elsif ( $type =~ /refseqstat|status/i ) {
 		$type = 'refseqstat';
 	}
-	elsif ($type =~ /refseqsum|summary/i) {
+	elsif ( $type =~ /refseqsum|summary/i ) {
 		$type = 'refseqsum';
 	}
-	elsif ($type =~ /kgxref/i) {
+	elsif ( $type =~ /kgxref/i ) {
 		$type = 'kgxref';
 	}
 	else {
 		carp "unknown type '$type' to load extra data";
 		return;
 	}
-	
+
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($file);
 	unless ($fh) {
 		carp "unable to open file '$file'! $!";
 		return;
 	}
-	
+
 	# load ensembl data
 	my $count = 0;
-	if ($type =~ /ensembl/) {
+	if ( $type =~ /ensembl/ ) {
+
 		# we will store gene name in position 0, and source in position 1
 		my $index = $type eq 'ensembltogene' ? 0 : 1;
-		while (my $line = $fh->getline) {
-			
+		while ( my $line = $fh->getline ) {
+
 			# process line
 			chomp $line;
-			next if ($line =~ /^#/);
+			next if ( $line =~ /^#/ );
 			my @line_data = split /\t/, $line;
-			if (scalar @line_data != 2) {
-				carp " file $file doesn't seem right!? Line has " .
-					scalar @line_data . " elements!\n";
+			if ( scalar @line_data != 2 ) {
+				carp " file $file doesn't seem right!? Line has "
+					. scalar @line_data
+					. " elements!\n";
 				return;
 			}
-			
+
 			# store data into hash
 			$self->{'ensembldata'}{ $line_data[0] }->[$index] = $line_data[1];
 			$count++;
 		}
 	}
-	
+
 	# load various refSeq data
 	else {
 		# we just store the line data based on the gene ID
 		# each table has different elements
 		# here they are for reference
-		
+
 		### refSeqStatus table
-		# 0	mrnaAcc	RefSeq gene accession name
-		# 1	status	Status ('Unknown', 'Reviewed', 'Validated', 'Provisional', 'Predicted', 'Inferred')
-		# 2	molecule type ('DNA', 'RNA', 'ds-RNA', 'ds-mRNA', 'ds-rRNA', 'mRNA', 'ms-DNA', 'ms-RNA', 'rRNA', 'scRNA', 'snRNA', 'snoRNA', 'ss-DNA', 'ss-RNA', 'ss-snoRNA', 'tRNA', 'cRNA', 'ss-cRNA', 'ds-cRNA', 'ms-rRNA')	values	molecule type
-	
+# 0	mrnaAcc	RefSeq gene accession name
+# 1	status	Status ('Unknown', 'Reviewed', 'Validated', 'Provisional', 'Predicted', 'Inferred')
+# 2	molecule type ('DNA', 'RNA', 'ds-RNA', 'ds-mRNA', 'ds-rRNA', 'mRNA', 'ms-DNA', 'ms-RNA', 'rRNA', 'scRNA', 'snRNA', 'snoRNA', 'ss-DNA', 'ss-RNA', 'ss-snoRNA', 'tRNA', 'cRNA', 'ss-cRNA', 'ds-cRNA', 'ms-rRNA')	values	molecule type
+
 		### refSeqSummary table
-		# 0	RefSeq mRNA accession
-		# 1	completeness	FullLength ('Unknown', 'Complete5End', 'Complete3End', 'FullLength', 'IncompleteBothEnds', 'Incomplete5End', 'Incomplete3End', 'Partial')	
-		# 1	summary	 	text	values	Summary comments
-	
+# 0	RefSeq mRNA accession
+# 1	completeness	FullLength ('Unknown', 'Complete5End', 'Complete3End', 'FullLength', 'IncompleteBothEnds', 'Incomplete5End', 'Incomplete3End', 'Partial')
+# 1	summary	 	text	values	Summary comments
+
 		### kgXref table
 		# 0	kgID	Known Gene ID
 		# 1	mRNA	mRNA ID
@@ -401,33 +405,33 @@ sub load_extra_data {
 		# 5	refseq	 RefSeq ID
 		# 6	protAcc	 NCBI protein Accession number
 		# 7	description	Description
-	
+
 		### ensemblToGeneName table
 		# 0 Ensembl transcript ID
 		# 1 gene name
-		
+
 		# load the table
-		while (my $line = $fh->getline) {
+		while ( my $line = $fh->getline ) {
 			chomp $line;
-			next if ($line =~ /^#/);
+			next if ( $line =~ /^#/ );
 			my @line_data = split /\t/, $line;
-	
+
 			# the unique id should be the first element in the array
 			# take it off the array, since it doesn't need to be stored there too
 			my $id = shift @line_data;
-	
+
 			# check for duplicate lines
-			if (exists $self->{$type}{$id} ) {
+			if ( exists $self->{$type}{$id} ) {
 				warn "  $type line for identifier $id exists twice!\n";
 				next;
 			}
-	
+
 			# store data into hash
 			$self->{$type}{$id} = [@line_data];
 			$count++;
 		}
 	}
-	
+
 	$fh->close;
 	return $count;
 }
@@ -435,11 +439,11 @@ sub load_extra_data {
 sub typelist {
 	my $self = shift;
 	my @items;
-	foreach my $k (keys %{$self->{counts}}) {
+	foreach my $k ( keys %{ $self->{counts} } ) {
 		push @items, $k if $self->{counts}{$k} > 0;
 	}
 	if (@items) {
-		return join(',', @items);
+		return join( ',', @items );
 	}
 	else {
 		# return generic list
@@ -449,42 +453,43 @@ sub typelist {
 
 sub next_feature {
 	my $self = shift;
-	
+
 	# check that we have an open filehandle
-	unless ($self->fh) {
+	unless ( $self->fh ) {
 		croak("no UCSC file loaded to parse!");
 	}
 	return if $self->{'eof'};
-	
-	while (my $line = $self->fh->getline) {
-		if ($line !~ /\w+/) {
+
+	while ( my $line = $self->fh->getline ) {
+		if ( $line !~ /\w+/ ) {
 			$self->{line_count}++;
 			next;
 		}
-		if ($line =~ /^#/) {
+		if ( $line =~ /^#/ ) {
 			push @{ $self->{comments} }, $line;
 			$self->{line_count}++;
 			next;
 		}
 		chomp $line;
-		my @linedata = split("\t", $line);
-		my $builder = Bio::ToolBox::parser::ucsc::builder->new(\@linedata, $self);
+		my @linedata = split( "\t", $line );
+		my $builder  = Bio::ToolBox::parser::ucsc::builder->new( \@linedata, $self );
 		$self->{line_count}++;
 		unless ($builder) {
+
 			# builder will print its own error message if fails
 			warn " unable to parse line number ", $self->{line_count}, "\n";
 			next;
 		}
-		
+
 		# generate and return the feature from the line
-		if ($self->do_gene) {
+		if ( $self->do_gene ) {
 			return $builder->build_gene;
 		}
 		else {
 			return $builder->build_transcript;
 		}
 	}
-	
+
 	# presumed end of file
 	$self->{'eof'} = 1;
 	return;
@@ -497,50 +502,47 @@ sub parse_table {
 	if (@_) {
 		$self->open_file(shift) or return;
 	}
-	unless ($self->fh) {
+	unless ( $self->fh ) {
 		carp "must open a file first!";
 		return;
 	}
-	return if ($self->{'eof'});
-	
+	return if ( $self->{'eof'} );
+
 	#### Main Loop
 	printf "  Parsing %s format file....\n", $self->filetype;
-	while (my $feature = $self->next_feature) {
-		
+	while ( my $feature = $self->next_feature ) {
+
 		# record this top feature
 		my $id = $feature->primary_id;
-			# the builder should have checked and made this ID unique
+
+		# the builder should have checked and made this ID unique
 		$self->{loaded}{$id} = $feature;
-		
+
 		# check chromosome
 		my $s = $feature->seq_id;
-		unless (exists $self->{seq_ids}{$s}) {
+		unless ( exists $self->{seq_ids}{$s} ) {
 			$self->{seq_ids}{$s} = $feature->end;
 		}
 		$self->{seq_ids}{$s} = $feature->end if $feature->end > $self->{seq_ids}{$s};
 	}
-	
-	# after parsing the entire file, add all the loaded features to a sorted 
-	# array of the top features 
-	# we pseudo-genomic sort by Schwartzian transform because UCSC tables 
+
+	# after parsing the entire file, add all the loaded features to a sorted
+	# array of the top features
+	# we pseudo-genomic sort by Schwartzian transform because UCSC tables
 	# can't be trusted to be sorted
-	push @{ $self->{top_features} }, 
-		map { $_->[2] }
+	push @{ $self->{top_features} }, map { $_->[2] }
 		sort { $a->[0] cmp $b->[0] or $a->[1] <=> $b->[1] }
-		map { [$_->seq_id, $_->start, $_] }
-		values %{ $self->{loaded} };
-	
+		map { [ $_->seq_id, $_->start, $_ ] } values %{ $self->{loaded} };
+
 	# finished parsing
 	return 1;
 }
 
 sub counts {
-	my $self = shift;
+	my $self   = shift;
 	my %counts = %{ $self->{counts} };
 	return wantarray ? %counts : \%counts;
 }
-
-
 
 __END__
 

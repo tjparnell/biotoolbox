@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Test script for Bio::ToolBox::Data 
+# Test script for Bio::ToolBox::Data
 # working with Bam data
 
 use strict;
@@ -9,258 +9,268 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	if (eval {require Bio::DB::HTS; 1}) {
-		plan tests => 60;
-	}
-	else {
-		plan skip_all => 'Optional module Bio::DB::HTS not available';
-	}
-	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
+    if ( eval { require Bio::DB::HTS; 1 } ) {
+        plan tests => 60;
+    }
+    else {
+        plan skip_all => 'Optional module Bio::DB::HTS not available';
+    }
+    $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 }
 
-require_ok 'Bio::ToolBox::Data' or 
-	BAIL_OUT "Cannot load Bio::ToolBox::Data";
-use_ok( 'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support', 'get_chromosome_list',
-		'get_genomic_sequence' );
+require_ok 'Bio::ToolBox::Data'
+  or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+use_ok(
+    'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support',
+    'get_chromosome_list',     'get_genomic_sequence'
+);
 
-
-my $dataset = File::Spec->catfile($Bin, "Data", "sample1.bam");
-my $fasta = File::Spec->catfile($Bin, "Data", 'sequence.fa');
+my $dataset = File::Spec->catfile( $Bin, "Data", "sample1.bam" );
+my $fasta   = File::Spec->catfile( $Bin, "Data", 'sequence.fa' );
 
 ### Open a test file
-my $infile = File::Spec->catfile($Bin, "Data", "sample.bed");
-my $Data = Bio::ToolBox::Data->new(file => $infile);
-isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
+my $infile = File::Spec->catfile( $Bin, "Data", "sample.bed" );
+my $Data   = Bio::ToolBox::Data->new( file => $infile );
+isa_ok( $Data, 'Bio::ToolBox::Data', 'BED Data' );
 
 # add a database
-is($Data->bam_adapter('hts'), 'hts', 'set preferred database adapter to hts');
+is( $Data->bam_adapter('hts'), 'hts', 'set preferred database adapter to hts' );
 $Data->database($dataset);
-is($Data->database, $dataset, 'get database');
+is( $Data->database, $dataset, 'get database' );
 my $db = $Data->open_database;
-isa_ok($db, 'Bio::DB::HTS', 'connected database');
+isa_ok( $db, 'Bio::DB::HTS', 'connected database' );
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
-is(scalar @chromos, 1, 'bam number of chromosomes');
-is($chromos[0][0], 'chrI', 'bam name of first chromosome');
-is($chromos[0][1], 230208, 'bam length of first chromosome');
+is( scalar @chromos, 1,      'bam number of chromosomes' );
+is( $chromos[0][0],  'chrI', 'bam name of first chromosome' );
+is( $chromos[0][1],  230208, 'bam length of first chromosome' );
 
 # check total mapped alignments
 my $total = check_dataset_for_rpm_support($dataset);
-is($total, 1414, "number of mapped alignments in bam");
+is( $total, 1414, "number of mapped alignments in bam" );
 
 # check fasta
 my $fdb = $Data->open_new_database($fasta);
-isa_ok($fdb, 'Bio::DB::HTS::Faidx', 'HTS Faidx fasta database');
-my $seq = get_genomic_sequence($fdb, 'chrI', 257, 275);
-is($seq, 'ACCCTACCATTACCCTACC', 'fetched fasta sequence');
+isa_ok( $fdb, 'Bio::DB::HTS::Faidx', 'HTS Faidx fasta database' );
+my $seq = get_genomic_sequence( $fdb, 'chrI', 257, 275 );
+is( $seq, 'ACCCTACCATTACCCTACC', 'fetched fasta sequence' );
 @chromos = get_chromosome_list($fdb);
-is(scalar @chromos, 1, 'fai number of chromosomes');
-is($chromos[0][0], 'chrI', 'fai name of first chromosome');
-is($chromos[0][1], 400, 'fai length of first chromosome');
+is( scalar @chromos, 1,      'fai number of chromosomes' );
+is( $chromos[0][0],  'chrI', 'fai name of first chromosome' );
+is( $chromos[0][1],  400,    'fai length of first chromosome' );
 unlink "$fasta.fai";
-
 
 ### Initialize row stream
 my $stream = $Data->row_stream;
-isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator');
+isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
 
 # First row is YAL047C
 my $row = $stream->next_row;
-is($row->name, 'YAL047C', 'row name');
+is( $row->name, 'YAL047C', 'row name' );
 
 # try a segment
 my $segment = $row->segment;
-isa_ok($segment, 'Bio::DB::HTS::Segment', 'row segment');
-is($segment->start, 54989, 'segment start');
+isa_ok( $segment, 'Bio::DB::HTS::Segment', 'row segment' );
+is( $segment->start, 54989, 'segment start' );
 
 # read count sum
 my $score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'method'   => 'count',
+    'db'      => $dataset,
+    'dataset' => $dataset,
+    'method'  => 'count',
 );
+
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 453, 'row sum of read count score');
+is( $score, 453, 'row sum of read count score' );
 
 # mean coverage
 $score = $row->get_score(
-	'db'       => $db,
-	'dataset'  => $dataset,
-	'method'   => 'mean',
+    'db'      => $db,
+    'dataset' => $dataset,
+    'method'  => 'mean',
 );
+
 # print "mean coverage for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 16.33, 'row mean coverage');
+is( sprintf( "%.2f", $score ), 16.33, 'row mean coverage' );
 
 # read precise count sum
 $score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'method'   => 'pcount',
+    'db'      => $dataset,
+    'dataset' => $dataset,
+    'method'  => 'pcount',
 );
+
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 414, 'row sum of read precise count score');
+is( $score, 414, 'row sum of read precise count score' );
 
 # read ncount sum
 $score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'method'   => 'ncount',
+    'db'      => $dataset,
+    'dataset' => $dataset,
+    'method'  => 'ncount',
 );
+
 # print "ncount sum for ", $row->name, " is $score\n";
-is($score, 453, 'row read name count score');
-
-
-
+is( $score, 453, 'row read name count score' );
 
 ### Move to the next row
 $row = $stream->next_row;
-is($row->start, 57029, 'row start position');
-is($row->strand, -1, 'row strand');
+is( $row->start,  57029, 'row start position' );
+is( $row->strand, -1,    'row strand' );
 
 # try stranded data collection
 $score = $row->get_score(
-	'dataset'  => $dataset,
-	'method'   => 'count',
-	'stranded' => 'all',
+    'dataset'  => $dataset,
+    'method'   => 'count',
+    'stranded' => 'all',
 );
+
 # print "all read count sum for ", $row->name, " is $score\n";
-is($score, 183, 'row sum of count score for all strands');
+is( $score, 183, 'row sum of count score for all strands' );
 
 $score = $row->get_score(
-	'dataset'  => $dataset,
-	'method'   => 'count',
-	'stranded' => 'sense',
+    'dataset'  => $dataset,
+    'method'   => 'count',
+    'stranded' => 'sense',
 );
+
 # print "sense read count sum for ", $row->name, " is $score\n";
-is($score, 86, 'row sum of count score for sense strand');
+is( $score, 86, 'row sum of count score for sense strand' );
 
 $score = $row->get_score(
-	'dataset'  => $dataset,
-	'method'   => 'count',
-	'stranded' => 'antisense',
+    'dataset'  => $dataset,
+    'method'   => 'count',
+    'stranded' => 'antisense',
 );
+
 # print "antisense read count sum for ", $row->name, " is $score\n";
-is($score, 97, 'row sum of count score for antisense strand');
+is( $score, 97, 'row sum of count score for antisense strand' );
 
 $score = $row->get_score(
-	'dataset'  => $dataset,
-	'method'   => 'mean',
-	'stranded' => 'sense',
+    'dataset'  => $dataset,
+    'method'   => 'mean',
+    'stranded' => 'sense',
 );
+
 # print "sense mean coverage for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 29.38, 'row mean coverage for sense strand');
+is( sprintf( "%.2f", $score ), 29.38, 'row mean coverage for sense strand' );
 
 $score = $row->get_score(
-	'dataset'  => $dataset,
-	'value'    => 'score',
-	'method'   => 'mean',
-	'stranded' => 'antisense',
+    'dataset'  => $dataset,
+    'value'    => 'score',
+    'method'   => 'mean',
+    'stranded' => 'antisense',
 );
+
 # print "antisense mean coverage for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 29.38, 'row mean coverage for sense strand');
-
-
+is( sprintf( "%.2f", $score ), 29.38, 'row mean coverage for sense strand' );
 
 ### Move to third row
 # test row positioned score using bam file
 $row = $stream->next_row;
-is($row->name, 'YAL044W-A', 'row name');
+is( $row->name, 'YAL044W-A', 'row name' );
 
 my %pos2scores = $row->get_region_position_scores(
-	'dataset'  => $dataset,
-	'method'   => 'count',
+    'dataset' => $dataset,
+    'method'  => 'count',
 );
-is(scalar keys %pos2scores, 150, 'number of positioned scores');
+is( scalar keys %pos2scores, 150, 'number of positioned scores' );
+
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is($pos2scores{6}, 1, 'positioned count at 6');
-is($pos2scores{-21}, 2, 'positioned count at -21');
+is( $pos2scores{6},   1, 'positioned count at 6' );
+is( $pos2scores{-21}, 2, 'positioned count at -21' );
 
 %pos2scores = $row->get_region_position_scores(
-	'dataset'  => $dataset,
-	'method'   => 'pcount',
+    'dataset' => $dataset,
+    'method'  => 'pcount',
 );
+
 # print "found ", scalar keys %pos2scores, " positions with precise reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is(scalar keys %pos2scores, 89, 'number of precise positioned scores');
-is($pos2scores{37}, 1, 'precise positioned count at 37');
-is($pos2scores{72}, 2, 'precise positioned count at 72');
+is( scalar keys %pos2scores, 89, 'number of precise positioned scores' );
+is( $pos2scores{37},         1,  'precise positioned count at 37' );
+is( $pos2scores{72},         2,  'precise positioned count at 72' );
 
 %pos2scores = $row->get_region_position_scores(
-	'dataset'  => $dataset,
-	'method'   => 'ncount',
+    'dataset' => $dataset,
+    'method'  => 'ncount',
 );
+
 # print "found ", scalar keys %pos2scores, " positions of named reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	printf "  $_ => %s\n", join(',', @{$pos2scores{$_}});
 # }
-is(scalar keys %pos2scores, 150, 'number of named positioned scores');
-is($pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1', 'positioned named at 6');
-is(scalar @{$pos2scores{56}}, 2, 'positioned name count at 56');
+is( scalar keys %pos2scores, 150, 'number of named positioned scores' );
+is(
+    $pos2scores{6}->[0],
+    'HWI-EAS240_0001:7:64:6158:10466#0/1',
+    'positioned named at 6'
+);
+is( scalar @{ $pos2scores{56} }, 2, 'positioned name count at 56' );
 
 %pos2scores = $row->get_region_position_scores(
-	'dataset'  => $dataset,
-	'absolute' => 1,
-	'stranded' => 'antisense',
-	'method'   => 'count',
+    'dataset'  => $dataset,
+    'absolute' => 1,
+    'stranded' => 'antisense',
+    'method'   => 'count',
 );
+
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is(scalar keys %pos2scores, 79, 'number of positioned scores');
-is($pos2scores{57593}, 2, 'positioned score at 57593');
-is($pos2scores{57613}, 1, 'positioned score at 57613');
-
+is( scalar keys %pos2scores, 79, 'number of positioned scores' );
+is( $pos2scores{57593},      2,  'positioned score at 57593' );
+is( $pos2scores{57613},      1,  'positioned score at 57613' );
 
 # Fetch alignments
 my $alignment_data = { mapq => [] };
-my $callback = sub {
- my ($a, $data) = @_;
- push @{ $data->{mapq} }, $a->qual;
+my $callback       = sub {
+    my ( $a, $data ) = @_;
+    push @{ $data->{mapq} }, $a->qual;
 };
 my $f = $row->fetch_alignments(
-'db'        => $db,
-'data'      => $alignment_data,
-'callback'  => $callback,
+    'db'       => $db,
+    'data'     => $alignment_data,
+    'callback' => $callback,
 );
-is($f, 1, 'Raw alignment fetch');
+is( $f, 1, 'Raw alignment fetch' );
+
 # printf "found %d alignments\n", scalar(@{$alignment_data->{mapq}});
 # for my $i (0..183) {
 # 	printf "$i\t%d\n", $alignment_data->{mapq}->[$i];
 # }
-is(scalar(@{$alignment_data->{mapq}}), 184, 'Raw fetch mapq number');
-is($alignment_data->{mapq}->[0], 150, 'First alignment mapq');
-is($alignment_data->{mapq}->[66], 0, '66th alignment mapq');
-is($alignment_data->{mapq}->[80], 95, '80th alignment mapq');
-
+is( scalar( @{ $alignment_data->{mapq} } ), 184, 'Raw fetch mapq number' );
+is( $alignment_data->{mapq}->[0],           150, 'First alignment mapq' );
+is( $alignment_data->{mapq}->[66],          0,   '66th alignment mapq' );
+is( $alignment_data->{mapq}->[80],          95,  '80th alignment mapq' );
 
 # Generate new genomic window file
 undef $Data;
 undef $row;
 $Data = Bio::ToolBox::Data->new(
-	feature  => 'genome',
-	db       => $dataset,
-	win      => 500
+    feature => 'genome',
+    db      => $dataset,
+    win     => 500
 );
-isa_ok($Data, 'Bio::ToolBox::Data', 'new genome window file');
-is($Data->feature, 'genome', 'Data feature name');
-is($Data->feature_type, 'coordinate', 'Data feature type is coordinate');
-is($Data->number_columns, 3, 'Data number of columns');
-is($Data->number_rows, 461, 'Data number of rows');
+isa_ok( $Data, 'Bio::ToolBox::Data', 'new genome window file' );
+is( $Data->feature,        'genome',     'Data feature name' );
+is( $Data->feature_type,   'coordinate', 'Data feature type is coordinate' );
+is( $Data->number_columns, 3,            'Data number of columns' );
+is( $Data->number_rows,    461,          'Data number of rows' );
 $row = $Data->get_row(1);
-isa_ok($row, 'Bio::ToolBox::Data::Feature', 'First row object');
-is($row->start, 1, 'First row start coordinate');
-is($row->stop, 500, 'First row stop coordinate');
-is($row->length, 500, 'First row length');
+isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'First row object' );
+is( $row->start,  1,   'First row start coordinate' );
+is( $row->stop,   500, 'First row stop coordinate' );
+is( $row->length, 500, 'First row length' );
 $row = $Data->get_row(461);
-isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Last row object');
-is($row->start, 230001, 'Last row start coordinate');
-is($row->length, 208, 'Last row length');
-
+isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'Last row object' );
+is( $row->start,  230001, 'Last row start coordinate' );
+is( $row->length, 208,    'Last row length' );
 

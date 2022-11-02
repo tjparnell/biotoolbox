@@ -12,60 +12,59 @@ my $VERSION = '1.69';
 
 print "\n A tool for manipulating datasets in data files\n";
 
-
-
 ### Quick help
-unless (@ARGV) { # when no command line options are present
-	# print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
+unless (@ARGV) {    # when no command line options are present
+					# print SYNOPSIS
+	pod2usage(
+		{
+			'-verbose' => 0,
+			'-exitval' => 1,
+		}
+	);
 }
 
-
 ### Get command line options and initialize values
-my ( # command line option variables
-	$infile, 
-	$outfile, 
-	$function, 
+my (    # command line option variables
+	$infile,
+	$outfile,
+	$function,
 	$opt_index,
-	$opt_numerator, 
-	$opt_denominator, 
-	$opt_target, 
+	$opt_numerator,
+	$opt_denominator,
+	$opt_target,
 	$opt_placement,
-	$opt_exception, 
-	$opt_zero, 
-	$opt_direction, 
-	$opt_name, 
-	$opt_log, 
+	$opt_exception,
+	$opt_zero,
+	$opt_direction,
+	$opt_name,
+	$opt_log,
 	$noheader,
-	$gz, 
+	$gz,
 	$bgz,
 	$help,
 	$print_version,
 );
 
 # Command line options
-GetOptions( 
-	'i|in=s'      => \$infile, # name of input file
-	'o|out=s'     => \$outfile, # name of new output file 
-	'f|func=s'    => \$function, # name of the function to  perform
-	'x|index=s'   => \$opt_index, # index number(s) of the dataset to work on
-	'n|exp|num=i' => \$opt_numerator, # index number of numerator dataset
-	'd|con|den=i' => \$opt_denominator, # index number of denominator dataset
-	't|target=s'  => \$opt_target, # target
-	'place=s'     => \$opt_placement, # placement of transformed dataset
-	'except=s'    => \$opt_exception, # old argument exception to deal with 0 values
-	'zero!'       => \$opt_zero, # include 0 values
-	'dir=s'       => \$opt_direction, # sort order
-	'name=s'      => \$opt_name, # new dataset name
-	'log!'        => \$opt_log, # data values are in log2 space
-	'H|noheader'  => \$noheader, # file has no headers
-	'z|gz!'       => \$gz, # write gzipped data file
-	'Z|bgz!'      => \$bgz, # compress with bgzip
-	'h|help'      => \$help, # request help
-	'v|version'   => \$print_version, # print the version
+GetOptions(
+	'i|in=s'      => \$infile,             # name of input file
+	'o|out=s'     => \$outfile,            # name of new output file
+	'f|func=s'    => \$function,           # name of the function to  perform
+	'x|index=s'   => \$opt_index,          # index number(s) of the dataset to work on
+	'n|exp|num=i' => \$opt_numerator,      # index number of numerator dataset
+	'd|con|den=i' => \$opt_denominator,    # index number of denominator dataset
+	't|target=s'  => \$opt_target,         # target
+	'place=s'     => \$opt_placement,      # placement of transformed dataset
+	'except=s'    => \$opt_exception,      # old argument exception to deal with 0 values
+	'zero!'       => \$opt_zero,           # include 0 values
+	'dir=s'       => \$opt_direction,      # sort order
+	'name=s'      => \$opt_name,           # new dataset name
+	'log!'        => \$opt_log,            # data values are in log2 space
+	'H|noheader'  => \$noheader,           # file has no headers
+	'z|gz!'       => \$gz,                 # write gzipped data file
+	'Z|bgz!'      => \$bgz,                # compress with bgzip
+	'h|help'      => \$help,               # request help
+	'v|version'   => \$print_version,      # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Get file name
@@ -73,14 +72,16 @@ unless ($infile) {
 	$infile = shift @ARGV;
 }
 
-
 ### Print help if requested
 if ($help) {
+
 	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
+	pod2usage(
+		{
+			'-verbose' => 2,
+			'-exitval' => 1,
+		}
+	);
 }
 
 # Print version
@@ -94,77 +95,67 @@ if ($print_version) {
 	exit;
 }
 
-
 ### Check for required values
 unless ($infile) {
 	die "No file name supplied!";
 }
 
-
-
 ### Load file
 $noheader = defined $noheader ? $noheader : 0;
-my $Data = Bio::ToolBox::Data->new(file => $infile, noheader => $noheader) 
+my $Data = Bio::ToolBox::Data->new( file => $infile, noheader => $noheader )
 	or die "no data loaded from file '$infile'!";
-printf "    Loaded '$infile' with %s data rows and %s columns\n\n", 
-	format_with_commas($Data->last_row), $Data->number_columns;
-
-
+printf "    Loaded '$infile' with %s data rows and %s columns\n\n",
+	format_with_commas( $Data->last_row ), $Data->number_columns;
 
 ### Initialize more variables
 # parse the requested index string in to an array of indices
 my @opt_indices;
-if (defined $opt_index) {
-	@opt_indices = parse_list($opt_index) or 
-		die " requested index '$opt_index' cannot be parsed!\n";
+if ( defined $opt_index ) {
+	@opt_indices = parse_list($opt_index)
+		or die " requested index '$opt_index' cannot be parsed!\n";
 }
 
 # set zero usage
-if ($opt_exception =~ /^y/i) {
+if ( $opt_exception =~ /^y/i ) {
 	$opt_zero = 1;
 }
 
 # initialize modification count
-my $modification = 0; 
-	# the function subroutines return a value indicating success (the data
-	# table has been modified) or failure (or at least no changes has been
-	# written to the data array)
-	# the $modification variable stores the sum of these return values and 
-	# hence indicates whether a new file needs to be written or not
+my $modification = 0;
+
+# the function subroutines return a value indicating success (the data
+# table has been modified) or failure (or at least no changes has been
+# written to the data array)
+# the $modification variable stores the sum of these return values and
+# hence indicates whether a new file needs to be written or not
 
 # set menu hashes
 my %letter_to_function = _get_letter_to_function_hash();
-	# these are hashes that convert a single letter to the function name
+
+# these are hashes that convert a single letter to the function name
 
 # set the function to subroutine hash
 my %function_to_subroutine = _get_function_to_subroutine_hash();
-	# this hash will convert the function name to the actual subroutine that 
-	# does the work
 
+# this hash will convert the function name to the actual subroutine that
+# does the work
 
 ### Determine execution mode
 if ($function) {
+
 	# Function was requested upon execution
 	automatic_execution();
 	write_and_quit_function();
-} 
+}
 else {
 	# otherwise interactive execution
 	interactive_execution();
 	write_and_quit_function();
 }
 
-
-
-
 ################################################################################
 ##############             Main Program Subroutines               ##############
 ################################################################################
-
-
-
-
-
 
 sub print_menu {
 	print <<MENU;
@@ -222,56 +213,59 @@ Other
   q  (q)uit, saving changes if necessary
   Q  (Q)uit without saving changes
 MENU
+
 	# unlisted option: print this (m)enu
-	# unused letters: E F H jJ k 
-	return; # return 0, nothing done
+	# unused letters: E F H jJ k
+	return;    # return 0, nothing done
 }
 
-
 sub print_online_help {
+
 	# display FUNCTIONS from POD for online help
 	# upon quitting perldoc it should return to the program
-	pod2usage( {
-		'-verbose'  => 99,
-		'-sections' => 'FUNCTIONS',
-		'-exitval'  => 'NOEXIT',
-	} );
+	pod2usage(
+		{
+			'-verbose'  => 99,
+			'-sections' => 'FUNCTIONS',
+			'-exitval'  => 'NOEXIT',
+		}
+	);
 	return;
 }
 
-
-
 sub automatic_execution {
+
 	# use global variables defined by command-line arguments to automatically
 	# execute the manipulations
-	
+
 	# print options as a record for when I keep the output
 	print " Executing automatic manipulation with function '$function'\n";
 	my %option_values = (
-		'index'      => $opt_index, 
-		'experiment' => $opt_numerator, 
-		'control'    => $opt_denominator, 
-		'target'     => $opt_target, 
-		'place'      => $opt_placement, 
-		'include zero' => $opt_zero, 
-		'direction'  => $opt_direction, 
-		'name'       => $opt_name, 
-		'log'        => $opt_log, 
+		'index'        => $opt_index,
+		'experiment'   => $opt_numerator,
+		'control'      => $opt_denominator,
+		'target'       => $opt_target,
+		'place'        => $opt_placement,
+		'include zero' => $opt_zero,
+		'direction'    => $opt_direction,
+		'name'         => $opt_name,
+		'log'          => $opt_log,
 	);
-	foreach my $value (sort {$a cmp $b} keys %option_values) {
-		if (defined $option_values{$value}) {
+	foreach my $value ( sort { $a cmp $b } keys %option_values ) {
+		if ( defined $option_values{$value} ) {
 			print "   using '$option_values{$value}' for option $value\n";
 		}
 	}
-	
+
 	# set default placement to new
-		# I hate having a shell script stall asking the user for placement
-	unless (defined $opt_placement) {
+	# I hate having a shell script stall asking the user for placement
+	unless ( defined $opt_placement ) {
 		$opt_placement = 'n';
 	}
-	
+
 	# execute
-	if (exists $function_to_subroutine{$function} ) {
+	if ( exists $function_to_subroutine{$function} ) {
+
 		# the function is recognized as legitimate
 		$modification += &{ $function_to_subroutine{$function} };
 	}
@@ -280,32 +274,30 @@ sub automatic_execution {
 	}
 }
 
-
 sub interactive_execution {
+
 	# interact with the user to perform an unlimited number of executions
-	
+
 	# Ask for the function
 	print " Functions are chosen by symbol. Use [m] for menu or [h] for help\n";
 	print " Enter the symbol for the function you would like to perform   ";
 	my $request = <STDIN>;
 	chomp $request;
 	while (1) {
-		if (exists $letter_to_function{$request} ) {
+		if ( exists $letter_to_function{$request} ) {
+
 			# first check that the letter corresponds to a function
-			
+
 			# perform the function
-			$modification += &{ 
-				$function_to_subroutine{
-					$letter_to_function{$request}
-				}
-			};
-			
+			$modification +=
+				&{ $function_to_subroutine{ $letter_to_function{$request} } };
+
 			# prepare for the next function
 			print " Which function is next? [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
 			$request = <STDIN>;
 			chomp $request;
 		}
-		
+
 		else {
 			# unrecognized command
 			print " unrecognized command. [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
@@ -316,26 +308,25 @@ sub interactive_execution {
 	return;
 }
 
-
-
 ################################################################################
 ##############               Function Subroutines                 ##############
 ################################################################################
 
-
 sub write_and_quit_function {
+
 	# write out file as necessary and quit
-	
-	if ($modification > 0) { 
+
+	if ( $modification > 0 ) {
+
 		# a value greater than 0 indicates that changes to the data array have been
 		# made and that we need to write an output file
-	
+
 		# write the file
 		my $write_results = $Data->write_file(
-			'filename'  => $outfile,
-			'gz'        => $bgz ? 2 : $gz ? 1 : undef,
+			'filename' => $outfile,
+			'gz'       => $bgz ? 2 : $gz ? 1 : undef,
 		);
-	
+
 		# report write results
 		print " $modification manipulations performed\n";
 		if ($write_results) {
@@ -344,7 +335,7 @@ sub write_and_quit_function {
 		else {
 			print " Failed to write datafile\n";
 		}
-	} 
+	}
 	else {
 		# no need to write output
 		print " No changes written\n";
@@ -352,103 +343,106 @@ sub write_and_quit_function {
 	exit;
 }
 
-
 sub quit_function {
+
 	# do not write file
 	print " No changes written\n";
 	exit;
 }
 
-
 sub print_statistics_function {
+
 	# print simple statistics for the dataset
-	
+
 	# request dataset(s)
 	my @indices = _request_indices(
-		" Enter one or more column index numbers to calculate statistics  "
-	);
+		" Enter one or more column index numbers to calculate statistics  ");
 	unless (@indices) {
 		warn " unknown index number(s).\n";
 		return;
 	}
-	
+
 	# get statistics and print
 	foreach my $index (@indices) {
 		my %statdata = _get_statistics_hash($index);
-		unless (%statdata) { 
-			warn " unable to get statistics for column index $index!\n"; 
+		unless (%statdata) {
+			warn " unable to get statistics for column index $index!\n";
 			return;
 		}
 
 		# print the metadata and the calculated statistics
 		printf "  Statistics for column $index, '%s'\n", $Data->name($index);
 		my %metadata = $Data->metadata($index);
-		foreach my $key (keys %metadata ) {
+		foreach my $key ( keys %metadata ) {
+
 			# print the metadata
-			if ($key eq 'name') {
-				next; # skip the name, it's been done
+			if ( $key eq 'name' ) {
+				next;    # skip the name, it's been done
 			}
-			elsif ($key eq 'index') {
-				next; # skip the index, it's been done
+			elsif ( $key eq 'index' ) {
+				next;    # skip the index, it's been done
 			}
-			elsif ($key eq 'AUTO') {
-				next; # skip the name, it's been done
+			elsif ( $key eq 'AUTO' ) {
+				next;    # skip the name, it's been done
 			}
 			else {
 				printf "   $key => '%s'\n", $metadata{$key};
 			}
 		}
-		print "   count    = $statdata{count}\n" ;
-		print "   mean     = $statdata{mean}\n", ;
-		print "   median   = $statdata{median}\n", ;
-		print "   std dev  = $statdata{stddevp}\n", ;
-		print "   min      = $statdata{min}\n", ;
+		print "   count    = $statdata{count}\n";
+		print "   mean     = $statdata{mean}\n",;
+		print "   median   = $statdata{median}\n",;
+		print "   std dev  = $statdata{stddevp}\n",;
+		print "   min      = $statdata{min}\n",;
 		print "   max      = $statdata{max}\n";
 		print "   mode     = $statdata{mode}\n";
 		print "   sum      = $statdata{sum}\n";
 	}
-	
+
 	# we're returning 0 because the data file has not been modified
-	return; 
+	return;
 }
 
-
 sub reorder_function {
+
 	# this subroutine will re-order the datasets (columns) in the file
-	
+
 	# determine the new order for the columns
-	my @order; # array for the new order
-	my $sub_request = 0; # a flag to indicate a request from another subroutine
+	my @order;              # array for the new order
+	my $sub_request = 0;    # a flag to indicate a request from another subroutine
 	if (@_) {
+
 		# the new order may be passed from another subroutine
-		@order = @_;
-		$sub_request = 1; # set to true
+		@order       = @_;
+		$sub_request = 1;    # set to true
 	}
 	else {
 		# otherwise request from user
-		my $line = 
-			" Enter the indices in the desired order." . 
-			" Indices may skipped or duplicated.\n" . 
-			" Enter as comma delimited list, and/or range (start - stop)\n   ";
+		my $line =
+			  " Enter the indices in the desired order."
+			. " Indices may skipped or duplicated.\n"
+			. " Enter as comma delimited list, and/or range (start - stop)\n   ";
 		@order = _request_indices($line);
 	}
 	unless (@order) {
 		warn " No order! Nothing done!\n";
 		return;
 	}
-	
+
 	# re-order the data columns
 	$Data->reorder_column(@order);
-	
+
 	# completion
 	if ($sub_request) {
+
 		# the re-ordering was requested by another subroutine
 		# suppress the completion statement
 		return 1;
 	}
 	else {
 		# explicit user request, print completion statement
-		print " re-ordered data as '" . join(", ", @order) . "\n";
+		print " re-ordered data as '" . join( ", ", @order ) . "\n";
+
 		# reset structure
 		$Data->gff(0);
 		$Data->bed(0);
@@ -459,30 +453,32 @@ sub reorder_function {
 	}
 }
 
-
 sub delete_function {
+
 	# this will delete datasets (columns)
-	
+
 	# request the datasets to be deleted
 	my @deletion_list;
 	if (@_) {
+
 		# the deletion may be passed on from another subroutine
 		@deletion_list = @_;
 	}
 	else {
 		# otherwise request list from user
 		@deletion_list = _request_indices(
-		" Enter one or more column index numbers to be deleted.\n  "
-		);
+			" Enter one or more column index numbers to be deleted.\n  ");
 	}
 	unless (@deletion_list) {
 		warn " No list for deletion! Nothing done!\n";
 		return;
 	}
-	
+
 	$Data->delete_column(@deletion_list);
-	print " datasets " . join(", ", map { sprintf "'%s'", $Data->name($_) } 
-		@deletion_list) . " deleted\n";
+	print " datasets "
+		. join( ", ", map { sprintf "'%s'", $Data->name($_) } @deletion_list )
+		. " deleted\n";
+
 	# reset structure
 	$Data->gff(0);
 	$Data->bed(0);
@@ -492,87 +488,92 @@ sub delete_function {
 	return 1;
 }
 
-
 sub rename_function {
+
 	# this subroutine will re-name a dataset name
-	
+
 	# determine or request dataset indices and newname
 	my @indices;
 	my @newnames;
-	if (scalar @_ == 2) {
+	if ( scalar @_ == 2 ) {
+
 		# passed from internal subroutine
 		$indices[0]  = $_[0];
 		$newnames[0] = $_[1];
 	}
 	else {
 		# request index from user
-		@indices = _request_indices(
-			" Enter the index numbers of the columns to rename  "
-		);
+		@indices =
+			_request_indices(" Enter the index numbers of the columns to rename  ");
 	}
-	
+
 	# check if user supplied name
-	if ($function and $opt_name) {
+	if ( $function and $opt_name ) {
+
 		# new name is specified from the command line during automatic execution
 		# use this global value
 		# it might be a comma delimited name, so split it
 		my @provided = split /,/, $opt_name;
-		if (scalar @provided == scalar @indices) {
+		if ( scalar @provided == scalar @indices ) {
+
 			# this is great - same number
 			@newnames = @provided;
 		}
-		elsif (scalar @provided == 1 and scalar @indices > 1) {
+		elsif ( scalar @provided == 1 and scalar @indices > 1 ) {
+
 			# use the same one for each of them!?
-			@newnames = map { $opt_name } @indices;
+			@newnames = map {$opt_name} @indices;
 		}
 		else {
 			warn "unequal number of provided names and indices!? nothing done\n";
 			return;
 		}
 	}
-	
+
 	# rename each of the requested indices
 	my $count = 0;
 	foreach my $i (@indices) {
-		my $name = shift @newnames || undef;
+		my $name    = shift @newnames || undef;
 		my $oldname = $Data->name($i);
 		unless ($name) {
+
 			# request a new name from the user
 			print " ($oldname) Enter a new name: ";
 			$name = <STDIN>;
 			chomp $name;
 		}
+
 		# assign new name
-		$Data->name($i, $name);
+		$Data->name( $i, $name );
 		print "  $oldname re-named to $name\n";
 		$count++;
 	}
 	return $count;
 }
 
-
 sub concatenate_function {
+
 	# this subroutine will concatenate two or more column values into a new column
-	
+
 	# request datasets
-	my @indices = _request_indices(
-			" Enter two or more column index numbers to concatenate  "
-	);
+	my @indices =
+		_request_indices(" Enter two or more column index numbers to concatenate  ");
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	unless (scalar @indices >= 2) {
+	unless ( scalar @indices >= 2 ) {
 		warn " at least two columns are required to concatenate! nothing done\n";
 		return;
 	}
-	
+
 	# identify joining character
 	my $glue;
 	if ($opt_target) {
 		$glue = $opt_target;
 	}
 	elsif ($function) {
+
 		# automatic execution, don't bother user, default is _
 		print " Joining values with character '_'\n";
 		$glue = '_';
@@ -582,53 +583,57 @@ sub concatenate_function {
 		$glue = <STDIN>;
 		chomp $glue;
 	}
-	
+
 	# generate new column
 	my $new_name;
-	if ($function and $opt_name) {
-		# automatic execution and new name was specifically given 
+	if ( $function and $opt_name ) {
+
+		# automatic execution and new name was specifically given
 		$new_name = $opt_name;
 	}
 	else {
-		$new_name = join('_', map {$Data->name($_)} @indices);
-		if (length($new_name) > 30) {
+		$new_name = join( '_', map { $Data->name($_) } @indices );
+		if ( length($new_name) > 30 ) {
+
 			# I don't like long names!
-			$new_name = 'cat_' . join(',', @indices);
+			$new_name = 'cat_' . join( ',', @indices );
 		}
 	}
 	my $new_position = $Data->add_column($new_name);
-	
+
 	# concatenate values
-	$Data->iterate( sub {
-		my $row = shift;
-		my $cat = join($glue, map {$row->value($_)} @indices);
-		$row->value($new_position, $cat);
-	} );
-	
-	printf " Values from %s concatenated into new column '$new_name'\n", 
-		join(", ", map {$Data->name($_)} @indices);
+	$Data->iterate(
+		sub {
+			my $row = shift;
+			my $cat = join( $glue, map { $row->value($_) } @indices );
+			$row->value( $new_position, $cat );
+		}
+	);
+
+	printf " Values from %s concatenated into new column '$new_name'\n",
+		join( ", ", map { $Data->name($_) } @indices );
 	return 1;
 }
 
-
 sub split_function {
+
 	# split a column into multiple new columns
 	# this is tricky as we must know how many columns to create
-	
+
 	# Request dataset
-	my $index = _request_index(
-		" Enter the index number of a column to split  ");
-	if ($index == -1) {
+	my $index = _request_index(" Enter the index number of a column to split  ");
+	if ( $index == -1 ) {
 		warn " unknown index number. nothing done\n";
 		return;
 	}
-	
+
 	# identify joining character
 	my $glue;
 	if ($opt_target) {
 		$glue = $opt_target;
 	}
 	elsif ($function) {
+
 		# automatic execution, don't bother user, default is _
 		print " Splitting on default character '_'\n";
 		$glue = '_';
@@ -638,97 +643,105 @@ sub split_function {
 		$glue = <STDIN>;
 		chomp $glue;
 	}
-	
+
 	# add new column
 	my $new_position = $Data->add_column( $Data->name($index) . '_array' );
-	
+
 	# split values
-	my $number = 1; # maximum number of split values found
-	$Data->iterate( sub {
-		my $row = shift;
-		my @values = split($glue, $row->value($index));
-		if (scalar @values > $number) {
-			$number = scalar @values;
+	my $number = 1;    # maximum number of split values found
+	$Data->iterate(
+		sub {
+			my $row    = shift;
+			my @values = split( $glue, $row->value($index) );
+			if ( scalar @values > $number ) {
+				$number = scalar @values;
+			}
+			$row->value( $new_position, \@values );    # store array reference for now
 		}
-		$row->value($new_position, \@values); # store array reference for now
-	} );
-	
+	);
+
 	# add more columns as necessary
 	my @positions;
-	for my $i (1 .. $number) {
+	for my $i ( 1 .. $number ) {
 		my $p = $Data->add_column( $Data->name($index) . '_' . $i );
 		push @positions, $p;
 	}
-	
+
 	# now store the split values from the array ref into the new columns
-	$Data->iterate( sub {
-		my $row = shift;
-		my $values = $row->value($new_position); # an array ref
-		my $i = 0;
-		foreach my $p (@positions) {
-			$row->value($p, $values->[$i] || '.');
-			$i++;
+	$Data->iterate(
+		sub {
+			my $row    = shift;
+			my $values = $row->value($new_position);    # an array ref
+			my $i      = 0;
+			foreach my $p (@positions) {
+				$row->value( $p, $values->[$i] || '.' );
+				$i++;
+			}
 		}
-	} );
-	
+	);
+
 	# delete the array reference Column
 	$Data->delete_column($new_position);
-	
+
 	printf " Split column %s into $number new columns\n", $Data->name($index);
 	return 1;
 }
 
-
 sub coordinate_function {
+
 	# this subroutine will generate a coordinate string from coordinate values
-	
+
 	# check for coordinates
-	unless ($Data->feature_type eq 'coordinate') {
+	unless ( $Data->feature_type eq 'coordinate' ) {
+
 		# cannot add coordinate column, do without ?
 		warn " cannot generate coordinates, no chromosome or start column found\n";
 		return;
 	}
-	
-	# the new index position 
+
+	# the new index position
 	my $new_position = $Data->add_column('Coordinate');
-	
+
 	# generate coordinates
-	$Data->iterate( sub {
-		my $row = shift;
-		$row->value($new_position, $row->coordinate);
-	} );
-	
+	$Data->iterate(
+		sub {
+			my $row = shift;
+			$row->value( $new_position, $row->coordinate );
+		}
+	);
+
 	print " Coordinate string generated as new column $new_position\n";
 	return 1;
 }
 
-
 sub median_scale_function {
+
 	# this subroutine will median scale a dataset
-	
+
 	# request datasets
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more column index numbers to median scale  "
-		);
+		@indices =
+			_request_indices(" Enter one or more column index numbers to median scale  ");
 	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	
+
 	# Where to put new values?
 	my $placement = _request_placement();
-	
+
 	# Obtain the target median value
 	my $target;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# use the command line specified target
 		$target = $opt_target;
 	}
@@ -738,55 +751,59 @@ sub median_scale_function {
 		$target = <STDIN>;
 		chomp $target;
 	}
-	
+
 	# Work through the requested datasets
-	my @datasets_modified; # a list of which datasets were modified
-	INDEX_LOOP: foreach my $index (@indices) {
-		
+	my @datasets_modified;    # a list of which datasets were modified
+INDEX_LOOP: foreach my $index (@indices) {
+
 		# Retrieve values and calculate median
-		my %statdata = _get_statistics_hash($index, 'n');
-		unless (%statdata) { 
-			warn " unable to get statistics for dataset " . 
-				$Data->name($index) . ", index $index!\n"; 
+		my %statdata = _get_statistics_hash( $index, 'n' );
+		unless (%statdata) {
+			warn " unable to get statistics for dataset "
+				. $Data->name($index)
+				. ", index $index!\n";
 			next INDEX_LOOP;
 		}
-		print " The median value for dataset " . 
-			$Data->name($index) . " is $statdata{'median'}\n";
-	
+		print " The median value for dataset "
+			. $Data->name($index)
+			. " is $statdata{'median'}\n";
+
 		# Calculate correction value
 		my $correction_value = $target / $statdata{median};
-	
+
 		# Replace values
-		$index = _prepare_new_destination($index, '_scaled') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			next if _is_null( $row->value($index) ); 
-			my $v = $correction_value * $row->value($index);
-			$row->value($index, $v);
-		} );
-			
+		$index = _prepare_new_destination( $index, '_scaled' ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				next if _is_null( $row->value($index) );
+				my $v = $correction_value * $row->value($index);
+				$row->value( $index, $v );
+			}
+		);
+
 		# annotate metadata
-		$Data->metadata($index, 'median_scaled', $target);
-		
+		$Data->metadata( $index, 'median_scaled', $target );
+
 		# results
 		push @datasets_modified, $Data->name($index);
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " %s were median scaled to $target\n", 
-			join(", ", @datasets_modified);
+		printf " %s were median scaled to $target\n", join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
 sub percentile_rank_function {
+
 	# this subroutine will convert a dataset into a percentile rank
 
 	# request datasets
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
@@ -800,133 +817,137 @@ sub percentile_rank_function {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	
+
 	# Where to put new values?
-	my $placement = _request_placement();	
-	
+	my $placement = _request_placement();
+
 	# Process each index request
-	my @datasets_modified; # a list of which datasets were modified
-	INDEX_LOOP: foreach my $index (@indices) {
-		
+	my @datasets_modified;    # a list of which datasets were modified
+INDEX_LOOP: foreach my $index (@indices) {
+
 		# Calculate percent rank of values
-			# remove null values
-		my @values = grep {!/^\.$/} $Data->column_values($index);
-		my $total = scalar @values;
+		# remove null values
+		my @values = grep { !/^\.$/ } $Data->column_values($index);
+		my $total  = scalar @values;
 		my %percentrank;
 		my $n = 1;
-		foreach (sort { $a <=> $b } @values) {
+		foreach ( sort { $a <=> $b } @values ) {
+
 			# sort by increasing hash values, not hash keys
 			# percentrank is key value (index) divided by total
-			$percentrank{$_} = $n/$total;
+			$percentrank{$_} = $n / $total;
 			$n++;
 		}
-		
+
 		# Replace the contents with the calculated percent rank
-		$index = _prepare_new_destination($index, '_pr') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			next if _is_null($row->value($index));
-			$row->value($index, $percentrank{ $row->value($index) });
-		} );
-		
+		$index = _prepare_new_destination( $index, '_pr' ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				next if _is_null( $row->value($index) );
+				$row->value( $index, $percentrank{ $row->value($index) } );
+			}
+		);
+
 		# update metadata
-		$Data->metadata($index, 'converted', 'percent_rank');
-		
+		$Data->metadata( $index, 'converted', 'percent_rank' );
+
 		# done
 		push @datasets_modified, $Data->name($index);
-	}	
-	
+	}
+
 	# report results
 	if (@datasets_modified) {
-		printf " %s were converted to percent rank\n", 
-			join(", ", @datasets_modified);
+		printf " %s were converted to percent rank\n", join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
 sub zscore_function {
+
 	# this subroutine will generate a z-score for each value in a dataset
 
 	# identify the datasets to convert
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter one or more column index numbers to convert to z-scores  "
-		);
+			" Enter one or more column index numbers to convert to z-scores  ");
 	}
 	unless (@indices) {
 		warn " Unknown columns. Nothing done.\n";
 		return;
 	}
-	
+
 	# Where to put new values?
-	my $placement = _request_placement();	
-	
+	my $placement = _request_placement();
+
 	# Process each index request
-	my @datasets_modified; # a list of which datasets were modified
+	my @datasets_modified;    # a list of which datasets were modified
 	foreach my $index (@indices) {
-		
+
 		# generate statistics on the dataset
-		my %statdata = _get_statistics_hash($index, 'y');
+		my %statdata = _get_statistics_hash( $index, 'y' );
 		unless (%statdata) {
 			warn " unable to generate statistics for index $index! skipping\n";
 			next;
 		}
-		
+
 		# Replace the current values
-		$index = _prepare_new_destination($index, '_Zscore') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			next if _is_null($row->value($index));
-			my $v = ($row->value($index) - $statdata{'mean'}) / $statdata{'stddevp'};
-			$row->value($index, $v);
-		} );
-		
+		$index = _prepare_new_destination( $index, '_Zscore' ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				next if _is_null( $row->value($index) );
+				my $v =
+					( $row->value($index) - $statdata{'mean'} ) / $statdata{'stddevp'};
+				$row->value( $index, $v );
+			}
+		);
+
 		# update metadata
-		$Data->metadata($index, 'converted', 'Z-score');
-		
+		$Data->metadata( $index, 'converted', 'Z-score' );
+
 		# done
 		push @datasets_modified, $Data->name($index);
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " %s were converted to Z-scores\n", 
-			join(", ", @datasets_modified);
+		printf " %s were converted to Z-scores\n", join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
-
-
 sub sort_function {
+
 	# This will sort the entire data table by the values in one dataset
-	
+
 	# Request dataset
 	my @indices;
 	if (@_) {
+
 		# from another subroutine
 		@indices = @_;
 	}
 	else {
 		@indices = _request_indices(
-		" Enter column index number (or column ranges for mean) to sort by  ");
+			" Enter column index number (or column ranges for mean) to sort by  ");
 	}
-	unless (scalar(@indices)) {
+	unless ( scalar(@indices) ) {
 		warn " no index provided. nothing done\n";
 		return;
 	}
-	
+
 	# Ask the sort direction
 	my $direction;
 	if ($opt_direction) {
+
 		# direction was specified on the command line
 		$direction = $opt_direction;
 	}
@@ -935,237 +956,245 @@ sub sort_function {
 		print " Sort by (i)ncreasing or (d)ecreasing order?  ";
 		$direction = <STDIN>;
 		chomp $direction;
-		unless ($direction =~ /^i|d$/i) {
+		unless ( $direction =~ /^i|d$/i ) {
 			warn " unknown order; nothing done\n";
 			return;
 		}
 	}
-	
-	
-	
+
 	# sort
-	if (scalar(@indices) == 1) {
+	if ( scalar(@indices) == 1 ) {
+
 		# excellent! only one column index to sort by
-		$Data->sort_data($indices[0], $direction);
+		$Data->sort_data( $indices[0], $direction );
 	}
 	else {
 		# need to sort by the mean of provided column indices
 		# we will generate a temporary column of the mean
 		# first need to set the target of mean which is needed by combine function
-		my $original = $opt_target; # keep a backup just in case
+		my $original = $opt_target;    # keep a backup just in case
 		$opt_target = 'mean';
 		combine_function(@indices);
 		my $i = $Data->last_column;
-		$opt_target = $original; # restore backup just in case
-		$Data->sort_data($i, $direction);
-		$Data->delete_column($i); # delete the temporary column
+		$opt_target = $original;       # restore backup just in case
+		$Data->sort_data( $i, $direction );
+		$Data->delete_column($i);      # delete the temporary column
 	}
-	
+
 	# remove any pre-existing sorted metadata since no longer valid
-	for (my $i = 0; $i < $Data->number_columns; $i++) {
-		$Data->delete_metadata($i, 'sorted');
+	for ( my $i = 0; $i < $Data->number_columns; $i++ ) {
+		$Data->delete_metadata( $i, 'sorted' );
 	}
-	
+
 	# annotate metadata, but only if there was one index
-	if (scalar(@indices) == 1) {
-		if ($direction =~ /i/i) {
-			$Data->metadata($indices[0], 'sorted', "increasing")
-				unless $Data->metadata($indices[0], 'AUTO'); # internal flag to not accept metadata
+	if ( scalar(@indices) == 1 ) {
+		if ( $direction =~ /i/i ) {
+			$Data->metadata( $indices[0], 'sorted', "increasing" )
+				unless $Data->metadata( $indices[0], 'AUTO' )
+				;    # internal flag to not accept metadata
 		}
 		else {
-			$Data->metadata($indices[0], 'sorted', "decreasing")
-				unless $Data->metadata($indices[0], 'AUTO'); # internal flag to not accept metadata
+			$Data->metadata( $indices[0], 'sorted', "decreasing" )
+				unless $Data->metadata( $indices[0], 'AUTO' )
+				;    # internal flag to not accept metadata
 		}
 	}
-	
+
 	return 1;
 }
 
-
-
 sub genomic_sort_function {
+
 	# This will sort the entire data table by chromosome and start position
-	
+
 	my $result = $Data->gsort_data;
 	unless ($result) {
 		print " Data table not sorted\n";
 		return;
 	}
-	
+
 	# remove any pre-existing sorted metadata since no longer valid
-	for (my $i = 0; $i < $Data->number_columns; $i++) {
-		$Data->delete_metadata($i, 'sorted');
+	for ( my $i = 0; $i < $Data->number_columns; $i++ ) {
+		$Data->delete_metadata( $i, 'sorted' );
 	}
-	
+
 	# annotate metadata
-	my $chr_i = $Data->chromo_column;
+	my $chr_i   = $Data->chromo_column;
 	my $start_i = $Data->start_column;
-	$Data->metadata($chr_i, 'sorted', 'genomic') unless 
-		$Data->metadata($chr_i, 'AUTO');
-	$Data->metadata($start_i, 'sorted', 'genomic') unless 
-		$Data->metadata($start_i, 'AUTO');
-	
+	$Data->metadata( $chr_i, 'sorted', 'genomic' )
+		unless $Data->metadata( $chr_i, 'AUTO' );
+	$Data->metadata( $start_i, 'sorted', 'genomic' )
+		unless $Data->metadata( $start_i, 'AUTO' );
+
 	print " Data table is sorted by genomic order\n";
 	return 1;
 }
 
-
-
 sub toss_nulls_function {
+
 	# Toss out datapoints (lines) that have a non-value in the specified dataset
-	
+
 	# generate the list of datasets to check
 	my @order = _request_indices(
-		" Enter one or more column index numbers to check for non-values\n   "); 
+		" Enter one or more column index numbers to check for non-values\n   ");
 	unless (@order) {
 		warn " No valid columns! Nothing done!\n";
 		return;
 	}
-	
+
 	# Collection exception rule from commandline
 	my $zero = $opt_zero;
-	
+
 	# Identify those rows that need to be deleted
 	my @todelete;
-	$Data->iterate( sub {
-		my $row = shift;
-		my $check = 0; 
-		foreach my $i (@order) {
-			my $v = $row->value($i);
-			if (_is_null($v)) {
-				$check++;
-			} 
-			elsif ($v eq '0') {
-				# we have a 0 value, what to do?
-				if (not defined $zero and $function) {
-					# running automatically, do not both user
-					$zero = 0;
-				}
-				elsif (not defined $zero and not defined $function) {
-					# ask the user if we haven't already
-					print " Also toss values of 0? y or n  ";
-					my $answer = <STDIN>;
-					if ($answer =~ /^y/i) {
-						$zero = 1;
-					}
-					else {
-						$zero = 0;
-					}
-				}
-				if ($zero) { 
-					# Yes, toss the 0 values
+	$Data->iterate(
+		sub {
+			my $row   = shift;
+			my $check = 0;
+			foreach my $i (@order) {
+				my $v = $row->value($i);
+				if ( _is_null($v) ) {
 					$check++;
 				}
+				elsif ( $v eq '0' ) {
+
+					# we have a 0 value, what to do?
+					if ( not defined $zero and $function ) {
+
+						# running automatically, do not both user
+						$zero = 0;
+					}
+					elsif ( not defined $zero and not defined $function ) {
+
+						# ask the user if we haven't already
+						print " Also toss values of 0? y or n  ";
+						my $answer = <STDIN>;
+						if ( $answer =~ /^y/i ) {
+							$zero = 1;
+						}
+						else {
+							$zero = 0;
+						}
+					}
+					if ($zero) {
+
+						# Yes, toss the 0 values
+						$check++;
+					}
+				}
 			}
+
+			# mark for deletion if the row fails the check
+			push @todelete, $row->row_index if $check;
 		}
-		# mark for deletion if the row fails the check
-		push @todelete, $row->row_index if $check;
-	} );
-	
+	);
+
 	# Delete
 	$Data->delete_row(@todelete);
-	
+
 	# update metadata
 	foreach my $index (@order) {
-		$Data->metadata($index, 'deleted_non_value_features',  scalar(@todelete))
-			unless $Data->metadata($index, 'AUTO');
+		$Data->metadata( $index, 'deleted_non_value_features', scalar(@todelete) )
+			unless $Data->metadata( $index, 'AUTO' );
 	}
-	
+
 	# report
-	printf " %s rows with null values in %s were deleted.\n", scalar(@todelete), 
-		join(', ', map {$Data->name($_)} @order);
+	printf " %s rows with null values in %s were deleted.\n", scalar(@todelete),
+		join( ', ', map { $Data->name($_) } @order );
 	printf " %s rows are remaining\n", $Data->last_row;
 	return 1;
 }
 
-
-
-
-
-
 sub toss_duplicates_function {
+
 	# Toss out datapoints (lines) that have a duplicate values
-	
+
 	# generate the list of datasets to check
 	my @order = _request_indices(
-		" Enter one or more column index numbers to check for duplicates\n   "); 
+		" Enter one or more column index numbers to check for duplicates\n   ");
 	unless (@order) {
 		warn " No valid columns! Nothing done!\n";
 		return;
 	}
-	
+
 	# initialize variables
 	my %values2check;
 	my @todelete;
-	
+
 	# check values
-	$Data->iterate( sub {
-		my $row = shift;
-		# we will simply concatenate all values to check for duplicity
-		my $value = join('_', map {$row->value($_)} @order);
-		if (exists $values2check{$value}) {
-			# yes, it exists, mark for destruction
-			$values2check{$value}++;
-			push @todelete, $row->row_index;
+	$Data->iterate(
+		sub {
+			my $row = shift;
+
+			# we will simply concatenate all values to check for duplicity
+			my $value = join( '_', map { $row->value($_) } @order );
+			if ( exists $values2check{$value} ) {
+
+				# yes, it exists, mark for destruction
+				$values2check{$value}++;
+				push @todelete, $row->row_index;
+			}
+			else {
+				# nope, it's good
+				$values2check{$value} = 1;
+			}
 		}
-		else {
-			# nope, it's good
-			$values2check{$value} = 1;
-		}
-	} );
-	
+	);
+
 	# delete
 	$Data->delete_row(@todelete);
-	
+
 	# update metadata
 	foreach my $index (@order) {
-		$Data->metadata($index, 'deleted_duplicate_features',  scalar(@todelete))
-			unless $Data->metadata($index, 'AUTO');
+		$Data->metadata( $index, 'deleted_duplicate_features', scalar(@todelete) )
+			unless $Data->metadata( $index, 'AUTO' );
 	}
-	
+
 	# print result
-	printf " %s rows with duplicate values in %s were deleted.\n", 
-		scalar(@todelete), join(', ', map {$Data->name($_)} @order);
+	printf " %s rows with duplicate values in %s were deleted.\n",
+		scalar(@todelete), join( ', ', map { $Data->name($_) } @order );
 	printf " %s rows are remaining\n", $Data->last_row;
 	return 1;
 }
 
 sub toss_above_threshold_function {
+
 	# Toss out datapoints (lines) whose value is above a certain threshold
 	return toss_threshold_function('above');
 }
 
-
 sub toss_below_threshold_function {
+
 	# Toss out datapoints (lines) whose value is below a certain threshold
 	return toss_threshold_function('below');
 }
 
-
 sub toss_threshold_function {
-	# Toss out lines whose specified datapoint value is above or below a 
+
+	# Toss out lines whose specified datapoint value is above or below a
 	# specified threshold
-	
+
 	# get the direction for excluding datapoints, above or below
 	my $direction = shift;
-	
+
 	# generate the list of datasets to check
 	my @order = _request_indices(
-		" Enter one or more column index numbers to toss values $direction a value\n   "); 
+		" Enter one or more column index numbers to toss values $direction a value\n   ");
 	unless (@order) {
 		warn " No valid datasets! Nothing done!\n";
 		return;
 	}
-	
+
 	# identify the threshold
 	my $threshold;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# specified on the command line
 		$threshold = $opt_target;
 	}
 	else {
 		# interactively ask the user
-		if ($direction eq 'above') {
+		if ( $direction eq 'above' ) {
 			print " Toss values that exceed this value:  ";
 		}
 		else {
@@ -1174,107 +1203,115 @@ sub toss_threshold_function {
 		$threshold = <STDIN>;
 		chomp $threshold;
 	}
-	
+
 	# Check values
 	my @todelete;
-	if ($direction eq 'above') {
-		$Data->iterate( sub {
-			my $row = shift;
-			my $check = 0; 
-			foreach my $i (@order) {
-				my $v = $row->value($i);
-				next if _is_null($v);
-				$check++ if $v > $threshold;
+	if ( $direction eq 'above' ) {
+		$Data->iterate(
+			sub {
+				my $row   = shift;
+				my $check = 0;
+				foreach my $i (@order) {
+					my $v = $row->value($i);
+					next     if _is_null($v);
+					$check++ if $v > $threshold;
+				}
+
+				# mark for deletion if the row fails the check
+				push @todelete, $row->row_index if $check;
 			}
-			# mark for deletion if the row fails the check
-			push @todelete, $row->row_index if $check;
-		} );
+		);
 	}
-	elsif ($direction eq 'below') {
-		$Data->iterate( sub {
-			my $row = shift;
-			my $check = 0; 
-			foreach my $i (@order) {
-				my $v = $row->value($i);
-				next if _is_null($v);
-				$check++ if $v < $threshold;
+	elsif ( $direction eq 'below' ) {
+		$Data->iterate(
+			sub {
+				my $row   = shift;
+				my $check = 0;
+				foreach my $i (@order) {
+					my $v = $row->value($i);
+					next     if _is_null($v);
+					$check++ if $v < $threshold;
+				}
+
+				# mark for deletion if the row fails the check
+				push @todelete, $row->row_index if $check;
 			}
-			# mark for deletion if the row fails the check
-			push @todelete, $row->row_index if $check;
-		} );
+		);
 	}
-	
+
 	# Delete
 	$Data->delete_row(@todelete);
-	
+
 	# update metadata
 	foreach my $index (@order) {
-		$Data->metadata($index, "deleted_$direction\_$threshold", scalar(@todelete) ) 
-			unless $Data->metadata($index, 'AUTO');
+		$Data->metadata( $index, "deleted_$direction\_$threshold", scalar(@todelete) )
+			unless $Data->metadata( $index, 'AUTO' );
 	}
-	
+
 	# report
-	printf " %s rows with values $direction $threshold in %s were deleted.\n", 
-		scalar(@todelete), join(', ', map {$Data->name($_)} @order);
+	printf " %s rows with values $direction $threshold in %s were deleted.\n",
+		scalar(@todelete), join( ', ', map { $Data->name($_) } @order );
 	printf " %s rows are remaining\n", $Data->last_row;
 	return 1;
 }
-
 
 sub toss_specific_values_function {
 	return do_specific_values_function(1);
 }
 
-
 sub keep_specific_values_function {
 	return do_specific_values_function(0);
 }
 
-
 sub do_specific_values_function {
+
 	# toss specific values
-	my $toss = shift; # boolean to toss (1) or keep (0) 
-	
+	my $toss = shift;    # boolean to toss (1) or keep (0)
+
 	# generate the list of datasets to check
 	my @list = _request_indices(
-		" Enter one or more column index numbers to check for specific values\n   "); 
+		" Enter one or more column index numbers to check for specific values\n   ");
 	unless (@list) {
 		warn " No valid columns! Nothing done!\n";
 		return;
 	}
-	
+
 	# determine values
 	my %wanted;
 	if ($opt_target) {
+
 		# list provided
-		%wanted = map {$_ => 0} split(/,/, $opt_target);
+		%wanted = map { $_ => 0 } split( /,/, $opt_target );
 	}
 	else {
 		# generate potential values, hope there aren't too many
 		my %possibilities;
-		$Data->iterate( sub {
-			my $row = shift;
-			foreach my $l (@list) {
-				$possibilities{ $row->value($l) } += 1;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				foreach my $l (@list) {
+					$possibilities{ $row->value($l) } += 1;
+				}
 			}
-		} );
-		
+		);
+
 		# present list to user
 		print " These are the values (occurrences) in the indicated columns\n";
 		my %lookup;
 		my $i = 1;
-		foreach (sort { $a cmp $b } keys %possibilities) {
+		foreach ( sort { $a cmp $b } keys %possibilities ) {
+
 			# sort asciibetically by name
 			printf "   $i\t$_ (%s)\n", $possibilities{$_};
 			$lookup{$i} = $_;
 			$i++;
 		}
-		printf " Enter the number(s) corresponding to the values to %s. Enter as a \n" . 
-			" comma-delimited list or range.    ", $toss ? 'toss' : 'keep';
+		printf " Enter the number(s) corresponding to the values to %s. Enter as a \n"
+			. " comma-delimited list or range.    ", $toss ? 'toss' : 'keep';
 		my $response = <STDIN>;
 		chomp $response;
-		foreach (parse_list($response)) {
-			if (exists $lookup{$_}) {
+		foreach ( parse_list($response) ) {
+			if ( exists $lookup{$_} ) {
 				$wanted{ $lookup{$_} } = 0;
 			}
 		}
@@ -1283,95 +1320,102 @@ sub do_specific_values_function {
 		warn " No specific values provided! Nothing done!\n";
 		return;
 	}
-	
+
 	# Identify rows to delete
 	my @todelete;
 	my $start_number = $Data->last_row;
 	if ($toss) {
+
 		# we are tossing lines that contain the specific value
-		$Data->iterate( sub {
-			my $row = shift;
-			foreach my $l (@list) {
-				if (exists $wanted{ $row->value($l) }) {
-					push @todelete, $row->row_index;
-					last;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				foreach my $l (@list) {
+					if ( exists $wanted{ $row->value($l) } ) {
+						push @todelete, $row->row_index;
+						last;
+					}
 				}
 			}
-		} );
+		);
 	}
 	else {
 		# we are keeping only those lines that contain the specific value
-		$Data->iterate( sub {
-			my $row = shift;
-			my $check = 1; # default is to delete this row, so check starts true
-			foreach my $l (@list) {
-				if (exists $wanted{ $row->value($l) }) {
-					$check = 0;
-					last;
+		$Data->iterate(
+			sub {
+				my $row   = shift;
+				my $check = 1;       # default is to delete this row, so check starts true
+				foreach my $l (@list) {
+					if ( exists $wanted{ $row->value($l) } ) {
+						$check = 0;
+						last;
+					}
 				}
+				push @todelete, $row->row_index if $check;
 			}
-			push @todelete, $row->row_index if $check;
-		} );
+		);
 	}
-	
+
 	# Delete
 	$Data->delete_row(@todelete);
-	
+
 	# update metadata
 	foreach my $index (@list) {
 		if ($toss) {
-			$Data->metadata($index, "deleted_specific_values", join(',', keys %wanted) ) 
-				unless $Data->metadata($index, 'AUTO');
+			$Data->metadata( $index, "deleted_specific_values",
+				join( ',', keys %wanted ) )
+				unless $Data->metadata( $index, 'AUTO' );
 		}
 		else {
-			$Data->metadata($index, "kept_specific_values", join(',', keys %wanted) ) 
-				unless $Data->metadata($index, 'AUTO');
+			$Data->metadata( $index, "kept_specific_values", join( ',', keys %wanted ) )
+				unless $Data->metadata( $index, 'AUTO' );
 		}
 	}
-	
+
 	# report
 	if ($toss) {
-		printf " %s rows with specific values of %s were deleted in columns %s.\n", 
-			format_with_commas(scalar(@todelete)), join(', ', keys %wanted),
-			join(', ', map {$Data->name($_)} @list),
-		printf " %s data lines are remaining\n", format_with_commas($Data->last_row);
+		printf " %s rows with specific values of %s were deleted in columns %s.\n",
+			format_with_commas( scalar(@todelete) ), join( ', ', keys %wanted ),
+			join( ', ', map { $Data->name($_) } @list ),
+			printf " %s data lines are remaining\n",
+			format_with_commas( $Data->last_row );
 	}
 	else {
 		printf " %s rows were deleted in columns %s\n",
-			format_with_commas(scalar(@todelete)),
-			join(', ', map {$Data->name($_)} @list);
+			format_with_commas( scalar(@todelete) ),
+			join( ', ', map { $Data->name($_) } @list );
 		printf " %s rows with specific values of %s were retained.\n",
-			format_with_commas( $start_number - scalar(@todelete) ), 
-			join(', ', keys %wanted);
+			format_with_commas( $start_number - scalar(@todelete) ),
+			join( ', ', keys %wanted );
 	}
 	return 1;
 }
 
-
-
 sub convert_nulls_function {
+
 	# Convert null values to something else
-	
+
 	# identify the datasets to check
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert null values  "
-		);
+			" Enter one or more dataset index numbers to convert null values  ");
 	}
 	unless (@indices) {
 		warn " no valid indices. Nothing done.\n";
 		return;
 	}
-	
+
 	# request replacement value
 	my $new_value;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$new_value = $opt_target;
 	}
@@ -1381,146 +1425,154 @@ sub convert_nulls_function {
 		$new_value = <STDIN>;
 		chomp $new_value;
 	}
-	
+
 	# check zero status
 	my $zero;
-	if (defined $opt_zero) {
+	if ( defined $opt_zero ) {
+
 		# command line option
 		$zero = $opt_zero;
 	}
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
+
 	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of resets done
+	my @datasets_modified;    # a list of which datasets were modified
+	my $total_count = 0;      # total number of resets done
 	foreach my $index (@indices) {
-		
+
 		# number of resets we do for this index
-		my $count  = 0; 
-		
+		my $count = 0;
+
 		# reset values
-		$index = _prepare_new_destination($index, '_convert_nulls') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			if (_is_null($v)) {
-				$row->value($index, $new_value);
-				$count++;
-			}
-			elsif ($v == 0) {
-				# zero value, what to do?
-				if (not defined $zero and $function) {
-					# running automatically, do not both user
-					$zero = 0;
-				}
-				elsif (not defined $zero and not defined $function) {
-					# wasn't defined on the command line, running interactively, 
-					# so stop the program and ask the user
-					print " Include 0 values to convert? y or n  ";
-					my $answer = <STDIN>;
-					$zero = ($answer =~ /^y/i) ? 1 : 0;
-					# remember for next time, chances are user may still want this
-					# value again in the future
-					$opt_zero = $zero;
-				}
-				
-				if ($zero) {
-					$row->value($index, $new_value);
+		$index = _prepare_new_destination( $index, '_convert_nulls' )
+			if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+				if ( _is_null($v) ) {
+					$row->value( $index, $new_value );
 					$count++;
 				}
+				elsif ( $v == 0 ) {
+
+					# zero value, what to do?
+					if ( not defined $zero and $function ) {
+
+						# running automatically, do not both user
+						$zero = 0;
+					}
+					elsif ( not defined $zero and not defined $function ) {
+
+						# wasn't defined on the command line, running interactively,
+						# so stop the program and ask the user
+						print " Include 0 values to convert? y or n  ";
+						my $answer = <STDIN>;
+						$zero = ( $answer =~ /^y/i ) ? 1 : 0;
+
+						# remember for next time, chances are user may still want this
+						# value again in the future
+						$opt_zero = $zero;
+					}
+
+					if ($zero) {
+						$row->value( $index, $new_value );
+						$count++;
+					}
+				}
 			}
-		} );
-		
+		);
+
 		# update metadata
 		if ($count) {
-			$Data->metadata($index, 'null_value', $new_value) unless 
-				$Data->metadata($index, 'AUTO');
+			$Data->metadata( $index, 'null_value', $new_value )
+				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
 			push @datasets_modified, $Data->name($index);
 		}
 	}
-		
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " $total_count null values were converted for %s\n", 
-			join(", ", @datasets_modified);
+		printf " $total_count null values were converted for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
-
 sub convert_absolute_function {
+
 	# Convert signed values to their absolute value
-	
+
 	# identify the datasets to check
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter one or more dataset index numbers to make absolute  "
-		);
+			" Enter one or more dataset index numbers to make absolute  ");
 	}
 	unless (@indices) {
 		warn " no valid indices. Nothing done.\n";
 		return;
 	}
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
+
 	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
+	my @datasets_modified;    # a list of which datasets were modified
+	my $total_count  = 0;     # total number of conversions done
 	my $total_failed = 0;
 	foreach my $index (@indices) {
-		
+
 		# number of resets we do
-		my $count  = 0; 
+		my $count  = 0;
 		my $failed = 0;
-		
+
 		# reset minimum values
-		$index = _prepare_new_destination($index, '_absolute') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			next if _is_null($v);
-			my $new_value;
-			eval { $new_value = abs($v) };
-			if (defined $new_value) {
-				$row->value($index, $new_value);
-				$count++;
+		$index = _prepare_new_destination( $index, '_absolute' ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+				next if _is_null($v);
+				my $new_value;
+				eval { $new_value = abs($v) };
+				if ( defined $new_value ) {
+					$row->value( $index, $new_value );
+					$count++;
+				}
+				else {
+					$failed++;
+				}
 			}
-			else {
-				$failed++;
-			}
-		} );
-		
+		);
+
 		# update metadata
-			
+
 		# results
 		if ($count) {
-			$Data->metadata($index, 'convert', 'absolute') unless 
-				$Data->metadata($index, 'AUTO');
+			$Data->metadata( $index, 'convert', 'absolute' )
+				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
 			push @datasets_modified, $Data->name($index);
 		}
 		else {
 			$total_failed += $failed;
-		} 
+		}
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " $total_count values were converted to absolute values for %s\n", 
-			join(", ", @datasets_modified);
+		printf " $total_count values were converted to absolute values for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	if ($total_failed) {
 		print " $total_failed values could not be converted\n";
@@ -1528,12 +1580,10 @@ sub convert_absolute_function {
 	return scalar(@datasets_modified);
 }
 
-
-
-
 sub minimum_function {
-	# Set a minimum value 
-	
+
+	# Set a minimum value
+
 	# request datasets
 	my @indices = _request_indices(
 		" Enter one or more dataset index numbers to reset minimum values  ");
@@ -1541,10 +1591,11 @@ sub minimum_function {
 		warn " no valid indices. nothing done\n";
 		return;
 	}
-	
+
 	# request value
 	my $value;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$value = $opt_target;
 	}
@@ -1554,53 +1605,54 @@ sub minimum_function {
 		$value = <STDIN>;
 		chomp $value;
 	}
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
+
 	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
+	my @datasets_modified;    # a list of which datasets were modified
+	my $total_count = 0;      # total number of conversions done
 	foreach my $index (@indices) {
-		
+
 		# number of resets we do
-		my $count  = 0; 
-		
+		my $count = 0;
+
 		# reset minimum values
-		$index = _prepare_new_destination($index, '_minimum_reset') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			next if _is_null($v);
-			if ($v < $value) {
-				$row->value($index, $value);
-				$count++;
+		$index = _prepare_new_destination( $index, '_minimum_reset' )
+			if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+				next if _is_null($v);
+				if ( $v < $value ) {
+					$row->value( $index, $value );
+					$count++;
+				}
 			}
-		} );
-		
+		);
+
 		# results
 		if ($count) {
-			$Data->metadata($index, 'minimum_value', $value) unless 
-				$Data->metadata($index, 'AUTO');
+			$Data->metadata( $index, 'minimum_value', $value )
+				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
 			push @datasets_modified, $Data->name($index);
 		}
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " $total_count values were reset to a minimum value for %s\n", 
-			join(", ", @datasets_modified);
+		printf " $total_count values were reset to a minimum value for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
-
-
 sub maximum_function {
+
 	# Set a maximum value
-	
+
 	# request datasets
 	my @indices = _request_indices(
 		" Enter one or more dataset index numbers to reset maximum values  ");
@@ -1608,10 +1660,11 @@ sub maximum_function {
 		warn " no valid indices. nothing done\n";
 		return;
 	}
-	
+
 	# request value
 	my $value;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$value = $opt_target;
 	}
@@ -1621,67 +1674,68 @@ sub maximum_function {
 		$value = <STDIN>;
 		chomp $value;
 	}
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
-	
+
 	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
+	my @datasets_modified;    # a list of which datasets were modified
+	my $total_count = 0;      # total number of conversions done
 	foreach my $index (@indices) {
-		
+
 		# number of resets we do
-		my $count  = 0; 
-		
+		my $count = 0;
+
 		# reset minimum values
-		$index = _prepare_new_destination($index, '_maximum_reset') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			next if _is_null($v);
-			if ($v > $value) {
-				$row->value($index, $value);
-				$count++;
+		$index = _prepare_new_destination( $index, '_maximum_reset' )
+			if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+				next if _is_null($v);
+				if ( $v > $value ) {
+					$row->value( $index, $value );
+					$count++;
+				}
 			}
-		} );
-		
+		);
+
 		# results
 		if ($count) {
-			$Data->metadata($index, 'maximum_value', $value) unless 
-				$Data->metadata($index, 'AUTO');
+			$Data->metadata( $index, 'maximum_value', $value )
+				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
 			push @datasets_modified, $Data->name($index);
 		}
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " $total_count values were reset to a maximum value for %s\n", 
-			join(", ", @datasets_modified);
+		printf " $total_count values were reset to a maximum value for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
-
-
 sub log_function {
+
 	# this subroutine will convert dataset values to log2 space
-	
+
 	# request datasets
 	my @indices;
 	my $base;
 	if (@_) {
+
 		# provided from an internal subroutine
-		($base, @indices) = @_;
+		( $base, @indices ) = @_;
 	}
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert to log  "
-		);
-		if (defined $opt_target) {
+			" Enter one or more dataset index numbers to convert to log  ");
+		if ( defined $opt_target ) {
+
 			# specified on the command line
 			$base = $opt_target;
 		}
@@ -1691,66 +1745,72 @@ sub log_function {
 			$base = <STDIN>;
 			chomp $base;
 		}
-		
+
 	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	unless ($base =~ /^\d+$/) {
+	unless ( $base =~ /^\d+$/ ) {
 		warn " unrecognized base number. nothing done\n";
 		return;
 	}
 	my $factor = log($base);
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
+
 	# process each index request
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
+	my @datasets_modified;    # a list of which datasets were modified
+	my $total_count  = 0;     # total number of conversions done
 	my $total_failed = 0;
 	foreach my $index (@indices) {
-		
+
 		# check the current metadata status
-		my $check = $Data->metadata($index, 'log') || $Data->metadata($index, 'log2') || 0;
-		if ($check != 0) {
-			warn " dataset $Data->name($index) metadata " .
-				"reports it is currently in log scale. Continue? y/n\n";
+		my $check =
+			$Data->metadata( $index, 'log' ) || $Data->metadata( $index, 'log2' ) || 0;
+		if ( $check != 0 ) {
+			warn " dataset $Data->name($index) metadata "
+				. "reports it is currently in log scale. Continue? y/n\n";
 			my $response = <STDIN>;
 			next if $response =~ /n/i;
 		}
-		
+
 		# Placement dictates method
-		my $count = 0; # conversion count
+		my $count  = 0;    # conversion count
 		my $failed = 0;
-		
+
 		# perform log conversions
-		$index = _prepare_new_destination($index, "_log$base") if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			# check the value contents and process appropriately
-			if (_is_null($v)) {
-				# a null value, do nothing
-				$failed++;
-			} 
-			elsif ($v == 0) { 
-				# cannot take log of 0, change to null
-				$row->value($index, '.'); 
-				$failed++;
-			} 
-			else {
-				my $new_value = log($v) / $factor;
-				$row->value($index, $new_value);
-				$count++;
+		$index = _prepare_new_destination( $index, "_log$base" ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+
+				# check the value contents and process appropriately
+				if ( _is_null($v) ) {
+
+					# a null value, do nothing
+					$failed++;
+				}
+				elsif ( $v == 0 ) {
+
+					# cannot take log of 0, change to null
+					$row->value( $index, '.' );
+					$failed++;
+				}
+				else {
+					my $new_value = log($v) / $factor;
+					$row->value( $index, $new_value );
+					$count++;
+				}
 			}
-		} );
-			
+		);
+
 		# update metadata
-		$Data->metadata($index, 'log', $base) unless 
-			$Data->metadata($index, 'AUTO');
-		
+		$Data->metadata( $index, 'log', $base )
+			unless $Data->metadata( $index, 'AUTO' );
+
 		# results
 		if ($count) {
 			$total_count += $count;
@@ -1758,11 +1818,11 @@ sub log_function {
 		}
 		$total_failed += $failed;
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " $total_count values were converted to log$base for %s\n", 
-			join(", ", @datasets_modified);
+		printf " $total_count values were converted to log$base for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	if ($total_failed) {
 		print " $total_failed values could not be converted\n";
@@ -1770,46 +1830,45 @@ sub log_function {
 	return scalar(@datasets_modified);
 }
 
-
-
 sub delog_function {
+
 	# this subroutine will convert a dataset from log to normal numbers
-	
+
 	# request datasets
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert from log  "
-		);
+			" Enter one or more dataset index numbers to convert from log  ");
 	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
+
 	# process each index request
 	my $base;
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
+	my @datasets_modified;    # a list of which datasets were modified
+	my $total_count  = 0;     # total number of conversions done
 	my $total_failed = 0;
 	foreach my $index (@indices) {
-		
+
 		# check the log metadata status
-		$base = $Data->metadata($index, 'log') || 0;
+		$base = $Data->metadata( $index, 'log' ) || 0;
 		unless ($base) {
-			$base = 2 if ($Data->metadata($index, 'log2'));
-			$base = 10 if ($Data->metadata($index, 'log10'));
+			$base = 2  if ( $Data->metadata( $index, 'log2' ) );
+			$base = 10 if ( $Data->metadata( $index, 'log10' ) );
 		}
-		if ($base == 0) {
-			if (defined $opt_target) {
+		if ( $base == 0 ) {
+			if ( defined $opt_target ) {
 				$base = $opt_target;
 			}
 			else {
@@ -1818,36 +1877,40 @@ sub delog_function {
 				chomp $base;
 			}
 		}
-		unless ($base =~ /^\d+$/) {
+		unless ( $base =~ /^\d+$/ ) {
 			warn " Unrecognized base integer '$base'. Nothing done.\n";
 			return scalar(@datasets_modified);
 		}
-		
+
 		# Placement dictates method
-		my $count = 0; # conversion count
+		my $count  = 0;    # conversion count
 		my $failed = 0;
-		$index = _prepare_new_destination($index, "_delog$base") if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			# check the value contents and process appropriately
-			if (_is_null($v)) {
-				# a null value, do nothing
-				$failed++;
-			} 
-			else {
-				my $new_value = $base ** $v;
-				$row->value($index, $new_value);
-				$count++;
+		$index = _prepare_new_destination( $index, "_delog$base" ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+
+				# check the value contents and process appropriately
+				if ( _is_null($v) ) {
+
+					# a null value, do nothing
+					$failed++;
+				}
+				else {
+					my $new_value = $base**$v;
+					$row->value( $index, $new_value );
+					$count++;
+				}
 			}
-		} );
-		
+		);
+
 		# update metadata
-		$Data->metadata($index, 'log', 0) unless 
-			$Data->metadata($index, 'AUTO');
-		$Data->delete_metadata($index, 'log2');
-		$Data->delete_metadata($index, 'log10');
-			
+		$Data->metadata( $index, 'log', 0 )
+			unless $Data->metadata( $index, 'AUTO' );
+		$Data->delete_metadata( $index, 'log2' );
+		$Data->delete_metadata( $index, 'log10' );
+
 		# results
 		if ($count) {
 			$total_count += $count;
@@ -1855,11 +1918,11 @@ sub delog_function {
 		}
 		$total_failed += $failed;
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " $total_count values were converted from log$base for %s\n", 
-			join(", ", @datasets_modified);
+		printf " $total_count values were converted from log$base for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	if ($total_failed) {
 		print " $total_failed values could not be converted\n";
@@ -1867,31 +1930,31 @@ sub delog_function {
 	return scalar(@datasets_modified);
 }
 
-
-
 sub format_function {
+
 	# this subroutine will format the numbers in a dataset using sprintf
-	
+
 	# request datasets
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to format  "
-		);
+		@indices =
+			_request_indices(" Enter one or more dataset index numbers to format  ");
 	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	
+
 	# ask for the number of decimal positions to format to
 	my $positions;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# specified on the command line
 		$positions = $opt_target;
 	}
@@ -1901,68 +1964,71 @@ sub format_function {
 		$positions = <STDIN>;
 		chomp $positions;
 	}
-	unless ($positions =~ /^\d+$/) {
+	unless ( $positions =~ /^\d+$/ ) {
 		warn " Unknown number of positions; formatting NOT done\n";
 		return;
 	}
 	my $format_string = '%.' . $positions . 'f';
-	
+
 	# ask for placement
 	my $placement = _request_placement();
-	
+
 	# format each index request
-	my @datasets_modified; # a list of which datasets were modified
+	my @datasets_modified;    # a list of which datasets were modified
 	foreach my $index (@indices) {
-		$index = _prepare_new_destination($index, '_formatted') if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			my $v = $row->value($index);
-			if (not _is_null($v)) {
-				$row->value($index, sprintf($format_string, $v));
+		$index = _prepare_new_destination( $index, '_formatted' ) if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $v   = $row->value($index);
+				if ( not _is_null($v) ) {
+					$row->value( $index, sprintf( $format_string, $v ) );
+				}
 			}
-		});
-	
-		$Data->metadata($index, 'formatted', $positions) unless 
-			$Data->metadata($index, 'AUTO');;
+		);
+
+		$Data->metadata( $index, 'formatted', $positions )
+			unless $Data->metadata( $index, 'AUTO' );
 		push @datasets_modified, $Data->name($index);
 	}
-	
+
 	# report results
 	if (@datasets_modified) {
-		printf " formatted values to $positions decimal positions for %s\n", 
-			join(", ", @datasets_modified);
+		printf " formatted values to $positions decimal positions for %s\n",
+			join( ", ", @datasets_modified );
 	}
 	return scalar(@datasets_modified);
 }
 
-
 sub combine_function {
+
 	# mathematically combine two or more datasets
-	
+
 	# request datasets
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter two or more dataset index numbers to mathematically combine  "
-		);
+			" Enter two or more dataset index numbers to mathematically combine  ");
 	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
 	}
-	unless (scalar @indices >= 2) {
+	unless ( scalar @indices >= 2 ) {
 		warn " two or more indices are required to combine. nothing done.\n";
 		return;
 	}
-	
+
 	# request value
 	my $method;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$method = $opt_target;
 	}
@@ -1972,126 +2038,130 @@ sub combine_function {
 		$method = <STDIN>;
 		chomp $method;
 	}
-	my $combine_method = 
-		$method eq 'mean'   ? \&mean : 
-		$method eq 'median' ? \&median :
-		$method eq 'min'    ? \&min :
-		$method eq 'max'    ? \&max :
-		$method eq 'stdev'  ? \&stddevp : 
-		$method eq 'sum'    ? \&sum :
-		undef;
+	my $combine_method =
+		  $method eq 'mean'   ? \&mean
+		: $method eq 'median' ? \&median
+		: $method eq 'min'    ? \&min
+		: $method eq 'max'    ? \&max
+		: $method eq 'stdev'  ? \&stddevp
+		: $method eq 'sum'    ? \&sum
+		:                       undef;
 	unless ($combine_method) {
 		warn " unknown method. nothing done\n";
 		return;
 	}
-	
+
 	# generate new column
 	my $new_name;
-	if ($function and $opt_name) {
-		# automatic execution and new name was specifically given 
+	if ( $function and $opt_name ) {
+
+		# automatic execution and new name was specifically given
 		$new_name = $opt_name;
 	}
 	else {
 		$new_name = $method;
 	}
 	my $new_position = $Data->add_column($new_name);
-		
+
 	# combine datasets
-	my $failure_count = 0; # number of failures
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# collect data, throwing out null values
-		# my @data = grep {!/^\.$/} map {$row->value($_)} @indices;
-		my @data;
-		foreach (@indices) {
-			my $v = $row->value($_);
-			next if _is_null($v);
-			push @data, $v;
-		} 
-		
-		# combine the data
-		my $v;
-		if (@data) {
-			$v = &{$combine_method}(@data);
+	my $failure_count = 0;    # number of failures
+	$Data->iterate(
+		sub {
+			my $row = shift;
+
+			# collect data, throwing out null values
+			# my @data = grep {!/^\.$/} map {$row->value($_)} @indices;
+			my @data;
+			foreach (@indices) {
+				my $v = $row->value($_);
+				next if _is_null($v);
+				push @data, $v;
+			}
+
+			# combine the data
+			my $v;
+			if (@data) {
+				$v = &{$combine_method}(@data);
+			}
+			else {
+				$v = $method eq 'sum' ? 0 : '.';
+				$failure_count++;
+			}
+			$row->value( $new_position, $v );
 		}
-		else {
-			$v = $method eq 'sum' ? 0 : '.';
-			$failure_count++;
-		}
-		$row->value($new_position, $v);
-	} );
-	
+	);
+
 	# generate new metadata
-	$Data->metadata($new_position, 'datasets', join(',', map {$Data->name($_)} @indices));
-	$Data->metadata($new_position, 'combine', $method);
-	
+	$Data->metadata( $new_position, 'datasets',
+		join( ',', map { $Data->name($_) } @indices ) );
+	$Data->metadata( $new_position, 'combine', $method );
+
 	# finish
-	printf " combined datasets %s by $method\n", 
-		join(', ', map { $Data->name($_) } @indices);
+	printf " combined datasets %s by $method\n",
+		join( ', ', map { $Data->name($_) } @indices );
 	print " $failure_count data rows could not be combined\n" if $failure_count;
 	return 1;
 }
 
-
-
-
 sub ratio_function {
+
 	# Generate a new ratio between two datasets
-	
+
 	# request dataset
-	my ($numerator, $denominator);
-	if (defined $opt_numerator and defined $opt_denominator) {
-		if ( _validate_index_list($opt_numerator, $opt_denominator) ) {
-			$numerator = $opt_numerator;
+	my ( $numerator, $denominator );
+	if ( defined $opt_numerator and defined $opt_denominator ) {
+		if ( _validate_index_list( $opt_numerator, $opt_denominator ) ) {
+			$numerator   = $opt_numerator;
 			$denominator = $opt_denominator;
 		}
 		else {
 			warn " unknown index number(s); nothing done\n";
 			return;
-		}	
+		}
 	}
 	else {
-		($numerator, $denominator) = _request_indices(
-			" Enter two dataset index numbers for the ratio as " 
-			. "'numerator, denominator'\n  ");
-		unless (defined $numerator and defined $denominator) {
+		( $numerator, $denominator ) =
+			_request_indices( " Enter two dataset index numbers for the ratio as "
+				. "'numerator, denominator'\n  " );
+		unless ( defined $numerator and defined $denominator ) {
 			warn " unknown index number(s); nothing done\n";
 			return;
 		}
 	}
-	
+
 	# check if log2 numbers
 	# log2 ratios performed by subtraction, regular number ratios by division
 	my $log;
-	if (defined $opt_log) {
+	if ( defined $opt_log ) {
+
 		# if unable to identify the log2 status in metadata
 		# use the command line option variable if set
 		$log = $opt_log;
 	}
 	else {
 		# set log status based on mutual metadata flags
-		my $numerator_log = $Data->metadata($numerator, 'log2') || 
-			$Data->metadata($numerator, 'log');
-		my $denominator_log = $Data->metadata($denominator, 'log2') || 
-			$Data->metadata($denominator, 'log');
-		
-		if ($numerator_log and $denominator_log) { 
-			if ($numerator_log == $denominator_log) {
+		my $numerator_log = $Data->metadata( $numerator, 'log2' )
+			|| $Data->metadata( $numerator, 'log' );
+		my $denominator_log = $Data->metadata( $denominator, 'log2' )
+			|| $Data->metadata( $denominator, 'log' );
+
+		if ( $numerator_log and $denominator_log ) {
+			if ( $numerator_log == $denominator_log ) {
+
 				# both set, both equal, great!
 				$log = $numerator_log;
 			}
 			else {
-				warn " Columns appear to have different log status!\n" . 
-					"  numerator is $numerator_log and denominator is " . 
-					" $denominator_log\n  Nothing done.";
+				warn " Columns appear to have different log status!\n"
+					. "  numerator is $numerator_log and denominator is "
+					. " $denominator_log\n  Nothing done.";
 				return;
 			}
 		}
-		elsif ($numerator_log or $denominator_log) { 
-			warn " Columns appear to have different log status!\n" . 
-				"  numerator is $numerator_log and denominator is " . 
-				" $denominator_log\n  Nothing done.";
+		elsif ( $numerator_log or $denominator_log ) {
+			warn " Columns appear to have different log status!\n"
+				. "  numerator is $numerator_log and denominator is "
+				. " $denominator_log\n  Nothing done.";
 			return;
 		}
 		else {
@@ -2099,59 +2169,64 @@ sub ratio_function {
 			$log = 0;
 		}
 	}
-	$log = 2 if $log == 1; # assume log2 status if simply true
-		
+	$log = 2 if $log == 1;    # assume log2 status if simply true
+
 	# generate new column
 	my $new_name;
-	if ($function and $opt_name) {
-		# automatic execution and new name was specifically given 
+	if ( $function and $opt_name ) {
+
+		# automatic execution and new name was specifically given
 		$new_name = $opt_name;
 	}
 	else {
-		$new_name = $Data->name($numerator) . '_' .
-			$Data->name($denominator) . '_ratio';
+		$new_name = $Data->name($numerator) . '_' . $Data->name($denominator) . '_ratio';
 	}
 	my $new_position = $Data->add_column($new_name);
-		
+
 	# generate ratio
-	my $failure_count = 0; # number of failures
-	$Data->iterate( sub {
-		my $row = shift;
-		my $n = $row->value($numerator);
-		my $d = $row->value($denominator);
-		
-		# add new value
-		if (_is_null($n) or _is_null($d)) {
-			# either value is null
-			$row->value($new_position, '.');
-			$failure_count++;
-		}
-		elsif ($d == 0 and !$log) {
-			# denominator is 0, avoid div by 0 errors, assign null
-			$row->value($new_position, '.');
-			$failure_count++;
-		}
-		else {
-			# both values good, calculate ratio
-			if ($log) {
-				# perform a subtraction with log values
-				$row->value($new_position, ($n - $d) );
-			} 
+	my $failure_count = 0;    # number of failures
+	$Data->iterate(
+		sub {
+			my $row = shift;
+			my $n   = $row->value($numerator);
+			my $d   = $row->value($denominator);
+
+			# add new value
+			if ( _is_null($n) or _is_null($d) ) {
+
+				# either value is null
+				$row->value( $new_position, '.' );
+				$failure_count++;
+			}
+			elsif ( $d == 0 and !$log ) {
+
+				# denominator is 0, avoid div by 0 errors, assign null
+				$row->value( $new_position, '.' );
+				$failure_count++;
+			}
 			else {
-				# perform a division with non-log values
-				$row->value($new_position, ($n / $d) );
+				# both values good, calculate ratio
+				if ($log) {
+
+					# perform a subtraction with log values
+					$row->value( $new_position, ( $n - $d ) );
+				}
+				else {
+					# perform a division with non-log values
+					$row->value( $new_position, ( $n / $d ) );
+				}
 			}
 		}
-	} );
-	
+	);
+
 	# annotate the new medadata hash
-	$Data->metadata($new_position, 'method', 'ratio');
-	$Data->metadata($new_position, 'log', $log);
-	$Data->metadata($new_position, 'denominator', $Data->name($denominator));
-	$Data->metadata($new_position, 'numerator', $Data->name($numerator));
-	
+	$Data->metadata( $new_position, 'method',      'ratio' );
+	$Data->metadata( $new_position, 'log',         $log );
+	$Data->metadata( $new_position, 'denominator', $Data->name($denominator) );
+	$Data->metadata( $new_position, 'numerator',   $Data->name($numerator) );
+
 	# print conclusion
-	printf " ratio between %s and %s\n generated as new dataset\n", 
+	printf " ratio between %s and %s\n generated as new dataset\n",
 		$Data->name($numerator), $Data->name($denominator);
 	if ($failure_count) {
 		print " $failure_count datapoints could not generate ratios\n";
@@ -2160,118 +2235,129 @@ sub ratio_function {
 }
 
 sub difference_function {
+
 	# Generate a new difference between two datasets
-	
+
 	# Determine whether the difference should be normalized
 	# normalization divides the difference by the square root of the sum, an
 	# estimation of standard deviation
-	my $normalization = shift; # pass a true value to normalize
-	
+	my $normalization = shift;    # pass a true value to normalize
+
 	# Request datasets
-	my ($experiment_index, $control_index); 
-	if (defined $opt_numerator and defined $opt_denominator) {
-		if ( _validate_index_list($opt_numerator, $opt_denominator) ) {
+	my ( $experiment_index, $control_index );
+	if ( defined $opt_numerator and defined $opt_denominator ) {
+		if ( _validate_index_list( $opt_numerator, $opt_denominator ) ) {
+
 			# defined as command line options
 			$experiment_index = $opt_numerator;
-			$control_index = $opt_denominator;
+			$control_index    = $opt_denominator;
 		}
 		else {
 			warn " unknown index number(s); nothing done\n";
 			return;
-		}	
+		}
 	}
 	else {
 		# request from user
 		my $line;
 		if ($normalization) {
-			$line = " Enter two dataset index numbers to generate the normalized difference\n" 
+			$line =
+				" Enter two dataset index numbers to generate the normalized difference\n"
 				. " as 'experiment, control'\n  ";
 		}
 		else {
-			$line = " Enter two dataset index numbers to generate the difference\n" 
+			$line = " Enter two dataset index numbers to generate the difference\n"
 				. " as 'experiment, control'\n  ";
 		}
-		($experiment_index, $control_index) = _request_indices($line);
-		unless (defined $experiment_index and defined $control_index) {
+		( $experiment_index, $control_index ) = _request_indices($line);
+		unless ( defined $experiment_index and defined $control_index ) {
 			warn " unknown index number(s); nothing done\n";
 			return;
 		}
 	}
-	
+
 	# Generate new column
 	my $new_name;
-	if ($function and $opt_name) {
+	if ( $function and $opt_name ) {
+
 		# this was an automatically executed function
 		# and a new name was specified on the command line
 		$new_name = $opt_name;
-	} 
+	}
 	elsif ($normalization) {
-		$new_name = $Data->name($experiment_index) . '_' .
-			$Data->name($control_index) . '_normdiff';
+		$new_name =
+			  $Data->name($experiment_index) . '_'
+			. $Data->name($control_index)
+			. '_normdiff';
 	}
 	else {
-		$new_name = $Data->name($experiment_index) . '_' .
-			$Data->name($control_index) . '_diff';
+		$new_name =
+			$Data->name($experiment_index) . '_' . $Data->name($control_index) . '_diff';
 	}
 	my $new_position = $Data->add_column($new_name);
-		
+
 	# Generate difference
-	my $failure_count = 0; # number of failures
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# calculate difference
-		if (_is_null( $row->value($experiment_index) ) or 
-			_is_null( $row->value($control_index) )
-		) {
-			# can't do anything with nulls, new value will be null
-			$row->value($new_position, '.');
-			$failure_count++;
-		}
-		else {
-			my $diff = $row->value($experiment_index) - $row->value($control_index);
-			if ($normalization) {
-				# determine a normalized difference value
-				my $sum = $row->value($experiment_index) + $row->value($control_index);
-				if ($sum == 0) {
-					# avoid pesky divide-by-0 errors, the difference is also 0
-					$row->value($new_position, 0);
-				}
-				else {
-					$row->value($new_position, ($diff / sqrt($sum)) );
-				}
+	my $failure_count = 0;    # number of failures
+	$Data->iterate(
+		sub {
+			my $row = shift;
+
+			# calculate difference
+			if (   _is_null( $row->value($experiment_index) )
+				or _is_null( $row->value($control_index) ) )
+			{
+				# can't do anything with nulls, new value will be null
+				$row->value( $new_position, '.' );
+				$failure_count++;
 			}
 			else {
-				# determine a straight difference value
-				$row->value($new_position, $diff);
+				my $diff =
+					$row->value($experiment_index) - $row->value($control_index);
+				if ($normalization) {
+
+					# determine a normalized difference value
+					my $sum =
+						$row->value($experiment_index) + $row->value($control_index);
+					if ( $sum == 0 ) {
+
+						# avoid pesky divide-by-0 errors, the difference is also 0
+						$row->value( $new_position, 0 );
+					}
+					else {
+						$row->value( $new_position, ( $diff / sqrt($sum) ) );
+					}
+				}
+				else {
+					# determine a straight difference value
+					$row->value( $new_position, $diff );
+				}
 			}
 		}
-	} );
-	
-	
+	);
+
 	# Annotate the new medadata hash
-	$Data->metadata($new_position, 'method', 
-		$normalization ? 'normalized_difference' : 'difference');
-	$Data->metadata($new_position, 'experiment', $Data->name($experiment_index) ); 
-	$Data->metadata($new_position, 'control', $Data->name($control_index) ); 
-	
+	$Data->metadata( $new_position, 'method',
+		$normalization ? 'normalized_difference' : 'difference' );
+	$Data->metadata( $new_position, 'experiment', $Data->name($experiment_index) );
+	$Data->metadata( $new_position, 'control',    $Data->name($control_index) );
+
 	# Print conclusion
-	printf "%s difference between %s and %s\n generated as new column\n", 
-		$normalization ? ' normalized' : '', $Data->name($experiment_index), 
+	printf "%s difference between %s and %s\n generated as new column\n",
+		$normalization ? ' normalized' : '', $Data->name($experiment_index),
 		$Data->name($control_index);
 	if ($failure_count) {
 		print " $failure_count rows could not generate ratios\n";
 	}
-	
+
 	return 1;
 }
 
-
 sub normalized_difference_function {
+
 	# Generate a normalized difference between two datasets
-	
+
 	# this actually calls the difference_function subroutine
-		# pass a true value to force normalization
+	# pass a true value to force normalization
 	if ( difference_function(1) ) {
 		return 1;
 	}
@@ -2281,66 +2367,65 @@ sub normalized_difference_function {
 	}
 }
 
-
-
 sub add_function {
-	# add a specific value to dataset values
-	return math_function('add', @_);
-}
 
+	# add a specific value to dataset values
+	return math_function( 'add', @_ );
+}
 
 sub subtract_function {
-	# subtract a specific value from dataset values
-	return math_function('subtract', @_);
-}
 
+	# subtract a specific value from dataset values
+	return math_function( 'subtract', @_ );
+}
 
 sub multiply_function {
-	# multiply dataset values by a specific value
-	return math_function('multiply', @_);
-}
 
+	# multiply dataset values by a specific value
+	return math_function( 'multiply', @_ );
+}
 
 sub divide_function {
+
 	# divide dataset values by a specific value
-	return math_function('divide', @_);
+	return math_function( 'divide', @_ );
 }
 
-
 sub math_function {
-	# General function to perform simple math on each datapoint value 
+
+	# General function to perform simple math on each datapoint value
 	# in a dataset by a specific value
-	
+
 	# determine the mathematical function
-		# function is one of add, subtract, multiply, divide
+	# function is one of add, subtract, multiply, divide
 	my $math = shift;
-	my $calculate; # a reference to the appropriate function
-	if ($math eq 'add') {
+	my $calculate;    # a reference to the appropriate function
+	if ( $math eq 'add' ) {
 		$calculate = sub {
 			return $_[0] + $_[1];
 		};
 	}
-	elsif ($math eq 'subtract') {
+	elsif ( $math eq 'subtract' ) {
 		$calculate = sub {
 			return $_[0] - $_[1];
 		};
 	}
-	elsif ($math eq 'multiply') {
+	elsif ( $math eq 'multiply' ) {
 		$calculate = sub {
 			return $_[0] * $_[1];
 		};
 	}
-	elsif ($math eq 'divide') {
+	elsif ( $math eq 'divide' ) {
 		$calculate = sub {
 			return $_[0] / $_[1];
 		};
 	}
 
-	
 	# request dataset indices
 	my $line = " Enter one or more dataset index numbers to $math  ";
 	my @indices;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@indices = @_;
 	}
@@ -2352,10 +2437,11 @@ sub math_function {
 		warn " no valid indices. nothing done\n";
 		return;
 	}
-	
-	# request the value to perform the mathematical function 
+
+	# request the value to perform the mathematical function
 	my $request_value;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$request_value = $opt_target;
 	}
@@ -2365,70 +2451,72 @@ sub math_function {
 		$request_value = <STDIN>;
 		chomp $request_value;
 	}
-	
-	
+
 	# request placement
 	my $placement = _request_placement();
-	
-	
+
 	# generate past tense verb
 	my $mathed = $math;
 	$mathed =~ s/^(multipl)y$/$1ied/;
 	$mathed =~ s/^(add)$/$1ed/;
 	$mathed =~ s/^(divide)$/$1d/;
 	$mathed =~ s/^(subtract)$/$1ed/;
-	
+
 	## Process the datasets and subtract their values
-	my $dataset_modification_count = 0; # a count of how many processed
+	my $dataset_modification_count = 0;    # a count of how many processed
 	foreach my $index (@indices) {
-		
+
 		# determine the actual value to divide by
-		my $value; # the actual number to divide by
-		if ($request_value =~ /median|mean|sum/i) { 
-			
+		my $value;                         # the actual number to divide by
+		if ( $request_value =~ /median|mean|sum/i ) {
+
 			# collect dataset statistics
 			my %stathash = _get_statistics_hash($index);
-			unless (%stathash) { 
+			unless (%stathash) {
 				warn " unable to get statistics! nothing done\n";
 				return;
 			}
-			
+
 			# assign the appropriate value
-			if ($request_value eq 'median') {
+			if ( $request_value eq 'median' ) {
 				$value = $stathash{'median'};
 				printf "  median value for %s is $value\n", $Data->name($index);
 			}
-			elsif ($request_value eq 'mean') {
+			elsif ( $request_value eq 'mean' ) {
 				$value = $stathash{'mean'};
 				printf "  mean value for %s is $value\n", $Data->name($index);
 			}
-			elsif ($request_value eq 'sum') {
+			elsif ( $request_value eq 'sum' ) {
 				$value = $stathash{'sum'};
 				printf "  sum value for %s is $value\n", $Data->name($index);
 			}
-		} 
-		elsif ($request_value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
+		}
+		elsif ( $request_value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/ ) {
+
 			# a numeric value, allowing for negatives, decimals, exponents
 			$value = $request_value;
-		} 
+		}
 		else {
 			warn " unrecognized value '$request_value'; nothing done\n";
 			return;
 		}
-		
-		
+
 		# generate subtraction product
-		my $failed_count = 0; # failed count  
-		$index = _prepare_new_destination($index, "_$mathed\_$value") if $placement =~ /^n/i;
-		$Data->iterate( sub {
-			my $row = shift;
-			if (_is_null( $row->value($index) )) {
-				$failed_count++;
+		my $failed_count = 0;    # failed count
+		$index = _prepare_new_destination( $index, "_$mathed\_$value" )
+			if $placement =~ /^n/i;
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				if ( _is_null( $row->value($index) ) ) {
+					$failed_count++;
+				}
+				else {
+					$row->value( $index, &$calculate( $row->value($index), $value ) );
+				}
 			}
-			else {
-				$row->value($index, &$calculate( $row->value($index), $value) );
-			}
-		} );	
+		);
+
 		# print conclusion
 		printf " dataset %s  was $mathed by $value\n", $Data->name($index);
 		if ($failed_count) {
@@ -2436,50 +2524,54 @@ sub math_function {
 		}
 		$dataset_modification_count++;
 	}
-	
+
 	# done
 	return $dataset_modification_count;
 }
 
-
-
 sub number_function {
+
 	# This subroutine will number the datapoints or lines
-	
+
 	# request dataset
-	my $line = " The numbers will be entered as a dataset in front of " . 
-		"which current dataset?\n Enter nothing to place the numbers " .
-		"at the end.    ";
+	my $line =
+		  " The numbers will be entered as a dataset in front of "
+		. "which current dataset?\n Enter nothing to place the numbers "
+		. "at the end.    ";
 	my $index = _request_index($line);
+
 	# a return of -1 indicates the numbers will be put at the end
-	
+
 	# generate new column
 	# we'll put the numbers at the end for now
 	my $new_name;
-	if ($function and $opt_name) {
+	if ( $function and $opt_name ) {
 		$new_name = $opt_name;
 	}
 	else {
 		$new_name = 'Numbers';
 	}
 	my $new_position = $Data->add_column($new_name);
-	
+
 	# put in numbers for each line
-	$Data->iterate( sub {
-		my $row = shift;
-		$row->value($new_position, $row->row_index);
-	} );
-	
-	
+	$Data->iterate(
+		sub {
+			my $row = shift;
+			$row->value( $new_position, $row->row_index );
+		}
+	);
+
 	# Reorder the columns
-	if ($index >= 0) {
+	if ( $index >= 0 ) {
 		my @new_order;
-		for (my $i = 0; $i < $new_position; $i++) {
+		for ( my $i = 0; $i < $new_position; $i++ ) {
+
 			# we will walk through the list of index numbers sequentially
 			# put each index into the new_order array
-			# when we encounter the requested index to put the new dataset, 
+			# when we encounter the requested index to put the new dataset,
 			# we'll put the new_position, and then the requested index
-			if ($i == $index) {
+			if ( $i == $index ) {
+
 				# we want to put the new Numbers dataset before this index
 				push @new_order, $new_position;
 				push @new_order, $i;
@@ -2490,45 +2582,46 @@ sub number_function {
 			}
 		}
 		$Data->reorder_column(@new_order);
-	} 
-	
+	}
+
 	print " Lines numbered at column $index\n";
 	return 1;
 }
 
-
-
 sub write_summary_function {
+
 	# this will write out a summary file of the data
-	
+
 	# determine indices to summarize
-	my ($startcolumn, $stopcolumn);
+	my ( $startcolumn, $stopcolumn );
 	if ($function) {
+
 		# running under automatic mode
 		# check if user supplied indices
-		if (scalar @opt_indices >= 2) {
+		if ( scalar @opt_indices >= 2 ) {
+
 			# assume contiguous indices, use the first and last one
 			# it may also be simply the start and stop indices
 			$startcolumn = $opt_indices[0];
 			$stopcolumn  = $opt_indices[-1];
 		}
+
 		# otherwise the summary module will automatically deduce the columns
 	}
 	else {
 		# request indices only when running interactively and not automatically
-		($startcolumn, $stopcolumn) = _request_indices(
-			" Enter the starting and/or ending indices of the datasets to summarize\n". 
-			" Or nothing for automatic detection     "
-		);
+		( $startcolumn, $stopcolumn ) = _request_indices(
+			" Enter the starting and/or ending indices of the datasets to summarize\n"
+				. " Or nothing for automatic detection     " );
 	}
-	
+
 	# write the summary
 	my $sumfile = $Data->summary_file(
-		'filename'     => $outfile,
-		'startcolumn'  => $startcolumn,
-		'endcolumn'    => $stopcolumn,
+		'filename'    => $outfile,
+		'startcolumn' => $startcolumn,
+		'endcolumn'   => $stopcolumn,
 	);
-	
+
 	# report outcome
 	if ($sumfile) {
 		print " wrote summary file '$sumfile'\n";
@@ -2536,21 +2629,22 @@ sub write_summary_function {
 	else {
 		print " unable to write summary file!\n";
 	}
-	
+
 	# since no changes have been made to the data structure, return 0
 	return;
 }
 
-
 sub export_function {
+
 	# this will export the file into an even simpler text format
-	
+
 	# generate a possible new name based on the input name
 	my $possible_name = $Data->path . $Data->basename . '_out.txt';
-	
+
 	# determine the export file name
 	my $outfilename;
-	if (defined $outfile) {
+	if ( defined $outfile ) {
+
 		# use the outfile name specified on the command line
 		# note that this could be overwritten later if $modification > 0
 		# but to allow for automated execution, we can't ask the user
@@ -2558,6 +2652,7 @@ sub export_function {
 		$outfilename = $outfile;
 	}
 	elsif ($function) {
+
 		# automatic execution, don't ask the user
 		$outfilename = $possible_name;
 	}
@@ -2566,24 +2661,24 @@ sub export_function {
 		print " Provide an exported file name [$possible_name]  ";
 		my $answer = <STDIN>;
 		chomp $answer;
-		if ($answer eq '') {
+		if ( $answer eq '' ) {
+
 			# user wants to use the suggested name
 			$outfilename = $possible_name;
-		} 
+		}
 		else {
 			# user requested own name
 			$outfilename = $answer;
 		}
 	}
-		
-	
+
 	# write the file
 	my $write_results = $Data->write_file(
-		'filename'  => $outfilename,
-		'gz'        => $gz,
-		'simple'    => 1,
+		'filename' => $outfilename,
+		'gz'       => $gz,
+		'simple'   => 1,
 	);
-	
+
 	# report write results
 	if ($write_results) {
 		print " Exported data to simple text file '$write_results'\n";
@@ -2591,50 +2686,48 @@ sub export_function {
 	else {
 		print " Unable to export data to file!\n";
 	}
-	
+
 	# since no changes have been made to the data structure, return
 	return;
 }
 
-
-
 sub export_treeview_function {
-	# this is a specialized function to export a datafile into a format 
+
+	# this is a specialized function to export a datafile into a format
 	# compatible with the Treeview program
-	
+
 	print " Exporting CDT file for Treeview and Cluster analysis\n";
-	
+
 	# First check for previous modifications
-	if ($modification and not $function) {
+	if ( $modification and not $function ) {
 		print " There are existing unsaved changes to the data. Do you want to\n";
-		print " save these first before making required, irreversible changes? ".
-			"y/n  ";
+		print " save these first before making required, irreversible changes? "
+			. "y/n  ";
 		my $answer = <STDIN>;
 		chomp $answer;
-		if ($answer =~ /^y/i) {
+		if ( $answer =~ /^y/i ) {
 			rewrite_function();
 		}
 	}
-	
+
 	# Set options for placement for subsequent manipulations
 	$opt_placement = 'r';
-	
-	
+
 	### Get user information for processing
 	# Identify the dataset columns
 	# we need one unique name column, and a range of data columns
 	# the rest will be deleted
 	my @datasets = _request_indices(
-		" Enter one unique name column, followed by a range of data columns  "
-	);
+		" Enter one unique name column, followed by a range of data columns  ");
 	unless (@datasets) {
 		warn " Unknown datasets. Nothing done.\n";
 		return;
 	}
-	
+
 	# Identify the manipulations requested
 	my @manipulations;
 	if ($function) {
+
 		# automatic function, use the command line target option
 		@manipulations = split /,/, $opt_target;
 	}
@@ -2657,29 +2750,28 @@ LIST
 		chomp $answer;
 		@manipulations = split /[,\s]+/, $answer;
 	}
-	
-	
+
 	### First, delete extraneous datasets or columns
 	# the CDT format for Treeview expects a unique ID and NAME column
 	# we will duplicate the first column
 	unshift @datasets, $datasets[0];
-	
+
 	# perform a reordering of the columns
 	$Data->reorder_column(@datasets);
-	
+
 	# rename the first two columns
-	$Data->name(0, 'ID');
-	$Data->name(1, 'NAME');
-	
+	$Data->name( 0, 'ID' );
+	$Data->name( 1, 'NAME' );
+
 	# we now have just the columns we want
 	# reset the dataset indices to what we currently have
 	# name and ID should be index 0 and 1
-	@datasets = (2 .. $Data->last_column);
-	
-	
+	@datasets = ( 2 .. $Data->last_column );
+
 	### Second, perform dataset manipulations
 	foreach (@manipulations) {
 		if (/^su$/i) {
+
 			# decreasing sort by sum of row values
 			$opt_target = 'sum';
 			combine_function(@datasets);
@@ -2689,6 +2781,7 @@ LIST
 			$Data->delete_column($i);
 		}
 		elsif (/^sm$/i) {
+
 			# decreasing sort by sum of row values
 			$opt_target = 'mean';
 			combine_function(@datasets);
@@ -2698,53 +2791,60 @@ LIST
 			$Data->delete_column($i);
 		}
 		elsif (/^cg$/i) {
+
 			# Median center features
 			print " median centering features....\n";
 			center_function(@datasets);
 		}
 		elsif (/^cd$/i) {
+
 			# Median center datasets
 			print " median centering datasets....\n";
 			$opt_target = 'median';
-			$opt_zero = 1;
+			$opt_zero   = 1;
 			subtract_function(@datasets);
 		}
 		elsif (/^zd$/i) {
+
 			# Z-score convert dataset
 			print " converting datasets to Z-scores....\n";
 			zscore_function(@datasets);
 		}
 		elsif (/^pd$/i) {
+
 			# convert dataset to percentile rank
 			print " converting datasets to percentile ranks....\n";
 			percentile_rank_function(@datasets);
 		}
 		elsif (/^l2$/i) {
+
 			# convert dataset to log2 values
 			print " converting datasets to log2 values....\n";
-			log_function(2, @datasets);
+			log_function( 2, @datasets );
 		}
 		elsif (/^l10$/i) {
+
 			# convert dataset to log10 values
 			print " converting datasets to log10 values....\n";
-			log_function(10, @datasets);
+			log_function( 10, @datasets );
 		}
 		elsif (/^n0$/i) {
+
 			# convert nulls to 0
 			print " converting null values to 0.0....\n";
 			$opt_target = '0.0';
-			$opt_zero   = 1 unless defined $opt_zero; # convert 0s too
+			$opt_zero   = 1 unless defined $opt_zero;    # convert 0s too
 			convert_nulls_function(@datasets);
 		}
 		else {
 			warn " unknown manipulation '$_'!\n";
 		}
 	}
-	
-	
+
 	### Third, export a simple file
 	if ($outfile) {
-		unless ($outfile =~ /\.cdt$/i) {
+		unless ( $outfile =~ /\.cdt$/i ) {
+
 			# make sure it has .cdt extension
 			$outfile .= '.cdt';
 		}
@@ -2755,80 +2855,81 @@ LIST
 	}
 	$gz = 0;
 	export_function();
-	
-	
-	### Finally, reset the modification status 
-	# We don't to record these changes upon exit as they are specific to 
-	# exporting for treeview, any pre-existing changes should have been 
+
+	### Finally, reset the modification status
+	# We don't to record these changes upon exit as they are specific to
+	# exporting for treeview, any pre-existing changes should have been
 	# saved earlier
 	$modification = 0;
 	return;
 }
 
-
-
 sub center_function {
+
 	# this will center the datapoints in each row
-	
+
 	# identify the datasets to be centered
 	my @datasets;
 	if (@_) {
+
 		# provided from an internal subroutine
 		@datasets = @_;
 	}
 	else {
 		# otherwise request from user
-		@datasets = _request_indices(
-			" Enter the range of dataset indices to be centered  "
-		);
+		@datasets =
+			_request_indices(" Enter the range of dataset indices to be centered  ");
 	}
 	unless (@datasets) {
 		warn " Unknown datasets. Nothing done.\n";
 		return;
 	}
-	
+
 	# Center the data
-	# We will determine the median value for all the datapoints in the 
+	# We will determine the median value for all the datapoints in the
 	# indicated datasets for each feature (row). Then the median value will
-	# be subtracted from each value. The median value of the adjusted 
+	# be subtracted from each value. The median value of the adjusted
 	# datapoints should then be effectively 0.
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# collect the datapoint values in each dataset for the feature  
-		my @values;
-		foreach my $d (@datasets) {
-			push @values, $row->value($d) if not _is_null($row->value($d));
+	$Data->iterate(
+		sub {
+			my $row = shift;
+
+			# collect the datapoint values in each dataset for the feature
+			my @values;
+			foreach my $d (@datasets) {
+				push @values, $row->value($d) if not _is_null( $row->value($d) );
+			}
+			next unless (@values);
+
+			# determine median value
+			my $median_value = median(@values);
+
+			# adjust the datapoints
+			foreach my $d (@datasets) {
+				next if _is_null( $row->value($d) );
+				$row->value( $d, ( $row->value($d) - $median_value ) );
+			}
 		}
-		next unless (@values);
-		
-		# determine median value
-		my $median_value = median(@values);
-		
-		# adjust the datapoints
-		foreach my $d (@datasets) {
-			next if _is_null($row->value($d));
-			$row->value($d, ($row->value($d) - $median_value) );
-		}
-	} );
-	
+	);
+
 	# annotate metadata
 	foreach my $d (@datasets) {
-		$Data->metadata($d, 'centered', 'median');
+		$Data->metadata( $d, 'centered', 'median' );
 	}
-	
+
 	# print conclusion
-	printf " Datasets %s  median centered\n", join(", ", @datasets);
+	printf " Datasets %s  median centered\n", join( ", ", @datasets );
 	return 1;
 }
 
-
 sub new_column_function {
+
 	# this will generate a new dataset
-	
+
 	# request column name
 	my $name;
-	if (defined $opt_name) {
+	if ( defined $opt_name ) {
+
 		# command line option
 		$name = $opt_name;
 	}
@@ -2841,15 +2942,16 @@ sub new_column_function {
 		$name = <STDIN>;
 		chomp $name;
 	}
-	
+
 	# request value
 	my $value;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$value = $opt_target;
 	}
 	elsif ($function) {
-		$value = '.'; # null
+		$value = '.';    # null
 	}
 	else {
 		# interactively ask the user
@@ -2857,31 +2959,35 @@ sub new_column_function {
 		$value = <STDIN>;
 		chomp $value;
 	}
-	
+
 	# generate the new dataset
 	my $new_position = $Data->add_column($name);
-	$Data->iterate( sub {
-		shift->value($new_position, $value);
-	} );
-	
+	$Data->iterate(
+		sub {
+			shift->value( $new_position, $value );
+		}
+	);
+
 	# done
 	print " Added new dataset '$name' at index $new_position with value '$value'\n";
 	return 1;
 }
 
 sub addname_function {
+
 	# this will add a name column and uniquely name the rows
-	
+
 	# request column name
-	
+
 	# request value
 	my $prefix;
-	if (defined $opt_target) {
+	if ( defined $opt_target ) {
+
 		# command line option
 		$prefix = $opt_target;
 	}
 	elsif ($function) {
-		$prefix = $Data->feature || 'feature'; 
+		$prefix = $Data->feature || 'feature';
 	}
 	else {
 		# interactively ask the user
@@ -2889,16 +2995,18 @@ sub addname_function {
 		$prefix = <STDIN>;
 		chomp $prefix;
 	}
-	
+
 	# Identify column
 	my $idx = $Data->name_column;
-	if (defined $idx) {
+	if ( defined $idx ) {
+
 		# we are updating an existing column
 	}
 	else {
 		# we are adding a new column
 		my $name;
-		if (defined $opt_name) {
+		if ( defined $opt_name ) {
+
 			# command line option
 			$name = $opt_name;
 		}
@@ -2907,30 +3015,30 @@ sub addname_function {
 		}
 		$idx = $Data->add_column($name);
 	}
-	
-	
+
 	# generate the new names
 	my $number = 1;
-	$Data->iterate( sub {
-		shift->value($idx, sprintf("%s%d", $prefix, $number));
-		$number++;
-	} );
-	
+	$Data->iterate(
+		sub {
+			shift->value( $idx, sprintf( "%s%d", $prefix, $number ) );
+			$number++;
+		}
+	);
+
 	# done
 	print " Added feature names to index $idx\n";
 	return 1;
 }
 
-
-
 sub rewrite_function {
-	
+
 	# check output file name
 	my $rewrite_filename;
-	if (defined $outfile) {
+	if ( defined $outfile ) {
+
 		# use the defined outfile name given
 		$rewrite_filename = $outfile;
-	} 
+	}
 	else {
 		# ask the user for a new name
 		print " Enter a new file name [$infile]  ";
@@ -2944,13 +3052,13 @@ sub rewrite_function {
 			$rewrite_filename = $infile;
 		}
 	}
-	
+
 	# write the file
 	my $write_results = $Data->write_file(
-		'filename'  => $rewrite_filename,
-		'gz'        => $gz,
+		'filename' => $rewrite_filename,
+		'gz'       => $gz,
 	);
-	
+
 	# report write results
 	if ($write_results) {
 		print " Wrote datafile $write_results\n";
@@ -2958,37 +3066,33 @@ sub rewrite_function {
 	else {
 		print " Unable to re-write to file '$rewrite_filename'!\n";
 	}
-	
+
 	return;
 }
 
-
 sub view_function {
-	
+
 	my $start_row = 0;
-	my $stop_row = 10;
-	
+	my $stop_row  = 10;
+
 	# print the contents
 	while ($stop_row) {
-		
+
 		# print the table contents
 		$stop_row = $Data->last_row if $stop_row > $Data->last_row;
-		for (my $i = $start_row; $i <= $stop_row; $i++) {
-			my $text = join("  ", $Data->row_values($i));
+		for ( my $i = $start_row; $i <= $stop_row; $i++ ) {
+			my $text = join( "  ", $Data->row_values($i) );
 			print "$text\n";
 		}
-		
+
 		# continue or return the next menu response
 		print "\nPress Return for next 10 lines, or enter a (m)enu command   ";
 		my $answer = <STDIN>;
 		chomp $answer;
 		if ($answer) {
-			if (exists $letter_to_function{$answer}) {
-				$modification += &{ 
-					$function_to_subroutine{
-						$letter_to_function{$answer}
-					}
-				};
+			if ( exists $letter_to_function{$answer} ) {
+				$modification +=
+					&{ $function_to_subroutine{ $letter_to_function{$answer} } };
 			}
 			else {
 				print "unkown response\n";
@@ -2998,22 +3102,18 @@ sub view_function {
 		else {
 			# print next 10 lines
 			$start_row += 10;
-			$stop_row += 10;
+			$stop_row  += 10;
 		}
 	}
 	return;
 }
 
-
-
-
-
 ################################################################################
 ##############               Internal Subroutines                 ##############
 ################################################################################
 
-
 sub _get_letter_to_function_hash {
+
 	# this hash converts the one-letter menu key to the function name
 	# the key is the menu letter
 	# the value is the function name
@@ -3068,6 +3168,7 @@ sub _get_letter_to_function_hash {
 }
 
 sub _get_function_to_subroutine_hash {
+
 	# this hash converts the function name to the actual subroutine for the function
 	# the key is the function name
 	# the value is a scalar reference to the subroutine
@@ -3101,7 +3202,7 @@ sub _get_function_to_subroutine_hash {
 		'pr'          => \&percentile_rank_function,
 		'zscore'      => \&zscore_function,
 		'log'         => \&log_function,
-		'log2'        => \&log_function, # holdover from previous
+		'log2'        => \&log_function,                     # holdover from previous
 		'delog'       => \&delog_function,
 		'delog2'      => \&delog_function,
 		'format'      => \&format_function,
@@ -3123,26 +3224,28 @@ sub _get_function_to_subroutine_hash {
 	);
 }
 
-
 sub _request_index {
+
 	# this subroutine will determine which dataset index to use
 	# if index is specified on the command line, that will be used
-	# alternatively, it will ask the user which dataset to process.	
+	# alternatively, it will ask the user which dataset to process.
 	# it will return the index number
-	my $line = shift; # the custom request line to give the user
+	my $line = shift;    # the custom request line to give the user
 	if (@opt_indices) {
+
 		# index array is specified on the command line
 		# use the first element in the global index array
 		my $index = $opt_indices[0];
-		unless ( _validate_index_list($index) )  {
-			return -1; # error value
+		unless ( _validate_index_list($index) ) {
+			return -1;    # error value
 		}
 		return $index;
 	}
 	else {
 		# request interactively from the user
-		my $index = ask_user_for_index($Data, $line);
-		unless (defined $index) {
+		my $index = ask_user_for_index( $Data, $line );
+		unless ( defined $index ) {
+
 			# return an error value
 			return -1;
 		}
@@ -3150,15 +3253,16 @@ sub _request_index {
 	}
 }
 
-
 sub _request_indices {
+
 	# this subroutine will determine which datasets are to be used
 	# if the indices are specified on the command line, those will be used
 	# alternatively, it will ask the user for the indices interactively
-	my $line = shift; # the custom request line to give the user
-	
+	my $line = shift;    # the custom request line to give the user
+
 	# get list of indices
 	if (@opt_indices) {
+
 		# index array is specified on the command line
 		my @indices = @opt_indices;
 		unless ( _validate_index_list(@indices) ) {
@@ -3168,17 +3272,18 @@ sub _request_indices {
 	}
 	else {
 		# request interactively from the user
-		return ask_user_for_index($Data, $line);
+		return ask_user_for_index( $Data, $line );
 	}
 }
 
-
 sub _request_placement {
+
 	# this subroutine will determine where to put a new dataset
 	# replace current or generate new
-	
+
 	my $placement;
-	if (defined $opt_placement) {
+	if ( defined $opt_placement ) {
+
 		# use the command line specified placement
 		$placement = $opt_placement;
 	}
@@ -3188,41 +3293,41 @@ sub _request_placement {
 		$placement = <STDIN>;
 		chomp $placement;
 	}
-	
+
 	return $placement;
 }
 
-
-
 sub _prepare_new_destination {
+
 	# User requested new column placement
-	my ($index, $suffix) = @_;
-	
+	my ( $index, $suffix ) = @_;
+
 	my $new_index = $Data->copy_column($index);
 	my $new_name;
-	if ($function and $opt_name) {
-		# automatic execution and new name was specifically given 
+	if ( $function and $opt_name ) {
+
+		# automatic execution and new name was specifically given
 		$new_name = $opt_name;
 	}
 	else {
 		$new_name = $Data->name($index) . $suffix;
 	}
-	$Data->name($new_index, $new_name);
-		
+	$Data->name( $new_index, $new_name );
+
 	return $new_index;
 }
 
-
-
 sub _validate_index_list {
-	# this subroutine will ensure that the list of index numbers represent 
-	# actual columns, i.e., is each number < than the number of datasets in 
+
+	# this subroutine will ensure that the list of index numbers represent
+	# actual columns, i.e., is each number < than the number of datasets in
 	# the data table
-	
+
 	foreach my $num (@_) {
-		# check that each number represents a metadata hash 
+
+		# check that each number represents a metadata hash
 		# and presumably dataset
-		unless ($num =~ /^\d+$/ and $num <= $Data->number_columns) {
+		unless ( $num =~ /^\d+$/ and $num <= $Data->number_columns ) {
 			warn " requested index number '$num' is not valid!\n";
 			return;
 		}
@@ -3230,65 +3335,65 @@ sub _validate_index_list {
 	return 1;
 }
 
-
-
 sub _get_statistics_hash {
+
 	# internal subroutine to get statistics
-	
-	my ($index, $zero) = @_;
+
+	my ( $index, $zero ) = @_;
+
 	# the index number (column) of the dataset
 	# the exception rule to work with 0 numbers
-	unless (defined $zero) {
+	unless ( defined $zero ) {
+
 		# use global command-line specified value if present
 		$zero = $opt_zero;
 	}
-	
+
 	# collect the values in the dataset
 	my @invalues = $Data->column_values($index);
-	shift @invalues; # remove header
+	shift @invalues;    # remove header
 	my @goodvalues;
 	foreach my $v (@invalues) {
 		next if _is_null($v);
-		if ($v == 0) {
+		if ( $v == 0 ) {
+
 			# we need to determine whether we can accept 0 values
-			unless (defined $zero) {
+			unless ( defined $zero ) {
+
 				# wasn't defined on the command line, so stop the program and ask the user
 				print " Include 0 values in the statistics? y or n  ";
 				my $answer = <STDIN>;
-				if ($answer =~ /^y/i) {
+				if ( $answer =~ /^y/i ) {
 					$zero = 1;
 				}
 				else {
 					$zero = 0;
 				}
-				
+
 				# remember for next time, chances are user may still want this
 				# value again in the future
 				$opt_zero = $zero;
 			}
 			next unless $zero;
-		} 
+		}
 		push @goodvalues, $v;
 	}
-	
+
 	# check that we have values
 	unless (@goodvalues) {
 		warn " no valid values collected from dataset index '$index'!";
 		return;
 	}
-	
+
 	return statshash(@goodvalues);
 }
-
 
 sub _is_null {
 	my $v = shift;
 	return 1 if not defined $v;
-	return 1 if ($v eq '.' or $v =~ /^(?:n\/?a|nan|\-?inf)$/i);
+	return 1 if ( $v eq '.' or $v =~ /^(?:n\/?a|nan|\-?inf)$/i );
 	return 0;
 }
-
-
 
 __END__
 

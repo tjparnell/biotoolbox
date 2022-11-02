@@ -1,0 +1,18 @@
+# Configuration for Bio::ToolBox
+# I have always used tabs in Perl code for the past 1.8 decades.
+# I will stick with tabs. I'm too old and cranky to change.
+-i=4    # indent-columns
+-et=4   # entab-leading-whitespace
+-ci=4   # continuation-indentation
+-dt=4   # default-tabsize
+-l=90   # maximum-line-length
+-xci    # extended-continuation-indentation
+-pt=1   # parent-tightness
+-sbt=1  # square-bracket-tightness
+-bbt=1  # block-brace-tightness
+-nsfs   # nospace-for-semicolon
+-blbs=1 # blank-lines-before-subs
+-blbp=1 # blank-lines-before-packages
+
+
+
