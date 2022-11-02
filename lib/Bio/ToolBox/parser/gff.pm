@@ -177,7 +177,7 @@ use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser'; 
 use Bio::ToolBox::Data; 
 
-my %TYPECOUNTS = {};
+my %TYPECOUNTS = ();
 
 1;
 
