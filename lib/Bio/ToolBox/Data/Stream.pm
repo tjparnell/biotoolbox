@@ -221,7 +221,16 @@ sub copy_column {
 
 #### Row Access ####
 
+# aliases
 *next_line = *read_line = \&next_row;
+*add_row = *add_line = *write_line = \&write_row;
+
+# stop once warnings
+*next_line  if 0;
+*read_line  if 0;
+*add_row    if 0;
+*add_line   if 0;
+*write_line if 0;
 
 sub next_row {
 	my $self = shift;
@@ -250,8 +259,6 @@ sub next_row {
 		'index' => 1,
 	);
 }
-
-*add_row = *add_line = *write_line = \&write_row;
 
 sub write_row {
 	my $self = shift;

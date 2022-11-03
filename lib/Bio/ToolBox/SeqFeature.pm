@@ -35,6 +35,19 @@ our $VERSION = '1.70';
 *get_all_tags        = \&all_tags;
 *gff3_string         = \&gff_string;
 
+# avoid once warning errors
+*stop                 if 0;
+*name                 if 0;
+*id                   if 0;
+*method               if 0;
+*source               if 0;
+*add_segment          if 0;
+*get_all_SeqFeatures  if 0;
+*segments             if 0;
+*each_tag_value       if 0;
+*get_all_tags         if 0;
+*gff3_string          if 0;
+
 #### METHODS ####
 sub new {
 	my $class = shift;

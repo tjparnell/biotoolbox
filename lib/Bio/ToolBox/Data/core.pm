@@ -1463,7 +1463,9 @@ sub stop_column {
 	}
 	return $self->{column_indices}{stop};
 }
+
 *end_column = \&stop_column;
+*end_column if 0;  # avoid once warning
 
 sub coord_column {
 	my $self = shift;
@@ -1550,6 +1552,7 @@ sub score_column {
 }
 
 *zero_start = \&interbase;
+*zero_start if 0;  # avoid once warning
 
 sub interbase {
 	my $self = shift;

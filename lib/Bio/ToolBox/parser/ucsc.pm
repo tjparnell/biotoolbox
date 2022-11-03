@@ -268,6 +268,7 @@ sub next_feature {
 }
 
 *parse_file = \&parse_table;
+*parse_file if 0;  # avoid once warning
 
 sub parse_table {
 	my $self = shift;

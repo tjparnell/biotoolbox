@@ -205,6 +205,7 @@ sub start {
 }
 
 *stop = \&end;
+*stop if 0;  # avoid once warning
 
 sub end {
 	my $self = shift;
@@ -375,6 +376,7 @@ sub midpoint {
 }
 
 *name = \&display_name;
+*name if 0;  # avoid once warning
 
 sub display_name {
 	my $self = shift;
@@ -466,6 +468,7 @@ sub type {
 }
 
 *id = \&primary_id;
+*id if 0;  # avoid once warning
 
 sub primary_id {
 	my $self = shift;
@@ -649,6 +652,7 @@ sub rewrite_vcf_attributes {
 ### Data collection convenience methods
 
 *feature = \&seqfeature;
+*feature if 0;  # avoid once warning
 
 sub seqfeature {
 	my $self  = shift;

@@ -339,6 +339,7 @@ sub top_features {
 }
 
 *get_feature_by_id = \&fetch;
+*get_feature_by_id if 0;  # avoid once warning
 
 sub fetch {
 	my ( $self, $id ) = @_;
