@@ -487,7 +487,7 @@ sub parse_headers {
 			my $i = $self->add_column('Column1');
 			$self->reorder_column( $i, 0 .. $old_last );
 		}
-		if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
+		if ( ref $self eq 'Bio::ToolBox::Data::Stream' ) {
 
 			# store an example first line for Stream objects
 			chomp $nextdata[-1];
@@ -989,7 +989,7 @@ sub save {
 sub open_to_read_fh {
 	my $self = shift;
 	my $file = shift || undef;
-	my $obj  = ref($self) =~ /^Bio::ToolBox/ ? 1 : 0;
+	my $obj  = ref $self =~ /^Bio::ToolBox/ ? 1 : 0;
 
 	# check file
 	if ( not $file and $obj ) {

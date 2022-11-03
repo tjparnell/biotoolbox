@@ -205,8 +205,8 @@ sub open_wig_to_bigwig_fh {
 	# wigToBigWig will always die anyway if something is wrong
 	# cannot trap it with an eval, since it doesn't just error out
 	# but actually exits, dragging the whole Perl process with it
-	# printf "we have a filehandle %s\n", ref($bwfh);
-	confess "unable to execute command '$command'" unless ref($bwfh);
+	# printf "we have a filehandle %s\n", ref $bwfh;
+	confess "unable to execute command '$command'" unless ref $bwfh;
 
 	# we will still get an IO::File handle back even with a failed convertor - sigh
 	return $bwfh;
@@ -257,8 +257,8 @@ sub open_bigwig_to_wig_fh {
 	# bigWigToWig will always die anyway if something is wrong
 	# cannot trap it with an eval, since it doesn't just error out
 	# but actually exits, dragging the whole Perl process with it
-	# printf "we have a filehandle %s\n", ref($bwfh);
-	confess "unable to execute command '$command'" unless ref($bwfh);
+	# printf "we have a filehandle %s\n", ref $bwfh;
+	confess "unable to execute command '$command'" unless ref $bwfh;
 
 	# we will still get an IO::File handle back even with a failed convertor - sigh
 	return $bwfh;

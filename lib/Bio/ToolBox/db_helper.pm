@@ -67,7 +67,7 @@ my %SCORE_CALCULATOR_SUB = (
 		my $s = shift;
 		my %name2count;
 		foreach my $n (@$s) {
-			if ( ref($n) eq 'ARRAY' ) {
+			if ( ref $n eq 'ARRAY' ) {
 
 				# this is likely from a ncount indexed hash
 				foreach (@$n) {
@@ -506,7 +506,7 @@ sub open_db_connection {
 sub get_db_name {
 	my $db = shift;
 	return unless $db;
-	my $db_ref = ref($db);
+	my $db_ref = ref $db;
 	return $db unless $db_ref;    # presumption that non-object is just a database name
 	my $db_name;
 	if ( $db_ref =~ /^Bio::DB::SeqFeature::Store/ ) {
@@ -971,7 +971,7 @@ sub get_new_feature_list {
 		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
 		return;
 	}
-	unless ( ref($data) eq 'Bio::ToolBox::Data' ) {
+	unless ( ref $data eq 'Bio::ToolBox::Data' ) {
 		confess 'must pass a Bio::ToolBox::Data object!';
 		return;
 	}
@@ -1052,7 +1052,7 @@ sub get_new_genome_list {
 	unless ($data) {
 		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
 	}
-	unless ( ref($data) eq 'Bio::ToolBox::Data' ) {
+	unless ( ref $data eq 'Bio::ToolBox::Data' ) {
 		confess 'must pass a Bio::ToolBox::Data object!';
 	}
 
@@ -1313,7 +1313,7 @@ sub get_segment_score {
 
 		# this might be an array reference of scores that need to be combined
 		# or it could be a single scalar score which just needs to be returned
-		if ( ref($scores) ) {
+		if ( ref $scores ) {
 			return calculate_score( $_[METH], $scores );
 		}
 		else {
@@ -1352,7 +1352,7 @@ sub get_chromosome_list {
 
 	# Check for BigWigSet database
 	# these need to be handled a little differently
-	if ( ref($db) =~ /BigWigSet/ ) {
+	if ( ref $db =~ /BigWigSet/ ) {
 
 		# BigWigSet databases are the only databases that don't
 		# support the seq_ids method
@@ -1370,7 +1370,7 @@ sub get_chromosome_list {
 	# Database specific approaches to collecting chromosomes
 	# I used to have one generic approach, but idiosyncrasies and potential
 	# bugs make me use different approaches for better consistency
-	my $type = ref($db);
+	my $type = ref $db;
 
 	# SeqFeature::Store
 	if ( $type =~ /^Bio::DB::SeqFeature::Store/ ) {
@@ -1524,7 +1524,7 @@ sub low_level_bam_fetch {
 
 	# run the the low level bam fetch based on which adapter is being used
 	unless ($BAM_ADAPTER) {
-		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
+		$BAM_ADAPTER = ref $sam =~ /hts/i ? 'hts' : 'sam';
 	}
 	if ( $BAM_ADAPTER eq 'hts' ) {
 
@@ -1551,7 +1551,7 @@ sub low_level_bam_coverage {
 
 	# run the the low level bam coverage based on which adapter is being used
 	unless ($BAM_ADAPTER) {
-		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
+		$BAM_ADAPTER = ref $sam =~ /hts/i ? 'hts' : 'sam';
 	}
 	if ( $BAM_ADAPTER eq 'hts' ) {
 
@@ -1577,7 +1577,7 @@ sub get_genomic_sequence {
 	my ( $db, $chrom, $start, $stop ) = @_;
 
 	# check database
-	my $type = ref($db);
+	my $type = ref $db;
 	$db = open_db_connection($db) if not $type;
 
 	# return sequence based on the type of database adapter we're using

@@ -21,8 +21,8 @@ our $VERSION = '1.70';
 sub new {
 	my $class = shift;
 	my %args  = @_;
-	if ( ref($class) ) {
-		$class = ref($class);
+	if ( ref $class ) {
+		$class = ref $class;
 	}
 
 	# check for important arguments
@@ -192,7 +192,7 @@ sub parse_table {
 	my $self = shift;
 	my $args = shift;
 	my $file;
-	if ( ref($args) eq 'HASH' ) {
+	if ( ref $args eq 'HASH' ) {
 		$file = $args->{file} || '';
 	}
 	else {
@@ -544,7 +544,7 @@ sub iterate {
 
 sub store_seqfeature {
 	my ( $self, $row_i, $seqfeature ) = @_;
-	unless ( defined $row_i and ref($seqfeature) ) {
+	unless ( defined $row_i and ref $seqfeature ) {
 		confess "must provide a row index and SeqFeature object!";
 	}
 	confess "invalid row index" unless ( $row_i <= $self->last_row );

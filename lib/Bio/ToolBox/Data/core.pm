@@ -20,8 +20,8 @@ sub new {
 	my $class = shift;
 
 	# in case someone calls this from an established object
-	if ( ref($class) ) {
-		$class = ref($class);
+	if ( ref $class ) {
+		$class = ref $class;
 	}
 
 	# Initialize the hash structure
@@ -1584,7 +1584,7 @@ sub interbase {
 # objects inherit from Data::core, this is in here.
 sub get_seqfeature {
 	my ( $self, $row ) = @_;
-	return unless ( ref($self) eq 'Bio::ToolBox::Data' );
+	return unless ( ref $self eq 'Bio::ToolBox::Data' );
 	return unless ( $row and $row <= $self->{last_row} );
 	return unless exists $self->{SeqFeatureObjects};
 	return $self->{SeqFeatureObjects}->[$row] || undef;
