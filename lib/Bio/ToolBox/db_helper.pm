@@ -997,7 +997,7 @@ sub get_new_feature_list {
 		carp "no search feature types passed!";
 		return;
 	}
-	my @classes = split( ',', $searchFeature );    # it may or may not be a list
+	my @classes = split /,/, $searchFeature;    # it may or may not be a list
 
 	# chromosomes to skip
 	my $chr_exclude = $args{'chrskip'} || undef;

@@ -243,7 +243,7 @@ sub next_feature {
 			next;
 		}
 		chomp $line;
-		my @linedata = split( "\t", $line );
+		my @linedata = split /\t/, $line;
 		my $builder  = Bio::ToolBox::parser::ucsc::builder->new( \@linedata, $self );
 		$self->{line_count}++;
 		unless ($builder) {

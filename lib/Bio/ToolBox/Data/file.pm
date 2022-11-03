@@ -210,7 +210,7 @@ sub sample_gff_type_list {
 		my $line = $fh->getline or last;
 		next if $line !~ m/\w+/;
 		next if $line =~ /^#/;
-		my @fields = split( '\t', $line );
+		my @fields = split /\t/, $line;
 		$types{ $fields[2] } += 1;
 		$count++;
 	}
@@ -395,19 +395,19 @@ sub parse_headers {
 
 			### a peak file
 			elsif ( $format =~ /peak/i ) {
-				my $count = scalar( split '\t', $line );
+				my $count = scalar( split /\t/, $line );
 				$self->add_peak_metadata($count);
 			}
 
 			### a Bed or BedGraph file
 			elsif ( $format =~ /bg|bdg|bed/i ) {
-				my $count = scalar( split '\t', $line );
+				my $count = scalar( split /\t/, $line );
 				$self->add_bed_metadata($count);
 			}
 
 			### a UCSC gene table
 			elsif ( $format =~ /ref+lat|genepred|ucsc/i ) {
-				my $count = scalar( split '\t', $line );
+				my $count = scalar( split /\t/, $line );
 				$self->add_ucsc_metadata($count);
 			}
 
@@ -476,7 +476,7 @@ sub parse_headers {
 	# need to handle these
 	my $nextline = $fh->getline;
 	if ($nextline) {
-		my @nextdata = split '\t', $nextline;
+		my @nextdata = split /\t/, $nextline;
 		if ( scalar(@nextdata) - 1 == $self->number_columns ) {
 
 			# whoops! we caught a off-by-one discrepancy between header and data row
@@ -514,7 +514,7 @@ sub add_data_line {
 	my ( $self, $line ) = @_;
 
 	# do not chomp the line yet, just split into an array
-	my @linedata = split '\t', $line, $self->{number_columns};
+	my @linedata = split /\t/, $line, $self->{number_columns};
 
 	# chomp the last element
 	# we do this here to ensure the tab split above gets all of the values
@@ -1167,9 +1167,9 @@ sub _commented_header_line {
 	if ( scalar @{ $data->{'comments'} } >= 1 ) {
 
 		# take the last line in the other array
-		@commentdata = split '\t', $data->{'comments'}->[-1];
+		@commentdata = split /\t/, $data->{'comments'}->[-1];
 	}
-	my @linedata = split '\t', $line;
+	my @linedata = split /\t/, $line;
 
 	# check if the counts are equal
 	if ( scalar @commentdata == scalar @linedata ) {
@@ -1190,7 +1190,7 @@ sub add_column_metadata {
 
 	# break up the column metadata
 	my %temphash;    # a temporary hash to put the column metadata into
-	foreach ( split ';', $line ) {
+	foreach ( split /;/, $line ) {
 		my ( $key, $value ) = split '=';
 		if ( $key eq 'index' ) {
 			if ( $index != $value ) {
@@ -1537,7 +1537,7 @@ sub add_sgr_metadata {
 sub add_standard_metadata {
 	my ( $self, $line ) = @_;
 
-	my @namelist = split '\t', $line;
+	my @namelist = split /\t/, $line;
 	chomp $namelist[-1];
 
 	# we will define the columns based on

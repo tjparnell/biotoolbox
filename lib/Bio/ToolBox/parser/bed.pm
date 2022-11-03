@@ -318,8 +318,8 @@ sub _parse_bed12 {
 	$data[11] ||= 0;                      # block starts
 
 	# calculate exons
-	my @exonSizes  = split( ',', $data[10] );
-	my @exonStarts = map { $data[1] + $_ } split( ',', $data[11] );
+	my @exonSizes  = split /,/, $data[10];
+	my @exonStarts = map { $data[1] + $_ } split /,/, $data[11];
 	my @exonEnds;
 	for ( my $i = 0; $i < $data[9]; $i++ ) {
 		push @exonEnds, $exonStarts[$i] + $exonSizes[$i];
@@ -364,8 +364,8 @@ sub _parse_gappedPeak {
 	# fortunately, the two are pretty similar in structure
 
 	# calculate exons, er, sub peaks
-	my @exonSizes  = split( ',', $data[10] );
-	my @exonStarts = map { $data[1] + $_ } split( ',', $data[11] );
+	my @exonSizes  = split /,/, $data[10];
+	my @exonStarts = map { $data[1] + $_ } split /,/, $data[11];
 	my @exonEnds;
 	for ( my $i = 0; $i < $data[9]; $i++ ) {
 		push @exonEnds, $exonStarts[$i] + $exonSizes[$i];

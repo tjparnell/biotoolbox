@@ -147,7 +147,7 @@ sub next_feature {
 
 		# line must be a GFF feature
 		chomp $line;
-		my @fields = split( '\t', $line );
+		my @fields = split /\t/, $line;
 		next unless scalar(@fields) == 9;
 
 		# check the primary_tag and generate the SeqFeature object for known types

@@ -947,7 +947,7 @@ sub next_seq {
 		$entry = shift @{ $self->{entries} } || undef;
 	}
 	return unless $entry;
-	my @bits = split( '\t', $entry->{string} );
+	my @bits = split /\t/, $entry->{string};
 	return Bio::ToolBox::SeqFeature->new(
 		-seq_id       => $self->{seqid},
 		-start        => $entry->{start} + 1,    # compensate for 0-based coordinates

@@ -250,8 +250,8 @@ sub new {
 
 	# fix values
 	$self{strand}     = $self{strand} eq '+' ? 1 : $self{strand} eq '-' ? -1 : 0;
-	$self{exonStarts} = [ map { $_ += 1 } ( split ",", $self{exonStarts} ) ];
-	$self{exonEnds}   = [ ( split ",", $self{exonEnds} ) ];
+	$self{exonStarts} = [ map { $_ += 1 } ( split /,/, $self{exonStarts} ) ];
+	$self{exonEnds}   = [ ( split /,/, $self{exonEnds} ) ];
 
 	# Attempt to identify the transcript type
 	my $type = $ucsc->{ensembldata}->{ $self{name} }->[1] || undef;
