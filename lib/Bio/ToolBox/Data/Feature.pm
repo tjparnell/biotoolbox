@@ -1,1018 +1,6 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.691';
 
-=head1 NAME
-
-Bio::ToolBox::Data::Feature - Objects representing rows in a data table
-
-=head1 DESCRIPTION
-
-A Bio::ToolBox::Data::Feature is an object representing a row in the 
-data table. Usually, this in turn represents an annotated feature or 
-segment in the genome. As such, this object provides convenient 
-methods for accessing and manipulating the values in a row, as well as 
-methods for working with the represented genomic feature.
-
-This class should NOT be used directly by the user. Rather, Feature 
-objects are generated from a Bio::ToolBox::Data::Iterator object 
-(generated itself from the L<row_stream|Bio::ToolBox::Data/row_stream> 
-function in Bio::ToolBox::Data), or the L<iterate|Bio::ToolBox::Data/iterate> 
-function in Bio::ToolBox::Data. Please see the respective documentation 
-for more information.
-
-Example of working with a stream object.
-
-	  my $Data = Bio::ToolBox::Data->new(file => $file);
-	  
-	  # stream method
-	  my $stream = $Data->row_stream;
-	  while (my $row = $stream->next_row) {
-		 # each $row is a Bio::ToolBox::Data::Feature object
-		 # representing the row in the data table
-		 my $value = $row->value($index);
-		 # do something with $value
-	  }
-	  
-	  # iterate method
-	  $Data->iterate( sub {
-	     my $row = shift;
-	     my $number = $row->value($index);
-	     my $log_number = log($number);
-	     $row->value($index, $log_number);
-	  } );
-
-
-=head1 METHODS
-
-=head2 General information methods
-
-=over 4
-
-=item row_index
-
-Returns the index position of the current data row within the 
-data table. Useful for knowing where you are at within the data 
-table.
-
-=item feature_type
-
-Returns one of three specific values describing the contents 
-of the data table inferred by the presence of specific column 
-names. This provides a clue as to whether the table features 
-represent genomic regions (defined by coordinate positions) or 
-named database features. The return values include:
-
-=over 4
-
-=item * coordinate: Table includes at least chromosome and start
-
-=item * named: Table includes name, type, and/or Primary_ID
-
-=item * unknown: unrecognized
-
-=back
-
-=item column_name
-
-Returns the column name for the given index. 
-
-item data
-
-Returns the parent L<Bio::ToolBox::Data> object, in case you may 
-have lost it by going out of scope.
-
-=back
-
-=head2 Methods to access row feature attributes
-
-These methods return the corresponding value, if present in the 
-data table, based on the column header name. If the row represents 
-a named database object, try calling the L</feature> method first. 
-This will retrieve the database SeqFeature object, and the attributes 
-can then be retrieved using the methods below or on the actual 
-database SeqFeature object.
-
-In cases where there is a table column and a corresponding SeqFeature 
-object, for example a start column and a parsed SeqFeature object, the 
-table value takes precedence and is returned. You can always obtain the 
-SeqFeature's value separately and directly.
-
-These methods do not set attribute values. If you need to change the 
-values in a table, use the L</value> method below.
-
-=over 4
-
-=item seq_id
-
-The name of the chromosome the feature is on.
-
-=item start
-
-=item end
-
-=item stop
-
-The coordinates of the feature or segment. Coordinates from known 
-0-based file formats, e.g. BED, are returned as 1-based. Coordinates 
-must be integers to be returned. Zero or negative start coordinates 
-are assumed to be accidents or poor programming and transformed to 1. 
-Use the L</value> method if you don't want this to happen.
-
-=item strand
-
-The strand of the feature or segment. Returns -1, 0, or 1. Default is 0, 
-or unstranded.
-
-=item midpoint
-
-The calculated midpoint position of the feature.
-
-=item peak
-
-For features in a C<narrowPeak> file, this will report the peak coordinate, 
-transformed into a genomic coordinate. 
-
-=item name
-
-=item display_name
-
-The name of the feature.
-
-=item coordinate
-
-Returns a coordinate string formatted as C<seqid:start-stop>. This uses the 
-start coordinate as listed in the source file and does not convert 0-based 
-start values to 1-based values. This may confound downstream applications. 
-
-=item type
-
-The type of feature. Typically either C<primary_tag> or C<primary_tag:source_tag>. 
-In a GFF3 file, this represents columns 3 and 2, respectively. In annotation 
-databases such as L<Bio::DB::SeqFeature::Store>, the type is used to restrict 
-to one of many different types of features, e.g. gene, mRNA, or exon.
-
-=item id
-
-=item primary_id
-
-Here, this represents the C<primary_ID> in the database. Note that this number 
-is generally unique to a specific database, and not portable between databases.
-
-=item length
-
-The length of the feature or segment.
-
-=item score
-
-Returns the value of the Score column, if one is available. Typically 
-associated with defined file formats, such as GFF files (6th column), 
-BED and related Peak files (5th column), and bedGraph (4th column).
-
-=back
-
-=head2 Accessing and setting values in the row.
-
-=over 4
-
-=item value
-
-  # retrieve a value 
-  my $v = $row->value($index);
-  # set a value
-  $row->value($index, $v + 1);
-
-Returns or sets the value at a specific column index in the 
-current data row. Null values return a '.', symbolizing an 
-internal null value. 
-
-=item row_values
-
-Returns an array or array reference representing all the values 
-in the current data row. 
-
-=back
-
-=head2 Special feature attributes
-
-GFF and VCF files have special attributes in the form of key =E<gt> value pairs. 
-These are stored as specially formatted, character-delimited lists in 
-certain columns. These methods will parse this information and return as 
-a convenient hash reference. The keys and values of this hash may be 
-changed, deleted, or added to as desired. To write the changes back to 
-the file, use the L</rewrite_attributes> to properly write the attributes 
-back to the file with the proper formatting.
-
-=over 4
-
-=item attributes
-
-Generic method that calls either L</gff_attributes> or L</vcf_attributes> 
-depending on the data table format. 
-
-=item gff_attributes
-
-Parses the 9th column of GFF files. URL-escaped characters are converted 
-back to text. Returns a hash reference of key =E<gt> value pairs. 
-
-=item vcf_attributes
-
-Parses the C<INFO> (8th column) and all sample columns (10th and higher 
-columns) in a version 4 VCF file. The Sample columns use the C<FORMAT> 
-column (9th column) as keys. The returned hash reference has two levels:
-The first level keys are both the column names and index (0-based). The 
-second level keys are the individual attribute keys to each value. 
-For example:
-
-   my $attr = $row->vcf_attributes;
-   
-   # access by column name
-   my $genotype = $attr->{sample1}{GT};
-   my $depth    = $attr->{INFO}{ADP};
-   
-   # access by 0-based column index 
-   my $genotype = $attr->{9}{GT};
-   my $depth    = $attr->{7}{ADP}
-
-=item rewrite_attributes
-
-Generic method that either calls L</rewrite_gff_attributes> or 
-L</rewrite_vcf_attributes> depending on the data table format.
-
-=item rewrite_gff_attributes
-
-Rewrites the GFF attributes column (the 9th column) based on the 
-contents of the attributes hash that was previously generated with 
-the L</gff_attributes> method. Useful when you have modified the 
-contents of the attributes hash.
-
-=item rewrite_vcf_attributes
-
-Rewrite the VCF attributes for the C<INFO> (8th column), C<FORMAT> (9th 
-column), and sample columns (10th and higher columns) based on the 
-contents of the attributes hash that was previously generated with 
-the L</vcf_attributes> method. Useful when you have modified the 
-contents of the attributes hash.
-
-=back
-
-=head2 Convenience Methods to database functions
-
-The next three functions are convenience methods for using the 
-attributes in the current data row to interact with databases. 
-They are wrappers to methods in the L<Bio::ToolBox::db_helper> 
-module.
-
-=over 4
-
-=item seqfeature
-
-=item feature
-
-Returns a SeqFeature object representing the feature or item in 
-the current row. If the SeqFeature object is stored in the parent 
-C<$Data> object (usually from parsing an annotation file), it is 
-immediately returned. Otherwise, the SeqFeature 
-object is retrieved from the database using the name and 
-type values in the current Data table row. The SeqFeature object 
-is requested from the database named in the general metadata. If 
-an alternate database is desired, you should change it first using  
-the C<$Data>-E<gt>database() method. If the feature name or type is not 
-present in the table, then nothing is returned.
-
-See L<Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
-information about working with these objects. See L<Bio::DB::SeqFeature::Store> 
-about working with database features.
-
-This method normally only works with "named" feature types in a 
-L<Bio::ToolBox::Data> Data table. If your Data table has coordinate 
-information, i.e. chromosome, start, and stop columns, then it will 
-likely be recognized as a "coordinate" feature_type and not work.
-
-Pass a true value to this method to force the seqfeature lookup. This 
-will still require the presence of Name, ID, and/or Type columns to 
-perform the database lookup. The L<Bio::ToolBox::Data> method feature() 
-is used to determine the type if a Type column is not present.
-
-=item segment
-
-Returns a database Segment object corresponding to the coordinates 
-defined in the Data table row. If a named feature and type are 
-present instead of coordinates, then the feature is first automatically 
-retrieved and a Segment returned based on its coordinates. The 
-database named in the general metadata is used to establish the 
-Segment object. If a different database is desired, it should be 
-changed first using the general L</database> method. 
-
-See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
-about working with Segment objects.
-
-=item get_features
-
-  my @overlap_features = $row->get_features(type => $type);
-
-Returns seqfeature objects from a database that overlap the Feature 
-or interval in the current Data table row. This is essentially a 
-convenience wrapper for a Bio::DB style I<features> method using the 
-coordinates of the Feature. Optionally pass an array of key value pairs 
-to specify alternate coordinates if so desired. Potential keys 
-include 
-
-=over 4
-
-=item seq_id
-
-=item start
-
-=item end
-
-=item type
-
-The type of database features to retrieve.
-
-=item db
-
-An alternate database object to collect from.
-
-=back
-
-=item get_sequence
-
-Fetches genomic sequence based on the coordinates of the current seqfeature 
-or interval in the current Feature. This requires a database that 
-contains the genomic sequence, either the database specified in the 
-Data table metadata or an external indexed genomic fasta file. 
-
-If the Feature represents a transcript or gene, then a concatenated 
-sequence of the selected subfeatures may be generated and returned. B<Note> 
-that redundant or overlapping subfeatures are B<NOT> merged, and 
-unexpected results may be obtained.
-
-The sequence is returned as simple string. If the feature is on the reverse 
-strand, then the reverse complement sequence is automatically returned. 
-
-Pass an array of key value pairs to specify alternate coordinates if so 
-desired. Potential keys include
-
-=over 4
-
-=item subfeature 
-
-Pass a text string representing the type of subfeature from which to collect 
-the sequence. Acceptable values include 
-
-=over 4 
-
-=item * exon
-
-=item * cds
-
-=item * 5p_utr
-
-=item * 3p_utr
-
-=item * intron
-
-=back
-
-=item seq_id
-
-=item start
-
-=item end
-
-=item strand
-
-=item extend
-
-Indicate additional basepairs of sequence added to both sides
-
-=item db
-
-The fasta file or database from which to fetch the sequence
-
-=back
-
-=back
-
-=head2 Data collection
-
-The following methods allow for data collection from various 
-sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc. 
-
-=over 4
-
-=item calculate_reference($position)
-
-Calculates and returns the absolute genomic coordinate for a relative 
-reference position taking into account feature orientation (strand). 
-This is not explicitly data collection, but often used in conjunction
-with such. Provide an integer representing the relative position point:
-
-=over 4 
-
-=item * C<3> representing C<3'> end coordinate
-
-=item * C<4> representing mid point coordinate
-
-=item * C<5> representing C<5'> end coordinate
-
-=item * C<9> representing peak summit in F<narrowPeak> formatted files
-
-=back
-
-If necessary, an array or array reference may be provided as an 
-alternative parameter with keys including C<position>, C<strand>, 
-C<practical_start>, and C<practical_end> if alternate or adjusted 
-coordinates should be used instead of the given row feature coordinates.
-
-=item get_score
-
-  my $score = $row->get_score(
-       dataset => 'scores.bw',
-       method  => 'max',
-  );
-
-This method collects a single score over the feature or interval. 
-Usually a mathematical or statistical value is employed to derive the 
-single score. Pass an array of key value pairs to control data collection.
-Keys include the following:
-
-=over 4
-
-=item db
-
-=item ddb
-
-Specify a Bio::DB database from which to collect the data. The default 
-value is the database specified in the Data table metadata, if present.
-Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
-database.
-
-=item dataset 
-
-Specify the name of the dataset. If a database was specified, then this 
-value would be the C<primary_tag> or C<type:source> feature found in the 
-database. Otherwise, the name of a data file, such as a bam, bigWig, 
-bigBed, or USeq file, would be provided here. This options is required!
-
-=item method
-
-Specify the mathematical or statistical method combining multiple scores 
-over the interval into one value. Options include the following:
-
-=over 4
-
-=item * mean
-
-=item * sum
-
-=item * min
-
-=item * max
-
-=item * median
-
-=item * count
-
-Count all overlapping items.
-
-=item * pcount
-
-Precisely count only containing (not overlapping) items.
-
-=item * ncount
-
-Count overlapping unique names only.
-
-=item * range
-
-The difference between minimum and maximum values.
-
-=item * stddev
-
-Standard deviation.
-
-=back
-
-=item strandedness 
-
-Specify what strand from which the data should be taken, with respect 
-to the Feature strand. Three options are available. Only really relevant 
-for data sources that support strand. 
-
-=over 4
-
-=item * sense
-
-The same strand as the Feature.
-
-=item * antisense
-
-The opposite strand as the Feature.
-
-=item * all
-
-Strand is ignored, all is taken (default).
-
-=back
-
-=item subfeature
-
-Specify the subfeature type from which to collect the scores. Typically 
-a SeqFeature object representing a transcript is provided, and the 
-indicated subfeatures are collected from object. Pass the name of the 
-subfeature to use. Accepted values include the following.
-
-=over 4 
-
-=item * exon
-
-=item * cds
-
-=item * 5p_utr
-
-=item * 3p_utr
-
-=item * intron
-
-=back
-
-=item extend
-
-Specify the number of basepairs that the Data table Feature's 
-coordinates should be extended in both directions. Ignored 
-when used with the subfeature option.
-
-=item seq_id
-
-=item chromo
-
-=item start
-
-=item end
-
-=item stop
-
-=item strand
-
-Optionally specify zero or more alternate coordinates to use. 
-By default, these are obtained from the Data table Feature.
-
-=back
-  
-=item get_relative_point_position_scores
-
-  while (my $row = $stream->next_row) {
-     my $pos2score = $row->get_relative_point_position_scores(
-        'ddb'       => '/path/to/BigWigSet/',
-        'dataset'   => 'MyData',
-        'position'  => 5,
-        'extend'    => 1000,
-     );
-  }
-
-This method collects indexed position scores centered around a 
-specific reference point. The returned data is a hash of 
-relative positions (example -20, -10, 1, 10, 20) and their score 
-values. Pass an array of key value pairs to control data collection.
-Keys include the following:
-
-=over 4
-
-=item db
-
-=item ddb
-
-Specify a Bio::DB database from which to collect the data. The default 
-value is the database specified in the Data table metadata, if present.
-Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
-database.
-
-=item dataset 
-
-Specify the name of the dataset. If a database was specified, then this 
-value would be the C<primary_tag> or C<type:source> feature found in the 
-database. Otherwise, the name of a data file, such as a bam, bigWig, 
-bigBed, or USeq file, would be provided here. This options is required!
-
-=item position
-
-Indicate the position of the reference point relative to the Data table 
-Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
-midpoint (get it? it's between 5 and 3). Default is 5.
-
-=item extend
-
-Indicate the number of base pairs to extend from the reference coordinate. 
-This option is required!
-
-=item coordinate
-
-Optionally provide the real chromosomal coordinate as the reference point.
-
-=item absolute 
-
-Boolean option to indicate that the returned hash of positions and scores 
-should not be transformed into relative positions but kept as absolute 
-chromosomal coordinates.
-
-=item avoid
-
-Provide a C<primary_tag> or C<type:source> database feature type to avoid overlapping 
-scores. Each found score is checked for overlapping features and is 
-discarded if found to do so. The database should be set to use this.
-
-=item strandedness 
-
-Specify what strand from which the data should be taken, with respect 
-to the Feature strand. Three options are available. Only really relevant 
-for data sources that support strand. 
-
-=over 4
-
-=item * sense
-
-The same strand as the Feature.
-
-=item * antisense
-
-The opposite strand as the Feature.
-
-=item * all
-
-Strand is ignored, all is taken (default).
-
-=back
-
-=item method
-
-Only required when counting objects.
-
-=over 4
-
-=item * count
-
-Count all overlapping items.
-
-=item * pcount
-
-Precisely count only containing (not overlapping) items.
-
-=item * ncount
-
-Count overlapping unique names only.
-
-=back
-
-=back
-
-=item get_region_position_scores
-
-  while (my $row = $stream->next_row) {
-     my $pos2score = $row->get_relative_point_position_scores(
-        'ddb'       => '/path/to/BigWigSet/',
-        'dataset'   => 'MyData',
-        'position'  => 5,
-        'extend'    => 1000,
-     );
-  }
-
-This method collects indexed position scores across a defined 
-region or interval. The returned data is a hash of positions and 
-their score values. The positions are by default relative to a 
-region coordinate, usually to the 5' end. Pass an array of key value 
-pairs to control data collection. Keys include the following:
-
-=over 4
-
-=item db
-
-=item ddb
-
-Specify a Bio::DB database from which to collect the data. The default 
-value is the database specified in the Data table metadata, if present.
-Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
-database.
-
-=item dataset 
-
-Specify the name of the dataset. If a database was specified, then this 
-value would be the C<primary_tag> or C<type:source> feature found in the 
-database. Otherwise, the name of a data file, such as a bam, bigWig, 
-bigBed, or USeq file, would be provided here. This options is required!
-
-=item subfeature
-
-Specify the subfeature type from which to collect the scores. Typically 
-a SeqFeature object representing a transcript is provided, and the 
-indicated subfeatures are collected from object. When converting to 
-relative coordinates, the coordinates will be relative to the length of 
-the sum of the subfeatures, i.e. the length of the introns will be ignored.
-
-Pass the name of the subfeature to use. Accepted values include the following.
-
-=over 4 
-
-=item * exon
-
-=item * cds
-
-=item * 5p_utr
-
-=item * 3p_utr
-
-=item * intron
-
-=back
-
-=item extend
-
-Specify the number of basepairs that the Data table Feature's 
-coordinates should be extended in both directions. 
-
-=item seq_id
-
-=item chromo
-
-=item start
-
-=item end
-
-=item stop
-
-=item strand
-
-Optionally specify zero or more alternate coordinates to use. 
-By default, these are obtained from the Data table Feature.
-
-=item position
-
-Indicate the position of the reference point relative to the Data table 
-Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
-midpoint (get it? it's between 5 and 3). Default is 5.
-
-=item coordinate
-
-Optionally provide the real chromosomal coordinate as the reference point.
-
-=item absolute 
-
-Boolean option to indicate that the returned hash of positions and scores 
-should not be transformed into relative positions but kept as absolute 
-chromosomal coordinates.
-
-=item avoid
-
-Provide a C<primary_tag> or C<type:source> database feature type to avoid overlapping 
-scores. Each found score is checked for overlapping features and is 
-discarded if found to do so. The database should be set to use this.
-
-=item strandedness 
-
-Specify what strand from which the data should be taken, with respect 
-to the Feature strand. Three options are available. Only really relevant 
-for data sources that support strand. 
-
-=over 4
-
-=item * sense
-
-The same strand as the Feature.
-
-=item * antisense
-
-The opposite strand as the Feature.
-
-=item * all
-
-Strand is ignored, all is taken (default).
-
-=back
-
-=item method
-
-Only required when counting objects.
-
-=over 4
-
-=item * count
-
-Count all overlapping items.
-
-=item * pcount
-
-Precisely count only containing (not overlapping) items.
-
-=item * ncount
-
-Count overlapping unique names only.
-
-=back
-
-=back
-
-=item fetch_alignments
-
-  my $sam = $Data->open_database('/path/to/file.bam');
-  my $alignment_data = { mapq => [] };
-  my $callback = sub {
-     my ($a, $data) = @_;
-     push @{ $data->{mapq} }, $a->qual;
-  };
-  while (my $row = $stream->next_row) {
-     $row->fetch_alignments(
-        'db'        => $sam,
-        'data'      => $alignment_data,
-        'callback'  => $callback,
-     );
-  }
-
-This function allows you to iterate over alignments in a Bam file, 
-allowing custom information to be collected based on a callback 
-code reference that is provided. 
-
-Three parameters are required: C<db>, C<data>, and C<callback>. A 
-true value (1) is returned upon success.
-
-=over 4
-
-=item db
-
-Provide an opened, high-level, Bam database object. 
-
-=item callback
-
-Provide a code callback reference to use when iterating over the 
-alignments. Two objects are passed to this code function: the 
-alignment object and the data structure that is provided. See the 
-Bam adapter documentation for details on low-level C<fetch> through 
-the Bam index object for details.
-
-=item data
-
-This is a reference to a C<HASH> data object for storing information. 
-It is passed to the callback function along with the alignment. Three 
-new key =E<gt> value pairs are automatically added: C<start>, C<end>, 
-and C<strand>. These correspond to the values for the current queried 
-interval. Coordinates are automatically transformed to 0-base coordinate 
-system to match low level alignment objects.
-
-=item subfeature
-
-If the feature has subfeatures, such as exons, introns, etc., pass 
-the name of the subfeature to restrict iteration only over the 
-indicated subfeatures. The C<data> object will inherit the coordinates 
-for each subfeatures. Allowed subfeatures include the following:
-
-=over 4 
-
-=item * exon
-
-=item * cds
-
-=item * 5p_utr
-
-=item * 3p_utr
-
-=item * intron
-
-=back
-
-=item start
-
-=item stop
-
-=item end
-
-Provide alternate, custom start and stop coordinates for the row 
-feature. Ignored with subfeatures.
-
-=back
-
-=back
-
-=head2 Feature Export
-
-These methods allow the feature to be exported in industry standard 
-formats, including the BED format and the GFF format. Both methods 
-return a formatted tab-delimited text string suitable for printing to 
-file. The string does not include a line ending character.
-
-These methods rely on coordinates being present in the source table. 
-If the row feature represents a database item, the L</feature> method 
-should be called prior to these methods, allowing the feature to be 
-retrieved from the database and coordinates obtained.
-
-=over 4
-
-=item bed_string
-
-Returns a BED formatted string. By default, a 6-element string is 
-generated, unless otherwise specified. Pass an array of key values 
-to control how the string is generated. The following arguments 
-are supported.
-
-=over 4
-
-=item bed
-
-Specify the number of BED elements to include. The number of elements 
-correspond to the number of columns in the BED file specification. A 
-minimum of 3 (chromosome, start, stop) is required, and maximum of 6 
-is allowed (chromosome, start, stop, name, score, strand). 
-
-=item chromo
-
-=item seq_id
-
-Provide a text string of an alternative chromosome or sequence name.
-
-=item start
-
-=item stop
-
-=item end
-
-Provide alternative integers for the start and stop coordinates. 
-Note that start values are automatically converted to 0-base 
-by subtracting 1.
-
-=item strand
-
-Provide alternate an alternative strand value. 
-
-=item name
-
-Provide an alternate or missing name value to be used as text in the 4th 
-column. If no name is provided or available, a default name is generated.
-
-=item score
-
-Provide a numerical value to be included as the score. BED files typically 
-use integer values ranging from 1..1000. 
-
-=back
-
-=item gff_string
-
-Returns a GFF3 formatted string. Pass an array of key values 
-to control how the string is generated. The following arguments 
-are supported.
-
-=over 4
-
-=item chromo
-
-=item seq_id
-
-=item start
-
-=item stop
-
-=item end
-
-=item strand
-
-Provide alternate values from those defined or missing in the current 
-row Feature. 
-
-=item source
-
-Provide a text string to be used as the source_tag value in the 2nd 
-column. The default value is null ".".
-
-=item primary_tag
-
-Provide a text string to be used as the primary_tag value in the 3rd 
-column. The default value is null ".".
-
-=item type
-
-Provide a text string. This can be either a "primary_tag:source_tag" value 
-as used by GFF based BioPerl databases, or "primary_tag" alone.
-
-=item score
-
-Provide a numerical value to be included as the score. The default 
-value is null ".". 
-
-=item name
-
-Provide alternate or missing name value to be used as the display_name. 
-If no name is provided or available, a default name is generated.
-
-=item attributes
-
-Provide an anonymous array reference of one or more row Feature indices 
-to be used as GFF attributes. The name of the column is used as the GFF 
-attribute key. 
-
-=back
-
-=back
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use Module::Load;
@@ -1025,8 +13,9 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::constants;
 
+our $VERSION = '1.691';
+
 my $GENETOOL_LOADED = 0;
-1;
 
 ### Initialization
 
@@ -2606,7 +1595,1019 @@ sub gff_string {
 	return $string;
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::Data::Feature - Objects representing rows in a data table
+
+=head1 DESCRIPTION
+
+A Bio::ToolBox::Data::Feature is an object representing a row in the 
+data table. Usually, this in turn represents an annotated feature or 
+segment in the genome. As such, this object provides convenient 
+methods for accessing and manipulating the values in a row, as well as 
+methods for working with the represented genomic feature.
+
+This class should NOT be used directly by the user. Rather, Feature 
+objects are generated from a Bio::ToolBox::Data::Iterator object 
+(generated itself from the L<row_stream|Bio::ToolBox::Data/row_stream> 
+function in Bio::ToolBox::Data), or the L<iterate|Bio::ToolBox::Data/iterate> 
+function in Bio::ToolBox::Data. Please see the respective documentation 
+for more information.
+
+Example of working with a stream object.
+
+	  my $Data = Bio::ToolBox::Data->new(file => $file);
+	  
+	  # stream method
+	  my $stream = $Data->row_stream;
+	  while (my $row = $stream->next_row) {
+		 # each $row is a Bio::ToolBox::Data::Feature object
+		 # representing the row in the data table
+		 my $value = $row->value($index);
+		 # do something with $value
+	  }
+	  
+	  # iterate method
+	  $Data->iterate( sub {
+	     my $row = shift;
+	     my $number = $row->value($index);
+	     my $log_number = log($number);
+	     $row->value($index, $log_number);
+	  } );
+
+
+=head1 METHODS
+
+=head2 General information methods
+
+=over 4
+
+=item row_index
+
+Returns the index position of the current data row within the 
+data table. Useful for knowing where you are at within the data 
+table.
+
+=item feature_type
+
+Returns one of three specific values describing the contents 
+of the data table inferred by the presence of specific column 
+names. This provides a clue as to whether the table features 
+represent genomic regions (defined by coordinate positions) or 
+named database features. The return values include:
+
+=over 4
+
+=item * coordinate: Table includes at least chromosome and start
+
+=item * named: Table includes name, type, and/or Primary_ID
+
+=item * unknown: unrecognized
+
+=back
+
+=item column_name
+
+Returns the column name for the given index. 
+
+item data
+
+Returns the parent L<Bio::ToolBox::Data> object, in case you may 
+have lost it by going out of scope.
+
+=back
+
+=head2 Methods to access row feature attributes
+
+These methods return the corresponding value, if present in the 
+data table, based on the column header name. If the row represents 
+a named database object, try calling the L</feature> method first. 
+This will retrieve the database SeqFeature object, and the attributes 
+can then be retrieved using the methods below or on the actual 
+database SeqFeature object.
+
+In cases where there is a table column and a corresponding SeqFeature 
+object, for example a start column and a parsed SeqFeature object, the 
+table value takes precedence and is returned. You can always obtain the 
+SeqFeature's value separately and directly.
+
+These methods do not set attribute values. If you need to change the 
+values in a table, use the L</value> method below.
+
+=over 4
+
+=item seq_id
+
+The name of the chromosome the feature is on.
+
+=item start
+
+=item end
+
+=item stop
+
+The coordinates of the feature or segment. Coordinates from known 
+0-based file formats, e.g. BED, are returned as 1-based. Coordinates 
+must be integers to be returned. Zero or negative start coordinates 
+are assumed to be accidents or poor programming and transformed to 1. 
+Use the L</value> method if you don't want this to happen.
+
+=item strand
+
+The strand of the feature or segment. Returns -1, 0, or 1. Default is 0, 
+or unstranded.
+
+=item midpoint
+
+The calculated midpoint position of the feature.
+
+=item peak
+
+For features in a C<narrowPeak> file, this will report the peak coordinate, 
+transformed into a genomic coordinate. 
+
+=item name
+
+=item display_name
+
+The name of the feature.
+
+=item coordinate
+
+Returns a coordinate string formatted as C<seqid:start-stop>. This uses the 
+start coordinate as listed in the source file and does not convert 0-based 
+start values to 1-based values. This may confound downstream applications. 
+
+=item type
+
+The type of feature. Typically either C<primary_tag> or C<primary_tag:source_tag>. 
+In a GFF3 file, this represents columns 3 and 2, respectively. In annotation 
+databases such as L<Bio::DB::SeqFeature::Store>, the type is used to restrict 
+to one of many different types of features, e.g. gene, mRNA, or exon.
+
+=item id
+
+=item primary_id
+
+Here, this represents the C<primary_ID> in the database. Note that this number 
+is generally unique to a specific database, and not portable between databases.
+
+=item length
+
+The length of the feature or segment.
+
+=item score
+
+Returns the value of the Score column, if one is available. Typically 
+associated with defined file formats, such as GFF files (6th column), 
+BED and related Peak files (5th column), and bedGraph (4th column).
+
+=back
+
+=head2 Accessing and setting values in the row.
+
+=over 4
+
+=item value
+
+  # retrieve a value 
+  my $v = $row->value($index);
+  # set a value
+  $row->value($index, $v + 1);
+
+Returns or sets the value at a specific column index in the 
+current data row. Null values return a '.', symbolizing an 
+internal null value. 
+
+=item row_values
+
+Returns an array or array reference representing all the values 
+in the current data row. 
+
+=back
+
+=head2 Special feature attributes
+
+GFF and VCF files have special attributes in the form of key =E<gt> value pairs. 
+These are stored as specially formatted, character-delimited lists in 
+certain columns. These methods will parse this information and return as 
+a convenient hash reference. The keys and values of this hash may be 
+changed, deleted, or added to as desired. To write the changes back to 
+the file, use the L</rewrite_attributes> to properly write the attributes 
+back to the file with the proper formatting.
+
+=over 4
+
+=item attributes
+
+Generic method that calls either L</gff_attributes> or L</vcf_attributes> 
+depending on the data table format. 
+
+=item gff_attributes
+
+Parses the 9th column of GFF files. URL-escaped characters are converted 
+back to text. Returns a hash reference of key =E<gt> value pairs. 
+
+=item vcf_attributes
+
+Parses the C<INFO> (8th column) and all sample columns (10th and higher 
+columns) in a version 4 VCF file. The Sample columns use the C<FORMAT> 
+column (9th column) as keys. The returned hash reference has two levels:
+The first level keys are both the column names and index (0-based). The 
+second level keys are the individual attribute keys to each value. 
+For example:
+
+   my $attr = $row->vcf_attributes;
+   
+   # access by column name
+   my $genotype = $attr->{sample1}{GT};
+   my $depth    = $attr->{INFO}{ADP};
+   
+   # access by 0-based column index 
+   my $genotype = $attr->{9}{GT};
+   my $depth    = $attr->{7}{ADP}
+
+=item rewrite_attributes
+
+Generic method that either calls L</rewrite_gff_attributes> or 
+L</rewrite_vcf_attributes> depending on the data table format.
+
+=item rewrite_gff_attributes
+
+Rewrites the GFF attributes column (the 9th column) based on the 
+contents of the attributes hash that was previously generated with 
+the L</gff_attributes> method. Useful when you have modified the 
+contents of the attributes hash.
+
+=item rewrite_vcf_attributes
+
+Rewrite the VCF attributes for the C<INFO> (8th column), C<FORMAT> (9th 
+column), and sample columns (10th and higher columns) based on the 
+contents of the attributes hash that was previously generated with 
+the L</vcf_attributes> method. Useful when you have modified the 
+contents of the attributes hash.
+
+=back
+
+=head2 Convenience Methods to database functions
+
+The next three functions are convenience methods for using the 
+attributes in the current data row to interact with databases. 
+They are wrappers to methods in the L<Bio::ToolBox::db_helper> 
+module.
+
+=over 4
+
+=item seqfeature
+
+=item feature
+
+Returns a SeqFeature object representing the feature or item in 
+the current row. If the SeqFeature object is stored in the parent 
+C<$Data> object (usually from parsing an annotation file), it is 
+immediately returned. Otherwise, the SeqFeature 
+object is retrieved from the database using the name and 
+type values in the current Data table row. The SeqFeature object 
+is requested from the database named in the general metadata. If 
+an alternate database is desired, you should change it first using  
+the C<$Data>-E<gt>database() method. If the feature name or type is not 
+present in the table, then nothing is returned.
+
+See L<Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
+information about working with these objects. See L<Bio::DB::SeqFeature::Store> 
+about working with database features.
+
+This method normally only works with "named" feature types in a 
+L<Bio::ToolBox::Data> Data table. If your Data table has coordinate 
+information, i.e. chromosome, start, and stop columns, then it will 
+likely be recognized as a "coordinate" feature_type and not work.
+
+Pass a true value to this method to force the seqfeature lookup. This 
+will still require the presence of Name, ID, and/or Type columns to 
+perform the database lookup. The L<Bio::ToolBox::Data> method feature() 
+is used to determine the type if a Type column is not present.
+
+=item segment
+
+Returns a database Segment object corresponding to the coordinates 
+defined in the Data table row. If a named feature and type are 
+present instead of coordinates, then the feature is first automatically 
+retrieved and a Segment returned based on its coordinates. The 
+database named in the general metadata is used to establish the 
+Segment object. If a different database is desired, it should be 
+changed first using the general L</database> method. 
+
+See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
+about working with Segment objects.
+
+=item get_features
+
+  my @overlap_features = $row->get_features(type => $type);
+
+Returns seqfeature objects from a database that overlap the Feature 
+or interval in the current Data table row. This is essentially a 
+convenience wrapper for a Bio::DB style I<features> method using the 
+coordinates of the Feature. Optionally pass an array of key value pairs 
+to specify alternate coordinates if so desired. Potential keys 
+include 
+
+=over 4
+
+=item seq_id
+
+=item start
+
+=item end
+
+=item type
+
+The type of database features to retrieve.
+
+=item db
+
+An alternate database object to collect from.
+
+=back
+
+=item get_sequence
+
+Fetches genomic sequence based on the coordinates of the current seqfeature 
+or interval in the current Feature. This requires a database that 
+contains the genomic sequence, either the database specified in the 
+Data table metadata or an external indexed genomic fasta file. 
+
+If the Feature represents a transcript or gene, then a concatenated 
+sequence of the selected subfeatures may be generated and returned. B<Note> 
+that redundant or overlapping subfeatures are B<NOT> merged, and 
+unexpected results may be obtained.
+
+The sequence is returned as simple string. If the feature is on the reverse 
+strand, then the reverse complement sequence is automatically returned. 
+
+Pass an array of key value pairs to specify alternate coordinates if so 
+desired. Potential keys include
+
+=over 4
+
+=item subfeature 
+
+Pass a text string representing the type of subfeature from which to collect 
+the sequence. Acceptable values include 
+
+=over 4 
+
+=item * exon
+
+=item * cds
+
+=item * 5p_utr
+
+=item * 3p_utr
+
+=item * intron
+
+=back
+
+=item seq_id
+
+=item start
+
+=item end
+
+=item strand
+
+=item extend
+
+Indicate additional basepairs of sequence added to both sides
+
+=item db
+
+The fasta file or database from which to fetch the sequence
+
+=back
+
+=back
+
+=head2 Data collection
+
+The following methods allow for data collection from various 
+sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc. 
+
+=over 4
+
+=item calculate_reference($position)
+
+Calculates and returns the absolute genomic coordinate for a relative 
+reference position taking into account feature orientation (strand). 
+This is not explicitly data collection, but often used in conjunction
+with such. Provide an integer representing the relative position point:
+
+=over 4 
+
+=item * C<3> representing C<3'> end coordinate
+
+=item * C<4> representing mid point coordinate
+
+=item * C<5> representing C<5'> end coordinate
+
+=item * C<9> representing peak summit in F<narrowPeak> formatted files
+
+=back
+
+If necessary, an array or array reference may be provided as an 
+alternative parameter with keys including C<position>, C<strand>, 
+C<practical_start>, and C<practical_end> if alternate or adjusted 
+coordinates should be used instead of the given row feature coordinates.
+
+=item get_score
+
+  my $score = $row->get_score(
+       dataset => 'scores.bw',
+       method  => 'max',
+  );
+
+This method collects a single score over the feature or interval. 
+Usually a mathematical or statistical value is employed to derive the 
+single score. Pass an array of key value pairs to control data collection.
+Keys include the following:
+
+=over 4
+
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the C<primary_tag> or C<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item method
+
+Specify the mathematical or statistical method combining multiple scores 
+over the interval into one value. Options include the following:
+
+=over 4
+
+=item * mean
+
+=item * sum
+
+=item * min
+
+=item * max
+
+=item * median
+
+=item * count
+
+Count all overlapping items.
+
+=item * pcount
+
+Precisely count only containing (not overlapping) items.
+
+=item * ncount
+
+Count overlapping unique names only.
+
+=item * range
+
+The difference between minimum and maximum values.
+
+=item * stddev
+
+Standard deviation.
+
+=back
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item * sense
+
+The same strand as the Feature.
+
+=item * antisense
+
+The opposite strand as the Feature.
+
+=item * all
+
+Strand is ignored, all is taken (default).
+
+=back
+
+=item subfeature
+
+Specify the subfeature type from which to collect the scores. Typically 
+a SeqFeature object representing a transcript is provided, and the 
+indicated subfeatures are collected from object. Pass the name of the 
+subfeature to use. Accepted values include the following.
+
+=over 4 
+
+=item * exon
+
+=item * cds
+
+=item * 5p_utr
+
+=item * 3p_utr
+
+=item * intron
+
+=back
+
+=item extend
+
+Specify the number of basepairs that the Data table Feature's 
+coordinates should be extended in both directions. Ignored 
+when used with the subfeature option.
+
+=item seq_id
+
+=item chromo
+
+=item start
+
+=item end
+
+=item stop
+
+=item strand
+
+Optionally specify zero or more alternate coordinates to use. 
+By default, these are obtained from the Data table Feature.
+
+=back
+  
+=item get_relative_point_position_scores
+
+  while (my $row = $stream->next_row) {
+     my $pos2score = $row->get_relative_point_position_scores(
+        'ddb'       => '/path/to/BigWigSet/',
+        'dataset'   => 'MyData',
+        'position'  => 5,
+        'extend'    => 1000,
+     );
+  }
+
+This method collects indexed position scores centered around a 
+specific reference point. The returned data is a hash of 
+relative positions (example -20, -10, 1, 10, 20) and their score 
+values. Pass an array of key value pairs to control data collection.
+Keys include the following:
+
+=over 4
+
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the C<primary_tag> or C<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item position
+
+Indicate the position of the reference point relative to the Data table 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+midpoint (get it? it's between 5 and 3). Default is 5.
+
+=item extend
+
+Indicate the number of base pairs to extend from the reference coordinate. 
+This option is required!
+
+=item coordinate
+
+Optionally provide the real chromosomal coordinate as the reference point.
+
+=item absolute 
+
+Boolean option to indicate that the returned hash of positions and scores 
+should not be transformed into relative positions but kept as absolute 
+chromosomal coordinates.
+
+=item avoid
+
+Provide a C<primary_tag> or C<type:source> database feature type to avoid overlapping 
+scores. Each found score is checked for overlapping features and is 
+discarded if found to do so. The database should be set to use this.
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item * sense
+
+The same strand as the Feature.
+
+=item * antisense
+
+The opposite strand as the Feature.
+
+=item * all
+
+Strand is ignored, all is taken (default).
+
+=back
+
+=item method
+
+Only required when counting objects.
+
+=over 4
+
+=item * count
+
+Count all overlapping items.
+
+=item * pcount
+
+Precisely count only containing (not overlapping) items.
+
+=item * ncount
+
+Count overlapping unique names only.
+
+=back
+
+=back
+
+=item get_region_position_scores
+
+  while (my $row = $stream->next_row) {
+     my $pos2score = $row->get_relative_point_position_scores(
+        'ddb'       => '/path/to/BigWigSet/',
+        'dataset'   => 'MyData',
+        'position'  => 5,
+        'extend'    => 1000,
+     );
+  }
+
+This method collects indexed position scores across a defined 
+region or interval. The returned data is a hash of positions and 
+their score values. The positions are by default relative to a 
+region coordinate, usually to the 5' end. Pass an array of key value 
+pairs to control data collection. Keys include the following:
+
+=over 4
+
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the C<primary_tag> or C<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item subfeature
+
+Specify the subfeature type from which to collect the scores. Typically 
+a SeqFeature object representing a transcript is provided, and the 
+indicated subfeatures are collected from object. When converting to 
+relative coordinates, the coordinates will be relative to the length of 
+the sum of the subfeatures, i.e. the length of the introns will be ignored.
+
+Pass the name of the subfeature to use. Accepted values include the following.
+
+=over 4 
+
+=item * exon
+
+=item * cds
+
+=item * 5p_utr
+
+=item * 3p_utr
+
+=item * intron
+
+=back
+
+=item extend
+
+Specify the number of basepairs that the Data table Feature's 
+coordinates should be extended in both directions. 
+
+=item seq_id
+
+=item chromo
+
+=item start
+
+=item end
+
+=item stop
+
+=item strand
+
+Optionally specify zero or more alternate coordinates to use. 
+By default, these are obtained from the Data table Feature.
+
+=item position
+
+Indicate the position of the reference point relative to the Data table 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+midpoint (get it? it's between 5 and 3). Default is 5.
+
+=item coordinate
+
+Optionally provide the real chromosomal coordinate as the reference point.
+
+=item absolute 
+
+Boolean option to indicate that the returned hash of positions and scores 
+should not be transformed into relative positions but kept as absolute 
+chromosomal coordinates.
+
+=item avoid
+
+Provide a C<primary_tag> or C<type:source> database feature type to avoid overlapping 
+scores. Each found score is checked for overlapping features and is 
+discarded if found to do so. The database should be set to use this.
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item * sense
+
+The same strand as the Feature.
+
+=item * antisense
+
+The opposite strand as the Feature.
+
+=item * all
+
+Strand is ignored, all is taken (default).
+
+=back
+
+=item method
+
+Only required when counting objects.
+
+=over 4
+
+=item * count
+
+Count all overlapping items.
+
+=item * pcount
+
+Precisely count only containing (not overlapping) items.
+
+=item * ncount
+
+Count overlapping unique names only.
+
+=back
+
+=back
+
+=item fetch_alignments
+
+  my $sam = $Data->open_database('/path/to/file.bam');
+  my $alignment_data = { mapq => [] };
+  my $callback = sub {
+     my ($a, $data) = @_;
+     push @{ $data->{mapq} }, $a->qual;
+  };
+  while (my $row = $stream->next_row) {
+     $row->fetch_alignments(
+        'db'        => $sam,
+        'data'      => $alignment_data,
+        'callback'  => $callback,
+     );
+  }
+
+This function allows you to iterate over alignments in a Bam file, 
+allowing custom information to be collected based on a callback 
+code reference that is provided. 
+
+Three parameters are required: C<db>, C<data>, and C<callback>. A 
+true value (1) is returned upon success.
+
+=over 4
+
+=item db
+
+Provide an opened, high-level, Bam database object. 
+
+=item callback
+
+Provide a code callback reference to use when iterating over the 
+alignments. Two objects are passed to this code function: the 
+alignment object and the data structure that is provided. See the 
+Bam adapter documentation for details on low-level C<fetch> through 
+the Bam index object for details.
+
+=item data
+
+This is a reference to a C<HASH> data object for storing information. 
+It is passed to the callback function along with the alignment. Three 
+new key =E<gt> value pairs are automatically added: C<start>, C<end>, 
+and C<strand>. These correspond to the values for the current queried 
+interval. Coordinates are automatically transformed to 0-base coordinate 
+system to match low level alignment objects.
+
+=item subfeature
+
+If the feature has subfeatures, such as exons, introns, etc., pass 
+the name of the subfeature to restrict iteration only over the 
+indicated subfeatures. The C<data> object will inherit the coordinates 
+for each subfeatures. Allowed subfeatures include the following:
+
+=over 4 
+
+=item * exon
+
+=item * cds
+
+=item * 5p_utr
+
+=item * 3p_utr
+
+=item * intron
+
+=back
+
+=item start
+
+=item stop
+
+=item end
+
+Provide alternate, custom start and stop coordinates for the row 
+feature. Ignored with subfeatures.
+
+=back
+
+=back
+
+=head2 Feature Export
+
+These methods allow the feature to be exported in industry standard 
+formats, including the BED format and the GFF format. Both methods 
+return a formatted tab-delimited text string suitable for printing to 
+file. The string does not include a line ending character.
+
+These methods rely on coordinates being present in the source table. 
+If the row feature represents a database item, the L</feature> method 
+should be called prior to these methods, allowing the feature to be 
+retrieved from the database and coordinates obtained.
+
+=over 4
+
+=item bed_string
+
+Returns a BED formatted string. By default, a 6-element string is 
+generated, unless otherwise specified. Pass an array of key values 
+to control how the string is generated. The following arguments 
+are supported.
+
+=over 4
+
+=item bed
+
+Specify the number of BED elements to include. The number of elements 
+correspond to the number of columns in the BED file specification. A 
+minimum of 3 (chromosome, start, stop) is required, and maximum of 6 
+is allowed (chromosome, start, stop, name, score, strand). 
+
+=item chromo
+
+=item seq_id
+
+Provide a text string of an alternative chromosome or sequence name.
+
+=item start
+
+=item stop
+
+=item end
+
+Provide alternative integers for the start and stop coordinates. 
+Note that start values are automatically converted to 0-base 
+by subtracting 1.
+
+=item strand
+
+Provide alternate an alternative strand value. 
+
+=item name
+
+Provide an alternate or missing name value to be used as text in the 4th 
+column. If no name is provided or available, a default name is generated.
+
+=item score
+
+Provide a numerical value to be included as the score. BED files typically 
+use integer values ranging from 1..1000. 
+
+=back
+
+=item gff_string
+
+Returns a GFF3 formatted string. Pass an array of key values 
+to control how the string is generated. The following arguments 
+are supported.
+
+=over 4
+
+=item chromo
+
+=item seq_id
+
+=item start
+
+=item stop
+
+=item end
+
+=item strand
+
+Provide alternate values from those defined or missing in the current 
+row Feature. 
+
+=item source
+
+Provide a text string to be used as the source_tag value in the 2nd 
+column. The default value is null ".".
+
+=item primary_tag
+
+Provide a text string to be used as the primary_tag value in the 3rd 
+column. The default value is null ".".
+
+=item type
+
+Provide a text string. This can be either a "primary_tag:source_tag" value 
+as used by GFF based BioPerl databases, or "primary_tag" alone.
+
+=item score
+
+Provide a numerical value to be included as the score. The default 
+value is null ".". 
+
+=item name
+
+Provide alternate or missing name value to be used as the display_name. 
+If no name is provided or available, a default name is generated.
+
+=item attributes
+
+Provide an anonymous array reference of one or more row Feature indices 
+to be used as GFF attributes. The name of the column is used as the GFF 
+attribute key. 
+
+=back
+
+=back
 
 =head1 AUTHOR
 

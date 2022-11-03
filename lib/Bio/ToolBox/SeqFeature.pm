@@ -1,410 +1,6 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.70';
 
-=head1 NAME
-
-Bio::ToolBox::SeqFeature - Fast, simple SeqFeature implementation
-
-=head1 SYNOPSIS
-
-   # create a transcript
-   my $transcript = Bio::ToolBox::SeqFeature->new(
-        -seq_id     => chr1,
-        -start      => 1001,
-        -stop       => 1500,
-        -strand     => '+',
-   );
-   $seqf->primary_tag('mRNA'); # set parameters individually
-   
-   # create an exon
-   my $exon = Bio::ToolBox::SeqFeature->new(
-        -start      => 1001,
-        -end        => 1200,
-        -type       => 'exon',
-   );
-   
-   # associate exon with transcript
-   $transcript->add_SeqFeature($exon); 
-   my $exon_strand = $exon->strand; # inherits from parent
-   
-   # walk through subfeatures
-   foreach my $f ($transcript->get_all_SeqFeatures) {
-   	  printf "%s is a %s\n", $f->display_name, $f->type;
-   }
-   
-   # add attribute
-   $transcript->add_tag_value('Status', $status);
-   
-   # get attribute
-   my $value = $transcript->get_tag_values($key);
-
-=head1 DESCRIPTION
-
-SeqFeature objects represent functional elements on a genomic or chromosomal 
-sequence, such as genes, transcripts, exons, etc. In many cases, especially 
-genes, they have a hierarchical structure, typically in this order
-
-    gene
-      mRNA or transcript
-        exon
-        CDS
-
-SeqFeature objects have at a minimum coordinate information, including 
-chromosome, start, stop, and strand, and a name or unique identifier. They 
-often also have type or source information, which usually follows the 
-Sequence Ontology key words.
-
-This is a fast, efficient, simplified SeqFeature implementation that mostly 
-implements the L<Bio::SeqFeatureI> API, and could be substituted for other 
-implementations, such L<Bio::SeqFeature::Lite> and L<Bio::SeqFeature::Generic>. 
-Unlike the others, however, it inherits no classes or methods and uses an 
-unorthodox blessed array to store feature attributes, decreasing memory 
-requirements and overhead complexity. 
-
-=head1 METHODS
-
-Refer to the L<Bio::SeqFeatureI> documentation for general implementation and 
-ideas, which this module tries to implement.
-
-=head2 Creating new SeqFeature objects
-
-=over 4
-
-=item new
-
-Generate a new SeqFeature object. Pass an array of key =E<gt> value pairs 
-with the feature parameters. At a minimum, location information (C<seq_id>, 
-C<start>, and C<stop>) should be provided, with name and ID recommended. 
-Most of the accession methods may be used as key tags to the C<new> method. 
-The following attribute keys are accepted.
-
-=over 4
-
-=item -seq_id
-
-=item -start
-
-=item -end
-
-=item -stop
-
-=item -strand
-
-=item -name
-
-=item -display_name
-
-=item -id
-
-=item -primary_id
-
-=item -type
-
-=item -source
-
-=item -source_tag
-
-=item -primary_tag
-
-=item -score
-
-=item -phase
-
-=item -attributes
-
-Provide an anonymous array of key value pairs representing attribute 
-keys and their values.
-
-=item -segments
-
-Provide an anonymous array of SeqFeature objects to add as child 
-objects. 
-
-=back
-
-=item duplicate
-
-This method will duplicate a SeqFeature object as a new object, with 
-limitations. The C<primary_id> tag, attribute key/values, and subfeatures 
-are B<not> duplicated. This basically limits the object to coordinates, 
-C<primary_tag>, C<source_tag>, C<display_name>, C<score>, and C<phase>. 
-Remaining attributes should be explicitly set by the user.
-
-=back
-
-=head2 Accession methods
-
-These are methods to set and/or retrieve attribute values. Pass a 
-single value to set the attribute. The attribute value is always 
-returned.
-
-=over 4
-
-=item seq_id
-
-The name of the chromosome or reference sequence. If you are generating 
-a new child object, e.g. exon, then seq_id does not need to be provided. 
-In these cases, the parent's seq_id is inherited.
-
-=item start
-
-The start coordinate of the feature. SeqFeature objects use the 1-base 
-numbering system, following BioPerl convention. Start coordinates are 
-always less than the stop coordinate. 
-
-=item end
-
-=item stop
-
-The end coordinate of the feature. Stop coordinates are always greater 
-than the start coordinate.
-
-=item strand
-
-The strand that the feature is on. The default value is always unstranded, 
-or 0. Any of the following may be supplied: "C<1 0 -1 + . ->". Numeric 
-integers 1, 0, and -1 are always returned.
-
-=item source
-
-=item source_tag
-
-A text string representing the source of the feature. This corresponds to 
-the second field in a GFF file. The source tag is optional. If not supplied, 
-the source tag can be inherited from a parent feature if present. 
-
-=item primary_tag
-
-The type of feature. These usually follow Sequence Ontology terms, but are 
-not required. The default value is the generic term "region". Examples 
-include gene, mRNA, transcript, exon, CDS, etc. This corresponds to the 
-third field in a GFF file.
-
-=item type
-
-A shortcut method which can represent either "primary_tag:source_tag" or, 
-if no source_tag is defined, simply "primary_tag".
-
-=item name
-
-=item display_name
-
-A text string representing the name of the feature. The name is not 
-required to be a unique value, but generally is. The default name, if 
-none is provided, is the C<primary_id>.
-
-=item id
-
-=item primary_id
-
-A text string representing a unique identifier of the feature. If not 
-explicitly defined, a unique ID is automatically generated.
-
-=item score
-
-A numeric (integer or floating) value representing the feature. 
-
-=item phase 
-
-An integer (0,1,2) representing the coding frame. Only required for 
-CDS features.
-
-=back
-
-=head2 Special Attributes
-
-Special attributes are key value pairs that do not fall under the above 
-conventions. It is possible to have more than one value assigned to a 
-given key. In a GFF file, this corresponds to the attributes in the 9th 
-field, with the exception of special reserved attributes such as C<Name>, 
-C<ID>, and C<Parent>.
-
-=over 4
-
-=item add_tag_value
-
-    $seqf->add_tag_value($key, $value);
-
-Sets the special attribute C<$key> to C<$value>. If you have more than one 
-value, C<$value> should be an anonymous array of text values. Following 
-GFF convention, C<$key> should not comprise of special characters, including 
-";,= ".
-
-=item all_tags
-
-=item get_all_tags
-
-Returns an array of all attribute keys.
-
-=item has_tag($key)
-
-Boolean method whether the SeqFeature object contains the attribute.
-
-=item get_tag_values($key)
-
-=item each_tag_value($key)
-
-Returns the value for attribute C<$key>. If multiple values are present, 
-it may return an array or array reference.
-
-=item attributes
-
-Returns an array or reference to the key value hash;
-
-=item remove_tag($key)
-
-Deletes the indicated attribute.
-
-=back
-
-=head2 Subfeature Hierarchy
-
-Following Sequence Ontology and GFF conventions, SeqFeatures can have 
-subfeatures (children) representing a hierarchical structure, for example 
-genes beget transcripts which beget exons. 
-
-Child SeqFeature objects may have more than one parent, for example, shared
-exons between alternate transcripts. In which case, only one exon
-SeqFeature object is generated, but is added to both transcript objects. 
-
-=over 4
-
-=item add_SeqFeature
-
-=item add_segment
-
-Pass one or more SeqFeature objects to be associated as children.
-
-=item get_SeqFeatures
-
-=item get_all_SeqFeatures
-
-=item segments
-
-Returns an array of all sub SeqFeature objects.
-
-=item delete_SeqFeature($id)
-
-This method will delete a specific child SeqFeature. Pass the method the 
-C<primary_id> of the SeqFeature. All SeqFeatures will have a C<primary_id>. 
-
-=back
-
-=head2 Range Methods
-
-These are range methods for comparing one SeqFeature object to another.
-They are analogous to L<Bio::RangeI> methods.
-
-They currently do not support strand checks or strand options.
-
-=over 4
-
-=item length
-
-Returns the length of the SeqFeature object.
-
-=item overlaps
-
-	my $overlap_check = $seqf1->overlaps($other_seqf);
-
-Returns a boolean value whether a second SeqFeature object overlaps 
-with the self object.
-
-=item contains
-
-	my $check = $seqf1->contains($seqf2);
-
-Returns a boolean value whether the self object completely 
-contains a second SeqFeature object.
-
-=item equals
-
-	my $check = $seqf1->equals($seqf2);
-
-Returns a boolean value whether the self object coordinates are 
-equivalent to a second SeqFeature object.
-
-=item intersection
-
-	my $check = $seqf1->intersection($seqf2);
-
-Returns a new SeqFeature object representing the intersection or 
-overlap area between the self object and a second SeqFeature 
-object.
-
-=item union($other)
-
-	my $new_seqf = $seqf1->union($seqf2);
-
-Returns a new SeqFeature object representing the merged interval 
-between the self and a second SeqFeature object.
-
-=item subtract
-
-	my $new_seqf = $seqf1->subtract($seqf2);
-
-Returns a new SeqFeature object representing the interval of the 
-self object after subtracting a second SeqFeature object. 
-
-=back
-
-=head2 Export Strings
-
-These methods export the SeqFeature object as a text string in the 
-specified format. New line characters are included.
-
-=over 4
-
-=item gff_string($recurse)
-
-Exports the SeqFeature object as a GFF3 formatted string. Pass a 
-boolean value if you wish to recurse through the hierarchy and 
-print subfeatures as a multi-line string. Child-Parent ID attributes 
-are smartly handled, including multiple parentage. 
-
-See L<Bio::ToolBox::GeneTools> for methods for printing GTF transcript models.
-
-=item bed_string
-
-Exports the SeqFeature object as a simple BED6 formatted string. 
-See L<Bio::ToolBox::GeneTools> for methods for printing BED12 transcript models.
-
-=back
-
-=head1 LIMITATIONS
-
-Because of their underlying array structure, Bio::ToolBox::SeqFeature objects 
-should generally not be used as a base class (unless you know the ramifications 
-of doing so). The following Bio classes and Interfaces are similar and their API 
-was used as a model. However, in most cases they are not likely to work with this 
-module because of object structure incompatibility, although this has not been 
-explicitly tested. 
-
-=over 4
-
-=item Bio::AnnotationI
-
-=item Bio::LocationI
-
-=item Bio::RangeI
-
-=item Bio::SeqI
-
-=item Bio::Tools::GFF
-
-=item Bio::DB::SeqFeature::Store
-
-=item Bio::Graphics
-
-=back
-
-=head1 SEE ALSO
-
-L<Bio::SeqFeatureI>, L<Bio::SeqFeature::Lite>, L<Bio::Seqfeature::Generic>, 
-L<Bio::RangeI>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use constant {
@@ -422,7 +18,8 @@ use constant {
 	SUBF  => 11,
 };
 
-1;
+our $VERSION = '1.70';
+
 
 #### Aliases ####
 # to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we
@@ -1000,7 +597,411 @@ sub bed_string {
 	return "$string\n";
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::SeqFeature - Fast, simple SeqFeature implementation
+
+=head1 SYNOPSIS
+
+   # create a transcript
+   my $transcript = Bio::ToolBox::SeqFeature->new(
+        -seq_id     => chr1,
+        -start      => 1001,
+        -stop       => 1500,
+        -strand     => '+',
+   );
+   $seqf->primary_tag('mRNA'); # set parameters individually
+   
+   # create an exon
+   my $exon = Bio::ToolBox::SeqFeature->new(
+        -start      => 1001,
+        -end        => 1200,
+        -type       => 'exon',
+   );
+   
+   # associate exon with transcript
+   $transcript->add_SeqFeature($exon); 
+   my $exon_strand = $exon->strand; # inherits from parent
+   
+   # walk through subfeatures
+   foreach my $f ($transcript->get_all_SeqFeatures) {
+   	  printf "%s is a %s\n", $f->display_name, $f->type;
+   }
+   
+   # add attribute
+   $transcript->add_tag_value('Status', $status);
+   
+   # get attribute
+   my $value = $transcript->get_tag_values($key);
+
+=head1 DESCRIPTION
+
+SeqFeature objects represent functional elements on a genomic or chromosomal 
+sequence, such as genes, transcripts, exons, etc. In many cases, especially 
+genes, they have a hierarchical structure, typically in this order
+
+    gene
+      mRNA or transcript
+        exon
+        CDS
+
+SeqFeature objects have at a minimum coordinate information, including 
+chromosome, start, stop, and strand, and a name or unique identifier. They 
+often also have type or source information, which usually follows the 
+Sequence Ontology key words.
+
+This is a fast, efficient, simplified SeqFeature implementation that mostly 
+implements the L<Bio::SeqFeatureI> API, and could be substituted for other 
+implementations, such L<Bio::SeqFeature::Lite> and L<Bio::SeqFeature::Generic>. 
+Unlike the others, however, it inherits no classes or methods and uses an 
+unorthodox blessed array to store feature attributes, decreasing memory 
+requirements and overhead complexity. 
+
+=head1 METHODS
+
+Refer to the L<Bio::SeqFeatureI> documentation for general implementation and 
+ideas, which this module tries to implement.
+
+=head2 Creating new SeqFeature objects
+
+=over 4
+
+=item new
+
+Generate a new SeqFeature object. Pass an array of key =E<gt> value pairs 
+with the feature parameters. At a minimum, location information (C<seq_id>, 
+C<start>, and C<stop>) should be provided, with name and ID recommended. 
+Most of the accession methods may be used as key tags to the C<new> method. 
+The following attribute keys are accepted.
+
+=over 4
+
+=item -seq_id
+
+=item -start
+
+=item -end
+
+=item -stop
+
+=item -strand
+
+=item -name
+
+=item -display_name
+
+=item -id
+
+=item -primary_id
+
+=item -type
+
+=item -source
+
+=item -source_tag
+
+=item -primary_tag
+
+=item -score
+
+=item -phase
+
+=item -attributes
+
+Provide an anonymous array of key value pairs representing attribute 
+keys and their values.
+
+=item -segments
+
+Provide an anonymous array of SeqFeature objects to add as child 
+objects. 
+
+=back
+
+=item duplicate
+
+This method will duplicate a SeqFeature object as a new object, with 
+limitations. The C<primary_id> tag, attribute key/values, and subfeatures 
+are B<not> duplicated. This basically limits the object to coordinates, 
+C<primary_tag>, C<source_tag>, C<display_name>, C<score>, and C<phase>. 
+Remaining attributes should be explicitly set by the user.
+
+=back
+
+=head2 Accession methods
+
+These are methods to set and/or retrieve attribute values. Pass a 
+single value to set the attribute. The attribute value is always 
+returned.
+
+=over 4
+
+=item seq_id
+
+The name of the chromosome or reference sequence. If you are generating 
+a new child object, e.g. exon, then seq_id does not need to be provided. 
+In these cases, the parent's seq_id is inherited.
+
+=item start
+
+The start coordinate of the feature. SeqFeature objects use the 1-base 
+numbering system, following BioPerl convention. Start coordinates are 
+always less than the stop coordinate. 
+
+=item end
+
+=item stop
+
+The end coordinate of the feature. Stop coordinates are always greater 
+than the start coordinate.
+
+=item strand
+
+The strand that the feature is on. The default value is always unstranded, 
+or 0. Any of the following may be supplied: "C<1 0 -1 + . ->". Numeric 
+integers 1, 0, and -1 are always returned.
+
+=item source
+
+=item source_tag
+
+A text string representing the source of the feature. This corresponds to 
+the second field in a GFF file. The source tag is optional. If not supplied, 
+the source tag can be inherited from a parent feature if present. 
+
+=item primary_tag
+
+The type of feature. These usually follow Sequence Ontology terms, but are 
+not required. The default value is the generic term "region". Examples 
+include gene, mRNA, transcript, exon, CDS, etc. This corresponds to the 
+third field in a GFF file.
+
+=item type
+
+A shortcut method which can represent either "primary_tag:source_tag" or, 
+if no source_tag is defined, simply "primary_tag".
+
+=item name
+
+=item display_name
+
+A text string representing the name of the feature. The name is not 
+required to be a unique value, but generally is. The default name, if 
+none is provided, is the C<primary_id>.
+
+=item id
+
+=item primary_id
+
+A text string representing a unique identifier of the feature. If not 
+explicitly defined, a unique ID is automatically generated.
+
+=item score
+
+A numeric (integer or floating) value representing the feature. 
+
+=item phase 
+
+An integer (0,1,2) representing the coding frame. Only required for 
+CDS features.
+
+=back
+
+=head2 Special Attributes
+
+Special attributes are key value pairs that do not fall under the above 
+conventions. It is possible to have more than one value assigned to a 
+given key. In a GFF file, this corresponds to the attributes in the 9th 
+field, with the exception of special reserved attributes such as C<Name>, 
+C<ID>, and C<Parent>.
+
+=over 4
+
+=item add_tag_value
+
+    $seqf->add_tag_value($key, $value);
+
+Sets the special attribute C<$key> to C<$value>. If you have more than one 
+value, C<$value> should be an anonymous array of text values. Following 
+GFF convention, C<$key> should not comprise of special characters, including 
+";,= ".
+
+=item all_tags
+
+=item get_all_tags
+
+Returns an array of all attribute keys.
+
+=item has_tag($key)
+
+Boolean method whether the SeqFeature object contains the attribute.
+
+=item get_tag_values($key)
+
+=item each_tag_value($key)
+
+Returns the value for attribute C<$key>. If multiple values are present, 
+it may return an array or array reference.
+
+=item attributes
+
+Returns an array or reference to the key value hash;
+
+=item remove_tag($key)
+
+Deletes the indicated attribute.
+
+=back
+
+=head2 Subfeature Hierarchy
+
+Following Sequence Ontology and GFF conventions, SeqFeatures can have 
+subfeatures (children) representing a hierarchical structure, for example 
+genes beget transcripts which beget exons. 
+
+Child SeqFeature objects may have more than one parent, for example, shared
+exons between alternate transcripts. In which case, only one exon
+SeqFeature object is generated, but is added to both transcript objects. 
+
+=over 4
+
+=item add_SeqFeature
+
+=item add_segment
+
+Pass one or more SeqFeature objects to be associated as children.
+
+=item get_SeqFeatures
+
+=item get_all_SeqFeatures
+
+=item segments
+
+Returns an array of all sub SeqFeature objects.
+
+=item delete_SeqFeature($id)
+
+This method will delete a specific child SeqFeature. Pass the method the 
+C<primary_id> of the SeqFeature. All SeqFeatures will have a C<primary_id>. 
+
+=back
+
+=head2 Range Methods
+
+These are range methods for comparing one SeqFeature object to another.
+They are analogous to L<Bio::RangeI> methods.
+
+They currently do not support strand checks or strand options.
+
+=over 4
+
+=item length
+
+Returns the length of the SeqFeature object.
+
+=item overlaps
+
+	my $overlap_check = $seqf1->overlaps($other_seqf);
+
+Returns a boolean value whether a second SeqFeature object overlaps 
+with the self object.
+
+=item contains
+
+	my $check = $seqf1->contains($seqf2);
+
+Returns a boolean value whether the self object completely 
+contains a second SeqFeature object.
+
+=item equals
+
+	my $check = $seqf1->equals($seqf2);
+
+Returns a boolean value whether the self object coordinates are 
+equivalent to a second SeqFeature object.
+
+=item intersection
+
+	my $check = $seqf1->intersection($seqf2);
+
+Returns a new SeqFeature object representing the intersection or 
+overlap area between the self object and a second SeqFeature 
+object.
+
+=item union($other)
+
+	my $new_seqf = $seqf1->union($seqf2);
+
+Returns a new SeqFeature object representing the merged interval 
+between the self and a second SeqFeature object.
+
+=item subtract
+
+	my $new_seqf = $seqf1->subtract($seqf2);
+
+Returns a new SeqFeature object representing the interval of the 
+self object after subtracting a second SeqFeature object. 
+
+=back
+
+=head2 Export Strings
+
+These methods export the SeqFeature object as a text string in the 
+specified format. New line characters are included.
+
+=over 4
+
+=item gff_string($recurse)
+
+Exports the SeqFeature object as a GFF3 formatted string. Pass a 
+boolean value if you wish to recurse through the hierarchy and 
+print subfeatures as a multi-line string. Child-Parent ID attributes 
+are smartly handled, including multiple parentage. 
+
+See L<Bio::ToolBox::GeneTools> for methods for printing GTF transcript models.
+
+=item bed_string
+
+Exports the SeqFeature object as a simple BED6 formatted string. 
+See L<Bio::ToolBox::GeneTools> for methods for printing BED12 transcript models.
+
+=back
+
+=head1 LIMITATIONS
+
+Because of their underlying array structure, Bio::ToolBox::SeqFeature objects 
+should generally not be used as a base class (unless you know the ramifications 
+of doing so). The following Bio classes and Interfaces are similar and their API 
+was used as a model. However, in most cases they are not likely to work with this 
+module because of object structure incompatibility, although this has not been 
+explicitly tested. 
+
+=over 4
+
+=item Bio::AnnotationI
+
+=item Bio::LocationI
+
+=item Bio::RangeI
+
+=item Bio::SeqI
+
+=item Bio::Tools::GFF
+
+=item Bio::DB::SeqFeature::Store
+
+=item Bio::Graphics
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::SeqFeatureI>, L<Bio::SeqFeature::Lite>, L<Bio::Seqfeature::Generic>, 
+L<Bio::RangeI>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>
 
 =head1 AUTHOR
 

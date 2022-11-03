@@ -1,33 +1,34 @@
 package Bio::ToolBox::db_helper::wiggle;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use Bio::ToolBox::db_helper::constants;
 use Bio::Graphics::Wiggle;
+require Exporter;
+
 our $VERSION = '1.51';
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	collect_wig_scores
 	collect_wig_position_scores
 );
+## use critic
 
 # Hashes of opened file objects
-our %OPENED_WIGFILES;  # opened wigfile objects
+my %OPENED_WIGFILES;  # opened wigfile objects
                        # in empirical testing, this doesn't really seem to speed things up
                        # like I thought it would
                        # oh well, keep it anyway????
     # I think this is safe to keep opened wigfiles cached, even across forks,
     # since they are being opened only during data collection, which should
     # only occur within child processes, and there is no explicit db open
-
-# The true statement
-1;
-
-### Modules ###
 
 sub collect_wig_scores {
 
@@ -160,6 +161,8 @@ sub collect_wig_position_scores {
 	# return the wig data hash
 	return wantarray ? %pos2score : \%pos2score;
 }
+
+1;
 
 __END__
 

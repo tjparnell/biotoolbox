@@ -1,241 +1,13 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.70';
 
-=head1 NAME
-
-Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
-
-=head1 SYNOPSIS
-
-  use Bio::ToolBox::Parser;
-  my $filename = 'file.refFlat';
-  
-  my $Parser = Bio::ToolBox::Parser->new(
-  	file    => $filename,
-  	do_gene => 1,
-  	do_exon => 1,
-  ) or die "unable to open file!\n";
-  # the Parser will taste the file and open the appropriate 
-  # subclass parser, ucsc in this case
-  
-  while (my $feature = $Parser->next_top_feature() ) {
-	# each $feature is a parent SeqFeature object, usually a gene
-  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
-	
-	# subfeatures such as transcripts, exons, etc are nested within
-	my @children = $feature->get_SeqFeatures();
-  }
-
-=head1 DESCRIPTION
-
-This is the UCSC specific parser subclass to the L<Bio::ToolBox::Parser>
-object, and as such inherits generic methods from the parent. 
-
-This is a parser for converting UCSC-style gene prediction flat file formats into 
-BioPerl-style L<Bio::SeqFeatureI> compliant objects, complete with nested objects 
-representing transcripts, exons, CDS, UTRs, start- and stop-codons. Full control 
-is available on what to parse, e.g. exons on, CDS and codons off. Additional gene 
-information can be added by supplying additional tables of information, such as 
-common gene names and descriptions, available from the UCSC repository. 
-
-=head2 Table formats supported
-
-Supported files are tab-delimited text files obtained from UCSC and described 
-at L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>. Formats are identified 
-by the number of columns, rather than specific file extensions, column name 
-headers, or other metadata. Therefore, unmodified tables should only be used 
-for correct parsing. Some errors are reported for incorrect lines. Unadulterated 
-files can safely be downloaded from L<http://hgdownload.soe.ucsc.edu/downloads.html>.
-Files obtained from the UCSC Table Browser can also be used with caution. Files 
-may be gzip compressed.
-
-File formats supported include the following.
-
-=over 4
-
-=item * Gene Prediction (genePred), 10 columns
-
-=item * Gene Prediction with RefSeq gene Name (refFlat), 11 columns
-
-=item * Extended Gene Prediction (genePredExt), 15 columns
-
-=item * Extended Gene Prediction with bin (genePredExt), 16 columns
-
-=item * knownGene table, 12 columns
-
-=back
-
-=head2 Supplemental information
-
-The UCSC gene prediction tables include essential information, but not detailed 
-information, such as common gene names, description, protein accession IDs, etc. 
-This additional information can be associated with the genes or transcripts during 
-parsing if the appropriate tables are supplied. These tables can be obtained from 
-the UCSC download site L<http://hgdownload.soe.ucsc.edu/downloads.html>.
-
-Supported tables include the following.
-
-=over 4 
-
-=item * refSeqStatus, for refGene, knownGene, and xenoRefGene tables
-
-=item * refSeqSummary, for refGene, knownGene, and xenoRefGene tables
-
-=item * ensemblToGeneName, for ensGene tables
-
-=item * ensemblSource, for ensGene tables
-
-=item * kgXref, for knownGene tables
-
-=back
-
-=head2 Implementation
-
-For an implementation of this module to generate GFF3 formatted files from UCSC 
-data sources, see the L<Bio::ToolBox> script L<ucsc_table2gff3.pl>.
-
-=head1 METHODS
-
-=head2 Initalize the parser object
-
-In most cases, users should initialize an object using the generic 
-L<Bio::ToolBox::Parser> object.
-
-=over 4
-
-=item new
-
-Initiate a UCSC table parser object. Pass a single value (a table file name) 
-to open a table and parse its objects. Alternatively, pass an array of key 
-value pairs to control how the table is parsed. Options include the following.
-
-=over 4
-
-=item file
-
-=item table
-
-Provide a file name for a UCSC gene prediction table. The file may be gzip 
-compressed. 
-
-=item source
-
-Pass a string to be added as the source tag value of the SeqFeature objects. 
-The default value is 'UCSC'. If the file name has a recognizable name, 
-such as 'refGene' or 'ensGene', it will be used instead.
-
-=item do_gene
-
-Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
-name under a single gene object. Default is true.
-
--item do_exon
-
-=item do_cds
-
-=item do_utr
-
-=item do_codon
-
-Pass a boolean (1 or 0) value to parse certain subfeatures, including exon, 
-CDS, five_prime_UTR, three_prime_UTR, stop_codon, and start_codon features. 
-Default is false.
-
-=item do_name
-
-Pass a boolean (1 or 0) value to assign names to subfeatures, including exons, 
-CDSs, UTRs, and start and stop codons. Default is false.
-
-=item share
-
-Pass a boolean (1 or 0) value to recycle shared subfeatures (exons and UTRs) 
-between multiple transcripts of the same gene. This results in reduced 
-memory usage, and smaller exported GFF3 files. Default is true. 
-
-=item refseqsum
-
-=item refseqstat
-
-=item kgxref
-
-=item ensembltogene
-
-=item ensemblsource
-
-Pass the appropriate file name for additional information.
-
-=item class
-
-Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
-create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
-which is lighter-weight and consumes less memory. A suitable BioPerl alternative
-is L<Bio::SeqFeature::Lite>.
-
-=back
-
-=back
-
-=head2 Other methods
-
-See L<Bio::ToolBox::Parser> for generic methods for accessing the 
-features. Below are some specific methods to this subclass.
-
-=over 4
-
-=item load_extra_data($file, $type)
-
-	my $file = 'hg19_refSeqSummary.txt.gz';
-	my success = $ucsc->load_extra_data($file, 'summary');
-
-Pass two values, the file name of the supplemental file and the type 
-of supplemental data. Values can include the following 
-
-=over 4
-
-=item * refseqstatus or status
-
-=item * refseqsummary or summary
-
-=item * kgxref
-
-=item * ensembltogene or ensname
-
-=item * ensemblsource or enssrc
-
-=back
-
-The number of transcripts with information loaded from the supplemental 
-data file is returned.
-
-=item counts
-
-This method will return a hash of the number of genes and RNA types that 
-have been parsed.
-
-=item typelist
-
-This method will return a comma-delimited list of the feature types or 
-C<primary_tag>s found in the parsed file. If a file has not yet been 
-parsed, it will return a generic list of expected (typical) feature 
-types. Otherwise, it will return the feature types observed in the 
-parsed file.
-
-=back
-
-=head1 SEE ALSO
-
-L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, 
-L<Bio::ToolBox::SeqFeature>
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
 use Bio::ToolBox::parser::ucsc::builder;
 
-1;
+our $VERSION = '1.70';
 
 sub new {
 	my $class = shift;
@@ -544,7 +316,235 @@ sub counts {
 	return wantarray ? %counts : \%counts;
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
+
+=head1 SYNOPSIS
+
+  use Bio::ToolBox::Parser;
+  my $filename = 'file.refFlat';
+  
+  my $Parser = Bio::ToolBox::Parser->new(
+  	file    => $filename,
+  	do_gene => 1,
+  	do_exon => 1,
+  ) or die "unable to open file!\n";
+  # the Parser will taste the file and open the appropriate 
+  # subclass parser, ucsc in this case
+  
+  while (my $feature = $Parser->next_top_feature() ) {
+	# each $feature is a parent SeqFeature object, usually a gene
+  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
+	
+	# subfeatures such as transcripts, exons, etc are nested within
+	my @children = $feature->get_SeqFeatures();
+  }
+
+=head1 DESCRIPTION
+
+This is the UCSC specific parser subclass to the L<Bio::ToolBox::Parser>
+object, and as such inherits generic methods from the parent. 
+
+This is a parser for converting UCSC-style gene prediction flat file formats into 
+BioPerl-style L<Bio::SeqFeatureI> compliant objects, complete with nested objects 
+representing transcripts, exons, CDS, UTRs, start- and stop-codons. Full control 
+is available on what to parse, e.g. exons on, CDS and codons off. Additional gene 
+information can be added by supplying additional tables of information, such as 
+common gene names and descriptions, available from the UCSC repository. 
+
+=head2 Table formats supported
+
+Supported files are tab-delimited text files obtained from UCSC and described 
+at L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>. Formats are identified 
+by the number of columns, rather than specific file extensions, column name 
+headers, or other metadata. Therefore, unmodified tables should only be used 
+for correct parsing. Some errors are reported for incorrect lines. Unadulterated 
+files can safely be downloaded from L<http://hgdownload.soe.ucsc.edu/downloads.html>.
+Files obtained from the UCSC Table Browser can also be used with caution. Files 
+may be gzip compressed.
+
+File formats supported include the following.
+
+=over 4
+
+=item * Gene Prediction (genePred), 10 columns
+
+=item * Gene Prediction with RefSeq gene Name (refFlat), 11 columns
+
+=item * Extended Gene Prediction (genePredExt), 15 columns
+
+=item * Extended Gene Prediction with bin (genePredExt), 16 columns
+
+=item * knownGene table, 12 columns
+
+=back
+
+=head2 Supplemental information
+
+The UCSC gene prediction tables include essential information, but not detailed 
+information, such as common gene names, description, protein accession IDs, etc. 
+This additional information can be associated with the genes or transcripts during 
+parsing if the appropriate tables are supplied. These tables can be obtained from 
+the UCSC download site L<http://hgdownload.soe.ucsc.edu/downloads.html>.
+
+Supported tables include the following.
+
+=over 4 
+
+=item * refSeqStatus, for refGene, knownGene, and xenoRefGene tables
+
+=item * refSeqSummary, for refGene, knownGene, and xenoRefGene tables
+
+=item * ensemblToGeneName, for ensGene tables
+
+=item * ensemblSource, for ensGene tables
+
+=item * kgXref, for knownGene tables
+
+=back
+
+=head2 Implementation
+
+For an implementation of this module to generate GFF3 formatted files from UCSC 
+data sources, see the L<Bio::ToolBox> script L<ucsc_table2gff3.pl>.
+
+=head1 METHODS
+
+=head2 Initalize the parser object
+
+In most cases, users should initialize an object using the generic 
+L<Bio::ToolBox::Parser> object.
+
+=over 4
+
+=item new
+
+Initiate a UCSC table parser object. Pass a single value (a table file name) 
+to open a table and parse its objects. Alternatively, pass an array of key 
+value pairs to control how the table is parsed. Options include the following.
+
+=over 4
+
+=item file
+
+=item table
+
+Provide a file name for a UCSC gene prediction table. The file may be gzip 
+compressed. 
+
+=item source
+
+Pass a string to be added as the source tag value of the SeqFeature objects. 
+The default value is 'UCSC'. If the file name has a recognizable name, 
+such as 'refGene' or 'ensGene', it will be used instead.
+
+=item do_gene
+
+Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
+name under a single gene object. Default is true.
+
+-item do_exon
+
+=item do_cds
+
+=item do_utr
+
+=item do_codon
+
+Pass a boolean (1 or 0) value to parse certain subfeatures, including exon, 
+CDS, five_prime_UTR, three_prime_UTR, stop_codon, and start_codon features. 
+Default is false.
+
+=item do_name
+
+Pass a boolean (1 or 0) value to assign names to subfeatures, including exons, 
+CDSs, UTRs, and start and stop codons. Default is false.
+
+=item share
+
+Pass a boolean (1 or 0) value to recycle shared subfeatures (exons and UTRs) 
+between multiple transcripts of the same gene. This results in reduced 
+memory usage, and smaller exported GFF3 files. Default is true. 
+
+=item refseqsum
+
+=item refseqstat
+
+=item kgxref
+
+=item ensembltogene
+
+=item ensemblsource
+
+Pass the appropriate file name for additional information.
+
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
+which is lighter-weight and consumes less memory. A suitable BioPerl alternative
+is L<Bio::SeqFeature::Lite>.
+
+=back
+
+=back
+
+=head2 Other methods
+
+See L<Bio::ToolBox::Parser> for generic methods for accessing the 
+features. Below are some specific methods to this subclass.
+
+=over 4
+
+=item load_extra_data($file, $type)
+
+	my $file = 'hg19_refSeqSummary.txt.gz';
+	my success = $ucsc->load_extra_data($file, 'summary');
+
+Pass two values, the file name of the supplemental file and the type 
+of supplemental data. Values can include the following 
+
+=over 4
+
+=item * refseqstatus or status
+
+=item * refseqsummary or summary
+
+=item * kgxref
+
+=item * ensembltogene or ensname
+
+=item * ensemblsource or enssrc
+
+=back
+
+The number of transcripts with information loaded from the supplemental 
+data file is returned.
+
+=item counts
+
+This method will return a hash of the number of genes and RNA types that 
+have been parsed.
+
+=item typelist
+
+This method will return a comma-delimited list of the feature types or 
+C<primary_tag>s found in the parsed file. If a file has not yet been 
+parsed, it will return a generic list of expected (typical) feature 
+types. Otherwise, it will return the feature types observed in the 
+parsed file.
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, 
+L<Bio::ToolBox::SeqFeature>
 
 =head1 AUTHOR
 

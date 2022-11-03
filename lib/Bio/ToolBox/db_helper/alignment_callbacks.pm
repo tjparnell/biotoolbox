@@ -1,14 +1,19 @@
 package Bio::ToolBox::db_helper::alignment_callbacks;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use Bio::ToolBox::db_helper::constants;
+require Exporter;
+
 our $VERSION = '1.62';
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	assign_callback
 	_all_count_indexed
@@ -30,12 +35,10 @@ our @EXPORT = qw(
 	_reverse_precise_count_array
 	_reverse_name_array
 );
+## use critic
 
 # Lookup hash for caching callback methods
-our %CALLBACKS;
-
-# The true statement
-1;
+my %CALLBACKS;
 
 ### Generate callback subroutine for walking through Bam alignments
 sub assign_callback {
@@ -727,6 +730,8 @@ sub _reverse_name_array {
 			or ( $e >= $data->{start} and $e <= $data->{stop} ) );
 	push @{ $data->{scores} }, $a->qname;
 }
+
+1;
 
 __END__
 

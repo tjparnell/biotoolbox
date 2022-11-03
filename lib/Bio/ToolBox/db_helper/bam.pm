@@ -1,23 +1,28 @@
 package Bio::ToolBox::db_helper::bam;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use File::Copy;
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::db_helper::alignment_callbacks;
 use Bio::DB::Sam;
-our $parallel;
+require Exporter;
+
+my $parallel;
 eval {
 	# check for parallel support, when counting bam alignments
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
+
 our $VERSION = '1.62';
 
 # Exported names
 our @ISA    = qw(Exporter);
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	open_bam_db
 	open_indexed_fasta
@@ -26,9 +31,10 @@ our @EXPORT = qw(
 	collect_bam_scores
 	sum_total_bam_alignments
 );
+## use critic
 
 # Hash of Bam chromosomes
-our %BAM_CHROMOS;
+my %BAM_CHROMOS;
 
 # sometimes user may request a chromosome that's not in the bigfile
 # that could lead to an exception
@@ -38,15 +44,12 @@ our %BAM_CHROMOS;
 # to accommodate different naming conventions
 
 # Opened Bam db objects
-our %OPENED_BAM;
+my %OPENED_BAM;
 
 # a cache for opened Bam files
 # caching here is only for local purposes of collecting scores
 # db_helper also provides caching of db objects but with option to force open in
 # the case of forking processes - we don't have that here
-
-# The true statement
-1;
 
 ### Open a bam database connection
 sub open_bam_db {
@@ -389,6 +392,8 @@ sub sum_total_bam_alignments {
 	# done
 	return $total_read_number;
 }
+
+1;
 
 __END__
 

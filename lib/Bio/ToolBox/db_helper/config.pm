@@ -1,10 +1,12 @@
 package Bio::ToolBox::db_helper::config;
 
+use warnings;
 use strict;
-require Exporter;
-use File::Spec;
 use Carp;
+use File::Spec;
 use Config::Simple;
+require Exporter;
+
 our $VERSION = '1.70';
 
 # variables
@@ -62,13 +64,13 @@ DEFAULT
 	}
 }
 
-# Exported names
+## no critic
+## this is never intended to be used directly by end users
+## and exporting config mut always be done
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw($BTB_CONFIG);
 our @EXPORT_OK = qw(add_database add_program);
-
-# The true statement
-1;
+## use critic
 
 sub add_database {
 	my %args = @_;
@@ -142,6 +144,10 @@ sub _rewrite_config {
 		}
 	}
 }
+
+1;
+
+__END__
 
 =head1 NAME
 

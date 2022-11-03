@@ -1,846 +1,16 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.70';
 
-=head1 NAME
-
-Bio::ToolBox::db_helper - helper interface to various database formats
-
-=head1 DESCRIPTION
-
-In most cases, this module does not need to be used directly. The 
-methods available to L<Bio::ToolBox::Data> and L<Bio::ToolBox::Data::Feature> 
-provide convenient access to the methods described here.
-
-These are helper subroutines to work with relevant databases that can be 
-accessed through BioPerl modules. These include the L<Bio::DB::SeqFeature::Store> 
-relational database as well as L<Bio::DB::Fasta>, L<Bio::DB::Sam>, 
-L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, and 
-L<Bio::DB::BigBed> databases. The primary functions 
-included opening connections to these databases, verifying features found 
-within the database, generating lists of features or genomic intervals for 
-subsequent analysis, and collecting features and/or scores within regions 
-of interest. Collected scores may be summarized using a variety of statistical 
-methods.
-
-When collecting scores or features, the data may hosted in a variety of 
-formats and locations. These include:
-
-=over 4
-
-=item SeqFeature database
-
-Genomic feature annotation, including genes, transcripts, exons, etc, 
-may be stored in a L<Bio::DB::SeqFeature::Store> database. These 
-databases are backed by either a relational database, including 
-MySQL, PostGreSQL, or SQLite. Small GFF3 files may also be loaded in 
-an in-memory database. These are typically loaded from GFF3 
-files; see the adapter documentation for more information. Dataset 
-scores, such as from microarray, may also be stored as the score 
-value in the source GFF file. 
-
-References to local, binary, indexed files may also be included as 
-attributes to features stored in the database. This is legacy support 
-from the L<GBrowse genome browser|http://gmod.org/gbrowse>, and should 
-not be used in preference to other methods. Supported files include the 
-legacy binary wig files (F<.wib>, see L<Bio::Graphics::Wiggle>) using the 
-C<wigfile> attribute, or bigWig files using the C<wigfile> or C<bigwigfile> 
-attribute. The attribute values must be full paths. 
-
-=item BigWig files
-
-BigWig files (F<.bw> and F<.bigwig>) are compressed, binary, indexed 
-versions of text wig files and may be accessed either locally or remotely. 
-They support extremely  fast score retrieval from any genomic location of 
-any size without sacrificing resolution (spatial and numeric). See
-L<bigWig description|http://genome.ucsc.edu/goldenPath/help/bigWig.html> for more information. 
-BigWig files are supported by either the L<Bio::DB::Big> or the 
-L<Bio::DB::BigWig> adapter, based on either L<libBigWig|https://github.com/dpryan79/libBigWig> 
-or the L<UCSC|http://hgdownload.soe.ucsc.edu/downloads.html#source_downloads> libraries, 
-respectively; see their respective documentation for more information.
-
-=item Directory of BigWig files
-
-A directory containing two or more BigWig files is assembled into a 
-BigWigSet, allowing for metadata, such as strand, to be associated with 
-BigWig files. Additional metadata beyond the filename may be included in 
-text file F<metadata.txt> within the directory. See the 
-L<Bio::DB::BigWigSet> adapter documentation for more information. When using  
-L<Bio::DB::Big> adapters, BigWigSet support is natively supported by 
-the BioToolBox package.
-
-=item BigBed files
-
-BigBed files are compressed, binary, indexed versions of text BED files. See
-L<bigBed description|http://genome.ucsc.edu/goldenPath/help/bigBed.html> for more information.
-Both local and remote files may be accessed. BigBed files are supported by 
-either the L<Bio::DB::Big> or the L<Bio::DB::BigBed> adapter, based on either L<libBigWig|https://github.com/dpryan79/libBigWig> 
-or the L<UCSC|http://hgdownload.soe.ucsc.edu/downloads.html#source_downloads> libraries, 
-respectively; see their respective documentation for more information.
-
-=item Bam files
-
-Bam files (F<.bam>) are compressed, binary, indexed versions of the text SAM file, 
-or sequence alignment map. They are used with next generation sequencing 
-technologies. They support individual alignment retrieval as well as 
-read depth coverage. Two different Bam file adapters are supported. 
-
-The L<Bio::DB::HTS> adapter is an interface to the Bam (or Cram) file. 
-This is based on the modern HTSlib C library (version E<gt>= 1.0), successor 
-to the original samtools library. See L<http://samtools.github.io> for 
-more information.
-
-The L<Bio::DB::Sam> adapter is an older interface to the Bam alignment 
-file. This is based on the samtools C library version E<lt>= 0.1.19. While 
-this adapter is still supported, the above should be used for new installs.
-
-=item Cram files
-
-Cram files (F<.cram>) are similar to Bam files, but are much smaller due to 
-only storing sequence differences for each alignment. As such, they require 
-an indexed, reference fasta to regenerate the complete alignment. Cram files 
-are only supported by the L<Bio::DB::HTS> adapter.
-
-=item USeq files
-
-USeq files (F<.useq>) are compressed, binary, indexed files that support 
-multiple information types, including region intervals, BED type 
-annotations, or wig type scores distributed across the genome. They 
-support rapid, random access across the genome and are comparable to 
-both BigWig and BigBed files. See L<http://useq.sourceforge.net/useqArchiveFormat.html> 
-for more information. Files may only be local. These files are supported 
-by the L<Bio::DB::USeq> adapter. 
-
-=item Fasta files
-
-Fasta files (F<.fa> or F<.fasta>) may be opened. Fasta files are indexed to 
-rapidly and randomly fetch genomic sequence. Three different adapters are 
-available for indexing the fasta file. 
-
-The L<Bio::DB::HTS::Faidx> adapter is preferentially used, and requires a 
-F<.fai> index file. 
-
-The L<Bio::DB::Sam::Fai> adapter may alternatively used, and also requires a 
-F<.fai> index file.
-
-The older style L<Bio::DB::Fasta> adapter is much slower, but will index 
-either a single genomic fasta file or a directory of individual chromosome 
-or contig fasta files. 
-
-Additionally, genomic sequence stored in a L<Bio::DB::SeqFeature::Store> 
-annotation database may also be used.
-
-=back
-
-While the functions within this library may appear to be simply a rehashing of 
-the methods and functions in L<Bio::DB::SeqFeature::Store> and other modules, they 
-either provide a simpler function to often used database methodologies or are 
-designed to work intimately with the BioToolBox data format file and data structures 
-(see L<Bio::ToolBox::file_helper>). One key advantage to these functions is the ability
-to work with datasets that are stranded (transcriptome data, for example).
-
-Historically, this module was initially written to use L<Bio::DB::GFF> for 
-database usage. It has since been re-written to use L<Bio::DB::SeqFeature::Store> 
-database schema. Additional functionality has also been added for other databases 
-and file formats. 
-
-Complete usage and examples for the functions are provided below.
-
-=head1 USAGE
-
-Call the module at the beginning of your perl script and include the module 
-names to export. None are exported by default.
-
-  use Bio::ToolBox::db_helper qw(
-	  get_new_feature_list 
-	  get_db_feature
-  );
-
-This will export the indicated subroutine names into the current namespace. 
-Their usage is detailed below. 
-
-=head1 EXPORTED SUBROUTINES
-
-=over 4
-
-=item C<$BAM_ADAPTER> variable
-
-=item C<$BIG_ADAPTER> variable
-
-These variables control which Bam and bigWig/bigBed adapters are used
-during execution in installations where both adapters are present. These
-variables are not set initially; adapters are chosen automatically when an
-adapter is requested during execution and modules are evaluated for loading. 
-
-=item use_bam_adapter
-
-=item use_big_adapter
-
-These are convenience methods for explicitly setting and retrieving the 
-C<$BAM_ADAPTER> and C<$BIG_ADAPTER> variables, respectively. 
-
-Optionally pass the value to set. It will always return the value being used. 
-Values include the following:
-
-=over 4
-
-=item Bam adapter
-
-   * hts     Bio::DB::HTS (default if available)
-   * sam     Bio::DB::Sam
-   * none    no adapters allowed
-
-=item Big adapter
-
-   * big     Bio::DB::Big (default if available)
-   * ucsc    Bio::DB::BigWig and Bio::DB::BigBed
-   * none    no adapters allowed
-
-=back
-
-=item open_db_connection
-
-	my $db_name = 'cerevisiae';
-	my $db = open_db_connection($db_name);
-	
-	my $file = '/path/to/file.bam';
-	my $db = open_db_connection($file);
-	
-	# within a forked child process
-	# reusing the same variable to simplify code
-	# pass second true value to avoid cache
-	$db = open_db_connection($file, 1); 
-
-This is a simplified, generalized method that will open a connection to a 
-database or indexed file using any one of a number of different 
-BioPerl-style adapters. For local and remote files, the appropriate 
-adapter is determined by the file extension. Relational database 
-connection and authentication information is checked in a configuration 
-file. Once identified, the appropriate Perl module adapter is loaded 
-during run time automatically, saving the user from knowing in advance  
-to C<use> the appropriate module in the script. 
-
-Pass the name of a relational database or the path of the database file to 
-the subroutine. The opened database object is returned. If it fails, then 
-an error message should be generated and nothing is returned.
-
-B<Important!> If you are forking your perl process, B<always> re-open your 
-database objects in the child process, and pass a second true value 
-to avoid using the cached database object. By default, opened databases are 
-cached to improve efficiency, but this will be disastrous when crossing forks. 
-
-=over 4
-
-=item SeqFeature Store database
-
-Provide the name of the relational database to open. Parameters for 
-connecting to a relational database are stored in the BioToolBox 
-configuration file, F<.biotoolbox.cfg>. These include database adaptors, 
-user name, password, etc. Further information regarding the configuration 
-file may be found in L<Bio::ToolBox::db_helper::config>.
-
-For SQLite databases, provide the path to the F<.sqlite> or F<.db> file.
-
-For in-memory databases, provide the path to the F<.gff> or F<.gff3> file. 
-The larger the file, the more memory and processing time is consumed as 
-the file is parsed into memory. This may be fine for small model organisms 
-like yeast, but not for vertebrate annotation.  
-
-=item Bam file database 
-
-Provide the path to the F<.bam> file. This may be a local file, or a remote 
-URL (generally supported by the adapter). If a local F<.bam.bai> index file 
-is not present, it will automatically be built prior to opening; this may 
-fail if the bam file is not sorted. Remote files are not indexed.
-
-=item Cram file database
-
-Provide the path to the local F<.cram> file. Currently, supplementary fasta 
-files are not supported, so the Cram file header must point to a valid 
-reference. Cram files will be indexed automatically if an index is not available.
-
-=item BigWig file database
-
-Provide the path to a local F<.bw> or F<.bigwig> file, or URL to a 
-remote file. 
-
-=item BigWigSet database
-
-A local or remote directory of one or more BigWig files that can treated 
-collectively as a database. A special text file may be included in the 
-directory to assign metadata to each BigWig file, including attributes such 
-as type, source, display name, strand, etc. See L<Bio::DB::BigWigSet> for 
-more information on the formatting of the metadata file. If a metadata 
-file is not included (it's not necessary), then the filenames are used 
-as the name and type. Strand may be parsed from the filenames if the 
-basename ends in F<.f> and F<.r>.
-
-=item BigBed database
-
-Provide the path to a local F<.bb> or F<.bigbed> file, or URL to a 
-remote file. 
-
-=item USeq database
-
-Provide the path to a local F<.bb> or F<.bigbed> file, or URL to a 
-remote file. 
-
-=item Fasta database
-
-Provide the path to a local fasta file for rapidly fetching genomic 
-sequence. If the fasta file is not indexed, then it will be indexed 
-automatically upon opening. 
-
-=back
-
-=item get_db_name
-
-  my $name = get_db_name($db);
-
-This method will attempt to get the name of an opened Database 
-object if, for some reason, it's unknown, e.g. the user only provided an 
-opened db object. This only works for some databases, at least those I've 
-bothered to track down and find a usable API call to use.
-
-=item get_dataset_list
-
-	my $db_name = 'cerevisiae';
-	my @types = get_dataset_list($db_name);
-
-This method will retrieve a list of the available features stored in the 
-database and returns an array of the features' types.
-
-Pass either the name of the database or an established database object. 
-Supported databases include both L<Bio::DB::SeqFeature::Store> and 
-L<Bio::DB::BigWigSet> databases. 
-
-For L<Bio::DB::SeqFeature::Store> databases, the type is represented as 
-"C<type:source>", corresponding to the third and second GFF columns, 
-respectively. The types are sorted alphabetically first by source, 
-then by method.
-
-For L<Bio::DB::BigWigSet> databases, the C<type>, C<primary_tag>, C<method>, 
-or C<display_name> attribute may be used, in that respective order of 
-availability. The list is sorted alphabetically.
-
-=item verify_or_request_feature_types
-
-	# verify a dataset, either file or database type
-	my $db_name = 'cerevisiae';
-	my $dataset = 'microaray_data';
-	my @features = verify_or_request_feature_types(
-		db      => $db_name,
-		feature => $dataset,
-	);
-	unless (@features) {
-		die " no valid feature provided!\n";
-	}
-	
-	# select a list of features
-	my $db_name = 'cerevisiae';
-	my @types = (); # user not provided
-	@types = verify_or_request_feature_types(
-		db      => $db_name,
-		feature => $types,
-	);
-	# user will be promoted to select from database list
-	if (@types) {
-		print "using types " . join(", ", @types);
-	}
-	else {
-		die " no valid features selected!\n";
-	}
-
-This subroutine will process a list of feature types or data sources to be 
-used for data or feature collection. There are two modes of action. If a 
-list was provided, it will process and verify the list. If no list was 
-provided, then the user will be prompted to select from a list of available 
-feature types in the provided database.
-
-The provided list may be a list of feature types or a list of single 
-file data sources, including Bam, bigWig, or bigBed files. If the list 
-includes feature types, they are verified as existing in the provided 
-database. If the list includes file names, the local files are checked 
-and the names prefixed with "C<file:>" for use downstream.
-
-If no list was provided, then a list of available feature types in the 
-provided database will be presented to the user, and the user prompted 
-to make a selection. One or more types may be selected, and a single 
-item may be enforced if requested. The response is filtered through 
-the parse_list method from L<Bio::ToolBox::utility>, so a mix of single 
-numbers or a range of numbers may be accepted. The responses are then 
-validated.
-
-Two types of databases are supported: L<Bio::DB::SeqFeature::Store> and 
-L<Bio::DB::BigWigSet> databases. For SeqFeature Store databases, the 
-type is comprised of "C<method:source>", corresponding to the third and 
-second GFF columns. For BigWigSet databases, types correspond to either 
-the C<type>, C<method>, C<primary_tag>, or C<display_name> attributes, 
-in that order of availability. 
-
-For feature types or files that pass validation, they are returned as a 
-list. Types of files that do not pass validation are printed to C<STDOUT>. 
-
-To use this subroutine, pass an array with the following keys 
-and values. Not every key is required.
-
-=over 4
-
-=item db
-
-The name of the database or a reference to an established BioPerl
-database object. A L<Bio::DB::SeqFeature::Store> or
-L<Bio::DB::BigWigSet> database are typically used. Only required when
-no features are provided.
-
-=item feature
-
-Pass either a single dataset name as a scalar or an anonymous array
-reference of a list of dataset names. These may have been provided as
-a command line option and need to be verified. If nothing is passed,
-then a list of possible datasets will be presented to the user to be
-chosen.
-
-=item prompt
-
-Provide a phrase to be prompted to the user to help in selecting
-datasets from the list. If none is provided, a generic prompt will be
-used.
-
-=item single
-
-A Boolean value (1 or 0) indicating whether only a single dataset is
-allowed when selecting datasets from a presented list. If true, only
-one dataset choice is accepted. If false, one or more dataset choices
-are allowed. Default is false.
-
-=item limit
-
-Optionally provide a word or regular expression that matches the
-feature type (C<primary_tag> only; C<source_tag>, if present, is ignored).
-For example, provide "geneE<verbar>mrna" to only present gene and mRNA
-features to the user. This is only applicable when a user must select
-from a database list. The default is to list all available feature
-types.
-
-=back
-
-=item check_dataset_for_rpm_support($dataset, [$cpu])
-
-   # count the total number of alignments
-   my $dataset = '/path/to/file.bam';
-   my $total_count = check_dataset_for_rpm_support($dataset);
-   
-   # use multithreading
-   my $total_count = check_dataset_for_rpm_support($dataset, $cpu);
-
-This subroutine will check a dataset for RPM, or Reads Per Million mapped, 
-support. Only two types of database files support this, Bam files and 
-BigBed files. If the dataset is either one of these, or the name of a 
-database feature which points to one of these files, then it will 
-calculate the total number of mapped alignments (Bam file) or features 
-(BigBed file). It will return this total number. If the dataset does 
-not support RPM (because it is not a Bam or BigBed file, for example), 
-then it will return undefined.
-
-Pass this subroutine one or two values. The first is the name of the 
-dataset. Ideally it should be validated using verify_or_request_feature_types() 
-and have an appropriate prefix (file, http, or ftp). 
-
-For multi-threaded execution pass a second value, the number of CPU cores 
-available to count Bam files. This will speed up counting bam files 
-considerably. The default is 2 for environments where L<Parallel::ForkManager> 
-is installed, or 1 where it is not.
-
-=item get_new_feature_list
-
-	my $Data = Bio::ToolBox::Data->new;
-	my $db_name = 'cerevisiae';
-	my %data = get_new_feature_list(
-		data      => $Data,
-		db        => $db_name,
-		features  => 'genes',
-	);
-
-This subroutine will generate a new feature list collected from an annotation 
-database, such as a L<Bio::DB::SeqFeature::Store> database. It will populate 
-an empty L<Bio:ToolBox::Data> object data table with a list of the collected 
-features. Columns include the Primary ID, Name, and feature Type. 
-
-The subroutine is passed an array containing three required arguments. The keys 
-include
-
-=over 4
-
-=item data
-
-An empty L<Bio::ToolBox::Data> object. This is required.
-
-=item db
-
-The name of the database or a reference to an established database object. 
-Currently, this must be a L<Bio::DB::SeqFeature::Store> database.
-This is required.
-
-=item features
-
-A scalar value containing a name representing the feature type(s) of
-feature(s) to collect. The type may be a C<primary_tag> or C<primary_tag:source_tag>.
-It may be a single element or a comma-delimited list. This is required.
-
-=item chrskip
-
-Provide a regular-expression compatible string for skipping features from 
-specific chromosomes, for example mitochondrial or unmapped contigs.
-
-=back
-
-Status messages, including the number of features found and kept, are always 
-printed to C<STDOUT>. 
-
-=item get_new_genome_list
-
-	my $Data = Bio::ToolBox::Data->new();
-	my $db_name = 'cerevisiae';
-	my $window_size = 500;
-	my $step_size = 250;
-	my %data = get_new_genome_list(
-		data      => $Data,
-		db        => $db_name,
-		win       => $window_size,
-		step      => $step_size,
-	);
-
-This subroutine will generate a new list of genomic windows or intervals. 
-The genome is split into intervals of a specified size with the specified 
-step size.
-
-The subroutine is passed an array containing the required arguments. 
-
-=over 4
-
-=item data
-
-An empty L<Bio::ToolBox::Data> object. This is required.
-
-=item db
-
-The name of the database or a reference to an established database
-object. Any BioPerl adapter, including those described in the L</DESCRIPTION>, 
-are supported. Required. 
-
-=item win
-
-A scalar value containing an integer representing the size of the
-window in basepairs. The default value is 500 bp.
-
-=item step
-
-A scalar value containing an integer representing the step size for
-advancing the window across the genome. The default is the window size.
-
-=item chrskip
-
-=item skip
-
-=item exclude
-
-Provide a regular expression compatible string for excluding specific 
-chromosomes or classes of chromosomes, such as the mitochondrial or 
-unmapped contigs. 
-
-=back
-
-Status messages are printed to C<STDOUT>. 
-
-=item get_db_feature
-
-    my $db = open_db_connection('annotation.db');
-    my $seqfeature = get_db_feature(
-        db      => $db,
-        type    => 'gene',
-        name    => 'ABC1',
-    );
-
-This subroutine will retrieve a specific feature from a L<Bio::DB::SeqFeature::Store> 
-database for subsequent analysis, manipulation, and/or score retrieval using the 
-L</get_segment_score> methods. It relies upon unique information to pull out a 
-single, unique feature.
-
-Several attributes may be used to pull out the feature, including the feature's 
-unique database primary ID, name andE<sol>or aliases, and GFF type (C<primary_tag> 
-andE<sol>or C<source>). The L</get_new_feature_list> subroutine will generate a list 
-of features with their unique identifiers. 
-
-The C<primary_id> attribute is preferentially used as it provides the best 
-performance. However, it is not always portable between databases or even a 
-database re-load. In that case, the C<display_name> and C<type> are used to identify 
-potential features. Note that the C<display_name> may not always be unique in the 
-database. In this case, the addition of aliases may help. If all else fails, a new 
-feature list should be generated. 
-
-To get a feature, pass an array of arguments.
-
-=over 4
-
-=item db
-
-The name of the L<Bio::DB::SeqFeature::Store> database or a reference
-to an established database object. 
-
-=item id
-
-Provide the C<primary_id> tag. In the L<Bio::DB::SeqFeature::Store>
-database schema this is a (usually) non-portable, unique identifier
-specific to a database. It provides the fastest lookup.
-
-=item name
-
-A scalar value representing the feature C<display_name>. Aliases may be
-appended with semicolon delimiters. 
-
-=item type
-
-Provide the feature type, which is typically expressed as
-C<primary_tag:source>. Alternatively, provide just the C<primary_tag> only.
-
-=back
-
-While it is possible to identify features with any two attributes 
-(or possibly just name or ID), the best performance is obtained with 
-all three together. The first SeqFeature object is returned if multiple 
-are found.
-
-=item get_segment_score
-
-    my $score = get_segment_score(
-    	$seqfeature->seq_id,    # chromosome
-    	$seqfeature->start,     # start
-    	$seqfeature->end,       # end
-    	$seqfeature->strand,    # strand
-    	'sense',                # strandedness
-    	'mean',                 # method
-    	0,                      # return type
-    	$db,                    # database
-    	'scores.bw'             # datasets
-    );
-
-Generic method for collecting score(s) from a database. This is the 
-primary interface to all of the database handling packages, including 
-Bam, bigWig, bigBed, and USeq files, as well as SeqFeature databases. 
-By passing common parameters here, the appropriate database or file 
-handling packages are loaded during run time and the appropriate 
-methods are called. Essentially, this is where the magic happens.
-
-Pass the method an array of nine (or more) parameters. The parameters 
-are not keyed as a hash, and the order is explicit. However, see the 
-L<Bio::ToolBox::db_helper::constants> module for named index positions. 
-The order is as follows.
-
-=over 4
-
-=item * 0 Chromosome
-
-String representing chromosome or sequence ID.
-
-=item * 1 Start
-
-Start coordinate (integer, 1-based)
-
-=item * 2 Stop
-
-Stop or end coordinate (integer, 1-based)
-
-=item * 3 Strand
-
-BioPerl style strand value, including -1, 0, and 1.
-
-=item * 4 Strandedness
-
-A string indicating strandedness: sense, antisense, all.
-
-=item * 5 Method
-
-A string representing the method of data collection. 
-
-Current acceptable methods include mean, median, sum, min, max, 
-stddev, count, ncount (named count), and pcount (precise count). 
-See the individual db_helper sub classes for more details. Not all 
-adapters support all methods.
-
-=item * 6 Return type
-
-An integer (0, 1, 2) representing the type of value to return.
-
-A return type of 0 indicates a single score should be returned, 
-calculated using the specified method. A return type of 1 is an 
-array or array reference of all scores found. A return type of 2 
-is a hash or hash reference of coordinate => score. 
-
-=item * 7 Dataset database
-
-This is either a L<Bio::DB::SeqFeature::Store> or a L<Bio::DB::BigWigSet> 
-database containing multiple score dataset features. If your dataset 
-does not contain multiple different feature types, pass C<undefined>.
-
-Pass either a string containing the name of database (which will be opened) 
-or an already opened database object. 
-
-=item * 8 Dataset
-
-This is the verified dataset from which the scores will be passed. The 
-dataset should be verified using the L</verify_or_request_feature_types> 
-subroutine. For indexed file datasets, e.g. F<.bam> or F<.bw> files, 
-this will the verified local path or URL. For a database, this will be 
-a database type, sucha as C<primary_tag> or C<primary_tag:source>. 
-or the path to a data file, e.g. Bam, bigWig, bigBed, or USeq file. 
-
-If multiple datasets are to be combined, simply append them to the 
-array (index 9, 10, etc).
-
-=back
-
-The returned item is dependent on the value of the return type code.
-
-=item calculate_score
-
-    my $scores = get_segment_score($chr,$start,$stop,$strand,
-    	'sense','ncount',1,undef,'file:/path/to/dataset.bam');
-    my $score = calculate_score('ncount', $scores);
-
-This subroutine will perform the math to calculate a single score 
-from an array of values. Current acceptable methods include mean, 
-median, sum, min, max, stddev, count, ncount, and pcount.
-
-Pass the subroutine two items: the name of the mathematical method 
-enumerated above, and an array reference of the values to work on.
-A single score will be returned.
-
-=item get_chromosome_list
-
-	my $db = open_db_connection('cerevisiae');
-	# get all chromosomes in the database
-	my @chromosomes = get_chromosome_list($db);
-	foreach (@chromosomes) {
-		my $name = $_->[0];
-		my $length = $_->[1];
-		print "chromosome $name is $length bp\n";
-	}
-
-This subroutine will collect a list of chromosomes or reference sequences 
-in a Bio::DB database and return the list along with their sizes in bp. 
-Many BioPerl-based databases are supported, including 
-L<Bio::DB::SeqFeature::Store>, L<Bio::DB::Fasta>, L<Bio::DB::Sam>, 
-L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, 
-L<Bio::DB::BigBed>, or any others that support the C<seq_ids> method. 
-L<Bio::DB::Big> adapters for big files are also supported, though see note 
-below. See the L</open_db_connection> subroutine for more information.
-
-Pass the subroutine either the name of the database, the path to the 
-database file, or an opened database object.
-
-Optionally pass a second value, a regular expression compatible string 
-for skipping specific chromosomes or chromosome classes, such as mitochondrial 
-or unmapped contigs. The default is to return all chromosomes. 
-
-The subroutine will return an array, with each element representing each 
-chromosome or reference sequence in the database. Each element is an anonymous 
-array of two elements, the chromosome name and length in bp.
-
-B<NOTE>: L<Bio::DB::Big> databases for bigWig and bigBed files do 
-not return chromosomes in the original order as the file, and are returned 
-in a sorted manner that may not be the original order.
-
-=item low_level_bam_coverage
-
-	my $coverage = low_level_bam_coverage($sam, $tid, $start, $stop);
-
-This is a convenience method for running the low level bam coverage method. 
-Since both L<Bio::DB::Sam> and L<Bio::DB::HTS> bam file adapters are 
-supported, and each has slight variation in the API syntax, this method helps 
-to abstract the actual method and use the appropriate syntax depending on 
-which adapter is loaded. It is best if the C<$sam> object was opened using the 
-L</open_db_connection> method, or that C<$BAM_ADAPTER> is set.
-
-B<NOTE> that this is the B<low level> coverage method based on the index object, 
-and not the similarly named high level API method. Read the adapter 
-documentation for proper usage.
-
-=item low_level_bam_fetch
-
-	my $success = low_level_bam_fetch($sam, $tid, $start, $stop, $callback, $data);
-
-This is a convenience method for running the low level bam fetch method. 
-Since both L<Bio::DB::Sam> and L<Bio::DB::HTS> bam file adapters are 
-supported, and each has slight variation in the API syntax, this method helps 
-to abstract the actual method and use the appropriate syntax depending on 
-which adapter is loaded. It is best if the C<$sam> object was opened using the 
-L</open_db_connection> method, or that C<$BAM_ADAPTER> is set.
-
-B<NOTE> that this is the B<low level> fetch method based on the index object, 
-and not the similarly named high level API method. Read the adapter 
-documentation for proper usage.
-
-=item get_genomic_sequence
-
-	my $sequence = get_genomic_sequence($db, $chrom, $start, $stop);
-
-This is a convenience wrapper function for fetching genomic sequence from 
-three different supported fasta database adapters, which, of course, all 
-have different APIs, including the L<Bio::DB::Fasta>, L<Bio::DB::HTS::Faidx>, 
-and L<Bio::DB::Sam::Fai> adapters, as well as L<Bio::DB::SeqFeature::Store> 
-and possibly other BioPerl databases. 
-
-Pass the opened database object, chromosome, start, and stop coordinates. This 
-assumes BioPerl standard 1-base coordinates. Only the forward sequence is 
-retrieved. The sequence is returned as a simple string.
-
-=back
-
-=head1 INTERNAL SUBROUTINES
-
-These are not intended for normal general consumption but are documented here 
-so that at least some of us know what is going on.
-
-=over 4
-
-=item _lookup_db_method
-
-Internal method for determining which database adapter and method call 
-should be used given a set of parameters. This result is cached for 
-future data queries (likely hundreds or thousands of repeated calls). 
-The method is stored in the global hash C<%DB_METHODS>;
-
-Pass the parameter array reference from L</get_segment_score>. This 
-should load the appropriate db_helper sub module during run time.
-
-=item _load_helper_module
-
-Subroutine to load and import a db_helper module during run time.
-Sets the appropriate global variable if successful. 
-
-=item _load_bam_helper_module
-
-Subroutine to determine which Bam adapter db_helper module to load, 
-either the older samtools-based adapter or the newer HTSlib-based adapter.
-Uses the global and exportable variable C<$BAM_ADAPTER> to set a 
-preference for which adapter to use. Use 'sam' or 'hts' or some 
-string containing these names. Do B<NOT> change this variable after 
-loading the helper module; it will not do what you think it will do.
-If both are available and a preference is not set then the hts helper 
-is the default.
-
-=back
-
-=cut
-
+use warnings;
 use strict;
-require Exporter;
 use Carp qw(carp cluck croak confess);
 use Module::Load;    # for dynamic loading during runtime
 use List::Util qw(min max sum0 uniq);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
+require Exporter;
+
+our $VERSION = '1.70';
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources
@@ -939,7 +109,6 @@ my %SCORE_CALCULATOR_SUB = (
 
 # Exported names
 our @ISA       = qw(Exporter);
-our @EXPORT    = qw();
 our @EXPORT_OK = qw(
 	$BAM_ADAPTER
 	$BIG_ADAPTER
@@ -960,9 +129,6 @@ our @EXPORT_OK = qw(
 	low_level_bam_fetch
 	get_genomic_sequence
 );
-
-# The true statement
-1;
 
 ### Open a connection to the SeqFeature Store MySQL database
 
@@ -2767,6 +1933,840 @@ sub _load_bigbed_helper_module {
 	}
 	return $BIGBED_OK;
 }
+
+1;
+
+__END__
+
+=head1 NAME
+
+Bio::ToolBox::db_helper - helper interface to various database formats
+
+=head1 DESCRIPTION
+
+In most cases, this module does not need to be used directly. The 
+methods available to L<Bio::ToolBox::Data> and L<Bio::ToolBox::Data::Feature> 
+provide convenient access to the methods described here.
+
+These are helper subroutines to work with relevant databases that can be 
+accessed through BioPerl modules. These include the L<Bio::DB::SeqFeature::Store> 
+relational database as well as L<Bio::DB::Fasta>, L<Bio::DB::Sam>, 
+L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, and 
+L<Bio::DB::BigBed> databases. The primary functions 
+included opening connections to these databases, verifying features found 
+within the database, generating lists of features or genomic intervals for 
+subsequent analysis, and collecting features and/or scores within regions 
+of interest. Collected scores may be summarized using a variety of statistical 
+methods.
+
+When collecting scores or features, the data may hosted in a variety of 
+formats and locations. These include:
+
+=over 4
+
+=item SeqFeature database
+
+Genomic feature annotation, including genes, transcripts, exons, etc, 
+may be stored in a L<Bio::DB::SeqFeature::Store> database. These 
+databases are backed by either a relational database, including 
+MySQL, PostGreSQL, or SQLite. Small GFF3 files may also be loaded in 
+an in-memory database. These are typically loaded from GFF3 
+files; see the adapter documentation for more information. Dataset 
+scores, such as from microarray, may also be stored as the score 
+value in the source GFF file. 
+
+References to local, binary, indexed files may also be included as 
+attributes to features stored in the database. This is legacy support 
+from the L<GBrowse genome browser|http://gmod.org/gbrowse>, and should 
+not be used in preference to other methods. Supported files include the 
+legacy binary wig files (F<.wib>, see L<Bio::Graphics::Wiggle>) using the 
+C<wigfile> attribute, or bigWig files using the C<wigfile> or C<bigwigfile> 
+attribute. The attribute values must be full paths. 
+
+=item BigWig files
+
+BigWig files (F<.bw> and F<.bigwig>) are compressed, binary, indexed 
+versions of text wig files and may be accessed either locally or remotely. 
+They support extremely  fast score retrieval from any genomic location of 
+any size without sacrificing resolution (spatial and numeric). See
+L<bigWig description|http://genome.ucsc.edu/goldenPath/help/bigWig.html> for more information. 
+BigWig files are supported by either the L<Bio::DB::Big> or the 
+L<Bio::DB::BigWig> adapter, based on either L<libBigWig|https://github.com/dpryan79/libBigWig> 
+or the L<UCSC|http://hgdownload.soe.ucsc.edu/downloads.html#source_downloads> libraries, 
+respectively; see their respective documentation for more information.
+
+=item Directory of BigWig files
+
+A directory containing two or more BigWig files is assembled into a 
+BigWigSet, allowing for metadata, such as strand, to be associated with 
+BigWig files. Additional metadata beyond the filename may be included in 
+text file F<metadata.txt> within the directory. See the 
+L<Bio::DB::BigWigSet> adapter documentation for more information. When using  
+L<Bio::DB::Big> adapters, BigWigSet support is natively supported by 
+the BioToolBox package.
+
+=item BigBed files
+
+BigBed files are compressed, binary, indexed versions of text BED files. See
+L<bigBed description|http://genome.ucsc.edu/goldenPath/help/bigBed.html> for more information.
+Both local and remote files may be accessed. BigBed files are supported by 
+either the L<Bio::DB::Big> or the L<Bio::DB::BigBed> adapter, based on either L<libBigWig|https://github.com/dpryan79/libBigWig> 
+or the L<UCSC|http://hgdownload.soe.ucsc.edu/downloads.html#source_downloads> libraries, 
+respectively; see their respective documentation for more information.
+
+=item Bam files
+
+Bam files (F<.bam>) are compressed, binary, indexed versions of the text SAM file, 
+or sequence alignment map. They are used with next generation sequencing 
+technologies. They support individual alignment retrieval as well as 
+read depth coverage. Two different Bam file adapters are supported. 
+
+The L<Bio::DB::HTS> adapter is an interface to the Bam (or Cram) file. 
+This is based on the modern HTSlib C library (version E<gt>= 1.0), successor 
+to the original samtools library. See L<http://samtools.github.io> for 
+more information.
+
+The L<Bio::DB::Sam> adapter is an older interface to the Bam alignment 
+file. This is based on the samtools C library version E<lt>= 0.1.19. While 
+this adapter is still supported, the above should be used for new installs.
+
+=item Cram files
+
+Cram files (F<.cram>) are similar to Bam files, but are much smaller due to 
+only storing sequence differences for each alignment. As such, they require 
+an indexed, reference fasta to regenerate the complete alignment. Cram files 
+are only supported by the L<Bio::DB::HTS> adapter.
+
+=item USeq files
+
+USeq files (F<.useq>) are compressed, binary, indexed files that support 
+multiple information types, including region intervals, BED type 
+annotations, or wig type scores distributed across the genome. They 
+support rapid, random access across the genome and are comparable to 
+both BigWig and BigBed files. See L<http://useq.sourceforge.net/useqArchiveFormat.html> 
+for more information. Files may only be local. These files are supported 
+by the L<Bio::DB::USeq> adapter. 
+
+=item Fasta files
+
+Fasta files (F<.fa> or F<.fasta>) may be opened. Fasta files are indexed to 
+rapidly and randomly fetch genomic sequence. Three different adapters are 
+available for indexing the fasta file. 
+
+The L<Bio::DB::HTS::Faidx> adapter is preferentially used, and requires a 
+F<.fai> index file. 
+
+The L<Bio::DB::Sam::Fai> adapter may alternatively used, and also requires a 
+F<.fai> index file.
+
+The older style L<Bio::DB::Fasta> adapter is much slower, but will index 
+either a single genomic fasta file or a directory of individual chromosome 
+or contig fasta files. 
+
+Additionally, genomic sequence stored in a L<Bio::DB::SeqFeature::Store> 
+annotation database may also be used.
+
+=back
+
+While the functions within this library may appear to be simply a rehashing of 
+the methods and functions in L<Bio::DB::SeqFeature::Store> and other modules, they 
+either provide a simpler function to often used database methodologies or are 
+designed to work intimately with the BioToolBox data format file and data structures 
+(see L<Bio::ToolBox::file_helper>). One key advantage to these functions is the ability
+to work with datasets that are stranded (transcriptome data, for example).
+
+Historically, this module was initially written to use L<Bio::DB::GFF> for 
+database usage. It has since been re-written to use L<Bio::DB::SeqFeature::Store> 
+database schema. Additional functionality has also been added for other databases 
+and file formats. 
+
+Complete usage and examples for the functions are provided below.
+
+=head1 USAGE
+
+Call the module at the beginning of your perl script and include the module 
+names to export. None are exported by default.
+
+  use Bio::ToolBox::db_helper qw(
+	  get_new_feature_list 
+	  get_db_feature
+  );
+
+This will export the indicated subroutine names into the current namespace. 
+Their usage is detailed below. 
+
+=head1 EXPORTED SUBROUTINES
+
+=over 4
+
+=item C<$BAM_ADAPTER> variable
+
+=item C<$BIG_ADAPTER> variable
+
+These variables control which Bam and bigWig/bigBed adapters are used
+during execution in installations where both adapters are present. These
+variables are not set initially; adapters are chosen automatically when an
+adapter is requested during execution and modules are evaluated for loading. 
+
+=item use_bam_adapter
+
+=item use_big_adapter
+
+These are convenience methods for explicitly setting and retrieving the 
+C<$BAM_ADAPTER> and C<$BIG_ADAPTER> variables, respectively. 
+
+Optionally pass the value to set. It will always return the value being used. 
+Values include the following:
+
+=over 4
+
+=item Bam adapter
+
+   * hts     Bio::DB::HTS (default if available)
+   * sam     Bio::DB::Sam
+   * none    no adapters allowed
+
+=item Big adapter
+
+   * big     Bio::DB::Big (default if available)
+   * ucsc    Bio::DB::BigWig and Bio::DB::BigBed
+   * none    no adapters allowed
+
+=back
+
+=item open_db_connection
+
+	my $db_name = 'cerevisiae';
+	my $db = open_db_connection($db_name);
+	
+	my $file = '/path/to/file.bam';
+	my $db = open_db_connection($file);
+	
+	# within a forked child process
+	# reusing the same variable to simplify code
+	# pass second true value to avoid cache
+	$db = open_db_connection($file, 1); 
+
+This is a simplified, generalized method that will open a connection to a 
+database or indexed file using any one of a number of different 
+BioPerl-style adapters. For local and remote files, the appropriate 
+adapter is determined by the file extension. Relational database 
+connection and authentication information is checked in a configuration 
+file. Once identified, the appropriate Perl module adapter is loaded 
+during run time automatically, saving the user from knowing in advance  
+to C<use> the appropriate module in the script. 
+
+Pass the name of a relational database or the path of the database file to 
+the subroutine. The opened database object is returned. If it fails, then 
+an error message should be generated and nothing is returned.
+
+B<Important!> If you are forking your perl process, B<always> re-open your 
+database objects in the child process, and pass a second true value 
+to avoid using the cached database object. By default, opened databases are 
+cached to improve efficiency, but this will be disastrous when crossing forks. 
+
+=over 4
+
+=item SeqFeature Store database
+
+Provide the name of the relational database to open. Parameters for 
+connecting to a relational database are stored in the BioToolBox 
+configuration file, F<.biotoolbox.cfg>. These include database adaptors, 
+user name, password, etc. Further information regarding the configuration 
+file may be found in L<Bio::ToolBox::db_helper::config>.
+
+For SQLite databases, provide the path to the F<.sqlite> or F<.db> file.
+
+For in-memory databases, provide the path to the F<.gff> or F<.gff3> file. 
+The larger the file, the more memory and processing time is consumed as 
+the file is parsed into memory. This may be fine for small model organisms 
+like yeast, but not for vertebrate annotation.  
+
+=item Bam file database 
+
+Provide the path to the F<.bam> file. This may be a local file, or a remote 
+URL (generally supported by the adapter). If a local F<.bam.bai> index file 
+is not present, it will automatically be built prior to opening; this may 
+fail if the bam file is not sorted. Remote files are not indexed.
+
+=item Cram file database
+
+Provide the path to the local F<.cram> file. Currently, supplementary fasta 
+files are not supported, so the Cram file header must point to a valid 
+reference. Cram files will be indexed automatically if an index is not available.
+
+=item BigWig file database
+
+Provide the path to a local F<.bw> or F<.bigwig> file, or URL to a 
+remote file. 
+
+=item BigWigSet database
+
+A local or remote directory of one or more BigWig files that can treated 
+collectively as a database. A special text file may be included in the 
+directory to assign metadata to each BigWig file, including attributes such 
+as type, source, display name, strand, etc. See L<Bio::DB::BigWigSet> for 
+more information on the formatting of the metadata file. If a metadata 
+file is not included (it's not necessary), then the filenames are used 
+as the name and type. Strand may be parsed from the filenames if the 
+basename ends in F<.f> and F<.r>.
+
+=item BigBed database
+
+Provide the path to a local F<.bb> or F<.bigbed> file, or URL to a 
+remote file. 
+
+=item USeq database
+
+Provide the path to a local F<.bb> or F<.bigbed> file, or URL to a 
+remote file. 
+
+=item Fasta database
+
+Provide the path to a local fasta file for rapidly fetching genomic 
+sequence. If the fasta file is not indexed, then it will be indexed 
+automatically upon opening. 
+
+=back
+
+=item get_db_name
+
+  my $name = get_db_name($db);
+
+This method will attempt to get the name of an opened Database 
+object if, for some reason, it's unknown, e.g. the user only provided an 
+opened db object. This only works for some databases, at least those I've 
+bothered to track down and find a usable API call to use.
+
+=item get_dataset_list
+
+	my $db_name = 'cerevisiae';
+	my @types = get_dataset_list($db_name);
+
+This method will retrieve a list of the available features stored in the 
+database and returns an array of the features' types.
+
+Pass either the name of the database or an established database object. 
+Supported databases include both L<Bio::DB::SeqFeature::Store> and 
+L<Bio::DB::BigWigSet> databases. 
+
+For L<Bio::DB::SeqFeature::Store> databases, the type is represented as 
+"C<type:source>", corresponding to the third and second GFF columns, 
+respectively. The types are sorted alphabetically first by source, 
+then by method.
+
+For L<Bio::DB::BigWigSet> databases, the C<type>, C<primary_tag>, C<method>, 
+or C<display_name> attribute may be used, in that respective order of 
+availability. The list is sorted alphabetically.
+
+=item verify_or_request_feature_types
+
+	# verify a dataset, either file or database type
+	my $db_name = 'cerevisiae';
+	my $dataset = 'microaray_data';
+	my @features = verify_or_request_feature_types(
+		db      => $db_name,
+		feature => $dataset,
+	);
+	unless (@features) {
+		die " no valid feature provided!\n";
+	}
+	
+	# select a list of features
+	my $db_name = 'cerevisiae';
+	my @types = (); # user not provided
+	@types = verify_or_request_feature_types(
+		db      => $db_name,
+		feature => $types,
+	);
+	# user will be promoted to select from database list
+	if (@types) {
+		print "using types " . join(", ", @types);
+	}
+	else {
+		die " no valid features selected!\n";
+	}
+
+This subroutine will process a list of feature types or data sources to be 
+used for data or feature collection. There are two modes of action. If a 
+list was provided, it will process and verify the list. If no list was 
+provided, then the user will be prompted to select from a list of available 
+feature types in the provided database.
+
+The provided list may be a list of feature types or a list of single 
+file data sources, including Bam, bigWig, or bigBed files. If the list 
+includes feature types, they are verified as existing in the provided 
+database. If the list includes file names, the local files are checked 
+and the names prefixed with "C<file:>" for use downstream.
+
+If no list was provided, then a list of available feature types in the 
+provided database will be presented to the user, and the user prompted 
+to make a selection. One or more types may be selected, and a single 
+item may be enforced if requested. The response is filtered through 
+the parse_list method from L<Bio::ToolBox::utility>, so a mix of single 
+numbers or a range of numbers may be accepted. The responses are then 
+validated.
+
+Two types of databases are supported: L<Bio::DB::SeqFeature::Store> and 
+L<Bio::DB::BigWigSet> databases. For SeqFeature Store databases, the 
+type is comprised of "C<method:source>", corresponding to the third and 
+second GFF columns. For BigWigSet databases, types correspond to either 
+the C<type>, C<method>, C<primary_tag>, or C<display_name> attributes, 
+in that order of availability. 
+
+For feature types or files that pass validation, they are returned as a 
+list. Types of files that do not pass validation are printed to C<STDOUT>. 
+
+To use this subroutine, pass an array with the following keys 
+and values. Not every key is required.
+
+=over 4
+
+=item db
+
+The name of the database or a reference to an established BioPerl
+database object. A L<Bio::DB::SeqFeature::Store> or
+L<Bio::DB::BigWigSet> database are typically used. Only required when
+no features are provided.
+
+=item feature
+
+Pass either a single dataset name as a scalar or an anonymous array
+reference of a list of dataset names. These may have been provided as
+a command line option and need to be verified. If nothing is passed,
+then a list of possible datasets will be presented to the user to be
+chosen.
+
+=item prompt
+
+Provide a phrase to be prompted to the user to help in selecting
+datasets from the list. If none is provided, a generic prompt will be
+used.
+
+=item single
+
+A Boolean value (1 or 0) indicating whether only a single dataset is
+allowed when selecting datasets from a presented list. If true, only
+one dataset choice is accepted. If false, one or more dataset choices
+are allowed. Default is false.
+
+=item limit
+
+Optionally provide a word or regular expression that matches the
+feature type (C<primary_tag> only; C<source_tag>, if present, is ignored).
+For example, provide "geneE<verbar>mrna" to only present gene and mRNA
+features to the user. This is only applicable when a user must select
+from a database list. The default is to list all available feature
+types.
+
+=back
+
+=item check_dataset_for_rpm_support($dataset, [$cpu])
+
+   # count the total number of alignments
+   my $dataset = '/path/to/file.bam';
+   my $total_count = check_dataset_for_rpm_support($dataset);
+   
+   # use multithreading
+   my $total_count = check_dataset_for_rpm_support($dataset, $cpu);
+
+This subroutine will check a dataset for RPM, or Reads Per Million mapped, 
+support. Only two types of database files support this, Bam files and 
+BigBed files. If the dataset is either one of these, or the name of a 
+database feature which points to one of these files, then it will 
+calculate the total number of mapped alignments (Bam file) or features 
+(BigBed file). It will return this total number. If the dataset does 
+not support RPM (because it is not a Bam or BigBed file, for example), 
+then it will return undefined.
+
+Pass this subroutine one or two values. The first is the name of the 
+dataset. Ideally it should be validated using verify_or_request_feature_types() 
+and have an appropriate prefix (file, http, or ftp). 
+
+For multi-threaded execution pass a second value, the number of CPU cores 
+available to count Bam files. This will speed up counting bam files 
+considerably. The default is 2 for environments where L<Parallel::ForkManager> 
+is installed, or 1 where it is not.
+
+=item get_new_feature_list
+
+	my $Data = Bio::ToolBox::Data->new;
+	my $db_name = 'cerevisiae';
+	my %data = get_new_feature_list(
+		data      => $Data,
+		db        => $db_name,
+		features  => 'genes',
+	);
+
+This subroutine will generate a new feature list collected from an annotation 
+database, such as a L<Bio::DB::SeqFeature::Store> database. It will populate 
+an empty L<Bio:ToolBox::Data> object data table with a list of the collected 
+features. Columns include the Primary ID, Name, and feature Type. 
+
+The subroutine is passed an array containing three required arguments. The keys 
+include
+
+=over 4
+
+=item data
+
+An empty L<Bio::ToolBox::Data> object. This is required.
+
+=item db
+
+The name of the database or a reference to an established database object. 
+Currently, this must be a L<Bio::DB::SeqFeature::Store> database.
+This is required.
+
+=item features
+
+A scalar value containing a name representing the feature type(s) of
+feature(s) to collect. The type may be a C<primary_tag> or C<primary_tag:source_tag>.
+It may be a single element or a comma-delimited list. This is required.
+
+=item chrskip
+
+Provide a regular-expression compatible string for skipping features from 
+specific chromosomes, for example mitochondrial or unmapped contigs.
+
+=back
+
+Status messages, including the number of features found and kept, are always 
+printed to C<STDOUT>. 
+
+=item get_new_genome_list
+
+	my $Data = Bio::ToolBox::Data->new();
+	my $db_name = 'cerevisiae';
+	my $window_size = 500;
+	my $step_size = 250;
+	my %data = get_new_genome_list(
+		data      => $Data,
+		db        => $db_name,
+		win       => $window_size,
+		step      => $step_size,
+	);
+
+This subroutine will generate a new list of genomic windows or intervals. 
+The genome is split into intervals of a specified size with the specified 
+step size.
+
+The subroutine is passed an array containing the required arguments. 
+
+=over 4
+
+=item data
+
+An empty L<Bio::ToolBox::Data> object. This is required.
+
+=item db
+
+The name of the database or a reference to an established database
+object. Any BioPerl adapter, including those described in the L</DESCRIPTION>, 
+are supported. Required. 
+
+=item win
+
+A scalar value containing an integer representing the size of the
+window in basepairs. The default value is 500 bp.
+
+=item step
+
+A scalar value containing an integer representing the step size for
+advancing the window across the genome. The default is the window size.
+
+=item chrskip
+
+=item skip
+
+=item exclude
+
+Provide a regular expression compatible string for excluding specific 
+chromosomes or classes of chromosomes, such as the mitochondrial or 
+unmapped contigs. 
+
+=back
+
+Status messages are printed to C<STDOUT>. 
+
+=item get_db_feature
+
+    my $db = open_db_connection('annotation.db');
+    my $seqfeature = get_db_feature(
+        db      => $db,
+        type    => 'gene',
+        name    => 'ABC1',
+    );
+
+This subroutine will retrieve a specific feature from a L<Bio::DB::SeqFeature::Store> 
+database for subsequent analysis, manipulation, and/or score retrieval using the 
+L</get_segment_score> methods. It relies upon unique information to pull out a 
+single, unique feature.
+
+Several attributes may be used to pull out the feature, including the feature's 
+unique database primary ID, name andE<sol>or aliases, and GFF type (C<primary_tag> 
+andE<sol>or C<source>). The L</get_new_feature_list> subroutine will generate a list 
+of features with their unique identifiers. 
+
+The C<primary_id> attribute is preferentially used as it provides the best 
+performance. However, it is not always portable between databases or even a 
+database re-load. In that case, the C<display_name> and C<type> are used to identify 
+potential features. Note that the C<display_name> may not always be unique in the 
+database. In this case, the addition of aliases may help. If all else fails, a new 
+feature list should be generated. 
+
+To get a feature, pass an array of arguments.
+
+=over 4
+
+=item db
+
+The name of the L<Bio::DB::SeqFeature::Store> database or a reference
+to an established database object. 
+
+=item id
+
+Provide the C<primary_id> tag. In the L<Bio::DB::SeqFeature::Store>
+database schema this is a (usually) non-portable, unique identifier
+specific to a database. It provides the fastest lookup.
+
+=item name
+
+A scalar value representing the feature C<display_name>. Aliases may be
+appended with semicolon delimiters. 
+
+=item type
+
+Provide the feature type, which is typically expressed as
+C<primary_tag:source>. Alternatively, provide just the C<primary_tag> only.
+
+=back
+
+While it is possible to identify features with any two attributes 
+(or possibly just name or ID), the best performance is obtained with 
+all three together. The first SeqFeature object is returned if multiple 
+are found.
+
+=item get_segment_score
+
+    my $score = get_segment_score(
+    	$seqfeature->seq_id,    # chromosome
+    	$seqfeature->start,     # start
+    	$seqfeature->end,       # end
+    	$seqfeature->strand,    # strand
+    	'sense',                # strandedness
+    	'mean',                 # method
+    	0,                      # return type
+    	$db,                    # database
+    	'scores.bw'             # datasets
+    );
+
+Generic method for collecting score(s) from a database. This is the 
+primary interface to all of the database handling packages, including 
+Bam, bigWig, bigBed, and USeq files, as well as SeqFeature databases. 
+By passing common parameters here, the appropriate database or file 
+handling packages are loaded during run time and the appropriate 
+methods are called. Essentially, this is where the magic happens.
+
+Pass the method an array of nine (or more) parameters. The parameters 
+are not keyed as a hash, and the order is explicit. However, see the 
+L<Bio::ToolBox::db_helper::constants> module for named index positions. 
+The order is as follows.
+
+=over 4
+
+=item * 0 Chromosome
+
+String representing chromosome or sequence ID.
+
+=item * 1 Start
+
+Start coordinate (integer, 1-based)
+
+=item * 2 Stop
+
+Stop or end coordinate (integer, 1-based)
+
+=item * 3 Strand
+
+BioPerl style strand value, including -1, 0, and 1.
+
+=item * 4 Strandedness
+
+A string indicating strandedness: sense, antisense, all.
+
+=item * 5 Method
+
+A string representing the method of data collection. 
+
+Current acceptable methods include mean, median, sum, min, max, 
+stddev, count, ncount (named count), and pcount (precise count). 
+See the individual db_helper sub classes for more details. Not all 
+adapters support all methods.
+
+=item * 6 Return type
+
+An integer (0, 1, 2) representing the type of value to return.
+
+A return type of 0 indicates a single score should be returned, 
+calculated using the specified method. A return type of 1 is an 
+array or array reference of all scores found. A return type of 2 
+is a hash or hash reference of coordinate => score. 
+
+=item * 7 Dataset database
+
+This is either a L<Bio::DB::SeqFeature::Store> or a L<Bio::DB::BigWigSet> 
+database containing multiple score dataset features. If your dataset 
+does not contain multiple different feature types, pass C<undefined>.
+
+Pass either a string containing the name of database (which will be opened) 
+or an already opened database object. 
+
+=item * 8 Dataset
+
+This is the verified dataset from which the scores will be passed. The 
+dataset should be verified using the L</verify_or_request_feature_types> 
+subroutine. For indexed file datasets, e.g. F<.bam> or F<.bw> files, 
+this will the verified local path or URL. For a database, this will be 
+a database type, sucha as C<primary_tag> or C<primary_tag:source>. 
+or the path to a data file, e.g. Bam, bigWig, bigBed, or USeq file. 
+
+If multiple datasets are to be combined, simply append them to the 
+array (index 9, 10, etc).
+
+=back
+
+The returned item is dependent on the value of the return type code.
+
+=item calculate_score
+
+    my $scores = get_segment_score($chr,$start,$stop,$strand,
+    	'sense','ncount',1,undef,'file:/path/to/dataset.bam');
+    my $score = calculate_score('ncount', $scores);
+
+This subroutine will perform the math to calculate a single score 
+from an array of values. Current acceptable methods include mean, 
+median, sum, min, max, stddev, count, ncount, and pcount.
+
+Pass the subroutine two items: the name of the mathematical method 
+enumerated above, and an array reference of the values to work on.
+A single score will be returned.
+
+=item get_chromosome_list
+
+	my $db = open_db_connection('cerevisiae');
+	# get all chromosomes in the database
+	my @chromosomes = get_chromosome_list($db);
+	foreach (@chromosomes) {
+		my $name = $_->[0];
+		my $length = $_->[1];
+		print "chromosome $name is $length bp\n";
+	}
+
+This subroutine will collect a list of chromosomes or reference sequences 
+in a Bio::DB database and return the list along with their sizes in bp. 
+Many BioPerl-based databases are supported, including 
+L<Bio::DB::SeqFeature::Store>, L<Bio::DB::Fasta>, L<Bio::DB::Sam>, 
+L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, 
+L<Bio::DB::BigBed>, or any others that support the C<seq_ids> method. 
+L<Bio::DB::Big> adapters for big files are also supported, though see note 
+below. See the L</open_db_connection> subroutine for more information.
+
+Pass the subroutine either the name of the database, the path to the 
+database file, or an opened database object.
+
+Optionally pass a second value, a regular expression compatible string 
+for skipping specific chromosomes or chromosome classes, such as mitochondrial 
+or unmapped contigs. The default is to return all chromosomes. 
+
+The subroutine will return an array, with each element representing each 
+chromosome or reference sequence in the database. Each element is an anonymous 
+array of two elements, the chromosome name and length in bp.
+
+B<NOTE>: L<Bio::DB::Big> databases for bigWig and bigBed files do 
+not return chromosomes in the original order as the file, and are returned 
+in a sorted manner that may not be the original order.
+
+=item low_level_bam_coverage
+
+	my $coverage = low_level_bam_coverage($sam, $tid, $start, $stop);
+
+This is a convenience method for running the low level bam coverage method. 
+Since both L<Bio::DB::Sam> and L<Bio::DB::HTS> bam file adapters are 
+supported, and each has slight variation in the API syntax, this method helps 
+to abstract the actual method and use the appropriate syntax depending on 
+which adapter is loaded. It is best if the C<$sam> object was opened using the 
+L</open_db_connection> method, or that C<$BAM_ADAPTER> is set.
+
+B<NOTE> that this is the B<low level> coverage method based on the index object, 
+and not the similarly named high level API method. Read the adapter 
+documentation for proper usage.
+
+=item low_level_bam_fetch
+
+	my $success = low_level_bam_fetch($sam, $tid, $start, $stop, $callback, $data);
+
+This is a convenience method for running the low level bam fetch method. 
+Since both L<Bio::DB::Sam> and L<Bio::DB::HTS> bam file adapters are 
+supported, and each has slight variation in the API syntax, this method helps 
+to abstract the actual method and use the appropriate syntax depending on 
+which adapter is loaded. It is best if the C<$sam> object was opened using the 
+L</open_db_connection> method, or that C<$BAM_ADAPTER> is set.
+
+B<NOTE> that this is the B<low level> fetch method based on the index object, 
+and not the similarly named high level API method. Read the adapter 
+documentation for proper usage.
+
+=item get_genomic_sequence
+
+	my $sequence = get_genomic_sequence($db, $chrom, $start, $stop);
+
+This is a convenience wrapper function for fetching genomic sequence from 
+three different supported fasta database adapters, which, of course, all 
+have different APIs, including the L<Bio::DB::Fasta>, L<Bio::DB::HTS::Faidx>, 
+and L<Bio::DB::Sam::Fai> adapters, as well as L<Bio::DB::SeqFeature::Store> 
+and possibly other BioPerl databases. 
+
+Pass the opened database object, chromosome, start, and stop coordinates. This 
+assumes BioPerl standard 1-base coordinates. Only the forward sequence is 
+retrieved. The sequence is returned as a simple string.
+
+=back
+
+=head1 INTERNAL SUBROUTINES
+
+These are not intended for normal general consumption but are documented here 
+so that at least some of us know what is going on.
+
+=over 4
+
+=item _lookup_db_method
+
+Internal method for determining which database adapter and method call 
+should be used given a set of parameters. This result is cached for 
+future data queries (likely hundreds or thousands of repeated calls). 
+The method is stored in the global hash C<%DB_METHODS>;
+
+Pass the parameter array reference from L</get_segment_score>. This 
+should load the appropriate db_helper sub module during run time.
+
+=item _load_helper_module
+
+Subroutine to load and import a db_helper module during run time.
+Sets the appropriate global variable if successful. 
+
+=item _load_bam_helper_module
+
+Subroutine to determine which Bam adapter db_helper module to load, 
+either the older samtools-based adapter or the newer HTSlib-based adapter.
+Uses the global and exportable variable C<$BAM_ADAPTER> to set a 
+preference for which adapter to use. Use 'sam' or 'hts' or some 
+string containing these names. Do B<NOT> change this variable after 
+loading the helper module; it will not do what you think it will do.
+If both are available and a preference is not set then the hts helper 
+is the default.
+
+=back
 
 =head1 AUTHOR
 

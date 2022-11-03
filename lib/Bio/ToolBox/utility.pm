@@ -1,99 +1,17 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.69';
 
-=head1 NAME
-
-Bio::ToolBox::utility - common utility functions for Bio::ToolBox
-
-=head1 DESCRIPTION
-
-These are general subroutines that don't fit in with the other modules.
-
-=head1 REGULAR SUBROUTINES
-
-The following subroutines are automatically exported when you use this module.
-
-=over 4
-
-=item parse_list
-
-	my $index_request = '1,2,5-7';
-	my @indices = parse_list($index_request); # returns [1,2,5,6,7]
-
-This subroutine parses a scalar value into a list of values. The scalar is 
-a text string of numbers (usually column or dataset indices) delimited by 
-commas and/or including a range. For example, a string "1,2,5-7" would become 
-an array of [1,2,5,6,7].
-
-Pass the module the scalar string.
-
-It will return the array of numbers.
-
-=item format_with_commas
-
-	my $count = '4327908475';
-	printf " The final count was %s\n", format_with_commas($count);
-
-This subroutine process a large number (e.g. 4327908475) into a human-friendly 
-version with commas delimiting the thousands (4,327,908,475).
-
-Pass the module a scalar string with a number value.
-
-It will return a scalar value containing the formatted number.
-
-=item ask_user_for_index
-
-	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
-
-This subroutine will present the list of column names from a L<Bio::ToolBox::Data> 
-structure along with their numeric indexes to the user and prompt for one 
-or more to be selected and entered. The function is smart enough to only print 
-the list once (if it hasn't changed) so as not to annoy the user with repeated 
-lists of header names when used more than once. A text prompt should be provided, 
-or a generic one is used. The list of indices are validated, and a warning printed 
-for invalid responses. The responses are then returned as a single value or array, 
-depending on context.
-
-=item simplify_dataset_name
-
-	my $simple_name = simplify_dataset_name($dataset);
-
-This subroutine will take a dataset name and simplify it. Dataset names may 
-often be file names of data files, such as Bam and bigWig files. These may 
-include a C<file:>, C<http:>, or C<ftp:> prefix, one or more directory paths, 
-and one or more file name extensions. Additionally, more than one dataset 
-may be combined, for example two stranded bigWig files, with an ampersand. 
-This function will safely remove the prefix, directories, and everything after 
-the first period. 
-
-=item sane_chromo_sort
-
-    my @chromo = $db->seq_ids;
-    my @sorted = sane_chromo_sort(@chromo);
-
-This subroutine will take a list of chromosome or sequence identifiers and sort
-them into a reasonably sane order: standard numeric identifiers first (numeric
-order), sex chromosomes (alphabetical), mitochondrial, names with text and
-numbers (text first alphabetically, then numbers numerically) for contigs and
-such, and finally anything else (aciibetically). Any 'chr' prefix is ignored.
-Roman numerals are properly handled numerically. 
-
-The provided list may be a list of SCALAR values (chromosome names) or ARRAY 
-references, with the first element assumed to be the name, e.g. 
-C<[$name, $length]>. 
-
-=back
-
-=cut
-
+use warnings;
 use strict;
 use Carp;
 use File::Spec;
 require Exporter;
 
+our $VERSION = '1.69';
+
 ### Variables
 # Export
 our @ISA    = qw(Exporter);
+
 our @EXPORT = qw(
 	parse_list
 	format_with_commas
@@ -101,13 +19,9 @@ our @EXPORT = qw(
 	simplify_dataset_name
 	sane_chromo_sort
 );
-our $DATA_COLNAMES = undef;
-our $DATA_FILENAME = undef;
 
-### The True Statement
-1;
-
-#################   The Subroutines   ###################
+my $DATA_COLNAMES = undef;
+my $DATA_FILENAME = undef;
 
 ### Parse string into list
 sub parse_list {
@@ -386,7 +300,92 @@ sub sane_chromo_sort {
 	return @sorted;
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::utility - common utility functions for Bio::ToolBox
+
+=head1 DESCRIPTION
+
+These are general subroutines that don't fit in with the other modules.
+
+=head1 REGULAR SUBROUTINES
+
+The following subroutines are automatically exported when you use this module.
+
+=over 4
+
+=item parse_list
+
+	my $index_request = '1,2,5-7';
+	my @indices = parse_list($index_request); # returns [1,2,5,6,7]
+
+This subroutine parses a scalar value into a list of values. The scalar is 
+a text string of numbers (usually column or dataset indices) delimited by 
+commas and/or including a range. For example, a string "1,2,5-7" would become 
+an array of [1,2,5,6,7].
+
+Pass the module the scalar string.
+
+It will return the array of numbers.
+
+=item format_with_commas
+
+	my $count = '4327908475';
+	printf " The final count was %s\n", format_with_commas($count);
+
+This subroutine process a large number (e.g. 4327908475) into a human-friendly 
+version with commas delimiting the thousands (4,327,908,475).
+
+Pass the module a scalar string with a number value.
+
+It will return a scalar value containing the formatted number.
+
+=item ask_user_for_index
+
+	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
+
+This subroutine will present the list of column names from a L<Bio::ToolBox::Data> 
+structure along with their numeric indexes to the user and prompt for one 
+or more to be selected and entered. The function is smart enough to only print 
+the list once (if it hasn't changed) so as not to annoy the user with repeated 
+lists of header names when used more than once. A text prompt should be provided, 
+or a generic one is used. The list of indices are validated, and a warning printed 
+for invalid responses. The responses are then returned as a single value or array, 
+depending on context.
+
+=item simplify_dataset_name
+
+	my $simple_name = simplify_dataset_name($dataset);
+
+This subroutine will take a dataset name and simplify it. Dataset names may 
+often be file names of data files, such as Bam and bigWig files. These may 
+include a C<file:>, C<http:>, or C<ftp:> prefix, one or more directory paths, 
+and one or more file name extensions. Additionally, more than one dataset 
+may be combined, for example two stranded bigWig files, with an ampersand. 
+This function will safely remove the prefix, directories, and everything after 
+the first period. 
+
+=item sane_chromo_sort
+
+    my @chromo = $db->seq_ids;
+    my @sorted = sane_chromo_sort(@chromo);
+
+This subroutine will take a list of chromosome or sequence identifiers and sort
+them into a reasonably sane order: standard numeric identifiers first (numeric
+order), sex chromosomes (alphabetical), mitochondrial, names with text and
+numbers (text first alphabetically, then numbers numerically) for contigs and
+such, and finally anything else (aciibetically). Any 'chr' prefix is ignored.
+Roman numerals are properly handled numerically. 
+
+The provided list may be a list of SCALAR values (chromosome names) or ARRAY 
+references, with the first element assumed to be the name, e.g. 
+C<[$name, $length]>. 
+
+=back
 
 =head1 AUTHOR
 

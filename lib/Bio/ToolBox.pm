@@ -1,6 +1,88 @@
 package Bio::ToolBox;
 
+use warnings;
+use strict;
+use Carp qw(cluck);
+use Bio::ToolBox::Data;
+
 our $VERSION = '1.700';
+
+
+sub load_file {
+	my $self = shift;
+	if ( scalar(@_) == 1 ) {
+		return Bio::ToolBox::Data->new( file => $_[0], );
+	}
+	else {
+		return Bio::ToolBox::Data->new(@_);
+	}
+}
+
+sub parse_file {
+	my $self = shift;
+	if ( scalar(@_) == 1 ) {
+		return Bio::ToolBox::Data->new(
+			file       => $_[0],
+			parse      => 1,
+			simplify   => 1,
+			subfeature => 'exon,cds,utr',
+		);
+	}
+	else {
+		my %args = @_;
+		$args{parse} ||= 1;    # make sure this is present
+		return Bio::ToolBox::Data->new(%args);
+	}
+}
+
+sub new_data {
+	my $self = shift;
+	if ( $_[0] =~ /^(?:columns|datasets)$/ ) {
+
+		# looks like a correctly formatted list
+		return Bio::ToolBox::Data->new(@_);
+	}
+	else {
+		# put provided list into an array
+		return Bio::ToolBox::Data->new( columns => [@_] );
+	}
+}
+
+sub open_file {
+	my $self = shift;
+	cluck("Bio::ToolBox->open_file has been replaced by read_file");
+	return Bio::ToolBox::Data->open_to_read_fh(@_);
+}
+
+sub read_file {
+	my $self = shift;
+	return Bio::ToolBox::Data->open_to_read_fh(@_);
+}
+
+sub write_file {
+	my $self = shift;
+	return Bio::ToolBox::Data->open_to_write_fh(@_);
+}
+
+sub open_database {
+	my $self = shift;
+	return Bio::ToolBox::Data->open_new_database(@_);
+}
+
+sub bam_adapter {
+	my $self = shift;
+	return Bio::ToolBox::Data->bam_adapter(@_);
+}
+
+sub big_adapter {
+	my $self = shift;
+	return Bio::ToolBox::Data->big_adapter(@_);
+}
+
+1;
+
+__END__
+
 
 =head1 NAME
 
@@ -232,87 +314,3 @@ L<Bio::ViennaNGS>
 
 This package is free software; you can redistribute it and/or modify
 it under the terms of the Artistic License 2.0. 
-
-
-=cut
-
-use strict;
-use Carp qw(cluck);
-use Bio::ToolBox::Data;
-
-1;
-
-sub load_file {
-	my $self = shift;
-	if ( scalar(@_) == 1 ) {
-		return Bio::ToolBox::Data->new( file => $_[0], );
-	}
-	else {
-		return Bio::ToolBox::Data->new(@_);
-	}
-}
-
-sub parse_file {
-	my $self = shift;
-	if ( scalar(@_) == 1 ) {
-		return Bio::ToolBox::Data->new(
-			file       => $_[0],
-			parse      => 1,
-			simplify   => 1,
-			subfeature => 'exon,cds,utr',
-		);
-	}
-	else {
-		my %args = @_;
-		$args{parse} ||= 1;    # make sure this is present
-		return Bio::ToolBox::Data->new(%args);
-	}
-}
-
-sub new_data {
-	my $self = shift;
-	if ( $_[0] =~ /^(?:columns|datasets)$/ ) {
-
-		# looks like a correctly formatted list
-		return Bio::ToolBox::Data->new(@_);
-	}
-	else {
-		# put provided list into an array
-		return Bio::ToolBox::Data->new( columns => [@_] );
-	}
-}
-
-sub open_file {
-	my $self = shift;
-	cluck("Bio::ToolBox->open_file has been replaced by read_file");
-	return Bio::ToolBox::Data->open_to_read_fh(@_);
-}
-
-sub read_file {
-	my $self = shift;
-	return Bio::ToolBox::Data->open_to_read_fh(@_);
-}
-
-sub write_file {
-	my $self = shift;
-	return Bio::ToolBox::Data->open_to_write_fh(@_);
-}
-
-sub open_database {
-	my $self = shift;
-	return Bio::ToolBox::Data->open_new_database(@_);
-}
-
-sub bam_adapter {
-	my $self = shift;
-	return Bio::ToolBox::Data->bam_adapter(@_);
-}
-
-sub big_adapter {
-	my $self = shift;
-	return Bio::ToolBox::Data->big_adapter(@_);
-}
-
-__END__
-
-

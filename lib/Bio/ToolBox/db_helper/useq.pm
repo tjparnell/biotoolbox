@@ -1,25 +1,31 @@
 package Bio::ToolBox::db_helper::useq;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::USeq;
+require Exporter;
+
 our $VERSION = '1.51';
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	collect_useq_scores
 	collect_useq_position_scores
 	open_useq_db
 );
+## use critic
 
 # Hash of USeq chromosomes
-our %USEQ_CHROMOS;
+my %USEQ_CHROMOS;
 
 # sometimes user may request a chromosome that's not in the useq file
 # that could lead to an exception
@@ -29,15 +35,12 @@ our %USEQ_CHROMOS;
 # to accommodate different naming conventions
 
 # Opened USeq db objects
-our %OPENED_USEQ;
+my %OPENED_USEQ;
 
 # a cache for opened USeq databases, primarily for collecting scores
 # caching here is only for local purposes of collecting scores
 # db_helper also provides caching of db objects but with option to force open in
 # the case of forking processes - we don't have that here
-
-# The true statement
-1;
 
 sub collect_useq_scores {
 
@@ -311,6 +314,8 @@ sub _get_useq {
 	}
 	return $useq;
 }
+
+1;
 
 __END__
 

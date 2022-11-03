@@ -1,12 +1,13 @@
 package Bio::ToolBox::db_helper::big;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Big;
+require Exporter;
+
 our $VERSION = '1.69';
 
 # Initialize CURL buffers
@@ -19,6 +20,10 @@ BEGIN {
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	open_bigwig_db
 	collect_bigwig_score
@@ -33,6 +38,7 @@ our @EXPORT = qw(
 	collect_bigwigset_position_scores
 	sum_total_bigbed_features
 );
+## use critic
 
 # Hash of Bigfile chromosomes
 my %BIG_CHROMOS;
@@ -66,9 +72,6 @@ my %BIGWIGSET_WIGS;
 # we want to use low level bigWig access which isn't normally
 # available from the high level BigWigSet, so we identify the
 # bigWigs from the bigWigSet and cache them here
-
-# The true statement
-1;
 
 #### BigWig Subroutines
 
@@ -663,6 +666,8 @@ sub _lookup_bigwigset_wigs {
 	return \@paths;
 }
 
+1;
+
 package Bio::ToolBox::db_helper::big::BigWigSet;
 
 # this package borrows concepts from Bio::DB::BigWigSet by Lincoln Stein
@@ -895,6 +900,8 @@ sub filter_bigwigs_by_strand {
 	return @keepers;
 }
 
+1;
+
 package Bio::ToolBox::db_helper::big::BedIteratorWrapper;
 use Carp;
 use Bio::ToolBox::SeqFeature;
@@ -950,6 +957,8 @@ sub next_seq {
 		-strand       => $bits[2] || 0,
 	);
 }
+
+1;
 
 __END__
 

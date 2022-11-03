@@ -1,185 +1,14 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.70';
-
-=head1 NAME
-
-Bio::ToolBox::parser::gff - parse GFF3, GTF, and generic GFF files 
-
-=head1 SYNOPSIS
-
-  use Bio::ToolBox::Parser;
-  my $filename = 'file.gff3';
-  
-  my $Parser = Bio::ToolBox::Parser->new(
-  	file    => $filename,
-  	do_gene => 1,
-  	do_exon => 1,
-  ) or die "unable to open gff file!\n";
-  # the Parser will taste the file and open the appropriate 
-  # subclass parser, gff in this case
-  
-  while (my $feature = $Parser->next_top_feature() ) {
-	# each $feature is a parent SeqFeature object, usually a gene
-  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
-	
-	# subfeatures such as transcripts, exons, etc are nested within
-	my @children = $feature->get_SeqFeatures();
-  }
-
-=head1 DESCRIPTION
-
-This is the GFF specific parser subclass to the L<Bio::ToolBox::Parser>
-object, and as such inherits generic methods from the parent. 
-
-This module parses a GFF file into SeqFeature objects. It natively 
-handles GFF3, GTF, and general GFF files. 
-
-For both GFF3 and GTF files, fully nested gene models, typically 
-gene =E<gt> transcript =E<gt> (exon, CDS, etc), may be built using the appropriate 
-attribute tags. For GFF3 files, these include ID and Parent tags; for GTF 
-these include C<gene_id> and C<transcript_id> tags. 
-
-For GFF3 files, any feature without a C<Parent> tag is assumed to be a 
-parent. Children features referencing a parent feature that has not been 
-loaded are considered orphans. Orphans are attempted to be re-associated 
-with missing parents after the file is completely parsed. Any orphans left 
-may be collected. Files with orphans are considered poorly formatted or 
-incomplete and should be fixed. Multiple parentage, for example exons 
-shared between different transcripts of the same gene, are fully supported.
-
-Embedded Fasta sequences are ignored.
-
-The SeqFeature objects that are returned are L<Bio::ToolBox::SeqFeature> 
-objects (default SeqFeature class). Refer to that documentation for more 
-information.
-
-=head1 METHODS
-
-=head2 Initialize and modify the parser. 
-
-In most cases, users should initialize an object using the generic 
-L<Bio::ToolBox::Parser> object.
-
-These are class methods to initialize the parser with an annotation file 
-and modify the parsing behavior. Most parameters can be set either upon 
-initialization or as class methods on the object. Unpredictable behavior 
-may occur if you implement these in the midst of parsing a file. 
-
-Do not open subsequent files with the same object. Always create a new 
-object to parse a new file
-
-=over 4
-
-=item new
-
-  my $parser = Bio::ToolBox::parser::gff->new($filename);
-  my $parser = Bio::ToolBox::parser::gff->new(
-      file    => 'file.gtf.gz',
-      do_gene => 1,
-      do_utr  => 1,
-  );
-
-Initialize a new gff parser object. Pass a single value (a GFF file name) 
-to automatically open (but not parse yet) a file. Alternatively, pass an 
-array of key value pairs to control how the file is parsed. Options include 
-the following.
-
-=over 4
-
-=item file
-
-Provide a GFF file name to be parsed. It should have a gff, gtf, or gff3 file 
-extension. The file may be gzip compressed. 
-
-=item simplify
-
-Pass a boolean value to simplify the SeqFeature objects parsed from the GFF 
-file and ignore extraneous attributes.
-
-=item do_gene
-
-Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
-name under a single gene object. Default is true.
-
-=item do_cds
-
-=item do_exon
-
-=item do_utr
-
-=item do_codon
-
-Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
-are always parsed, but C<CDS>, C<five_prime_UTR>, C<three_prime_UTR>, C<stop_codon>, 
-and C<start_codon> features may be optionally parsed. Default is false.
-
-=item class
-
-Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
-create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
-which is lighter-weight and consumes less memory. A suitable BioPerl alternative
-is L<Bio::SeqFeature::Lite>.
-
-=back
-
-=back
-
-=head2 Other methods
-
-See L<Bio::ToolBox::Parser> for generic methods for accessing the 
-features. Below are some specific methods to this subclass.
-
-=over 4
-
-=item simplify
-
-Pass a boolean true value to simplify the attributes of GFF3 and GTF files 
-that may have considerable numbers of tags, e.g. Ensembl files. Only 
-essential information, including name, ID, and parentage, is retained. 
-Useful if you're trying to quickly parse annotation files for basic 
-information.
-
-=item orphans
-
-  my @orphans = $parser->orphans;
-  printf "we have %d orphans left over!", scalar @orpans;
-
-This method will return an array of orphan SeqFeature objects that indicated 
-they had a parent but said parent could not be found. Typically, this is an 
-indication of an incomplete or malformed GFF3 file. Nevertheless, it might 
-be a good idea to check this after retrieving all top features.
-
-=item typelist
-
-Returns a comma-delimited string of the GFF primary tags (column 3) 
-observed in the first 1000 lines of an opened file. Useful for 
-checking what is in the GFF file. See 
-L<Bio::ToolBox::Data::file/sample_gff_type_list>.
-
-=item unescape
-
-This method will unescape special characters in a text string. Certain 
-characters, including ";" and "=", are reserved for GFF3 formatting and 
-are not allowed, thus requiring them to be escaped.
-
-=back
-
-=head1 SEE ALSO
-
-L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
-L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
 
-my %TYPECOUNTS = ();
+our $VERSION = '1.70';
 
-1;
+my %TYPECOUNTS = ();
 
 sub new {
 	my $class = shift;
@@ -920,7 +749,177 @@ sub orphans {
 	return wantarray ? @orphans : \@orphans;
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::parser::gff - parse GFF3, GTF, and generic GFF files 
+
+=head1 SYNOPSIS
+
+  use Bio::ToolBox::Parser;
+  my $filename = 'file.gff3';
+  
+  my $Parser = Bio::ToolBox::Parser->new(
+  	file    => $filename,
+  	do_gene => 1,
+  	do_exon => 1,
+  ) or die "unable to open gff file!\n";
+  # the Parser will taste the file and open the appropriate 
+  # subclass parser, gff in this case
+  
+  while (my $feature = $Parser->next_top_feature() ) {
+	# each $feature is a parent SeqFeature object, usually a gene
+  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
+	
+	# subfeatures such as transcripts, exons, etc are nested within
+	my @children = $feature->get_SeqFeatures();
+  }
+
+=head1 DESCRIPTION
+
+This is the GFF specific parser subclass to the L<Bio::ToolBox::Parser>
+object, and as such inherits generic methods from the parent. 
+
+This module parses a GFF file into SeqFeature objects. It natively 
+handles GFF3, GTF, and general GFF files. 
+
+For both GFF3 and GTF files, fully nested gene models, typically 
+gene =E<gt> transcript =E<gt> (exon, CDS, etc), may be built using the appropriate 
+attribute tags. For GFF3 files, these include ID and Parent tags; for GTF 
+these include C<gene_id> and C<transcript_id> tags. 
+
+For GFF3 files, any feature without a C<Parent> tag is assumed to be a 
+parent. Children features referencing a parent feature that has not been 
+loaded are considered orphans. Orphans are attempted to be re-associated 
+with missing parents after the file is completely parsed. Any orphans left 
+may be collected. Files with orphans are considered poorly formatted or 
+incomplete and should be fixed. Multiple parentage, for example exons 
+shared between different transcripts of the same gene, are fully supported.
+
+Embedded Fasta sequences are ignored.
+
+The SeqFeature objects that are returned are L<Bio::ToolBox::SeqFeature> 
+objects (default SeqFeature class). Refer to that documentation for more 
+information.
+
+=head1 METHODS
+
+=head2 Initialize and modify the parser. 
+
+In most cases, users should initialize an object using the generic 
+L<Bio::ToolBox::Parser> object.
+
+These are class methods to initialize the parser with an annotation file 
+and modify the parsing behavior. Most parameters can be set either upon 
+initialization or as class methods on the object. Unpredictable behavior 
+may occur if you implement these in the midst of parsing a file. 
+
+Do not open subsequent files with the same object. Always create a new 
+object to parse a new file
+
+=over 4
+
+=item new
+
+  my $parser = Bio::ToolBox::parser::gff->new($filename);
+  my $parser = Bio::ToolBox::parser::gff->new(
+      file    => 'file.gtf.gz',
+      do_gene => 1,
+      do_utr  => 1,
+  );
+
+Initialize a new gff parser object. Pass a single value (a GFF file name) 
+to automatically open (but not parse yet) a file. Alternatively, pass an 
+array of key value pairs to control how the file is parsed. Options include 
+the following.
+
+=over 4
+
+=item file
+
+Provide a GFF file name to be parsed. It should have a gff, gtf, or gff3 file 
+extension. The file may be gzip compressed. 
+
+=item simplify
+
+Pass a boolean value to simplify the SeqFeature objects parsed from the GFF 
+file and ignore extraneous attributes.
+
+=item do_gene
+
+Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
+name under a single gene object. Default is true.
+
+=item do_cds
+
+=item do_exon
+
+=item do_utr
+
+=item do_codon
+
+Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
+are always parsed, but C<CDS>, C<five_prime_UTR>, C<three_prime_UTR>, C<stop_codon>, 
+and C<start_codon> features may be optionally parsed. Default is false.
+
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
+which is lighter-weight and consumes less memory. A suitable BioPerl alternative
+is L<Bio::SeqFeature::Lite>.
+
+=back
+
+=back
+
+=head2 Other methods
+
+See L<Bio::ToolBox::Parser> for generic methods for accessing the 
+features. Below are some specific methods to this subclass.
+
+=over 4
+
+=item simplify
+
+Pass a boolean true value to simplify the attributes of GFF3 and GTF files 
+that may have considerable numbers of tags, e.g. Ensembl files. Only 
+essential information, including name, ID, and parentage, is retained. 
+Useful if you're trying to quickly parse annotation files for basic 
+information.
+
+=item orphans
+
+  my @orphans = $parser->orphans;
+  printf "we have %d orphans left over!", scalar @orpans;
+
+This method will return an array of orphan SeqFeature objects that indicated 
+they had a parent but said parent could not be found. Typically, this is an 
+indication of an incomplete or malformed GFF3 file. Nevertheless, it might 
+be a good idea to check this after retrieving all top features.
+
+=item typelist
+
+Returns a comma-delimited string of the GFF primary tags (column 3) 
+observed in the first 1000 lines of an opened file. Useful for 
+checking what is in the GFF file. See 
+L<Bio::ToolBox::Data::file/sample_gff_type_list>.
+
+=item unescape
+
+This method will unescape special characters in a text string. Certain 
+characters, including ";" and "=", are reserved for GFF3 formatting and 
+are not allowed, thus requiring them to be escaped.
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
+L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>
 
 =head1 AUTHOR
 

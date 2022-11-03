@@ -1,8 +1,8 @@
 package Bio::ToolBox::db_helper::constants;
 
-# modules
-require Exporter;
 use strict;
+require Exporter;
+
 use constant {
 	CHR  => 0,    # chromosome
 	STRT => 1,    # start
@@ -16,7 +16,12 @@ use constant {
 };
 
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(CHR STRT STOP STR STND METH RETT DB DATA);
+## use critic
 
 # The true statement
 1;

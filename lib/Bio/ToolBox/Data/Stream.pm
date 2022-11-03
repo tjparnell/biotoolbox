@@ -1,5 +1,336 @@
 package Bio::ToolBox::Data::Stream;
+
+use warnings;
+use strict;
+use Carp qw(carp cluck croak confess);
+use base 'Bio::ToolBox::Data::core';
+use Bio::ToolBox::Data::Feature;
+
 our $VERSION = '1.69';
+
+#### Initialize ####
+
+sub new {
+	my $class = shift;
+	my %args  = @_;
+
+	# file arguments
+	$args{in}  ||= $args{file} || undef;
+	$args{out} ||= undef;
+	unless ( $args{in} or $args{out} ) {
+		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
+		return;
+	}
+	if ( defined $args{in} and defined $args{out} ) {
+		cluck "cannot define both 'in' and 'out' arguments!\n";
+		return;
+	}
+	$args{noheader} ||= 0;
+
+	# prepare object
+	my $self = $class->SUPER::new();
+
+	# open an existing file for reading
+	if ( $args{in} ) {
+
+		# check and open file
+		my $filename = $self->check_file( $args{in} );
+		unless ($filename) {
+			carp sprintf "file '%s' does not exist!", $args{in};
+			return;
+		}
+		$self->add_file_metadata($filename);
+		$self->open_to_read_fh or return;
+		$self->{mode} = 0;    # read mode
+
+		# parse column headers
+		$self->parse_headers( $args{noheader} );
+		$self->{line_count} = $self->{header_line_count};
+
+		# add example row, this will get tossed when the first next_row() is called
+		$self->{data_table}->[1] = $self->{example};
+		delete $self->{example};
+	}
+
+	# prepare to write to a new stream
+	elsif ( $args{out} ) {
+
+		# add file name information
+		$self->add_file_metadata( $args{out} );
+
+		# we will not open the file handle quite yet in case the user
+		# wants to modify metadata
+		$self->{mode} = 1;       # set to write mode
+		$self->{fh}   = undef;
+
+		# get names of columns user may have passed
+		my @columns;
+		if ( exists $args{columns} ) {
+			@columns = @{ $args{columns} };
+		}
+		elsif ( exists $args{datasets} ) {
+			@columns = @{ $args{datasets} };
+		}
+
+		# add the column names
+		if (@columns) {
+			foreach my $c (@columns) {
+				$self->add_column($c);
+			}
+		}
+		elsif ( exists $args{gff} and $args{gff} ) {
+
+			# use standard names for the number of columns indicated
+			# we trust that the user knows the subtle difference between gff versions
+			$self->add_gff_metadata( $args{gff} );
+			unless ( $self->extension =~ /g[tf]f/ ) {
+				$self->{extension} =
+					  $args{gff} == 2.5 ? '.gtf'
+					: $args{gff} == 3   ? '.gff3'
+					:                     '.gff';
+			}
+		}
+		elsif ( exists $args{bed} and $args{bed} ) {
+
+			# use standard names for the number of columns indicated
+			unless ( $args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3 ) {
+				carp "bed parameter must be an integer 3-12!";
+				return;
+			}
+			$self->add_bed_metadata( $args{bed} );
+			unless ( $self->extension =~ /bed|peak/ ) {
+				$self->{extension} = '.bed';
+			}
+		}
+		elsif ( exists $args{ucsc} and $args{ucsc} ) {
+
+			# a ucsc format such as refFlat, genePred, or genePredExt
+			my $u = $self->add_ucsc_metadata( $args{ucsc} );
+			unless ($u) {
+				carp "unrecognized number of columns for ucsc format!";
+				return;
+			}
+			unless ( $self->extension =~ /ucsc|ref+lat|genepred/ ) {
+				$self->{extension} = '.ucsc';
+			}
+		}
+
+		# else it will be an empty object with no columns
+
+		# append gz if necessary
+		if ( exists $args{gz} and $args{gz} and $self->extension !~ /gz$/ ) {
+			$self->{extension} .= '.gz';
+		}
+
+		# rebuild the filename after modifying the extension
+		$self->{filename} = $self->{path} . $self->{basename} . $self->{extension};
+
+		# add feature
+		$args{feature} ||= $args{features} || undef;
+		$self->feature( $args{feature} ) unless $self->feature;
+	}
+
+	return $self;
+}
+
+sub duplicate {
+	my ( $self, $filename ) = @_;
+	unless ($filename) {
+		carp "a new filename must be provided!";
+		return;
+	}
+	if ( $filename eq $self->filename ) {
+		carp "provided filename is not unique from that in metadata!";
+		return;
+	}
+
+	# duplicate the data structure
+	my $columns = $self->list_columns;
+	my $Dup     = $self->new(
+		'out'     => $filename,
+		'columns' => $columns,
+	) or return;
+
+	# copy the metadata
+	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+
+		# column metadata
+		my %md = $self->metadata($i);
+		$Dup->{$i} = \%md;
+	}
+	foreach (qw(feature program db bed gff vcf ucsc headers)) {
+
+		# various keys
+		$Dup->{$_} = $self->{$_};
+	}
+	my @comments = $self->comments;
+	push @{ $Dup->{comments} }, @comments;
+
+	return $Dup;
+}
+
+### Column manipulation
+
+sub add_column {
+	my ( $self, $name ) = @_;
+	return unless $name;
+	unless ( $self->mode ) {
+		cluck "We have a read-only Stream object, cannot add columns";
+		return;
+	}
+	if ( defined $self->{fh} ) {
+
+		# Stream file handle is opened
+		cluck "Cannot modify columns when a Stream file handle is opened!";
+		return;
+	}
+
+	my $column = $self->number_columns;
+	$self->{$column} = {
+		'name'  => $name,
+		'index' => $column,
+	};
+	$self->{data_table}->[0][$column] = $name;
+	$self->{number_columns}++;
+	delete $self->{column_indices} if exists $self->{column_indices};
+	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
+
+		# check if we maintain integrity, at least insofar what we test
+		$self->verify(1);    # silence so user doesn't get these messages
+	}
+	return $column;
+}
+
+sub copy_column {
+	my $self = shift;
+	unless ( $self->mode ) {
+		confess "We have a read-only Stream object, cannot add columns";
+	}
+	if ( defined $self->{fh} ) {
+
+		# Stream file handle is opened
+		confess "Cannot modify columns when a Stream file handle is opened!";
+	}
+	my $index = shift;
+	return unless defined $index;
+
+	my $new_index = $self->add_column( $self->name($index) );
+	$self->copy_metadata( $index, $new_index );
+	return $new_index;
+}
+
+#### Row Access ####
+
+*next_line = *read_line = \&next_row;
+
+sub next_row {
+	my $self = shift;
+	if ( $self->{mode} ) {
+		confess "Stream object is write-only! cannot read";
+	}
+
+	# read and add the next line in the file
+	my $line = $self->{fh}->getline or return;
+	$self->{line_count}++;
+	if ( substr( $line, 0, 1 ) eq '#' ) {
+
+		# we shouldn't have internal comment lines, but just in case....
+		# could be a gff3 pragma
+		$self->add_comment($line);
+		return $self->next_row;
+	}
+
+	# add the current line to the data table as row 1
+	pop @{ $self->{data_table} };    # remove the old line
+	$self->add_data_line($line);
+
+	# return the feature
+	return Bio::ToolBox::Data::Feature->new(
+		'data'  => $self,
+		'index' => 1,
+	);
+}
+
+*add_row = *add_line = *write_line = \&write_row;
+
+sub write_row {
+	my $self = shift;
+	my $data = shift;
+	unless ( $self->{mode} ) {
+		confess "Stream object is read-only! cannot write";
+	}
+
+	# open the file handle if it hasn't been opened yet
+	unless ( defined $self->{fh} ) {
+
+		# we first write a standard empty data file with metadata and headers
+		my $newfile = $self->write_file( $self->filename );
+		unless ($newfile) {
+			die "unable to write file!";
+		}
+
+		# just in case the filename is changed when writing the file
+		if ( $newfile ne $self->filename ) {
+			$self->add_file_metadata($newfile);
+		}
+
+		# then we re-open the file for appending
+		my $fh = $self->open_to_write_fh( $newfile, undef, 1 )
+			or die "unable to append to file $newfile!";
+		$self->{fh} = $fh;
+	}
+
+	# identify what kind of data we are dealing with
+	my $data_ref = ref $data;
+	if ( $data_ref eq 'Bio::ToolBox::Data::Feature' ) {
+
+		# user passed a Feature object
+		$self->{fh}->print( join( "\t", ( $data->row_values ) ), "\n" );
+	}
+	elsif ( $data_ref eq 'ARRAY' ) {
+
+		# user passed an array of values
+		$self->{fh}->print( join( "\t", @$data ), "\n" );
+	}
+	else {
+		# assume the passed data is a string
+		# make sure it has a newline
+		unless ( $data =~ /\n$/ ) {
+			$data .= "\n";
+		}
+		$self->{fh}->print($data);
+	}
+	return 1;
+}
+
+sub iterate {
+	my $self = shift;
+	my $code = shift;
+	unless ( ref $code eq 'CODE' ) {
+		cluck "iterate_function() method requires a code reference!";
+		return;
+	}
+	while ( my $row = $self->next_row ) {
+		&$code($row);
+	}
+	return 1;
+}
+
+#### File handle ####
+
+sub mode {
+	my $self = shift;
+	return $self->{mode};
+}
+
+sub DESTROY {
+	my $self = shift;
+	$self->close_fh;
+}
+
+1;
+
+__END__
 
 =head1 NAME
 
@@ -599,339 +930,6 @@ the file handle. Use with caution.
 =head1 SEE ALSO
 
 L<Bio::ToolBox::Data>, L<Bio::ToolBox::Data::Feature>
-
-=cut
-
-use strict;
-use Carp qw(carp cluck croak confess);
-use base 'Bio::ToolBox::Data::core';
-use Bio::ToolBox::Data::Feature;
-
-1;
-
-#### Initialize ####
-
-sub new {
-	my $class = shift;
-	my %args  = @_;
-
-	# file arguments
-	$args{in}  ||= $args{file} || undef;
-	$args{out} ||= undef;
-	unless ( $args{in} or $args{out} ) {
-		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
-		return;
-	}
-	if ( defined $args{in} and defined $args{out} ) {
-		cluck "cannot define both 'in' and 'out' arguments!\n";
-		return;
-	}
-	$args{noheader} ||= 0;
-
-	# prepare object
-	my $self = $class->SUPER::new();
-
-	# open an existing file for reading
-	if ( $args{in} ) {
-
-		# check and open file
-		my $filename = $self->check_file( $args{in} );
-		unless ($filename) {
-			carp sprintf "file '%s' does not exist!", $args{in};
-			return;
-		}
-		$self->add_file_metadata($filename);
-		$self->open_to_read_fh or return;
-		$self->{mode} = 0;    # read mode
-
-		# parse column headers
-		$self->parse_headers( $args{noheader} );
-		$self->{line_count} = $self->{header_line_count};
-
-		# add example row, this will get tossed when the first next_row() is called
-		$self->{data_table}->[1] = $self->{example};
-		delete $self->{example};
-	}
-
-	# prepare to write to a new stream
-	elsif ( $args{out} ) {
-
-		# add file name information
-		$self->add_file_metadata( $args{out} );
-
-		# we will not open the file handle quite yet in case the user
-		# wants to modify metadata
-		$self->{mode} = 1;       # set to write mode
-		$self->{fh}   = undef;
-
-		# get names of columns user may have passed
-		my @columns;
-		if ( exists $args{columns} ) {
-			@columns = @{ $args{columns} };
-		}
-		elsif ( exists $args{datasets} ) {
-			@columns = @{ $args{datasets} };
-		}
-
-		# add the column names
-		if (@columns) {
-			foreach my $c (@columns) {
-				$self->add_column($c);
-			}
-		}
-		elsif ( exists $args{gff} and $args{gff} ) {
-
-			# use standard names for the number of columns indicated
-			# we trust that the user knows the subtle difference between gff versions
-			$self->add_gff_metadata( $args{gff} );
-			unless ( $self->extension =~ /g[tf]f/ ) {
-				$self->{extension} =
-					  $args{gff} == 2.5 ? '.gtf'
-					: $args{gff} == 3   ? '.gff3'
-					:                     '.gff';
-			}
-		}
-		elsif ( exists $args{bed} and $args{bed} ) {
-
-			# use standard names for the number of columns indicated
-			unless ( $args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3 ) {
-				carp "bed parameter must be an integer 3-12!";
-				return;
-			}
-			$self->add_bed_metadata( $args{bed} );
-			unless ( $self->extension =~ /bed|peak/ ) {
-				$self->{extension} = '.bed';
-			}
-		}
-		elsif ( exists $args{ucsc} and $args{ucsc} ) {
-
-			# a ucsc format such as refFlat, genePred, or genePredExt
-			my $u = $self->add_ucsc_metadata( $args{ucsc} );
-			unless ($u) {
-				carp "unrecognized number of columns for ucsc format!";
-				return;
-			}
-			unless ( $self->extension =~ /ucsc|ref+lat|genepred/ ) {
-				$self->{extension} = '.ucsc';
-			}
-		}
-
-		# else it will be an empty object with no columns
-
-		# append gz if necessary
-		if ( exists $args{gz} and $args{gz} and $self->extension !~ /gz$/ ) {
-			$self->{extension} .= '.gz';
-		}
-
-		# rebuild the filename after modifying the extension
-		$self->{filename} = $self->{path} . $self->{basename} . $self->{extension};
-
-		# add feature
-		$args{feature} ||= $args{features} || undef;
-		$self->feature( $args{feature} ) unless $self->feature;
-	}
-
-	return $self;
-}
-
-sub duplicate {
-	my ( $self, $filename ) = @_;
-	unless ($filename) {
-		carp "a new filename must be provided!";
-		return;
-	}
-	if ( $filename eq $self->filename ) {
-		carp "provided filename is not unique from that in metadata!";
-		return;
-	}
-
-	# duplicate the data structure
-	my $columns = $self->list_columns;
-	my $Dup     = $self->new(
-		'out'     => $filename,
-		'columns' => $columns,
-	) or return;
-
-	# copy the metadata
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
-
-		# column metadata
-		my %md = $self->metadata($i);
-		$Dup->{$i} = \%md;
-	}
-	foreach (qw(feature program db bed gff vcf ucsc headers)) {
-
-		# various keys
-		$Dup->{$_} = $self->{$_};
-	}
-	my @comments = $self->comments;
-	push @{ $Dup->{comments} }, @comments;
-
-	return $Dup;
-}
-
-### Column manipulation
-
-sub add_column {
-	my ( $self, $name ) = @_;
-	return unless $name;
-	unless ( $self->mode ) {
-		cluck "We have a read-only Stream object, cannot add columns";
-		return;
-	}
-	if ( defined $self->{fh} ) {
-
-		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
-		return;
-	}
-
-	my $column = $self->number_columns;
-	$self->{$column} = {
-		'name'  => $name,
-		'index' => $column,
-	};
-	$self->{data_table}->[0][$column] = $name;
-	$self->{number_columns}++;
-	delete $self->{column_indices} if exists $self->{column_indices};
-	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
-
-		# check if we maintain integrity, at least insofar what we test
-		$self->verify(1);    # silence so user doesn't get these messages
-	}
-	return $column;
-}
-
-sub copy_column {
-	my $self = shift;
-	unless ( $self->mode ) {
-		confess "We have a read-only Stream object, cannot add columns";
-	}
-	if ( defined $self->{fh} ) {
-
-		# Stream file handle is opened
-		confess "Cannot modify columns when a Stream file handle is opened!";
-	}
-	my $index = shift;
-	return unless defined $index;
-
-	my $new_index = $self->add_column( $self->name($index) );
-	$self->copy_metadata( $index, $new_index );
-	return $new_index;
-}
-
-#### Row Access ####
-
-*next_line = *read_line = \&next_row;
-
-sub next_row {
-	my $self = shift;
-	if ( $self->{mode} ) {
-		confess "Stream object is write-only! cannot read";
-	}
-
-	# read and add the next line in the file
-	my $line = $self->{fh}->getline or return;
-	$self->{line_count}++;
-	if ( substr( $line, 0, 1 ) eq '#' ) {
-
-		# we shouldn't have internal comment lines, but just in case....
-		# could be a gff3 pragma
-		$self->add_comment($line);
-		return $self->next_row;
-	}
-
-	# add the current line to the data table as row 1
-	pop @{ $self->{data_table} };    # remove the old line
-	$self->add_data_line($line);
-
-	# return the feature
-	return Bio::ToolBox::Data::Feature->new(
-		'data'  => $self,
-		'index' => 1,
-	);
-}
-
-*add_row = *add_line = *write_line = \&write_row;
-
-sub write_row {
-	my $self = shift;
-	my $data = shift;
-	unless ( $self->{mode} ) {
-		confess "Stream object is read-only! cannot write";
-	}
-
-	# open the file handle if it hasn't been opened yet
-	unless ( defined $self->{fh} ) {
-
-		# we first write a standard empty data file with metadata and headers
-		my $newfile = $self->write_file( $self->filename );
-		unless ($newfile) {
-			die "unable to write file!";
-		}
-
-		# just in case the filename is changed when writing the file
-		if ( $newfile ne $self->filename ) {
-			$self->add_file_metadata($newfile);
-		}
-
-		# then we re-open the file for appending
-		my $fh = $self->open_to_write_fh( $newfile, undef, 1 )
-			or die "unable to append to file $newfile!";
-		$self->{fh} = $fh;
-	}
-
-	# identify what kind of data we are dealing with
-	my $data_ref = ref $data;
-	if ( $data_ref eq 'Bio::ToolBox::Data::Feature' ) {
-
-		# user passed a Feature object
-		$self->{fh}->print( join( "\t", ( $data->row_values ) ), "\n" );
-	}
-	elsif ( $data_ref eq 'ARRAY' ) {
-
-		# user passed an array of values
-		$self->{fh}->print( join( "\t", @$data ), "\n" );
-	}
-	else {
-		# assume the passed data is a string
-		# make sure it has a newline
-		unless ( $data =~ /\n$/ ) {
-			$data .= "\n";
-		}
-		$self->{fh}->print($data);
-	}
-	return 1;
-}
-
-sub iterate {
-	my $self = shift;
-	my $code = shift;
-	unless ( ref $code eq 'CODE' ) {
-		cluck "iterate_function() method requires a code reference!";
-		return;
-	}
-	while ( my $row = $self->next_row ) {
-		&$code($row);
-	}
-	return 1;
-}
-
-#### File handle ####
-
-sub mode {
-	my $self = shift;
-	return $self->{mode};
-}
-
-sub DESTROY {
-	my $self = shift;
-	$self->close_fh;
-}
-
-####################################################
-
-__END__
 
 =head1 AUTHOR
 

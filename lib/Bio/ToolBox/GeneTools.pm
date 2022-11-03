@@ -1,513 +1,14 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.67';
 
-=head1 NAME
-
-Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene models
-
-=head1 SYNOPSIS
-
-    use Bio::ToolBox::GeneTools qw(:all);
-    
-    my $gene; # a SeqFeatureI compliant gene object obtained elsewhere
-              # for example, from Bio::DB::SeqFeature::Store database
-              # or parsed from a GFF3, GTF, or UCSC-style gene table using 
-              # Bio::ToolBox parsers
-    
-    if (is_coding($gene)) { # boolean test
-    	
-    	# collect all exons from all transcripts in gene
-    	my @exons = get_exons($gene);
-    	
-    	# find just the alternate exons used only once
-    	my @alternate_exons = get_alt_exons($gene);
-    	
-    	# collect UTRs, which may not be defined in the original source
-    	my @utrs;
-    	foreach my $t (get_transcripts($gene)) {
-    		my @u = get_utrs($t);
-    		push @utrs, @u;
-    	}
-    }
-
-
-=head1 DESCRIPTION
-
-This module provides numerous exportable functions for working with gene 
-SeqFeature models. This assumes that the gene models follow the BioPerl 
-L<Bio::SeqFeatureI> convention with nested SeqFeature objects representing the 
-gene, transcript, and exons. For example, 
-
-    gene
-      transcript
-        exon
-        CDS
-
-Depending upon how the SeqFeatures were generated or defined, subfeatures 
-may or may not be defined or be obvious. For example, UTRs or introns may 
-not be present. Furthermore, the C<primary_tag> or type may not follow 
-Sequence Ontology terms. Regular expressions are deployed to handle 
-varying naming schemes and exceptions.
-
-These functions should work with most or all L<Bio::SeqFeatureI> compliant 
-objects. It has been tested with L<Bio::ToolBox::SeqFeature>, 
-L<Bio::SeqFeature::Lite>, and L<Bio::DB::SeqFeature> classes.
-
-New SeqFeature objects that are generated use the same class for 
-simplicity and expediency. 
-
-=head1 METHODS
-
-=head2 Function Import
-
-None of the functions are exported by default. Specify which ones you want 
-when you import the module. Alternatively, use one of the tags below.
-
-=over 4
-
-=item :all
-
-Import all of the methods.
-
-=item :exon
-
-Import all of the exon methods, including L</get_exons>, L</get_alt_exons>, 
-L</get_common_exons>, L</get_uncommon_exons>, and L</get_alt_common_exons>.
-
-=item :intron
-
-Import all of the intron methods, including L</get_introns>, L</get_alt_introns>, 
-L</get_common_introns>, L</get_uncommon_introns>, and L</get_alt_common_introns>.
-
-=item :transcript
-
-Import the transcript related methods, including L</get_transcripts>, 
-L</get_transcript_length>, and L</collapse_transcripts>.
-
-=item :cds
-
-Import the CDS pertaining methods, including L</is_coding>, L</get_cds>, 
-L</get_cdsStart>, L</get_cdsEnd>, L</get_transcript_cds_length>, and L</get_utrs>.
-
-=item :export
-
-Import all of the export methods, including L</gff_string>, L</gtf_string>, 
-L</ucsc_string>, and L</bed_string>;
-
-=item :filter
-
-Import all of the transcript filter methods, including L</filter_transcript_biotype>,
-L</filter_transcript_gencode_basic>, and L</filter_transcript_support_level>.
-
-=back
-
-=head2 Exon Methods
-
-Functions to get a list of exons from a gene or transcript
-
-=over 4
-
-=item get_exons
-
-	my @exons = get_exons($gene);
-	my @exons = get_exons($transcript);
-
-This will return an array or array reference of all the exon subfeatures in 
-the SeqFeature object, either gene or transcript. No discrimination whether 
-they are used once or more than once. Non-defined exons can be assembled from 
-CDS and/or UTR subfeatures. Exons are sorted by start coordinate.
-
-=item get_alt_exons
-
-	my @alternate_exons = get_alt_exons($gene);
-
-This will return an array or array reference of all the exon subfeatures for 
-a multi-transcript gene that are used only once in all of the transcripts.
-
-=item get_common_exons
-
-	my @common_exons = get_common_exons($gene);
-
-This will return an array or array reference of all the exon subfeatures for 
-a multi-transcript gene that are used in all of the transcripts.
-
-=item get_uncommon_exons
-
-	my @uncommon_exons = get_uncommon_exons($gene);
-
-This will return an array or array reference of all the exon subfeatures for 
-a multi-transcript gene that are used in some of the transcripts, i.e. more 
-than one but not all.
-
-=item get_alt_common_exons
-
-	my %exon_hash = get_alt_common_exons($gene);
-
-This will return a hash reference with several keys, including "common", 
-"uncommon", and each of the transcript IDs. Each key value is an array 
-reference with the exons for that category. The "common" will be all 
-common exons, "uncommon" will be uncommon exons (used more than once but 
-less than all), and each transcript ID will include their specific alternate 
-exons (used only once).
-
-For genes with only a single transcript, all exons will be marked as "common" 
-for simplicity, although technically they could all be considered "alternate" 
-since they're only used once.
-
-=back
-
-=head2 Intron Methods
-
-Functions to get a list of introns from a gene or transcript. Introns are 
-not usually defined in gene annotation files, but are inferred from the 
-exons and total gene or transcript length. In this case, new SeqFeature 
-elements are generated for each intron.
-
-=over 4
-
-=item get_introns
-
-	my @introns = get_introns($gene);
-	my @introns = get_introns($transcript);
-
-This will return an array or array reference of all the intron subfeatures in 
-the SeqFeature object, either gene or transcript. No discrimination whether 
-they are used once or more than once. Non-defined introns can be assembled from 
-CDS andE<sol>or UTR subfeatures. Introns are sorted by start coordinate.
-
-=item get_alt_introns
-
-	my @alternate_introns = get_alt_introns($gene);
-
-This will return an array or array reference of all the intron subfeatures for 
-a multi-transcript gene that are used only once in all of the transcripts.
-
-=item get_common_introns
-
-	my @common_introns = get_common_introns($gene);
-
-This will return an array or array reference of all the intron subfeatures for 
-a multi-transcript gene that are used in all of the transcripts.
-
-=item get_uncommon_introns
-
-	my @uncommon_introns = get_uncommon_introns($gene);
-
-This will return an array or array reference of all the intron subfeatures for 
-a multi-transcript gene that are used in some of the transcripts, i.e. more 
-than one but not all.
-
-=item get_alt_common_introns
-
-	my %intron_hash = get_alt_common_introns($gene);
-
-This will return a hash reference with several keys, including "common", 
-"uncommon", and each of the transcript IDs. Each key value is an array 
-reference with the introns for that category. The "common" will be all 
-common introns, "uncommon" will be uncommon introns (used more than once but 
-less than all), and each transcript ID will include their specific alternate 
-introns (used only once).
-
-For genes with only a single transcript, all introns will be marked as "common" 
-for simplicity, although technically they could all be considered "alternate" 
-since they're only used once.
-
-=back
-
-=head2 Transcript Methods
-
-These methods work on transcripts, typically alternate transcripts from a 
-gene SeqFeature.
-
-=over 4
-
-=item get_transcripts
-
-	my @transcripts = get_transcripts($gene);
-
-Returns an array or array reference of the transcripts associated with a 
-gene feature.
-
-=item collapse_transcripts
-
-	my $new_transcript = collapse_transcripts($gene);
-	my $new_transcript = collapse_transcripts($transcript1, $transcript2);
-
-This method will collapse all of the transcripts associated with a gene 
-SeqFeature into a single artificial transcript, merging exons as necessary 
-to maximize exon length and minimize introns. This is useful when 
-performing, for example, RNASeq analysis on genes. A single SeqFeature 
-transcript object is returned containing the merged exon subfeatures. 
-
-Pass either a gene or a list of transcripts to collapse.
-
-=item get_transcript_length
-
-	my $length = get_transcript_length($transcript);
-
-Calculates and returns the transcribed length of a transcript, i.e 
-the sum of its exon lengths. B<Warning!> If you pass a gene object, you 
-will get the maximum of all transcript exon lengths, which may not be 
-what you anticipate!
-
-=back
-
-=head2 CDS methods
-
-These methods calculate values related to the coding sequence of the 
-mRNA transcripts. 
-
-=over 4
-
-=item is_coding
-
-	if( is_coding($transcript) ) {
-		# do something
-	}
-
-This method will return a boolean value (1 or 0) if the passed transcript object 
-appears to be a coding transcript. GFF and GTF files are not always immediately 
-clear about the type of transcript; there are (unfortunately) multiple ways 
-to encode the feature as a protein coding transcript: C<primary_tag>, 
-C<source_tag>, GFF attribute, presence of CDS subfeatures, etc. 
-This method checks all of these possibilities. B<Note>: If you pass a 
-multi-transcript gene, only one transcript need to be coding to pass a true 
-value.
-
-=item get_cds
-
-	my @cds = get_cds($transcript);
-
-Returns the CDS subfeatures of the given transcript, if they are 
-defined. Returns either an array or array reference.
-
-=item get_cdsStart
-
-	my $start = get_cdsStart($trancript);
-
-Returns the start coordinate of the CDS for the given transcript.
-Note that this is the leftmost (smallest) coordinate of the CDS 
-and not necessarily the coordinate of the start codon, similar to 
-what the UCSC gene tables report. Use the transcript strand to 
-determine the 5' end.
-
-=item get_cdsEnd
-
-	my $end = get_cdsEnd($trancript);
-
-Returns the stop coordinate of the CDS for the given transcript.
-B<Note> that this is the rightmost (largest) coordinate of the CDS 
-and not necessarily the coordinate of the stop codon, similar to 
-what the UCSC gene tables report. Use the transcript strand to 
-determine which is the C<3'> and C<5'> end.
-
-=item get_start_codon
-
-	my $start_codon = get_start_codon($trancript);
-
-Returns a SeqFeature object representing the start codon. If one is 
-not explicitly defined in the hierarchy, then a new object is generated.
-
-=item get_stop_codon
-
-	my $stop_codon = get_stop_codon($transcript);
-
-Returns a SeqFeature object representing the stop codon. If one is 
-not defined in the hierarchy, then a new object is created. B<Note> that 
-this assumes that the stop codon is inclusive to the defined CDS, which is 
-the case with GFF3 and UCSC gene table derived features. On the other hand, 
-features derived from GTF is defined with the stop codon exclusive to the CDS. 
-This shouldn't matter with GTF, however, since GTF usually explicitly includes 
-stop codon features, whereas the other two formats do not.
-
-=item get_transcript_cds_length
-
-	my $length = get_transcript_cds_length($transcript);
-
-Calculates and returns the length of the coding sequence for a 
-transcript, i.e. the sum of the CDS lengths.
-
-=item get_utrs
-
-	my @utrs = get_utrs($trancript);
-
-Returns both C<5'> and C<3'> untranslated regions of the transcript. If these are 
-not defined in the SeqFeature subfeature hierarchy, then the coordinates will be 
-determined from from the exon and CDS subfeatures, if available, and new SeqFeature 
-objects generated. Non-coding transcripts will not return anything. 
-
-=item get_5p_utrs
-
-	my @5p_utrs = get_5p_utrs($trancript);
-
-Returns only the C<5'> untranslated regions of the transcript.
-
-=item get_3p_utrs($transcript)
-
-	my @3p_utrs = get_3p_utrs($trancript);
-
-Returns only the C<3'> untranslated regions of the transcript.
-
-=back
-
-=head2 Export methods
-
-These methods are used for exporting a gene andE<sol>or transcript model into 
-a text string based on the specified format. 
-
-=over 4
-
-=item gff_string
-
-	my $string .= gff_string($gene, 1);
-	my $string .= gff_string($transcript, 1);
-
-This is just a convenience method. SeqFeature objects based on 
-L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, or L<Bio::ToolBox::SeqFeature>
-have a C<gff_string> method, and this will simply call that method. SeqFeature 
-objects that do not have this method will, of course, cause the script to 
-terminate. 
-
-Pass the seqfeature object and a boolean value to recursively append all 
-subfeatures (e.g. exons) to the string. In most cases, this will generate a 
-GFF3-style string.
-
-L<Bio::ToolBox::Data::Feature> also provides a simplified gff_string method.
-
-=item gtf_string
-
-	my $string .= gtf_string($gene);
-	my $string .= gtf_string($transcript);
-
-This will export a gene or transcript model as a series of GTF formatted 
-text lines, following the defined Gene Transfer Format (also known as GFF 
-version 2.5). It will ensure that each feature is properly tagged with the 
-C<gene_id> and C<transcript_id> attributes. 
-
-This method will automatically recurse through all subfeatures.
-
-=item ucsc_string
-
-	my $string = ucsc_string($gene);
-
-This will export a gene or transcript model as a refFlat formatted Gene 
-Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
-for details. Multiple transcript genes are exported as multiple text lines 
-concatenated together.
-
-=item bed_string
-
-	my $string = bed_string($gene);
-
-This will export a gene or transcript model as a UCSC Bed formatted transcript 
-line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1>
-for details. Multiple transcript genes are exported as multiple text lines 
-concatenated together. Note that gene information is not preserved with Bed12 
-files; only the transcript name is used. The C<RGB> value is set to 0.
-
-=back
-
-=head2 Filter methods
-
-These methods are used to filter genes.
-
-=over 4
-
-=item filter_transcript_support_level
-
-	my $new_gene = filter_transcript_support_level($gene, 'best2');
-	my @good_transcripts = filter_transcript_support_level(\@transcripts);
-
-This will filter a gene object for transcripts that match or exceed the 
-provided transcript support level. This assumes that the transcripts 
-contain the attribute tag 'transcript_support_level', which are present in 
-Ensembl provided GFF3 and GTF annotation files. The values are a digit (1-5), 
-or 'NA', where 1 is experimentally supported and 5 is entirely predicted 
-with no experimental evidence. See 
-L<Ensembl TSL glossary entry|http://www.ensembl.org/info/website/glossary.html> 
-for details. 
-
-Pass a gene SeqFeature object with one or more transcript subfeatures. 
-Alternatively, an array reference of transcripts could be passed as well.
-
-A level may be provided as a second argument. The default is 'best'.
-
-=over 4
-
-=item best
-
-Only the transcripts with the highest existing value will be retained.
-
-=item bestE<lt>digitE<gt>
-
-All transcripts up to the indicated level are retained. For example, 
-'best3' would indicate that transcripts with support levels 1, 2, and 3 
-would be retained. 
-
-=item E<lt>digitE<gt>
-
-Only transcripts at the given level are retained.
-
-=item NA
-
-Only transcripts with 'NA' as the value are retained. These are typically 
-pseudogenes or single-exon transcripts.
-
-=back
-
-If none of the transcripts have the attribute, then all are returned 
-(nothing is filtered). 
-
-If a gene object was provided, a new gene object will be returned with 
-only the retained transcripts as subfeatures. If an array reference of 
-transcripts was provided, then an array reference of the filtered 
-transcripts is returned.
-
-=item filter_transcript_gencode_basic
-
-	my $new_gene = filter_transcript_gencode_basic($gene);
-	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts);
-
-This will filter a gene object for transcripts for the Ensembl GENCODE 
-tag "basic", which indicates that a transcript is tagged as GENCODE Basic 
-transcript. 
-
-If a gene object was provided, a new gene object will be returned with 
-only the retained transcripts as subfeatures. If an array reference of 
-transcripts was provided, then an array reference of the filtered 
-transcripts is returned.
- 
-=item filter_transcript_biotype
-
-	my $new_gene = filter_transcript_gencode_basic($gene, $biotype);
-	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts, 'miRNA');
-
-This will filter a gene object for transcripts for specific biotype values 
-using the C<transcript_biotype> or C<biotype> attribute tags, commonly found 
-in Ensembl annotation.
-
-If a gene object was provided, a new gene object will be returned with 
-only the retained transcripts as subfeatures. If an array reference of 
-transcripts was provided, then an array reference of the filtered 
-transcripts is returned.
-
-=back
-
-=head1 SEE ALSO
-
-L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, 
-L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>,
-L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, L<Bio::SeqFeatureI>
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 require Exporter;
 
+our $VERSION = '1.67';
+
 ### Export
 our @ISA       = qw(Exporter);
-our @EXPORT    = qw();
 our @EXPORT_OK = qw(
 	get_exons
 	get_alt_exons
@@ -607,9 +108,6 @@ our %EXPORT_TAGS = (
 		)
 	]
 );
-
-### The True Statement
-1;
 
 ######## Exon Methods
 
@@ -1861,7 +1359,507 @@ sub _return_filtered_transcripts {
 	}
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene models
+
+=head1 SYNOPSIS
+
+    use Bio::ToolBox::GeneTools qw(:all);
+    
+    my $gene; # a SeqFeatureI compliant gene object obtained elsewhere
+              # for example, from Bio::DB::SeqFeature::Store database
+              # or parsed from a GFF3, GTF, or UCSC-style gene table using 
+              # Bio::ToolBox parsers
+    
+    if (is_coding($gene)) { # boolean test
+    	
+    	# collect all exons from all transcripts in gene
+    	my @exons = get_exons($gene);
+    	
+    	# find just the alternate exons used only once
+    	my @alternate_exons = get_alt_exons($gene);
+    	
+    	# collect UTRs, which may not be defined in the original source
+    	my @utrs;
+    	foreach my $t (get_transcripts($gene)) {
+    		my @u = get_utrs($t);
+    		push @utrs, @u;
+    	}
+    }
+
+
+=head1 DESCRIPTION
+
+This module provides numerous exportable functions for working with gene 
+SeqFeature models. This assumes that the gene models follow the BioPerl 
+L<Bio::SeqFeatureI> convention with nested SeqFeature objects representing the 
+gene, transcript, and exons. For example, 
+
+    gene
+      transcript
+        exon
+        CDS
+
+Depending upon how the SeqFeatures were generated or defined, subfeatures 
+may or may not be defined or be obvious. For example, UTRs or introns may 
+not be present. Furthermore, the C<primary_tag> or type may not follow 
+Sequence Ontology terms. Regular expressions are deployed to handle 
+varying naming schemes and exceptions.
+
+These functions should work with most or all L<Bio::SeqFeatureI> compliant 
+objects. It has been tested with L<Bio::ToolBox::SeqFeature>, 
+L<Bio::SeqFeature::Lite>, and L<Bio::DB::SeqFeature> classes.
+
+New SeqFeature objects that are generated use the same class for 
+simplicity and expediency. 
+
+=head1 METHODS
+
+=head2 Function Import
+
+None of the functions are exported by default. Specify which ones you want 
+when you import the module. Alternatively, use one of the tags below.
+
+=over 4
+
+=item :all
+
+Import all of the methods.
+
+=item :exon
+
+Import all of the exon methods, including L</get_exons>, L</get_alt_exons>, 
+L</get_common_exons>, L</get_uncommon_exons>, and L</get_alt_common_exons>.
+
+=item :intron
+
+Import all of the intron methods, including L</get_introns>, L</get_alt_introns>, 
+L</get_common_introns>, L</get_uncommon_introns>, and L</get_alt_common_introns>.
+
+=item :transcript
+
+Import the transcript related methods, including L</get_transcripts>, 
+L</get_transcript_length>, and L</collapse_transcripts>.
+
+=item :cds
+
+Import the CDS pertaining methods, including L</is_coding>, L</get_cds>, 
+L</get_cdsStart>, L</get_cdsEnd>, L</get_transcript_cds_length>, and L</get_utrs>.
+
+=item :export
+
+Import all of the export methods, including L</gff_string>, L</gtf_string>, 
+L</ucsc_string>, and L</bed_string>;
+
+=item :filter
+
+Import all of the transcript filter methods, including L</filter_transcript_biotype>,
+L</filter_transcript_gencode_basic>, and L</filter_transcript_support_level>.
+
+=back
+
+=head2 Exon Methods
+
+Functions to get a list of exons from a gene or transcript
+
+=over 4
+
+=item get_exons
+
+	my @exons = get_exons($gene);
+	my @exons = get_exons($transcript);
+
+This will return an array or array reference of all the exon subfeatures in 
+the SeqFeature object, either gene or transcript. No discrimination whether 
+they are used once or more than once. Non-defined exons can be assembled from 
+CDS and/or UTR subfeatures. Exons are sorted by start coordinate.
+
+=item get_alt_exons
+
+	my @alternate_exons = get_alt_exons($gene);
+
+This will return an array or array reference of all the exon subfeatures for 
+a multi-transcript gene that are used only once in all of the transcripts.
+
+=item get_common_exons
+
+	my @common_exons = get_common_exons($gene);
+
+This will return an array or array reference of all the exon subfeatures for 
+a multi-transcript gene that are used in all of the transcripts.
+
+=item get_uncommon_exons
+
+	my @uncommon_exons = get_uncommon_exons($gene);
+
+This will return an array or array reference of all the exon subfeatures for 
+a multi-transcript gene that are used in some of the transcripts, i.e. more 
+than one but not all.
+
+=item get_alt_common_exons
+
+	my %exon_hash = get_alt_common_exons($gene);
+
+This will return a hash reference with several keys, including "common", 
+"uncommon", and each of the transcript IDs. Each key value is an array 
+reference with the exons for that category. The "common" will be all 
+common exons, "uncommon" will be uncommon exons (used more than once but 
+less than all), and each transcript ID will include their specific alternate 
+exons (used only once).
+
+For genes with only a single transcript, all exons will be marked as "common" 
+for simplicity, although technically they could all be considered "alternate" 
+since they're only used once.
+
+=back
+
+=head2 Intron Methods
+
+Functions to get a list of introns from a gene or transcript. Introns are 
+not usually defined in gene annotation files, but are inferred from the 
+exons and total gene or transcript length. In this case, new SeqFeature 
+elements are generated for each intron.
+
+=over 4
+
+=item get_introns
+
+	my @introns = get_introns($gene);
+	my @introns = get_introns($transcript);
+
+This will return an array or array reference of all the intron subfeatures in 
+the SeqFeature object, either gene or transcript. No discrimination whether 
+they are used once or more than once. Non-defined introns can be assembled from 
+CDS andE<sol>or UTR subfeatures. Introns are sorted by start coordinate.
+
+=item get_alt_introns
+
+	my @alternate_introns = get_alt_introns($gene);
+
+This will return an array or array reference of all the intron subfeatures for 
+a multi-transcript gene that are used only once in all of the transcripts.
+
+=item get_common_introns
+
+	my @common_introns = get_common_introns($gene);
+
+This will return an array or array reference of all the intron subfeatures for 
+a multi-transcript gene that are used in all of the transcripts.
+
+=item get_uncommon_introns
+
+	my @uncommon_introns = get_uncommon_introns($gene);
+
+This will return an array or array reference of all the intron subfeatures for 
+a multi-transcript gene that are used in some of the transcripts, i.e. more 
+than one but not all.
+
+=item get_alt_common_introns
+
+	my %intron_hash = get_alt_common_introns($gene);
+
+This will return a hash reference with several keys, including "common", 
+"uncommon", and each of the transcript IDs. Each key value is an array 
+reference with the introns for that category. The "common" will be all 
+common introns, "uncommon" will be uncommon introns (used more than once but 
+less than all), and each transcript ID will include their specific alternate 
+introns (used only once).
+
+For genes with only a single transcript, all introns will be marked as "common" 
+for simplicity, although technically they could all be considered "alternate" 
+since they're only used once.
+
+=back
+
+=head2 Transcript Methods
+
+These methods work on transcripts, typically alternate transcripts from a 
+gene SeqFeature.
+
+=over 4
+
+=item get_transcripts
+
+	my @transcripts = get_transcripts($gene);
+
+Returns an array or array reference of the transcripts associated with a 
+gene feature.
+
+=item collapse_transcripts
+
+	my $new_transcript = collapse_transcripts($gene);
+	my $new_transcript = collapse_transcripts($transcript1, $transcript2);
+
+This method will collapse all of the transcripts associated with a gene 
+SeqFeature into a single artificial transcript, merging exons as necessary 
+to maximize exon length and minimize introns. This is useful when 
+performing, for example, RNASeq analysis on genes. A single SeqFeature 
+transcript object is returned containing the merged exon subfeatures. 
+
+Pass either a gene or a list of transcripts to collapse.
+
+=item get_transcript_length
+
+	my $length = get_transcript_length($transcript);
+
+Calculates and returns the transcribed length of a transcript, i.e 
+the sum of its exon lengths. B<Warning!> If you pass a gene object, you 
+will get the maximum of all transcript exon lengths, which may not be 
+what you anticipate!
+
+=back
+
+=head2 CDS methods
+
+These methods calculate values related to the coding sequence of the 
+mRNA transcripts. 
+
+=over 4
+
+=item is_coding
+
+	if( is_coding($transcript) ) {
+		# do something
+	}
+
+This method will return a boolean value (1 or 0) if the passed transcript object 
+appears to be a coding transcript. GFF and GTF files are not always immediately 
+clear about the type of transcript; there are (unfortunately) multiple ways 
+to encode the feature as a protein coding transcript: C<primary_tag>, 
+C<source_tag>, GFF attribute, presence of CDS subfeatures, etc. 
+This method checks all of these possibilities. B<Note>: If you pass a 
+multi-transcript gene, only one transcript need to be coding to pass a true 
+value.
+
+=item get_cds
+
+	my @cds = get_cds($transcript);
+
+Returns the CDS subfeatures of the given transcript, if they are 
+defined. Returns either an array or array reference.
+
+=item get_cdsStart
+
+	my $start = get_cdsStart($trancript);
+
+Returns the start coordinate of the CDS for the given transcript.
+Note that this is the leftmost (smallest) coordinate of the CDS 
+and not necessarily the coordinate of the start codon, similar to 
+what the UCSC gene tables report. Use the transcript strand to 
+determine the 5' end.
+
+=item get_cdsEnd
+
+	my $end = get_cdsEnd($trancript);
+
+Returns the stop coordinate of the CDS for the given transcript.
+B<Note> that this is the rightmost (largest) coordinate of the CDS 
+and not necessarily the coordinate of the stop codon, similar to 
+what the UCSC gene tables report. Use the transcript strand to 
+determine which is the C<3'> and C<5'> end.
+
+=item get_start_codon
+
+	my $start_codon = get_start_codon($trancript);
+
+Returns a SeqFeature object representing the start codon. If one is 
+not explicitly defined in the hierarchy, then a new object is generated.
+
+=item get_stop_codon
+
+	my $stop_codon = get_stop_codon($transcript);
+
+Returns a SeqFeature object representing the stop codon. If one is 
+not defined in the hierarchy, then a new object is created. B<Note> that 
+this assumes that the stop codon is inclusive to the defined CDS, which is 
+the case with GFF3 and UCSC gene table derived features. On the other hand, 
+features derived from GTF is defined with the stop codon exclusive to the CDS. 
+This shouldn't matter with GTF, however, since GTF usually explicitly includes 
+stop codon features, whereas the other two formats do not.
+
+=item get_transcript_cds_length
+
+	my $length = get_transcript_cds_length($transcript);
+
+Calculates and returns the length of the coding sequence for a 
+transcript, i.e. the sum of the CDS lengths.
+
+=item get_utrs
+
+	my @utrs = get_utrs($trancript);
+
+Returns both C<5'> and C<3'> untranslated regions of the transcript. If these are 
+not defined in the SeqFeature subfeature hierarchy, then the coordinates will be 
+determined from from the exon and CDS subfeatures, if available, and new SeqFeature 
+objects generated. Non-coding transcripts will not return anything. 
+
+=item get_5p_utrs
+
+	my @5p_utrs = get_5p_utrs($trancript);
+
+Returns only the C<5'> untranslated regions of the transcript.
+
+=item get_3p_utrs($transcript)
+
+	my @3p_utrs = get_3p_utrs($trancript);
+
+Returns only the C<3'> untranslated regions of the transcript.
+
+=back
+
+=head2 Export methods
+
+These methods are used for exporting a gene andE<sol>or transcript model into 
+a text string based on the specified format. 
+
+=over 4
+
+=item gff_string
+
+	my $string .= gff_string($gene, 1);
+	my $string .= gff_string($transcript, 1);
+
+This is just a convenience method. SeqFeature objects based on 
+L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, or L<Bio::ToolBox::SeqFeature>
+have a C<gff_string> method, and this will simply call that method. SeqFeature 
+objects that do not have this method will, of course, cause the script to 
+terminate. 
+
+Pass the seqfeature object and a boolean value to recursively append all 
+subfeatures (e.g. exons) to the string. In most cases, this will generate a 
+GFF3-style string.
+
+L<Bio::ToolBox::Data::Feature> also provides a simplified gff_string method.
+
+=item gtf_string
+
+	my $string .= gtf_string($gene);
+	my $string .= gtf_string($transcript);
+
+This will export a gene or transcript model as a series of GTF formatted 
+text lines, following the defined Gene Transfer Format (also known as GFF 
+version 2.5). It will ensure that each feature is properly tagged with the 
+C<gene_id> and C<transcript_id> attributes. 
+
+This method will automatically recurse through all subfeatures.
+
+=item ucsc_string
+
+	my $string = ucsc_string($gene);
+
+This will export a gene or transcript model as a refFlat formatted Gene 
+Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
+for details. Multiple transcript genes are exported as multiple text lines 
+concatenated together.
+
+=item bed_string
+
+	my $string = bed_string($gene);
+
+This will export a gene or transcript model as a UCSC Bed formatted transcript 
+line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1>
+for details. Multiple transcript genes are exported as multiple text lines 
+concatenated together. Note that gene information is not preserved with Bed12 
+files; only the transcript name is used. The C<RGB> value is set to 0.
+
+=back
+
+=head2 Filter methods
+
+These methods are used to filter genes.
+
+=over 4
+
+=item filter_transcript_support_level
+
+	my $new_gene = filter_transcript_support_level($gene, 'best2');
+	my @good_transcripts = filter_transcript_support_level(\@transcripts);
+
+This will filter a gene object for transcripts that match or exceed the 
+provided transcript support level. This assumes that the transcripts 
+contain the attribute tag 'transcript_support_level', which are present in 
+Ensembl provided GFF3 and GTF annotation files. The values are a digit (1-5), 
+or 'NA', where 1 is experimentally supported and 5 is entirely predicted 
+with no experimental evidence. See 
+L<Ensembl TSL glossary entry|http://www.ensembl.org/info/website/glossary.html> 
+for details. 
+
+Pass a gene SeqFeature object with one or more transcript subfeatures. 
+Alternatively, an array reference of transcripts could be passed as well.
+
+A level may be provided as a second argument. The default is 'best'.
+
+=over 4
+
+=item best
+
+Only the transcripts with the highest existing value will be retained.
+
+=item bestE<lt>digitE<gt>
+
+All transcripts up to the indicated level are retained. For example, 
+'best3' would indicate that transcripts with support levels 1, 2, and 3 
+would be retained. 
+
+=item E<lt>digitE<gt>
+
+Only transcripts at the given level are retained.
+
+=item NA
+
+Only transcripts with 'NA' as the value are retained. These are typically 
+pseudogenes or single-exon transcripts.
+
+=back
+
+If none of the transcripts have the attribute, then all are returned 
+(nothing is filtered). 
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
+
+=item filter_transcript_gencode_basic
+
+	my $new_gene = filter_transcript_gencode_basic($gene);
+	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts);
+
+This will filter a gene object for transcripts for the Ensembl GENCODE 
+tag "basic", which indicates that a transcript is tagged as GENCODE Basic 
+transcript. 
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
+ 
+=item filter_transcript_biotype
+
+	my $new_gene = filter_transcript_gencode_basic($gene, $biotype);
+	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts, 'miRNA');
+
+This will filter a gene object for transcripts for specific biotype values 
+using the C<transcript_biotype> or C<biotype> attribute tags, commonly found 
+in Ensembl annotation.
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, 
+L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>,
+L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, L<Bio::SeqFeatureI>
 
 =head1 AUTHOR
 

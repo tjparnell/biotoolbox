@@ -1,34 +1,21 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.70';
 
-=head1 NAME
-
-Bio::ToolBox::Data::file - File functions to Bio:ToolBox::Data family
-
-=head1 DESCRIPTION
-
-File methods for reading and writing data files for both L<Bio::ToolBox::Data> 
-and L<Bio::ToolBox::Data::Stream> objects. This module should not be used 
-directly. See the respective modules for more information.
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
 
+our $VERSION = '1.70';
+
 # List of acceptable filename extensions
 our $SUFFIX =
 qr/\.(?:txt|gff3?|gtf|bed|bg|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|gappedpeak|reff?lat|genepred|ucsc|maf)(?:\.gz|\.bz2)?/i;
 
 # gzip application
-our $gzip_app;
-our $bgzip_app;
-
-### The True Statement
-1;
+my $gzip_app;
+my $bgzip_app;
 
 ### Load new version data table from file
 
@@ -1671,7 +1658,19 @@ sub standard_column_names {
 	}
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::Data::file - File functions to Bio:ToolBox::Data family
+
+=head1 DESCRIPTION
+
+File methods for reading and writing data files for both L<Bio::ToolBox::Data> 
+and L<Bio::ToolBox::Data::Stream> objects. This module should not be used 
+directly. See the respective modules for more information.
 
 =head1 DESCRIPTION
 
@@ -1747,7 +1746,6 @@ Almost any tab-delimited text file with a F<.txt> extension can be loaded.
 File extension F<.gz> and F<.bz2> are recognized as compressed files.
 Compressed files are usually read through an external decompression 
 program. All of the above formats can be loaded as compressed files.
-
 
 =back
 

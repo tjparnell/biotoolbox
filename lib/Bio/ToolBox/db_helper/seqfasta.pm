@@ -1,8 +1,8 @@
 package Bio::ToolBox::db_helper::seqfasta;
 
-require Exporter;
-use Carp;
+use warnings;
 use strict;
+use Carp;
 use Module::Load;    # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
@@ -10,21 +10,25 @@ use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
+require Exporter;
 
 our $VERSION   = '1.54';
-our $WIGGLE_OK = 0;
-our $CONFIG_OK = 0;
-our $BTB_CONFIG;
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	open_fasta_db
 	open_store_db
 	collect_store_scores
 );
+## use critic
 
-1;
+my $WIGGLE_OK = 0;
+my $CONFIG_OK = 0;
 
 sub open_fasta_db {
 	my $database = shift;
@@ -378,6 +382,8 @@ sub collect_store_scores {
 		return wantarray ? @scores : \@scores;
 	}
 }
+
+1;
 
 __END__
 

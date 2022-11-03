@@ -1,209 +1,13 @@
 package Bio::ToolBox::parser::bed;
-our $VERSION = '1.70';
 
-=head1 NAME
-
-Bio::ToolBox::parser::bed - Parser for BED-style formats
-
-=head1 SYNOPSIS
-
-  use Bio::ToolBox::Parser;
-  my $filename = 'file.bed';
-  
-  my $Parser = Bio::ToolBox::Parser->new(
-  	file    => $filename,
-  ) or die "unable to open gff file!\n";
-  # the Parser will taste the file and open the appropriate 
-  # subclass parser, bed in this case
-  
-  while (my $feature = $Parser->next_top_feature() ) {
-	# each $feature is parent SeqFeature object
-  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
-  }
-
-=head1 DESCRIPTION
-
-This is the BED-style specific parser subclass to the L<Bio::ToolBox::Parser>
-object, and as such inherits generic methods from the parent. File formats 
-include the following. 
-
-=over 4 
-
-=item Bed
-
-L<Bed|http://genome.ucsc.edu/FAQ/FAQformat.html#format1> files may have 3-12 columns, 
-where the first 3-6 columns are basic information about the feature itself, and 
-columns 7-12 are usually for defining subfeatures of a transcript model, including 
-exons, UTRs (thin portions), and CDS (thick portions) subfeatures. This parser will 
-parse these extra fields as appropriate into subfeature SeqFeature objects. Bed files 
-are recognized with the file extension F<.bed>.
-
-=item Bedgraph
-
-L<BedGraph|http://genome.ucsc.edu/FAQ/FAQformat.html#format1.8> files are a type of 
-wiggle format in Bed format, where the 4th column is a score instead of a name. BedGraph 
-files are recognized by the file extension F<.bedgraph> or F<.bdg>.
-
-=item narrowPeak
-
-L<narrowPeak|http://genome.ucsc.edu/FAQ/FAQformat.html#format12> files are a specialized 
-Encode variant of bed files with 10 columns (typically denoted as bed6+4), where the 
-extra 4 fields represent score attributes to a narrow ChIPSeq peak. These files are 
-parsed as a typical bed6 file, and the extra four fields are assigned to SeqFeature 
-attribute tags C<signalValue>, C<pValue>, C<qValue>, and C<peak>, respectively. 
-NarrowPeak files are recognized by the file extension F<.narrowPeak>. 
-
-=item broadPeak
-
-L<broadPeak|http://genome.ucsc.edu/FAQ/FAQformat.html#format13> files, like narrowPeak, 
-are an Encode variant with 9 columns (bed6+3) representing a broad or extended interval 
-of ChIP enrichment without a single "peak". The extra three fields are assigned to 
-SeqFeature attribute tags C<signalValue>, C<pValue>, and C<qValue>, respectively.
-BroadPeak files are recognized by the file extension F<.broadPeak>. 
-
-=back
-
-C<Track> and C<Browser> lines are generally ignored, although a C<track> definition 
-line containing a C<type> key will be interpreted if it matches one of the above file 
-types. 
-
-=head2 SeqFeature default values
-
-The SeqFeature objects built from the bed file intervals will have some inferred defaults. 
-
-=over 4
-
-=item Coordinate system
-
-SeqFeature objects use the 1-based coordinate system, per the specification of 
-L<Bio::SeqFeatureI>, so the 0-based start coordinates of bed files will always be 
-parsed into 1-based coordinates.
-
-=item C<display_name>
-
-SeqFeature objects will use the name field (4th column in bed files), if present, as the 
-C<display_name>. The SeqFeature object should default to the C<primary_id> if a name was 
-not provided.
-
-=item C<primary_id>
-
-It will use a concatenation of the sequence ID, start (original 0-based), and 
-stop coordinates as the C<primary_id>, for example 'chr1:0-100'. 
-
-=item C<primary_tag>
-
-Bed files don't have an inherent attribute of feature type (they are all the same 
-type), so a default C<primary_tag> is assigned based on the file type. For peak 
-files (F<narrowPeak> and F<broadPeak>) this is C<peak>, for F<gappedPeak> this is 
-C<gappedPeak> and C<peak> (subfeatures), and for F<bed12> files with transcript models, 
-the transcripts will be set to either C<mRNA> or C<ncRNA>, depending on the presence 
-of interpreted CDS start and stop (thick coordinates).
-
-=item C<source_tag>
-
-Bed files don't have a concept of a source; default is "".
-
-=item attribute tags
-
-Extra columns in the F<narrowPeak> and F<broadPeak> formats are assigned to attribute tags 
-as described above. The C<rgb> values set in bed12 files are also set to an attribute tag.
-
-=back
-
-=head1 METHODS
-
-=head2 Initializing the parser object
-
-In most cases, users should initialize an object using the generic 
-L<Bio::ToolBox::Parser> object. 
-
-These are class methods to initialize the parser with an annotation file 
-and modify the parsing behavior. Most parameters can be set either upon 
-initialization or as class methods on the object. Unpredictable behavior 
-may occur if you implement these in the midst of parsing a file. 
-
-Do not open subsequent files with the same object. Always create a new 
-object to parse a new file.
-
-=over 4
-
-=item new
-
-  my $parser = Bio::ToolBox::parser::bed->new($filename);
-  my $parser = Bio::ToolBox::parser::bed->new(
-      file    => 'file.bed',
-      do_gene => 1,
-      do_cds  => 1,
-  );
-
-Initiate a new Bed file parser object. Pass a single value (the bed file name) to 
-open the file for parsing. Alternatively, pass an array of key 
-value pairs to control how the table is parsed. These options are primarily for 
-parsing bed12 files with subfeatures. Options include the following.
-
-=over 4
-
-=item file
-
-Provide the path and file name for a Bed file. The file may be gzip compressed. 
-
-=item source
-
-Pass a string to be added as the source tag value of the SeqFeature objects. 
-
-=item do_exon
-
-=item do_cds
-
-=item do_utr
-
-=item do_codon
-
-For Bed12 formats that represent transcripts, pass a boolean (1 or 0) value to
-parse certain subfeatures, including C<exon>, C<CDS>, C<five_prime_UTR>, 
-C<three_prime_UTR>, C<stop_codon>, and C<start_codon> features. Default is false.
-
-=item class
-
-Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
-create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
-which is lighter-weight and consumes less memory. A suitable BioPerl alternative
-is L<Bio::SeqFeature::Lite>.
-
-=back
-
-=back
-
-=head2 Other methods
-
-Additional methods for working with the parser object and the parsed 
-SeqFeature objects.
-
-=over 4
-
-=item typelist
-
-Returns a string representation of the type of SeqFeature types to be encountered in 
-the file. Currently this returns generic strings, 'mRNA,ncRNA,exon,CDS' for bed12 
-and 'feature' for everything else.
-
-=back
-
-=head1 SEE ALSO
-
-L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
-L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::gff>
-
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
 use Module::Load;
 
-1;
+our $VERSION = '1.70';
 
 sub new {
 	my $class = shift;
@@ -600,7 +404,202 @@ sub _parse_gappedPeak {
 	return $feature;
 }
 
+1;
+
 __END__
+
+=head1 NAME
+
+Bio::ToolBox::parser::bed - Parser for BED-style formats
+
+=head1 SYNOPSIS
+
+  use Bio::ToolBox::Parser;
+  my $filename = 'file.bed';
+  
+  my $Parser = Bio::ToolBox::Parser->new(
+  	file    => $filename,
+  ) or die "unable to open gff file!\n";
+  # the Parser will taste the file and open the appropriate 
+  # subclass parser, bed in this case
+  
+  while (my $feature = $Parser->next_top_feature() ) {
+	# each $feature is parent SeqFeature object
+  	printf "%s:%d-%d\n", $f->seq_id, $f->start, $f->end;
+  }
+
+=head1 DESCRIPTION
+
+This is the BED-style specific parser subclass to the L<Bio::ToolBox::Parser>
+object, and as such inherits generic methods from the parent. File formats 
+include the following. 
+
+=over 4 
+
+=item Bed
+
+L<Bed|http://genome.ucsc.edu/FAQ/FAQformat.html#format1> files may have 3-12 columns, 
+where the first 3-6 columns are basic information about the feature itself, and 
+columns 7-12 are usually for defining subfeatures of a transcript model, including 
+exons, UTRs (thin portions), and CDS (thick portions) subfeatures. This parser will 
+parse these extra fields as appropriate into subfeature SeqFeature objects. Bed files 
+are recognized with the file extension F<.bed>.
+
+=item Bedgraph
+
+L<BedGraph|http://genome.ucsc.edu/FAQ/FAQformat.html#format1.8> files are a type of 
+wiggle format in Bed format, where the 4th column is a score instead of a name. BedGraph 
+files are recognized by the file extension F<.bedgraph> or F<.bdg>.
+
+=item narrowPeak
+
+L<narrowPeak|http://genome.ucsc.edu/FAQ/FAQformat.html#format12> files are a specialized 
+Encode variant of bed files with 10 columns (typically denoted as bed6+4), where the 
+extra 4 fields represent score attributes to a narrow ChIPSeq peak. These files are 
+parsed as a typical bed6 file, and the extra four fields are assigned to SeqFeature 
+attribute tags C<signalValue>, C<pValue>, C<qValue>, and C<peak>, respectively. 
+NarrowPeak files are recognized by the file extension F<.narrowPeak>. 
+
+=item broadPeak
+
+L<broadPeak|http://genome.ucsc.edu/FAQ/FAQformat.html#format13> files, like narrowPeak, 
+are an Encode variant with 9 columns (bed6+3) representing a broad or extended interval 
+of ChIP enrichment without a single "peak". The extra three fields are assigned to 
+SeqFeature attribute tags C<signalValue>, C<pValue>, and C<qValue>, respectively.
+BroadPeak files are recognized by the file extension F<.broadPeak>. 
+
+=back
+
+C<Track> and C<Browser> lines are generally ignored, although a C<track> definition 
+line containing a C<type> key will be interpreted if it matches one of the above file 
+types. 
+
+=head2 SeqFeature default values
+
+The SeqFeature objects built from the bed file intervals will have some inferred defaults. 
+
+=over 4
+
+=item Coordinate system
+
+SeqFeature objects use the 1-based coordinate system, per the specification of 
+L<Bio::SeqFeatureI>, so the 0-based start coordinates of bed files will always be 
+parsed into 1-based coordinates.
+
+=item C<display_name>
+
+SeqFeature objects will use the name field (4th column in bed files), if present, as the 
+C<display_name>. The SeqFeature object should default to the C<primary_id> if a name was 
+not provided.
+
+=item C<primary_id>
+
+It will use a concatenation of the sequence ID, start (original 0-based), and 
+stop coordinates as the C<primary_id>, for example 'chr1:0-100'. 
+
+=item C<primary_tag>
+
+Bed files don't have an inherent attribute of feature type (they are all the same 
+type), so a default C<primary_tag> is assigned based on the file type. For peak 
+files (F<narrowPeak> and F<broadPeak>) this is C<peak>, for F<gappedPeak> this is 
+C<gappedPeak> and C<peak> (subfeatures), and for F<bed12> files with transcript models, 
+the transcripts will be set to either C<mRNA> or C<ncRNA>, depending on the presence 
+of interpreted CDS start and stop (thick coordinates).
+
+=item C<source_tag>
+
+Bed files don't have a concept of a source; default is "".
+
+=item attribute tags
+
+Extra columns in the F<narrowPeak> and F<broadPeak> formats are assigned to attribute tags 
+as described above. The C<rgb> values set in bed12 files are also set to an attribute tag.
+
+=back
+
+=head1 METHODS
+
+=head2 Initializing the parser object
+
+In most cases, users should initialize an object using the generic 
+L<Bio::ToolBox::Parser> object. 
+
+These are class methods to initialize the parser with an annotation file 
+and modify the parsing behavior. Most parameters can be set either upon 
+initialization or as class methods on the object. Unpredictable behavior 
+may occur if you implement these in the midst of parsing a file. 
+
+Do not open subsequent files with the same object. Always create a new 
+object to parse a new file.
+
+=over 4
+
+=item new
+
+  my $parser = Bio::ToolBox::parser::bed->new($filename);
+  my $parser = Bio::ToolBox::parser::bed->new(
+      file    => 'file.bed',
+      do_gene => 1,
+      do_cds  => 1,
+  );
+
+Initiate a new Bed file parser object. Pass a single value (the bed file name) to 
+open the file for parsing. Alternatively, pass an array of key 
+value pairs to control how the table is parsed. These options are primarily for 
+parsing bed12 files with subfeatures. Options include the following.
+
+=over 4
+
+=item file
+
+Provide the path and file name for a Bed file. The file may be gzip compressed. 
+
+=item source
+
+Pass a string to be added as the source tag value of the SeqFeature objects. 
+
+=item do_exon
+
+=item do_cds
+
+=item do_utr
+
+=item do_codon
+
+For Bed12 formats that represent transcripts, pass a boolean (1 or 0) value to
+parse certain subfeatures, including C<exon>, C<CDS>, C<five_prime_UTR>, 
+C<three_prime_UTR>, C<stop_codon>, and C<start_codon> features. Default is false.
+
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>, 
+which is lighter-weight and consumes less memory. A suitable BioPerl alternative
+is L<Bio::SeqFeature::Lite>.
+
+=back
+
+=back
+
+=head2 Other methods
+
+Additional methods for working with the parser object and the parsed 
+SeqFeature objects.
+
+=over 4
+
+=item typelist
+
+Returns a string representation of the type of SeqFeature types to be encountered in 
+the file. Currently this returns generic strings, 'mRNA,ncRNA,exon,CDS' for bed12 
+and 'feature' for everything else.
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
+L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::gff>
 
 =head1 AUTHOR
 

@@ -1,18 +1,6 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.69';
 
-=head1 NAME
-
-Bio::ToolBox::Data::core - Common functions to Bio:ToolBox::Data family
-
-=head1 DESCRIPTION
-
-Common methods for metadata and manipulation in a L<Bio::ToolBox::Data> 
-data table and L<Bio::ToolBox::Data::Stream> file stream. This module 
-should not be used directly. See the respective modules for more information.
-
-=cut
-
+use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::file';
@@ -24,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Module::Load;
 
-1;
+our $VERSION = '1.69';
 
 #### Initialization and verification ###############################################
 
@@ -1599,9 +1587,21 @@ sub get_seqfeature {
 	return $self->{SeqFeatureObjects}->[$row] || undef;
 }
 
+1;
+
 __END__
 
-=head1 METHODS REFERENCE
+=head1 NAME
+
+Bio::ToolBox::Data::core - Common functions to Bio:ToolBox::Data family
+
+=head1 DESCRIPTION
+
+Common methods for metadata and manipulation in a L<Bio::ToolBox::Data> 
+data table and L<Bio::ToolBox::Data::Stream> file stream. This module 
+should not be used directly. See the respective modules for more information.
+
+=head1 METHODS
 
 For quick reference only. Please see L<Bio::ToolBox::Data> for implementation.
 

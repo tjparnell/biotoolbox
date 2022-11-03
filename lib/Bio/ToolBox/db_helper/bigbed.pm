@@ -1,26 +1,32 @@
 package Bio::ToolBox::db_helper::bigbed;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigBed;
+require Exporter;
+
 our $VERSION = '1.51';
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	collect_bigbed_scores
 	collect_bigbed_position_scores
 	open_bigbed_db
 	sum_total_bigbed_features
 );
+## use critic
 
 # Hash of Bigfile chromosomes
-our %BIGBED_CHROMOS;
+my %BIGBED_CHROMOS;
 
 # sometimes user may request a chromosome that's not in the bigfile
 # that could lead to an exception
@@ -30,15 +36,12 @@ our %BIGBED_CHROMOS;
 # to accommodate different naming conventions
 
 # Opened bigBed db objects
-our %OPENED_BB;
+my %OPENED_BB;
 
 # a cache for opened BigBed databases, primarily for collecting scores
 # caching here is only for local purposes of collecting scores
 # db_helper also provides caching of db objects but with option to force open in
 # the case of forking processes - we don't have that here
-
-# The true statement
-1;
 
 ### Collect BigBed scores only
 sub collect_bigbed_scores {
@@ -324,6 +327,8 @@ sub _get_bb {
 	}
 	return $bb;
 }
+
+1;
 
 __END__
 

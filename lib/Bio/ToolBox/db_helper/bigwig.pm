@@ -1,17 +1,22 @@
 package Bio::ToolBox::db_helper::bigwig;
 
-# modules
-require Exporter;
+use warnings;
 use strict;
 use Carp;
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
+require Exporter;
+
 our $VERSION = '1.51';
 
 # Exported names
 our @ISA    = qw(Exporter);
+
+## no critic
+## this is never intended to be used directly by end users
+## and exporting everything is required
 our @EXPORT = qw(
 	collect_bigwig_score
 	collect_bigwig_scores
@@ -22,6 +27,7 @@ our @EXPORT = qw(
 	open_bigwig_db
 	open_bigwigset_db
 );
+## use critic
 
 # Hash of Bigfile chromosomes
 our %BIGWIG_CHROMOS;
@@ -104,9 +110,6 @@ our %MULTI_SUMMARY_METHOD = (
 		croak "cannot calculate stddev value from multiple bigWig Summary objects!";
 	},
 );
-
-# The true statement
-1;
 
 ### Modules ###
 
@@ -529,6 +532,8 @@ sub _lookup_bigwigset_wigs {
 	$BIGWIGSET_WIGS{$lookup} = \@ids;
 	return \@ids;
 }
+
+1;
 
 __END__
 
