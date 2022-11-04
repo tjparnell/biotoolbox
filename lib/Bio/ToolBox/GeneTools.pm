@@ -1331,7 +1331,7 @@ sub _return_filtered_transcripts {
 	if ( ref $gene =~ /seqfeature/i ) {
 
 		# first check if we were only given a transcript
-		if ( $gene->primary_tag =~ /transcript|rna/i ) {
+		if ( $gene->primary_tag =~ /transcript | rna/xi ) {
 
 			# we must have been given a single transcript to check, so return it
 			$keepers->[0] ||= undef;

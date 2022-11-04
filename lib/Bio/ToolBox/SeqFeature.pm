@@ -199,7 +199,7 @@ sub source_tag {
 	if (@_) {
 		$self->[SRC] = $_[0];
 	}
-	return defined $self->[SRC] ? $self->[SRC] : '';
+	return defined $self->[SRC] ? $self->[SRC] : q();
 }
 
 sub type {

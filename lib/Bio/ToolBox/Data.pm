@@ -413,7 +413,7 @@ sub add_column {
 		};
 		$self->{data_table}->[0][$column] = $name->asString;
 	}
-	elsif ( $name_ref eq '' ) {
+	elsif ( $name_ref eq q() ) {
 
 		# just a name
 		$self->{$column} = {

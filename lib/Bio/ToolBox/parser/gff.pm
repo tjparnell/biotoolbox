@@ -89,7 +89,7 @@ sub open_file {
 }
 
 sub typelist {
-	return shift->{typelist} || '';
+	return shift->{typelist} || q();
 }
 
 sub next_feature {

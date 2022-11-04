@@ -30,7 +30,7 @@ sub new {
 		'feature'           => undef,
 		'feature_type'      => undef,
 		'db'                => undef,
-		'format'            => '',
+		'format'            => q(),
 		'gff'               => 0,
 		'bed'               => 0,
 		'ucsc'              => 0,
@@ -619,7 +619,7 @@ sub verify {
 			$self->{'filename'} =~ s/$ext/.txt/;
 			$self->{'extension'} = '.txt';
 			$self->{'ucsc'}      = 0;
-			$self->{'format'}    = '';
+			$self->{'format'}    = q();
 
 			# remove the AUTO key
 			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
@@ -672,7 +672,7 @@ sub verify {
 			# reset metadata
 			$self->{'vcf'}     = 0;
 			$self->{'headers'} = 1;
-			$self->{'format'}  = '';
+			$self->{'format'}  = q();
 
 			# remove the AUTO key from the metadata
 			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
@@ -719,7 +719,7 @@ sub verify {
 			$self->{'extension'} =~ s/sgr/txt/i;
 			$self->{'filename'}  =~ s/sgr/txt/i;
 			$self->{'headers'} = 1;
-			$self->{'format'}  = '';
+			$self->{'format'}  = q();
 
 			# remove the AUTO key from the metadata
 			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {

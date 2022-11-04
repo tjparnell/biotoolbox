@@ -61,7 +61,7 @@ sub new {
 		'share'         => 0,
 		'simplify'      => 0,
 		'source'        => undef,
-		'typelist'      => '',          # string list of observed feature types
+		'typelist'      => q(),         # string list of observed feature types
 		'seq_ids'       => {},          # hash of seq_id to length
 		'loaded'        => {},          # hash of primary_id to SeqFeature object
 		'top_features'  => [],          # list of top features

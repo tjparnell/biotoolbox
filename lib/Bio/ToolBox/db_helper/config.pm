@@ -76,8 +76,8 @@ sub add_database {
 	my %args = @_;
 
 	# check
-	croak "no name provided for new database configuration\n" unless ( $args{name} );
-	croak "no dsn provided for new database configuration\n"
+	croak 'no name provided for new database configuration' unless ( $args{name} );
+	croak 'no dsn provided for new database configuration'
 		unless ( $args{dsn} || $args{dsn_prefix} );
 
 	# check that we have config file to update

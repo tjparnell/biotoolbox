@@ -102,7 +102,7 @@ sub taste_file {
 		return ( 'vcf', $Taste->format );
 	}
 	elsif ( $Taste->format ) {
-		return ( '', $Taste->format );
+		return ( q(), $Taste->format );
 	}
 
 	# check if the number of columns match a known format, then verify
