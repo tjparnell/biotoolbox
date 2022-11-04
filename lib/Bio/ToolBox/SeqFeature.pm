@@ -561,7 +561,7 @@ sub gff_string {
 		next if $tag eq 'Parent';
 		my $value = $self->get_tag_values($tag);
 		if ( ref $value eq 'ARRAY' ) {
-			$value = join( ",", map { $self->_encode($_) } @$value );
+			$value = join( ",", map { $self->_encode($_) } @{ $value } );
 		}
 		else {
 			$value = $self->_encode($value);

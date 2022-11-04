@@ -642,7 +642,7 @@ sub _add_remaining_gtf_attributes {
 	my ( $self, $feature, $att ) = @_;
 	foreach my $key (
 		grep { !/transcript_id|transcript_name|gene_id|gene_name|exon_id/ }
-		keys %$att
+		keys %{ $att }
 		)
 	{
 		$feature->add_tag_value( $key, $att->{$key} );

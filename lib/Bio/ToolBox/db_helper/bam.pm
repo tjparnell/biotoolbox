@@ -153,7 +153,7 @@ sub collect_bam_scores {
 
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	for ( my $b = DATA; $b < scalar @$param; $b++ ) {
+	for ( my $b = DATA; $b < scalar @{ $param }; $b++ ) {
 
 		## Open the Bam File
 		my $bamfile = $param->[$b];
@@ -219,7 +219,7 @@ sub collect_bam_scores {
 
 			# convert the coverage data
 			# by default, this should return the coverage at 1 bp resolution
-			if ( scalar @$coverage ) {
+			if ( scalar @{ $coverage } ) {
 
 				# check whether we need to index the scores
 				if ( $param->[RETT] == 2 ) {
@@ -241,7 +241,7 @@ sub collect_bam_scores {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
-		return wantarray ? @$scores : $scores;
+		return wantarray ? @{ $scores } : $scores;
 	}
 }
 

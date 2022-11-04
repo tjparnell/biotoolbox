@@ -93,7 +93,7 @@ sub open_store_db {
 
 		# check for empty passwords
 		# config::simple passes an empty array when nothing was defined
-		if ( ref $pass eq 'ARRAY' and scalar @$pass == 0 ) { $pass = undef }
+		if ( ref $pass eq 'ARRAY' and scalar @{ $pass } == 0 ) { $pass = undef }
 
 		# set up the dsn
 		# it can be specifically defined
@@ -134,7 +134,7 @@ sub collect_store_scores {
 	my $param = shift;
 
 	# database feature types
-	my @types = splice( @$param, DATA );
+	my @types = splice( @{ $param }, DATA );
 
 	# set up iterator from database
 	my $iterator = $param->[DB]->get_seq_stream(
@@ -185,9 +185,9 @@ sub collect_store_scores {
 
 			# get the full list of features to pass off to the
 			# helper subroutine
-			push @$param, $feature;
+			push @{ $param }, $feature;
 			while ( my $f = $iterator->next_seq ) {
-				push @$param, $f;
+				push @{ $param }, $f;
 			}
 
 			# check that we have wiggle support

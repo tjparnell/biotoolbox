@@ -54,7 +54,7 @@ sub collect_bigbed_scores {
 	# usually there is only one, but for stranded data there may be
 	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	my @scores;
-	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 
 		# open the bedfile
 		my $bb = _get_bb( $param->[$d] );
@@ -125,7 +125,7 @@ sub collect_bigbed_position_scores {
 	# look at each bedfile
 	# usually there is only one, but there may be more
 	my %pos2data;
-	for ( my $i = DATA; $i < scalar @$param; $i++ ) {
+	for ( my $i = DATA; $i < scalar @{ $param }; $i++ ) {
 
 		# open the bedfile
 		my $bb = _get_bb( $param->[$i] );

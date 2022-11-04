@@ -32,45 +32,45 @@ my %DB_METHODS;              # cache for database score methods
 my %SCORE_CALCULATOR_SUB = (
 	'mean' => sub {
 		my $s = shift;
-		return sum0(@$s) / ( scalar(@$s) || 1 );
+		return sum0(@{ $s }) / ( scalar(@{ $s }) || 1 );
 	},
 	'sum' => sub {
 		my $s = shift;
-		return sum0(@$s);
+		return sum0(@{ $s });
 	},
 	'median' => sub {
 		my $s = shift;
-		return '.' unless scalar(@$s);
-		return median(@$s);
+		return '.' unless scalar(@{ $s });
+		return median(@{ $s });
 	},
 	'min' => sub {
 		my $s = shift;
-		return '.' unless scalar(@$s);
-		return min(@$s);
+		return '.' unless scalar(@{ $s });
+		return min(@{ $s });
 	},
 	'max' => sub {
 		my $s = shift;
-		return '.' unless scalar(@$s);
-		return max(@$s);
+		return '.' unless scalar(@{ $s });
+		return max(@{ $s });
 	},
 	'count' => sub {
 		my $s = shift;
-		return scalar(@$s);
+		return scalar(@{ $s });
 	},
 	'pcount' => sub {
 		my $s = shift;
-		return scalar(@$s);
+		return scalar(@{ $s });
 	},
 	'ncount' => sub {
 
 		# Convert names into unique counts
 		my $s = shift;
 		my %name2count;
-		foreach my $n (@$s) {
+		foreach my $n (@{ $s }) {
 			if ( ref $n eq 'ARRAY' ) {
 
 				# this is likely from a ncount indexed hash
-				foreach (@$n) {
+				foreach (@{ $n }) {
 					$name2count{$_} += 1;
 				}
 			}
@@ -84,16 +84,16 @@ my %SCORE_CALCULATOR_SUB = (
 
 		# the range value is 'min-max'
 		my $s = shift;
-		return '.' unless scalar(@$s);
-		return range(@$s);
+		return '.' unless scalar(@{ $s });
+		return range(@{ $s });
 	},
 	'stddev' => sub {
 
 		# we are using the standard deviation of the population,
 		# since these are the only scores we are considering
 		my $s = shift;
-		return '.' unless scalar(@$s);
-		return stddevp(@$s);
+		return '.' unless scalar(@{ $s });
+		return stddevp(@{ $s });
 	},
 	'rpm' => sub {
 		confess " The rpm methods have been deprecated due to complexity and "
@@ -1396,7 +1396,7 @@ sub get_chromosome_list {
 		my $chroms = $db->chroms();
 
 		my @list;
-		foreach ( values %$chroms ) {
+		foreach ( values %{ $chroms } ) {
 
 			# check for excluded chromosomes
 			next if ( defined $chr_exclude and $_->{name} =~ /$chr_exclude/i );
@@ -1791,7 +1791,7 @@ sub _lookup_db_method {
 	else {
 		confess "no recognizeable dataset provided!" unless $param->[DATA];
 		confess "no database passed!"                unless $param->[DB];
-		confess "something went wrong! parameters: @$param";
+		confess sprintf "something went wrong! parameters: %s", join ', ', @{ $param };
 	}
 
 	### Cache and return the results

@@ -1324,7 +1324,7 @@ sub copy_metadata {
 	delete $md->{name};
 	delete $md->{'index'};
 	delete $md->{'AUTO'} if exists $md->{'AUTO'};   # presume this is no longer auto index
-	foreach ( keys %$md ) {
+	foreach ( keys %{ $md } ) {
 		$self->{$target}{$_} = $md->{$_};
 	}
 	return 1;

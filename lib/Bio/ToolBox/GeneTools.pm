@@ -191,7 +191,7 @@ sub get_exons {
 sub get_alt_exons {
 	my $ac_exons = get_alt_common_exons(@_);
 	my @alts;
-	foreach my $k ( keys %$ac_exons ) {
+	foreach my $k ( keys %{ $ac_exons } ) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
 		push @alts, @{ $ac_exons->{$k} };
@@ -289,7 +289,7 @@ sub get_introns {
 sub get_alt_introns {
 	my $ac_introns = get_alt_common_introns(@_);
 	my @alts;
-	foreach my $k ( keys %$ac_introns ) {
+	foreach my $k ( keys %{ $ac_introns } ) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
 		push @alts, @{ $ac_introns->{$k} };
@@ -871,7 +871,7 @@ sub get_transcript_utr_length {
 	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
 	my $utrs  = get_utrs($transcript);
 	my $total = 0;
-	foreach my $utr (@$utrs) {
+	foreach my $utr (@{ $utrs }) {
 		$total += $utr->length;
 	}
 	return $total;
@@ -883,9 +883,9 @@ sub get_5p_utrs {
 
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
-	return unless scalar(@$utrs);
+	return unless scalar(@{ $utrs });
 
-	my @fivers = grep { $_->primary_tag =~ /5|five/i } @$utrs;
+	my @fivers = grep { $_->primary_tag =~ /5|five/i } @{ $utrs };
 	return wantarray ? @fivers : \@fivers;
 }
 
@@ -895,9 +895,9 @@ sub get_3p_utrs {
 
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
-	return unless scalar(@$utrs);
+	return unless scalar(@{ $utrs });
 
-	my @threes = grep { $_->primary_tag =~ /3|three/i } @$utrs;
+	my @threes = grep { $_->primary_tag =~ /3|three/i } @{ $utrs };
 	return wantarray ? @threes : \@threes;
 }
 
@@ -905,7 +905,7 @@ sub get_transcript_5p_utr_length {
 	my $transcript = shift;
 	my $utrs       = get_5p_utrs($transcript);
 	my $total      = 0;
-	foreach my $utr (@$utrs) {
+	foreach my $utr (@{ $utrs }) {
 		$total += $utr->length;
 	}
 	return $total;
@@ -915,7 +915,7 @@ sub get_transcript_3p_utr_length {
 	my $transcript = shift;
 	my $utrs       = get_3p_utrs($transcript);
 	my $total      = 0;
-	foreach my $utr (@$utrs) {
+	foreach my $utr (@{ $utrs }) {
 		$total += $utr->length;
 	}
 	return $total;
@@ -1126,7 +1126,7 @@ sub filter_transcript_support_level {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif ( ref $gene eq 'ARRAY' ) {
-		@transcripts = @$gene;
+		@transcripts = @{ $gene };
 	}
 	else {
 		return;
@@ -1207,7 +1207,7 @@ sub filter_transcript_gencode_basic {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif ( ref $gene eq 'ARRAY' ) {
-		@transcripts = @$gene;
+		@transcripts = @{ $gene };
 	}
 	else {
 		return;
@@ -1239,7 +1239,7 @@ sub filter_transcript_biotype {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif ( ref $gene eq 'ARRAY' ) {
-		@transcripts = @$gene;
+		@transcripts = @{ $gene };
 	}
 	else {
 		return;

@@ -15,7 +15,7 @@ sub new {
 	# may not be the best or accurate method, but it generally works for valid formats
 
 	### Extended Gene Prediction Table ###
-	if ( scalar @$linedata == 16 ) {
+	if ( scalar @{ $linedata } == 16 ) {
 
 		# an extended gene prediction table, e.g. refGene, ensGene, xenoRefGene
 		# as downloaded from the UCSC Table Browser or FTP site
@@ -63,7 +63,7 @@ sub new {
 		}
 	}
 	### Extended Gene Prediction Table ###
-	elsif ( scalar @$linedata == 15 ) {
+	elsif ( scalar @{ $linedata } == 15 ) {
 
 		# an extended gene prediction table, e.g. refGene, ensGene, xenoRefGene
 		# without the bin value
@@ -109,7 +109,7 @@ sub new {
 		}
 	}
 	### Known Gene Table ###
-	elsif ( scalar @$linedata == 12 ) {
+	elsif ( scalar @{ $linedata } == 12 ) {
 
 # 0 name	known gene identifier
 # 1 chrom	Reference sequence chromosome or scaffold
@@ -151,7 +151,7 @@ sub new {
 			$ucsc->{kgxref}->{ $linedata->[0] }->[5] || undef;    # NCBI protein accession
 	}
 	### refFlat or Gene Prediction Table ###
-	elsif ( scalar @$linedata == 11 ) {
+	elsif ( scalar @{ $linedata } == 11 ) {
 
 		# 0  name2 or gene name
 		# 1  name or transcript name
@@ -190,7 +190,7 @@ sub new {
 		}
 	}
 	### Gene Prediction Table ###
-	elsif ( scalar @$linedata == 10 ) {
+	elsif ( scalar @{ $linedata } == 10 ) {
 
 		# a simple gene prediction table, e.g. refGene, ensGene, xenoRefGene
 
@@ -228,7 +228,7 @@ sub new {
 	}
 	else {
 		# unrecognized line format
-		carp "unrecognized format, line has " . scalar @$linedata . "elements";
+		carp "unrecognized format, line has " . scalar @{ $linedata } . "elements";
 		return;
 	}
 
@@ -400,7 +400,7 @@ sub build_gene {
 		# same gene name, but located on opposite ends of the chromosome
 		# part of a gene family, but unlikely the same gene 200 Mb in
 		# length
-		foreach my $g (@$genes) {
+		foreach my $g (@{ $genes }) {
 			if (
 				# overlap method borrowed from Bio::RangeI
 				$g->seq_id eq $self->chrom

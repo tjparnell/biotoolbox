@@ -38,7 +38,7 @@ sub collect_wig_scores {
 	return unless $wig_data;
 
 	# return the values
-	my @values = values %$wig_data;
+	my @values = values %{ $wig_data };
 	return wantarray ? @values : \@values;
 }
 
@@ -52,7 +52,7 @@ sub collect_wig_position_scores {
 	# usually there is only one, but for stranded data there may be
 	# two wigfiles (+ and -), so we'll check each wig file for strand info
 	my %pos2score;    # position => score
-	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 
 		my $feature = $param->[$d];
 		confess "dataset is not a seqfeature object!"

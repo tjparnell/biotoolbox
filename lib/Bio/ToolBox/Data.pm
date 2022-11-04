@@ -374,7 +374,7 @@ sub add_column {
 		if ( $self->last_row > 1 ) {
 
 			# table has existing data beyond column headers
-			if ( $self->last_row == ( scalar @$name - 1 ) ) {
+			if ( $self->last_row == ( scalar @{ $name } - 1 ) ) {
 
 				# same number of elements, add it the table
 				$self->{$column} = {
@@ -397,10 +397,10 @@ sub add_column {
 				'name'  => $name->[0],
 				'index' => $column,
 			};
-			for ( my $i = 0; $i < scalar @$name; $i++ ) {
+			for ( my $i = 0; $i < scalar @{ $name }; $i++ ) {
 				$self->value( $i, $column, $name->[$i] );
 			}
-			$self->{last_row} = scalar @$name - 1;
+			$self->{last_row} = scalar @{ $name } - 1;
 			$self->{headers}  = 1;    # boolean to indicate the table now has headers
 		}
 	}

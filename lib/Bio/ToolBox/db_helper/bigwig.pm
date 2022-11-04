@@ -72,7 +72,7 @@ our %MULTI_SUMMARY_METHOD = (
 		return unless $summaries->[0];
 		my $sum   = 0;
 		my $count = 0;
-		foreach my $s (@$summaries) {
+		foreach my $s (@{ $summaries }) {
 			$sum   += $s->{sumData};
 			$count += $s->{validCount};
 		}
@@ -82,7 +82,7 @@ our %MULTI_SUMMARY_METHOD = (
 		my $summaries = shift;
 		return 0 unless $summaries->[0];
 		my $sum = 0;
-		foreach my $s (@$summaries) {
+		foreach my $s (@{ $summaries }) {
 			$sum += $s->{sumData};
 		}
 		return $sum;
@@ -90,18 +90,18 @@ our %MULTI_SUMMARY_METHOD = (
 	'min' => sub {
 		my $summaries = shift;
 		return unless $summaries->[0];
-		return min( map { $_->{minVal} } @$summaries );
+		return min( map { $_->{minVal} } @{ $summaries } );
 	},
 	'max' => sub {
 		my $summaries = shift;
 		return unless $summaries->[0];
-		return max( map { $_->{maxVal} } @$summaries );
+		return max( map { $_->{maxVal} } @{ $summaries } );
 	},
 	'count' => sub {
 		my $summaries = shift;
 		return 0 unless $summaries->[0];
 		my $count = 0;
-		foreach my $s (@$summaries) {
+		foreach my $s (@{ $summaries }) {
 			$count += $s->{validCount};
 		}
 		return $count;
@@ -126,7 +126,7 @@ sub collect_bigwig_score {
 	# Walk through each requested feature
 	# There is likely only one
 	my @summaries;
-	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 		my $bw = _get_bw( $param->[$d] );
 
 		# first check that the chromosome is present
@@ -158,7 +158,7 @@ sub collect_bigwig_scores {
 	# Walk through each requested feature
 	# There is likely only one
 	my @scores;
-	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 
 		# open db object
 		my $bw = _get_bw( $param->[$d] );
@@ -198,7 +198,7 @@ sub collect_bigwig_position_scores {
 
 	# Walk through each requested feature
 	# There is likely only one
-	for ( my $d = DATA; $d < scalar @$param; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 
 		# Open the BigWig file
 		my $bw = _get_bw( $param->[$d] );
@@ -260,8 +260,8 @@ sub collect_bigwigset_score {
 
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
-	return unless scalar(@$ids) > 0;
-	push @$param, @$ids;
+	return unless scalar(@{ $ids }) > 0;
+	push @{ $param }, @{ $ids };
 
 	# use the low level single bigWig API
 	return collect_bigwig_score($param);
@@ -275,8 +275,8 @@ sub collect_bigwigset_scores {
 
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
-	return unless scalar(@$ids) > 0;
-	push @$param, @$ids;
+	return unless scalar(@{ $ids }) > 0;
+	push @{ $param }, @{ $ids };
 
 	# use the low level single bigWig API
 	return collect_bigwig_scores($param);
@@ -290,8 +290,8 @@ sub collect_bigwigset_position_scores {
 
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
-	return unless scalar(@$ids) > 0;
-	push @$param, @$ids;
+	return unless scalar(@{ $ids }) > 0;
+	push @{ $param }, @{ $ids };
 
 	# use the low level single bigWig API
 	return collect_bigwig_position_scores($param);
@@ -352,7 +352,7 @@ sub open_bigwigset_db {
 	# of -1, 0, 1 gets messed up with regex matching, so we'll silently
 	# use minus, none, and plus as strand attribute values
 	my $md = $bws->metadata;
-	foreach my $i ( keys %$md ) {
+	foreach my $i ( keys %{ $md } ) {
 		my $f = $md->{$i}{dbid};    # the file path
 		if ( $f =~ /(?:f|for|forward|top|plus|\+)\.bw$/i ) {
 
@@ -426,12 +426,12 @@ sub _process_summaries {
 	my ( $method, $summaries ) = @_;
 
 	# calculate a value based on the number of summary features
-	if ( scalar @$summaries == 1 ) {
+	if ( scalar @{ $summaries } == 1 ) {
 
 		# great! only one summary returned
 		return &{ $ONE_SUMMARY_METHOD{$method} }( $summaries->[0] );
 	}
-	elsif ( scalar @$summaries > 1 ) {
+	elsif ( scalar @{ $summaries } > 1 ) {
 
 		# more than one summary
 		return &{ $MULTI_SUMMARY_METHOD{$method} }($summaries);
@@ -473,7 +473,7 @@ sub _lookup_bigwigset_wigs {
 	my $param = shift;
 
 	# the datasets, could be either types or names, unfortunately
-	my @types = splice( @$param, DATA );
+	my @types = splice( @{ $param }, DATA );
 
 	# we cache the list of looked up bigwigs to avoid doing this over and over
 	my $lookup =

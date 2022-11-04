@@ -297,7 +297,7 @@ sub write_row {
 	elsif ( $data_ref eq 'ARRAY' ) {
 
 		# user passed an array of values
-		$self->{fh}->print( join( "\t", @$data ), "\n" );
+		$self->{fh}->print( join( "\t", @{ $data } ), "\n" );
 	}
 	else {
 		# assume the passed data is a string
