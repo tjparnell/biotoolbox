@@ -33,7 +33,7 @@ sub parse_list {
 
 	my $string = shift;
 	return unless defined $string;
-	if ( $string =~ /[^\d,\-\s\&]/ ) {
+	if ( $string =~ /[^\d,\-\s\&]/x ) {
 		carp ' the string contains characters that cannot be parsed';
 		return;
 	}
@@ -66,12 +66,12 @@ sub format_with_commas {
 
 	# check number
 	my ( $integers, $decimals, $sign );
-	if ( $number =~ /^(\-)?(\d+)\.(\d+)$/ ) {
+	if ( $number =~ m/^ (\-)? (\d+) \. (\d+) $/x ) {
 		$sign     = $1;
 		$integers = $2;
 		$decimals = $3;
 	}
-	elsif ( $number =~ /^(\-)?(\d+)$/ ) {
+	elsif ( $number =~ m/^ (\-)? (\d+) $/x ) {
 		$sign     = $1;
 		$integers = $2;
 	}
@@ -107,7 +107,7 @@ sub format_with_commas {
 sub ask_user_for_index {
 	my $Data = shift;
 	my $line = shift || ' Enter the desired column index   ';
-	unless ( ref $Data =~ /Bio::ToolBox::Data/ ) {
+	unless ( ref $Data =~ /Bio::ToolBox::Data/x ) {
 		carp 'Must pass a Bio::ToolBox::Data object!';
 		return;
 	}
@@ -155,7 +155,7 @@ sub simplify_dataset_name {
 	my $new_name;
 
 	# strip any file prefix
-	$dataset =~ s/^(?:file|http|ftp):\/*//;
+	$dataset =~ s/^(?: file | http | ftp ):\/*//x;
 
 	if ( $dataset =~ /&/ ) {
 
@@ -178,14 +178,14 @@ sub simplify_dataset_name {
 
 		# remove any known file extensions
 		$new_name =~
-s/\.(?:bw|bam|bb|useq|bigwig|bigbed|g[tf]f3?|cram|wig|bdg|bedgraph)(?:\.gz)?$//i;
+s/\. (?: bw | bam | bb | useq | bigwig | bigbed | g[tf]f3? | cram | wig | bdg | bedgraph ) (?:\.gz)? $//xi;
 
 		# remove common non-useful stuff
 		# trying to imagine all sorts of possible things
 		$new_name =~
-s/[_\.\-](?:sort|sorted|dedup|dedupe|deduplicated|rmdup|mkdup|markdup|dup|unique|filt|filtered)\b//gi;
+s/[_\.\-] (?: sort | sorted | dedup | dedupe | deduplicated | rmdup | mkdup | markdup | dup | unique | filt | filtered ) \b //xgi;
 		$new_name =~
-s/[_\.\-](?:coverage|rpm|ext\d*|extend\d*|log2fe|log\d+|qvalue|fragment|count|lambda_control|fe|fold.?enrichment|ratio|log\d*ratio)\b//gi;
+s/[_\.\-] (?: coverage | rpm | ext\d* | extend\d* | log2fe | log\d+ | qvalue | fragment | count | lambda_control | fe | fold.?enrichment | ratio | log\d*ratio ) \b //xgi;
 	}
 	return $new_name;
 }
@@ -212,27 +212,27 @@ sub sane_chromo_sort {
 		}
 
 		# identify the type of chromosome name to sort
-		if ( $name =~ /^(?:chr)?([wxyz])$/i ) {
+		if ( $name =~ m/^ (?:chr)? ( [wxyz] ) $/xi ) {
 
 			# sex chromosomes
 			push @sex, [ $1, $c ];
 		}
-		elsif ( $name =~ /^(?:chr)?(?:m|mt|mito)(?:dna)?$/i ) {
+		elsif ( $name =~ m/^ (?:chr)? (?: m | mt | mito ) (?:dna)? $/xi ) {
 
 			# mitochondrial
 			push @mito, [ $name, $c ];
 		}
-		elsif ( $name =~ /^(?:chr)?(\d+)$/i ) {
+		elsif ( $name =~ m/^ (?:chr)? (\d+) $/xi ) {
 
 			# standard numeric chromosome
 			push @numeric, [ $1, $c ];
 		}
-		elsif ( $name =~ /^(?:chr)?([IVX]+)$/ ) {
+		elsif ( $name =~ m/^ (?:chr)? ( [IVX]+ ) $/x ) {
 
 			# Roman numerals - silly Saccharomyces cerevisiae
 			push @romanic, [ $1, $c ];
 		}
-		elsif ( $name =~ /^([a-zA-Z_\-\.]+)(\d+)/ ) {
+		elsif ( $name =~ m/^ ( [a-zA-Z_\-\.]+ ) (\d+)/x ) {
 
 			# presumed contigs and such?
 			push @mixed, [ $1, $2, $name, $c ];

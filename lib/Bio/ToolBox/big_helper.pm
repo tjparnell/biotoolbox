@@ -91,18 +91,18 @@ sub wig_to_bigwig_conversion {
 	# Generate the bw file name
 	# we can substitute one of three possible names for bw
 	my $bw_file = $args{wig};
-	$bw_file =~ s/\.(?:bed|bdg|bedgraph|wig)$/.bw/;
+	$bw_file =~ s/\.(?: bed | bdg | bedgraph | wig) $/.bw/x;
 
 	# Generate the bigwig file
 	printf " converting %s to bigWig....\n", $args{wig};
-	if ( $args{bwapppath} =~ /wigToBigWig$/ ) {
+	if ( $args{bwapppath} =~ /wigToBigWig$/x ) {
 
 		# include the -clip option in case there are any positions
 		# out of bounds of the chromosome
 		# it will just warn instead of fail
 		system $args{bwapppath}, '-clip', $args{wig}, $args{chromo}, $bw_file;
 	}
-	elsif ( $args{bwapppath} =~ /bedGraphToBigWig$/ ) {
+	elsif ( $args{bwapppath} =~ /bedGraphToBigWig$/x ) {
 
 		# this doesn't have the -clip option, too bad
 		system $args{bwapppath}, $args{wig}, $args{chromo}, $bw_file;
@@ -115,7 +115,7 @@ sub wig_to_bigwig_conversion {
 	if ( -e $bw_file and -s $bw_file ) {
 
 		# conversion successful
-		if ( $args{chromo} =~ /^chr_sizes_\w{5}/ ) {
+		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
 
 			# we no longer need our temp chromosome file
 			unlink $args{chromo};
@@ -129,7 +129,7 @@ sub wig_to_bigwig_conversion {
 			# 0-byte file was created
 			unlink $bw_file;
 		}
-		if ( $args{chromo} =~ /^chr_sizes_\w{5}/ ) {
+		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
 
 			# leave the temp chromosome file as a courtesy
 			warn " Leaving temporary chromosome file '$args{chromo}'\n";
@@ -241,7 +241,7 @@ sub open_bigwig_to_wig_fh {
 		# try checking the system path
 		$args{bwapppath} = which('bigWigToWig') || which('bigWigToBedGraph');
 	}
-	unless ( $args{bwapppath} =~ /bigWigTo(?:Wig|BedGraph)$/ ) {
+	unless ( $args{bwapppath} =~ /bigWigTo(?: Wig | BedGraph)$/x ) {
 		carp " Utility 'bigWigToWig' not specified and can not be found!\n";
 		return;
 	}
@@ -326,7 +326,7 @@ sub bed_to_bigbed_conversion {
 	if ( -e $bb_file and -s $bb_file ) {
 
 		# conversion successful
-		if ( $args{chromo} =~ /^chr_sizes_\w{5}/ ) {
+		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
 
 			# we no longer need our temp chromosome file
 			unlink $args{chromo};
@@ -340,7 +340,7 @@ sub bed_to_bigbed_conversion {
 			# 0-byte file was created
 			unlink $bb_file;
 		}
-		if ( $args{chromo} =~ /^chr_sizes_\w{5}/ ) {
+		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
 
 			# leave the temp chromosome file as a courtesy
 			print STDERR " Leaving temporary chromosome file '$args{chromo}'\n";

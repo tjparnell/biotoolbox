@@ -11,7 +11,7 @@ our $VERSION = '1.70';
 
 # List of acceptable filename extensions
 our $SUFFIX =
-qr/\.(?:txt|gff3?|gtf|bed|bg|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|gappedpeak|reff?lat|genepred|ucsc|maf)(?:\.gz|\.bz2)?/i;
+qr/\.(?: txt | gff3? | gtf | bed | bg | bdg | bedgraph | sgr | kgg | cdt | vcf | narrowpeak | broadpeak | gappedpeak | reff?lat | genepred | ucsc | maf) (?: \.gz | \.bz2 )?/xi;
 
 # gzip application
 my $gzip_app;
@@ -202,7 +202,7 @@ sub taste_file {
 
 sub sample_gff_type_list {
 	my ( $self, $file ) = @_;
-	return unless $file =~ /\.g[tf]f\d?(?:\.gz)?$/i;    # assume extension is accurate
+	return unless $file =~ m/\.g[tf]f\d? (?:\.gz)? $/xi;    # assume extension is accurate
 	my $fh = $self->open_to_read_fh($file) or die "can't open $file!\n";
 	my %types;
 	my $count = 0;
@@ -276,28 +276,28 @@ sub parse_headers {
 		}
 
 		# the generating program
-		elsif ( $line =~ m/^# Program (.+)$/ ) {
+		elsif ( $line =~ m/^#\ Program\ (.+)$/x ) {
 			my $p = $1;
 			$self->program($p);
 			$header_line_count++;
 		}
 
 		# the source database
-		elsif ( $line =~ m/^# Database (.+)$/ ) {
+		elsif ( $line =~ m/^#\ Database\ (.+)$/x ) {
 			my $d = $1;
 			$self->database($d);
 			$header_line_count++;
 		}
 
 		# the type of feature in this datafile
-		elsif ( $line =~ m/^# Feature (.+)$/ ) {
+		elsif ( $line =~ m/^#\ Feature\ (.+)$/x ) {
 			my $f = $1;
 			$self->feature($f);
 			$header_line_count++;
 		}
 
 		# column or dataset specific information
-		elsif ( $line =~ m/^# Column_(\d+)/ ) {
+		elsif ( $line =~ m/^#\ Column_(\d+)/x ) {
 
 			# the column number will become the index number
 			my $index = $1;
@@ -306,7 +306,7 @@ sub parse_headers {
 		}
 
 		# gff version header
-		elsif ( $line =~ /^##(g[vf]f).version\s+([\d\.]+)$/ ) {
+		elsif ( $line =~ m/^## (g[vf]f) . version\s+ ( [\d\.]+ )$/x ) {
 
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
@@ -334,7 +334,7 @@ sub parse_headers {
 		}
 
 		# VCF version header
-		elsif ( $line =~ /^##fileformat=VCFv([\d\.]+)$/ ) {
+		elsif ( $line =~ m/^## fileformat=VCFv ( [\d\.]+ )$/x ) {
 
 			# store the VCF version in the hash
 			# this may or may not be present in the vcf file, but want to keep
@@ -353,7 +353,7 @@ sub parse_headers {
 		}
 
 		# a track or browser line
-		elsif ( $line =~ /^(?:track|browser)\s+/i ) {
+		elsif ( $line =~ m/^(?: track | browser )\s+/xi ) {
 
 			# common with wig, bed, or bedgraph files for use with UCSC genome browser
 			# treat as a comment line, there's not that much useful info here
@@ -389,30 +389,30 @@ sub parse_headers {
 			my $format = $self->format || $self->extension;
 
 			### a GFF file
-			if ( $format =~ /g[tvf]f/i ) {
+			if ( $format =~ m/g[tvf]f/i ) {
 				$self->add_gff_metadata;
 			}
 
 			### a peak file
-			elsif ( $format =~ /peak/i ) {
+			elsif ( $format =~ m/peak/i ) {
 				my $count = scalar( split /\t/, $line );
 				$self->add_peak_metadata($count);
 			}
 
 			### a Bed or BedGraph file
-			elsif ( $format =~ /bg|bdg|bed/i ) {
+			elsif ( $format =~ m/bg|bdg|bed/i ) {
 				my $count = scalar( split /\t/, $line );
 				$self->add_bed_metadata($count);
 			}
 
 			### a UCSC gene table
-			elsif ( $format =~ /ref+lat|genepred|ucsc/i ) {
+			elsif ( $format =~ m/(?: ref+lat | genepred | ucsc )/xi ) {
 				my $count = scalar( split /\t/, $line );
 				$self->add_ucsc_metadata($count);
 			}
 
 			### a SGR file
-			elsif ( $format =~ /sgr/i ) {
+			elsif ( $format =~ m/sgr/i ) {
 				$self->add_sgr_metadata;
 			}
 
@@ -541,9 +541,9 @@ sub add_file_metadata {
 	unless ($extension) {
 
 		# look for a nonstandard extension, allowing for .gz extension
-		if ( $filename =~ /(\.\w+(?:\.gz)?)$/i ) {
+		if ( $filename =~ m/( \.\w+ (?:\.gz)? )$/xi ) {
 			$extension = $1;
-			$basename =~ s/$extension\Z//;
+			$basename =~ s/$extension\Z//x;
 		}
 	}
 	$self->{filename}  = $filename;
@@ -597,7 +597,7 @@ sub write_file {
 			}
 		}
 	}
-	elsif ( $extension =~ /bedgraph|bed|bdg|narrowpeak|broadpeak/i ) {
+	elsif ( $extension =~ m/(?: bedgraph | bed | bdg | narrowpeak | broadpeak )/xi ) {
 		if ( not $self->bed ) {
 
 			# let's set it to true and see if it passes verification
@@ -636,7 +636,7 @@ sub write_file {
 			$extension = $self->{'extension'};
 		}
 	}
-	elsif ( $extension =~ /reff?lat|genepred|ucsc/i ) {
+	elsif ( $extension =~ m/(?: reff?lat | genepred | ucsc )/xi ) {
 		if ( $self->ucsc != $self->number_columns ) {
 
 			# it's not set as a ucsc data
@@ -701,13 +701,13 @@ sub write_file {
 		elsif ( $self->vcf ) {
 			$extension = '.vcf';
 		}
-		elsif ( $name =~ /(\.\w{3}(?:\.gz)?)$/i ) {
+		elsif ( $name =~ m/( \.\w{3} (?:\.gz)? )$/xi ) {
 
 			# a non-standard 3 letter file extension
 			# anything else might be construed as part of the filename, so run the
 			# risk of adding a default extension below
 			$extension = $1;
-			$name =~ s/$extension\Z//;
+			$name =~ s/$extension\Z//x;
 		}
 		elsif ( $self->extension ) {
 
@@ -718,7 +718,7 @@ sub write_file {
 			if ( $self->extension =~ /g[tf]f/i ) {
 				$extension = $self->gff ? $self->extension : '.txt';
 			}
-			elsif ( $self->extension =~ /bed|bdg|peak/i ) {
+			elsif ( $self->extension =~ m/(?: bed | bdg | peak )/xi ) {
 				$extension = $self->bed ? $self->extension : '.txt';
 			}
 			else {
@@ -845,7 +845,7 @@ sub write_file {
 			or $self->bed
 			or $self->ucsc
 			or $self->vcf
-			or $extension =~ m/sgr|kgg|cdt|peak/i )
+			or $extension =~ m/(?: sgr | kgg | cdt | peak )/xi )
 		{
 			# we only write these for normal text files, not defined format files
 
@@ -907,7 +907,7 @@ sub write_file {
 				# these are so simple it's not worth writing them
 				next;
 			}
-			elsif ( $extension =~ /sgr|kgg|cdt/i or $self->ucsc or $self->vcf ) {
+			elsif ( $extension =~ m/(?: sgr | kgg | cdt )/xi or $self->ucsc or $self->vcf ) {
 
 				# these do not support metadata lines
 				next;
@@ -989,7 +989,7 @@ sub save {
 sub open_to_read_fh {
 	my $self = shift;
 	my $file = shift || undef;
-	my $obj  = ref $self =~ /^Bio::ToolBox/ ? 1 : 0;
+	my $obj  = ref $self =~ /^Bio::ToolBox/x ? 1 : 0;
 
 	# check file
 	if ( not $file and $obj ) {
@@ -1049,7 +1049,7 @@ sub open_to_write_fh {
 
 		# look at filename extension as a clue
 		# in case we're overwriting the input file, keep the zip status
-		if ( $filename =~ m/\.vcf(\.gz)?$/i ) {
+		if ( $filename =~ m/\.vcf (\.gz)? $/xi ) {
 			$gz = 2;    # bgzip
 		}
 		elsif ( $filename =~ m/\.gz$/i ) {
@@ -1186,12 +1186,12 @@ sub add_column_metadata {
 
 	# strip the Column metadata identifier
 	chomp $line;
-	$line =~ s/^# Column_\d+ //;
+	$line =~ s/^#\ Column_\d+\ //x;
 
 	# break up the column metadata
 	my %temphash;    # a temporary hash to put the column metadata into
-	foreach ( split /;/, $line ) {
-		my ( $key, $value ) = split '=';
+	foreach my $pair ( split /;/, $line ) {
+		my ( $key, $value ) = split /=/, $pair;
 		if ( $key eq 'index' ) {
 			if ( $index != $value ) {
 
@@ -1324,7 +1324,7 @@ sub add_bed_metadata {
 
 	# check bed type and set metadata appropriately
 	my $bed_names;
-	if ( $self->format =~ /bedgraph/i or $self->extension =~ /bg|bdg|graph/i ) {
+	if ( $self->format =~ /bedgraph/i or $self->extension =~ m/(?: bg | bdg | graph )/xi ) {
 
 		# bedGraph format, enforce uniformity
 		$self->format('bedGraph');    # possibly redundant

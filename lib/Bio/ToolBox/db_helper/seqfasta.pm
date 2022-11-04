@@ -56,7 +56,7 @@ sub open_store_db {
 	# by checking for an extension
 
 	# GFF3 file to be loaded into memory
-	if ( $database =~ /\.gff3?(?:\.gz)?$/i ) {
+	if ( $database =~ m/\.gff3? (?:\.gz)? $/xi ) {
 
 		# gff3 file can be gzipped
 		# this might take a while, so print a statement
@@ -69,7 +69,7 @@ sub open_store_db {
 		};
 	}
 
-	elsif ( $database =~ /\.(?:db|sqlite)$/i ) {
+	elsif ( $database =~ m/\. (?: db | sqlite )$/xi ) {
 		eval {
 			$db = Bio::DB::SeqFeature::Store->new(
 				-adaptor => 'DBI::SQLite',

@@ -126,10 +126,10 @@ sub get_exons {
 		if ( $type =~ /exon/i ) {
 			push @exons, $subfeat;
 		}
-		elsif ( $type =~ /cds|utr|untranslated/i ) {
+		elsif ( $type =~ m/(?: cds | utr | untranslated )/xi ) {
 			push @cdss, $subfeat;
 		}
-		elsif ( $type =~ /rna|transcript/i ) {
+		elsif ( $type =~ m/(?: rna | transcript )/xi ) {
 			push @transcripts, $subfeat;
 		}
 	}
@@ -398,15 +398,15 @@ sub get_transcripts {
 	my $gene = shift;
 	return                             unless $gene;
 	confess 'not a SeqFeature object!' unless ref $gene =~ /seqfeature/i;
-	return $gene if ( $gene->primary_tag =~ /rna|transcript/i );
+	return $gene if ( $gene->primary_tag =~ m/rna | transcript/xi );
 	my @transcripts;
 	my @exons;
 	my @other;
 	foreach my $subf ( $gene->get_SeqFeatures ) {
-		if ( $subf->primary_tag =~ /rna|transcript|\bprocessed/i ) {
+		if ( $subf->primary_tag =~ m/(?: rna | transcript | \bprocessed )/xi ) {
 			push @transcripts, $subf;
 		}
-		elsif ( $subf->primary_tag =~ /^(?:cds|exon|\w+codon)$/i ) {
+		elsif ( $subf->primary_tag =~ m/^(?: cds | exon | \w+codon )$/xi ) {
 			push @exons, $subf;
 		}
 		else {
@@ -570,18 +570,18 @@ sub is_coding {
 		return $code_potential;
 	}
 	return 1 if $transcript->primary_tag =~ /mrna/i;              # assumption
-	return 1 if $transcript->source      =~ /protein.?coding/i;
+	return 1 if $transcript->source      =~ m/protein .? coding/xi;
 	if ( $transcript->has_tag('transcript_biotype') ) {
 
 		# ensembl type GTFs
 		my ($biotype) = $transcript->get_tag_values('transcript_biotype');
-		return $biotype =~ /protein.?coding/i ? 1 : 0;
+		return $biotype =~ m/protein .? coding/xi ? 1 : 0;
 	}
 	elsif ( $transcript->has_tag('biotype') ) {
 
 		# ensembl type GFFs
 		my ($biotype) = $transcript->get_tag_values('biotype');
-		return $biotype =~ /protein.?coding/i ? 1 : 0;
+		return $biotype =~ m/protein .? coding/xi ? 1 : 0;
 	}
 	elsif ( $transcript->has_tag('gene_biotype') ) {
 
@@ -589,7 +589,7 @@ sub is_coding {
 		# must be careful here, gene_biotype of course pertains to gene,
 		# and not necessarily this particular transcript
 		my ($biotype) = $transcript->get_tag_values('gene_biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
+		return 1 if $biotype =~ m/protein .? coding/xi;
 	}
 	foreach ( $transcript->get_SeqFeatures ) {
 
@@ -671,7 +671,7 @@ sub get_start_codon {
 
 	# look for existing one
 	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
-		$start_codon = $subfeat if $subfeat->primary_tag =~ /start.?codon/i;
+		$start_codon = $subfeat if $subfeat->primary_tag =~ m/start .? codon/xi;
 	}
 	return $start_codon if $start_codon;
 
@@ -712,7 +712,7 @@ sub get_stop_codon {
 
 	# look for existing one
 	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
-		$stop_codon = $subfeat if $subfeat->primary_tag =~ /stop.?codon/i;
+		$stop_codon = $subfeat if $subfeat->primary_tag =~ m/stop .? codon/xi;
 	}
 	return $stop_codon if $stop_codon;
 
@@ -765,10 +765,10 @@ sub get_utrs {
 		elsif ( $type =~ /cds/i ) {
 			push @cdss, $subfeat;
 		}
-		elsif ( $type =~ /utr|untranslated/i ) {
+		elsif ( $type =~ m/utr | untranslated/xi ) {
 			push @utrs, $subfeat;
 		}
-		elsif ( $type =~ /rna|transcript/i ) {
+		elsif ( $type =~ m/rna | transcript/xi ) {
 			push @transcripts, $subfeat;
 		}
 	}
@@ -1029,7 +1029,7 @@ sub ucsc_string {
 			push @ucsc_list, $ucsc if $ucsc;
 		}
 	}
-	elsif ( $feature->primary_tag =~ /rna|transcript/i ) {
+	elsif ( $feature->primary_tag =~ m/rna | transcript/xi ) {
 
 		# some sort of RNA transcript
 		my $ucsc = _process_ucsc_transcript($feature);
@@ -1074,7 +1074,7 @@ sub bed_string {
 			push @ucsc_list, $ucsc if $ucsc;
 		}
 	}
-	elsif ( $feature->primary_tag =~ /rna|transcript/i ) {
+	elsif ( $feature->primary_tag =~ m/rna | transcript/xi ) {
 
 		# some sort of RNA transcript
 		my $ucsc = _process_ucsc_transcript($feature);

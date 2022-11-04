@@ -101,16 +101,16 @@ sub load_extra_data {
 	}
 
 	# check the type
-	if ( $type =~ /ensembltogene|ensname/i ) {
+	if ( $type =~ m/ensembltogene | ensname/xi ) {
 		$type = 'ensembltogene';
 	}
-	elsif ( $type =~ /ensemblsource|enssrc/i ) {
+	elsif ( $type =~ m/ensemblsource | enssrc/xi ) {
 		$type = 'ensemblsource';
 	}
-	elsif ( $type =~ /refseqstat|status/i ) {
+	elsif ( $type =~ m/refseqstat | status/xi ) {
 		$type = 'refseqstat';
 	}
-	elsif ( $type =~ /refseqsum|summary/i ) {
+	elsif ( $type =~ m/refseqsum | summary/xi ) {
 		$type = 'refseqsum';
 	}
 	elsif ( $type =~ /kgxref/i ) {

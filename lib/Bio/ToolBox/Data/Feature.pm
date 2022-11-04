@@ -335,7 +335,7 @@ sub _strand {
 
 sub _from_coordinate_string {
 	my ( $self, $i ) = shift;
-	my ( $chr, $start, $end, $str ) = split /(?:\-|\.\.|\s)/, $self->value($i);
+	my ( $chr, $start, $end, $str ) = split m/(?: \- | \.\. | \s )/x, $self->value($i);
 	$self->{seqid} = $chr   unless exists $self->{seqid};
 	$self->{start} = $start unless exists $self->{start};
 
@@ -530,7 +530,7 @@ sub gff_attributes {
 
 		# unescape URL encoded values, borrowed from Bio::DB::GFF
 		$value =~ tr/+/ /;
-		$value =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
+		$value =~ s/%( [0-9 a-f A-F]{2} )/chr hex($1)/xge;
 		$self->{attributes}->{$tag} = $value;
 	}
 	return $self->{attributes};
@@ -589,15 +589,15 @@ sub rewrite_gff_attributes {
 	}
 	if ( exists $self->{attributes}{Name} ) {
 		my $name = $self->{attributes}{Name};
-		$name =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		$name =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X",ord($1))/xge;
 		push @pairs, "Name=$name";
 	}
 	foreach my $key ( sort { $a cmp $b } keys %{ $self->{attributes} } ) {
 		next if $key eq 'ID';
 		next if $key eq 'Name';
 		my $value = $self->{attributes}{$key};
-		$key   =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
-		$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		$key   =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X",ord($1))/xge;
+		$value =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X",ord($1))/xge;
 		push @pairs, "$key=$value";
 	}
 	$self->value( 8, join( '; ', @pairs ) );
@@ -1585,9 +1585,9 @@ sub gff_string {
 	if ( exists $args{attributes} and ref( $args{attributes} ) eq 'ARRAY' ) {
 		foreach my $i ( @{ $args{attributes} } ) {
 			my $k = $self->{data}->name($i);
-			$k =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+			$k =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X",ord($1))/xge;
 			my $v = $self->value($i);
-			$v =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+			$v =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X",ord($1))/xge;
 			$attributes .= ";$k=$v";
 		}
 	}

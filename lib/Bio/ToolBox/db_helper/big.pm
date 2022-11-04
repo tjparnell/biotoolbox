@@ -694,12 +694,12 @@ sub new {
 	while ( my $f = $D->read ) {
 		my $f_path = File::Spec->catfile( $dir, $f );
 		next unless -f $f_path;
-		if ( $f =~ /\.(?:bw|bigwig)$/i ) {
+		if ( $f =~ /\.(?: bw | bigwig)$/xi ) {
 
 			# bigwig file
 			$self->{bwfiles}{$f} = $f_path;
 		}
-		elsif ( $f =~ /^meta.*\.txt$/i ) {
+		elsif ( $f =~ /^meta.*\.txt$/xi ) {
 
 			# a genuine metadata file - excellent!
 			# let's open it and parse the contents
@@ -710,13 +710,13 @@ sub new {
 				next if $line =~ /^#/;
 				next if $line !~ /\w+/;
 				chomp $line;
-				if ( $line =~ /\[(.+\.(?:bw|bigwig))\]/i ) {
+				if ( $line =~ /\[(.+ \. (?: bw | bigwig))\]/xi ) {
 
 					# start of a new metadata block for the current bw file
 					$current_bw = $1;
 					next;
 				}
-				elsif ( $line =~ /^([\w\-\.]+)\s*=\s*([\w\-\.]+)/ ) {
+				elsif ( $line =~ /^( [\w\-\.]+ ) \s* = \s* ( [\w\-\.]+ )/x ) {
 
 					# a metadata line
 					croak
@@ -741,13 +741,13 @@ sub new {
 		# therefore we will always put in our own metadata gleaned from file name
 		# do a regex to pull out basename and possibly strand information from filename
 		my $name = $f;
-		$name =~ s/\.(?:bw|bigwig)$//i;    # remove extension for the name
+		$name =~ s/\. (?: bw | bigwig)$//xi;    # remove extension for the name
 		my ( $type, $strand );
-		if ( $name =~ /^(.+)[\._](?:f|for|forward|plus|\+)$/i ) {
+		if ( $name =~ /^(.+) [\._] (?: f | for | forward | plus | \+ )$/xi ) {
 			$type   = $1;
 			$strand = 1;
 		}
-		elsif ( $name =~ /^(.+)[\._](?:r|rev|reverse|minus|\-)$/i ) {
+		elsif ( $name =~ /^(.+) [\._] (?: r | rev | reverse | minus | \- )$/xi ) {
 			$type   = $1;
 			$strand = -1;
 		}

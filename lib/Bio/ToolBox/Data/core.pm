@@ -115,7 +115,7 @@ sub verify {
 			# collapse problem list into compact string
 			# from http://www.perlmonks.org/?node_id=87538
 			my $problem = join( ',', @problems );
-			$problem =~ s/(?<!\d)(\d+)(?:,((??{$++1}))(?!\d))+/$1-$+/g;
+			$problem =~ s/(?<!\d) (\d+) (?: ,((??{$++1})) (?!\d) )+/$1-$+/xg;
 
 			if ($too_low) {
 				print
@@ -183,7 +183,7 @@ sub verify {
 			# column 0 should look like chromosome
 			exists $self->{0}
 			and $self->{0}{'name'} !~
-			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
+			m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi
 			)
 		{
 			$gff_check = 0;
@@ -191,7 +191,7 @@ sub verify {
 		}
 		if (
 			# column 3 should look like start
-			exists $self->{3} and $self->{3}{'name'} !~ m/start|pos|position/i
+			exists $self->{3} and $self->{3}{'name'} !~ m/start | pos | position/xi
 			)
 		{
 			$gff_check = 0;
@@ -199,7 +199,7 @@ sub verify {
 		}
 		if (
 			# column 4 should look like end
-			exists $self->{4} and $self->{4}{'name'} !~ m/stop|end|pos|position/i
+			exists $self->{4} and $self->{4}{'name'} !~ m/stop | end | pos | position/xi
 			)
 		{
 			$gff_check = 0;
@@ -261,19 +261,19 @@ sub verify {
 		# check column index names
 		if ( exists $self->{0}
 			and $self->{0}{'name'} !~
-			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
+			m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 0 name not chromosome-like.';
 		}
 		if ( exists $self->{1}
-			and $self->{1}{'name'} !~ m/start|pos|position/i )
+			and $self->{1}{'name'} !~ m/start | pos | position/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 1 name not start-like.';
 		}
 		if ( exists $self->{2}
-			and $self->{2}{'name'} !~ m/stop|end|pos|position/i )
+			and $self->{2}{'name'} !~ m/stop | end | pos | position/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 2 name not stop-like.';
@@ -285,41 +285,41 @@ sub verify {
 			$error .= ' Column 5 name not strand-like.';
 		}
 		if (    exists $self->{6}
-			and $self->{'format'}  !~ /narrow|broad/i
-			and $self->{6}{'name'} !~ m/start|thick|cds/i )
+			and $self->{'format'}  !~ /narrow | broad/xi
+			and $self->{6}{'name'} !~ m/start | thick | cds/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 6 name not thickStart-like.';
 		}
 		if (    exists $self->{7}
-			and $self->{'format'}  !~ /narrow|broad/i
-			and $self->{7}{'name'} !~ m/end|stop|thick|cds/i )
+			and $self->{'format'}  !~ /narrow | broad/xi
+			and $self->{7}{'name'} !~ m/end | stop | thick | cds/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 7 name not thickEnd-like.';
 		}
 		if (    exists $self->{8}
-			and $self->{'format'}  !~ /narrow|broad/i
-			and $self->{8}{'name'} !~ m/item|rgb|color/i )
+			and $self->{'format'}  !~ /narrow | broad/xi
+			and $self->{8}{'name'} !~ m/item | rgb | color/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 8 name not itemRGB-like.';
 		}
 		if (    exists $self->{9}
-			and $self->{'format'}  !~ /narrow|broad/i
-			and $self->{9}{'name'} !~ m/count|number|block|exon/i )
+			and $self->{'format'}  !~ /narrow | broad/xi
+			and $self->{9}{'name'} !~ m/count | number | block | exon/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 9 name not blockCount-like.';
 		}
 		if ( exists $self->{10}
-			and $self->{10}{'name'} !~ m/size|length|block|exon/i )
+			and $self->{10}{'name'} !~ m/size | length | block | exon/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 10 name not blockSizes-like.';
 		}
 		if ( exists $self->{11}
-			and $self->{11}{'name'} !~ m/start|block|exon/i )
+			and $self->{11}{'name'} !~ m/start | block | exon/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 11 name not blockStarts-like.';
@@ -347,7 +347,7 @@ sub verify {
 			}
 		}
 		if (    $self->{'format'}
-			and $self->{'format'} =~ /narrow|broad/i )
+			and $self->{'format'} =~ /narrow | broad/xi )
 		{
 			unless ( $self->_column_is_numeric( 6, 7, 8 ) ) {
 				$bed_check = 0;
@@ -418,7 +418,7 @@ sub verify {
 			my $ext = $self->{'extension'};
 			$self->{'filename'} =~ s/$ext/.txt/;
 			$self->{'extension'} = '.txt';
-			$self->{'format'}    = '';
+			$self->{'format'}    = q();
 
 			# remove the AUTO key from the metadata
 			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
@@ -447,24 +447,24 @@ sub verify {
 			# exonCount exonStarts exonEnds score name2 cdsStartSt
 			# cdsEndStat exonFrames
 			unless ( $self->{2}{name} =~
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
+				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 2 name not chromosome-like.';
 			}
-			unless ( $self->{4}{name} =~ /start|position/i ) {
+			unless ( $self->{4}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 4 name not start-like.';
 			}
-			unless ( $self->{5}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{5}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 5 name not stop-like.';
 			}
-			unless ( $self->{6}{name} =~ /start|position/i ) {
+			unless ( $self->{6}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 6 name not start-like.';
 			}
-			unless ( $self->{7}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{7}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 7 name not stop-like.';
 			}
@@ -492,24 +492,24 @@ sub verify {
 			# name chrom strand txStart txEnd cdsStart cdsEnd
 			# exonCount exonStarts exonEnds proteinID alignID
 			unless ( $self->{1}{name} =~
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
+				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 1 name not chromosome-like.';
 			}
-			unless ( $self->{3}{name} =~ /start|position/i ) {
+			unless ( $self->{3}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 3 name not start-like.';
 			}
-			unless ( $self->{4}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{4}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 4 name not stop-like.';
 			}
-			unless ( $self->{5}{name} =~ /start|position/i ) {
+			unless ( $self->{5}{name} =~  m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 5 name not start-like.';
 			}
-			unless ( $self->{6}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{6}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 6 name not stop-like.';
 			}
@@ -532,24 +532,24 @@ sub verify {
 			# geneName transcriptName chrom strand txStart txEnd
 			# cdsStart cdsEnd exonCount exonStarts exonEnds
 			unless ( $self->{2}{name} =~
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
+				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 2 name not chromosome-like.';
 			}
-			unless ( $self->{4}{name} =~ /start|position/i ) {
+			unless ( $self->{4}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 4 name not start-like.';
 			}
-			unless ( $self->{5}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{5}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 5 name not stop-like.';
 			}
-			unless ( $self->{6}{name} =~ /start|position/i ) {
+			unless ( $self->{6}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 6 name not start-like.';
 			}
-			unless ( $self->{7}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{7}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 7 name not stop-like.';
 			}
@@ -572,24 +572,24 @@ sub verify {
 			# name chrom strand txStart txEnd cdsStart cdsEnd
 			# exonCount exonStarts exonEnds
 			unless ( $self->{1}{name} =~
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
+				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 1 name not chromosome-like.';
 			}
-			unless ( $self->{3}{name} =~ /start|position/i ) {
+			unless ( $self->{3}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 3 name not start-like.';
 			}
-			unless ( $self->{4}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{4}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 4 name not stop-like.';
 			}
-			unless ( $self->{5}{name} =~ /start|position/i ) {
+			unless ( $self->{5}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 5 name not start-like.';
 			}
-			unless ( $self->{6}{name} =~ /stop|end|position/i ) {
+			unless ( $self->{6}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 6 name not stop-like.';
 			}
@@ -697,11 +697,13 @@ sub verify {
 			$sgr_check = 0;
 			$error .= ' Column number is not 3.';
 		}
-		if ( $self->{0}{'name'} !~ m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i ) {
+		if ( $self->{0}{'name'} !~
+			m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+		{
 			$sgr_check = 0;
 			$error .= ' Column 0 name not chromosome-like.';
 		}
-		if ( $self->{1}{'name'} !~ /start|position/i ) {
+		if ( $self->{1}{'name'} !~ m/start | pos | position/xi ) {
 			$sgr_check = 0;
 			$error .= ' Column 1 name not start-like.';
 		}
@@ -779,7 +781,8 @@ sub _column_is_numeric {
 		for my $i (@index) {
 
 			# we have a very loose definition of numeric: exponents, signs, commas
-			return 0 unless ( $self->{data_table}->[$row][$i] =~ /^[\d\-\+\.,eE]+$/ );
+			return 0 unless ( $self->{data_table}->[$row][$i] =~
+				m/^[ \d \- \+ \. , e E ]+$/x );
 		}
 	}
 	return 1;
@@ -806,7 +809,8 @@ sub _column_is_stranded {
 	my ( $self, $index ) = @_;
 	return unless exists $self->{$index};
 	for my $row ( 1 .. $self->{last_row} ) {
-		return 0 if ( $self->{data_table}->[$row][$index] !~ /^(?:\-1|0|1|\+|\-|\.)$/ );
+		return 0 if ( $self->{data_table}->[$row][$index] !~
+			m/^(?: \-1 | 0 | 1 | \+ | \- | \. )$/x );
 	}
 	return 1;
 }
@@ -862,7 +866,7 @@ sub verify_dataset {
 		return $self->{verfied_dataset}{$dataset};
 	}
 	else {
-		if ( $dataset =~ /^(?:file|http|ftp)/ ) {
+		if ( $dataset =~ /^(?: file | http | ftp )/x ) {
 
 			# local or remote file already verified?
 			$self->{verfied_dataset}{$dataset} = $dataset;
@@ -1058,7 +1062,7 @@ sub format {
 
 sub gff {
 	my $self = shift;
-	if ( defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.[2|5]|3)$/ ) {
+	if ( defined $_[0] and $_[0] =~ m/^(?: 0 | 1 | 2 | 2\.[2|5] | 3 )$/x ) {
 		$self->{gff} = $_[0];
 	}
 	return $self->{gff};
@@ -1175,7 +1179,7 @@ sub vcf_headers {
 	my $headers = {};
 	foreach my $comment ( $self->comments ) {
 		my ( $key, $value );
-		if ( $comment =~ /^##([\w\-\.]+)=(.+)$/ ) {
+		if ( $comment =~ m/^## ([\w \- \. ]+) = (.+)$/x ) {
 			$key   = $1;
 			$value = $2;
 		}
@@ -1191,7 +1195,7 @@ sub vcf_headers {
 		else {
 			# process complex values
 			# extract ID with regex which should have
-			my $id = ( $value =~ /ID=([\w\-\.:]+)/ )[0];
+			my $id = ( $value =~ m/ID = ([ \w \- \. : ]+)/x )[0];
 			$headers->{$key}{$id} = $value;
 		}
 	}
@@ -1379,7 +1383,9 @@ sub _find_column_indices {
 
 		# check if ID or name id looks like a coordinate string
 		if ( defined $id and defined $self->{data_table}->[1] ) {
-			if ( $self->{data_table}->[1][$id] =~ /^[\w\-\.]+:\d+(?:[\-\.]{1,2}\d+)?$/ ) {
+			if ( $self->{data_table}->[1][$id] =~
+				m/^[\w \- \.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
+			{
 
 				# first value looks like a coordinate string
 				$coord = $id;
@@ -1389,7 +1395,8 @@ sub _find_column_indices {
 			and defined $name
 			and defined defined $self->{data_table}->[1] )
 		{
-			if ( $self->{data_table}->[1][$name] =~ /^[\w\-\.]+:\d+(?:[\-\.]{1,2}\d+)?$/ )
+			if ( $self->{data_table}->[1][$name] =~ 
+				m/^[\w \- \.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
 			{
 				# first value looks like a coordinate string
 				$coord = $name;

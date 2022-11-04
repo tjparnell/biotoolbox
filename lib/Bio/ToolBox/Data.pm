@@ -46,11 +46,11 @@ sub new {
 	if ( $args{file} and $args{parse} ) {
 
 		# parse from file
-		$args{subfeature} ||= '';
+		$args{subfeature} ||= q();
 		unless ( $self->parse_table( \%args ) ) {
 			my $l = $self->load_file( $args{file} );
 			return unless $l;
-			if ( $self->database =~ /^Parsed:(.+)$/ and $self->feature_type eq 'named' ) {
+			if ( $self->database =~ /^Parsed:(.+)$/x and $self->feature_type eq 'named' ) {
 
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
@@ -153,7 +153,7 @@ sub new {
 				carp 'unrecognized number of columns for ucsc format!';
 				return;
 			}
-			unless ( $self->extension =~ /ucsc|ref+lat|genepred/ ) {
+			unless ( $self->extension =~ m/ucsc | ref+lat | genepred/xi ) {
 				$self->{extension} = '.ucsc';
 			}
 		}
@@ -193,7 +193,7 @@ sub parse_table {
 	my $args = shift;
 	my $file;
 	if ( ref $args eq 'HASH' ) {
-		$file = $args->{file} || '';
+		$file = $args->{file} || q();
 	}
 	else {
 		# no hash reference, assume just a file name
@@ -230,8 +230,8 @@ sub parse_table {
 	$self->format($format);    # specify the specific format
 
 	# additional user parameters
-	my $feature    = $args->{feature}    || '';
-	my $subfeature = $args->{subfeature} || '';
+	my $feature    = $args->{feature}    || q();
+	my $subfeature = $args->{subfeature} || q();
 	my $simplify =
 		( exists $args->{simplify} and defined $args->{simplify} )
 		? $args->{simplify}
@@ -253,7 +253,7 @@ sub parse_table {
 	if ($subfeature) {
 		$parser->do_exon(1)  if $subfeature =~ /exon/i;
 		$parser->do_cds(1)   if $subfeature =~ /cds/i;
-		$parser->do_utr(1)   if $subfeature =~ /utr|untranslated/i;
+		$parser->do_utr(1)   if $subfeature =~ /utr | untranslated/xi;
 		$parser->do_codon(1) if $subfeature =~ /codon/i;
 	}
 	if ( $feature =~ /gene$/i ) {
@@ -313,7 +313,7 @@ PARSEFAIL
 		# fill table with features
 		while ( my $f = $parser->next_top_feature ) {
 			if ($chr_exclude) {
-				next if $f->seq_id =~ /$chr_exclude/i;
+				next if $f->seq_id =~ m/$chr_exclude/xi;
 			}
 			if ($feature) {
 
@@ -700,7 +700,7 @@ sub sort_data {
 		# we want to avoid null values, so keep trying
 		# null being . or any variation of N/A, NaN, inf
 		my $v = $self->value( $i, $index );
-		if ( defined $v and $v !~ /^(?:\.|n\/?a|nan|\-?inf)$/i ) {
+		if ( defined $v and $v !~ m/^(?: \. | n\/?a | nan | \-?inf )$/xi ) {
 
 			# a non-null value, take it
 			$example = $v;
@@ -715,7 +715,7 @@ sub sort_data {
 		# there are detectable letters
 		$sortmethod = 'ascii';
 	}
-	elsif ( $example =~ /^\-?\d+\.?\d*$/ ) {
+	elsif ( $example =~ m/^\-?\d+ \.? \d*$/x ) {
 
 		# there are only digits, allowing for minus sign and a decimal point
 		# I don't think this allows for exponents, though
@@ -1220,7 +1220,7 @@ sub summary_file {
 	}
 
 	# Write summed data
-	$outfile =~ s/\.txt(\.gz)?$//i;    # strip any .txt or .gz extensions if present
+	$outfile =~ s/\.txt (\.gz)?$//xi;    # strip any .txt or .gz extensions if present
 	my $written_file = $summed_data->write_file(
 		'filename' => $outfile . '_summary.txt',
 		'gz'       => 0,

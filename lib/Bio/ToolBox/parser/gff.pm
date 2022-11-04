@@ -63,7 +63,7 @@ sub open_file {
 		$self->{convertor_sub} = \&_gtf_to_seqf;
 
 		# double check we have transcript information
-		if ( $self->typelist !~ /transcript|rna/i ) {
+		if ( $self->typelist !~ m/transcript | rna/xi ) {
 
 			# we will have to rely on exon and/or cds information to get transcript
 			unless ( $self->do_exon or $self->do_cds ) {
@@ -116,7 +116,7 @@ sub next_feature {
 				$self->check_orphanage;
 				next;
 			}
-			elsif ( $line =~ /^##sequence.region/i ) {
+			elsif ( $line =~ m/^##sequence . region/xi ) {
 
 				# sequence region pragma
 				my ( $pragma, $seq_id, $start, $stop ) = split /\s+/, $line;
@@ -168,7 +168,7 @@ sub next_feature {
 				next;
 			}
 		}
-		elsif ( $type =~ /utr|untranslated/ ) {
+		elsif ( $type =~ m/utr | untranslated/x ) {
 			if ( $self->do_utr ) {
 				return &{ $self->{convertor_sub} }( $self, \@fields );
 			}
@@ -192,10 +192,10 @@ sub next_feature {
 				next;
 			}
 		}
-		elsif ( $type =~ /transcript|rna/ ) {
+		elsif ( $type =~ m/transcript | rna/x ) {
 			return &{ $self->{convertor_sub} }( $self, \@fields );
 		}
-		elsif ( $type =~ /chromosome|contig|scaffold/ ) {
+		elsif ( $type =~ m/(?: chromosome | contig | scaffold )/x ) {
 
 			# gff3 files can record the chromosome as a gff record
 			# process this as a region
@@ -242,7 +242,7 @@ TOP_FEATURE_LOOP:
 		### Process the feature
 		# add genes, transcripts, and all other parent features
 		# to the loaded hash for lookup
-		if ( $feature->primary_tag =~ /(?:gene|rna|transcript)/i
+		if ( $feature->primary_tag =~ m/(?: gene | rna | transcript )/xi
 			or not $feature->has_tag('Parent') )
 		{
 			# remember this feature as it likely will have children features
@@ -441,7 +441,7 @@ sub _gff3_to_seqf {
 	if ( exists $att{'Parent'} ) {
 
 		# always record Parent except for transcripts when genes are not wanted
-		unless ( not $self->do_gene and $feature->primary_tag =~ /rna|transcript/i ) {
+		unless ( not $self->do_gene and $feature->primary_tag =~ m/rna | transcript/xi ) {
 			$feature->add_tag_value( 'Parent', $att{'Parent'} );
 		}
 	}
@@ -455,7 +455,7 @@ sub _gff3_to_seqf {
 	# extra attributes as necessary
 	unless ( $self->simplify ) {
 		foreach my $k (
-			grep { !/Name|ID|Parent|exon_id/ }
+			grep { !m/(?: Name | ID | Parent | exon_id )/x }
 			keys %att
 			)
 		{
@@ -503,7 +503,7 @@ sub _gtf_to_seqf {
 
 	# assign special tags based on the feature type
 	my $type = lc $fields->[2];
-	if ( $type =~ /cds|exon|utr|codon|untranslated/ ) {
+	if ( $type =~ m/(?: cds | exon | utr | codon | untranslated )/x ) {
 		$feature->add_tag_value( 'Parent', $transcript_id );
 
 		# exon id if present
@@ -540,7 +540,7 @@ sub _gtf_to_seqf {
 	}
 
 	# transcript
-	elsif ( $type =~ /transcript|rna/ ) {
+	elsif ( $type =~ m/transcript | rna/x ) {
 
 		# these are sometimes present in GTF files, such as from Ensembl
 
@@ -641,7 +641,7 @@ sub _gtf_to_seqf {
 sub _add_remaining_gtf_attributes {
 	my ( $self, $feature, $att ) = @_;
 	foreach my $key (
-		grep { !/transcript_id|transcript_name|gene_id|gene_name|exon_id/ }
+		grep { !m/(?: transcript_id | transcript_name | gene_id | gene_name | exon_id )/x }
 		keys %{ $att }
 		)
 	{
@@ -699,7 +699,7 @@ sub unescape {
 	my $self = shift;
 	my $v    = shift;
 	$v =~ tr/+/ /;
-	$v =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
+	$v =~ s/%( [0-9a-fA-F]{2} ) /chr hex($1)/xge;
 	return $v;
 }
 

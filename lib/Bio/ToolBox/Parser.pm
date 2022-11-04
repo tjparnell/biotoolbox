@@ -26,7 +26,7 @@ sub new {
 	my $flavor   = $args{flavor}   || undef;
 	my $filetype = $args{filetype} || undef;
 	if ( not $flavor or not $filetype ) {
-		if ( $class =~ /Bio::ToolBox::parser::(\w+)/ ) {
+		if ( $class =~ m/Bio::ToolBox::parser::(\w+)/x ) {
 
 			# we got the flavor directly from a flavored parser new function
 			$flavor ||= $1;
@@ -38,7 +38,7 @@ sub new {
 			( $flavor, $filetype ) = Bio::ToolBox::Data->taste_file( $args{file} );
 		}
 	}
-	if ( $flavor and $flavor =~ m/^(?:gff|bed|ucsc)$/i ) {
+	if ( $flavor and $flavor =~ m/^(?: gff | bed | ucsc )$/xi ) {
 		$class = 'Bio::ToolBox::parser::' . $flavor;
 		load $class;
 	}

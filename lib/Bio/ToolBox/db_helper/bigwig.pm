@@ -354,7 +354,7 @@ sub open_bigwigset_db {
 	my $md = $bws->metadata;
 	foreach my $i ( keys %{ $md } ) {
 		my $f = $md->{$i}{dbid};    # the file path
-		if ( $f =~ /(?:f|for|forward|top|plus|\+)\.bw$/i ) {
+		if ( $f =~ /(?: f | for | forward | top | plus | \+ ) \.bw$/xi ) {
 
 			# implied forward strand
 			if ( exists $md->{$i}{strand} ) {
@@ -364,7 +364,7 @@ sub open_bigwigset_db {
 				$bws->set_bigwig_attributes( $f, { strand => 'plus' } );
 			}
 		}
-		elsif ( $f =~ /(?:r|rev|reverse|bottom|minus|\-)\.bw$/i ) {
+		elsif ( $f =~ /(?: r | rev | reverse | bottom | minus | \- ) \.bw$/xi ) {
 
 			# implied reverse strand
 			if ( exists $md->{$i}{strand} ) {

@@ -157,7 +157,7 @@ sub open_db_connection {
 
 	# first check if it is a database reference
 	my $db_ref = ref $database;
-	if ( $db_ref =~ /DB|big::BigWigSet/ ) {
+	if ( $db_ref =~ m/DB | big::BigWigSet/x ) {
 
 		# the provided database is already an open database object
 		# nothing to open, return as is
@@ -187,7 +187,7 @@ sub open_db_connection {
 	my $error;
 
 	# check if it is a remote file
-	if ( $database =~ /^(?:https?|ftp)/i ) {
+	if ( $database =~ /^(?: https? | ftp)/xi ) {
 
 		# a remote Bam database
 		if ( $database =~ /\.bam$/i ) {
@@ -208,7 +208,7 @@ sub open_db_connection {
 		}
 
 		# a remote BigBed database
-		elsif ( $database =~ /\.(?:bb|bigbed)$/i ) {
+		elsif ( $database =~ m/\. (?: bb | bigbed )$/xi ) {
 
 			# open using BigBed adaptor
 			$BIGBED_OK = _load_bigbed_helper_module() unless $BIGBED_OK;
@@ -227,7 +227,7 @@ sub open_db_connection {
 		}
 
 		# a remote BigWig database
-		elsif ( $database =~ /\.(?:bw|bigwig)$/i ) {
+		elsif ( $database =~ m/\. (?: bw | bigwig )$/xi ) {
 
 			# open using BigWig adaptor
 			$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
@@ -253,7 +253,7 @@ sub open_db_connection {
 		}
 
 		# a remote fasta file???
-		elsif ( $database =~ /\.fa(?:sta)?$/i ) {
+		elsif ( $database =~ m/\.fa (?: sta)? $/xi ) {
 
 			# uh oh! remote fasta files are not supported
 			$error .= " ERROR: remote fasta files are not supported!\n";
@@ -303,7 +303,7 @@ sub open_db_connection {
 		}
 
 		# a BigBed database
-		elsif ( $database =~ /\.(?:bb|bigbed)$/i ) {
+		elsif ( $database =~ /\. (?: bb | bigbed )$/xi ) {
 
 			# open using BigBed adaptor
 			$BIGBED_OK = _load_bigbed_helper_module() unless $BIGBED_OK;
@@ -322,7 +322,7 @@ sub open_db_connection {
 		}
 
 		# a BigWig database
-		elsif ( $database =~ /\.(?:bw|bigwig)$/i ) {
+		elsif ( $database =~ /\. (?: bw | bigwig )$/xi ) {
 
 			# open using BigWig adaptor
 			$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
@@ -360,7 +360,7 @@ sub open_db_connection {
 		}
 
 		# a Fasta File
-		elsif ( $database =~ /\.fa(?:sta)?(?:\.gz)?$/i ) {
+		elsif ( $database =~ /\.fa (?:sta)? (?:\.gz)? $/xi ) {
 
 			# first try a modern fai indexed adapter
 			_load_bam_helper_module() unless $BAM_OK;
@@ -394,7 +394,7 @@ sub open_db_connection {
 		}
 
 		# a gff3 or sqlite database
-		elsif ( $database =~ /\.(?:gff3?|gff3?\.gz|db|sqlite)$/ ) {
+		elsif ( $database =~ /\. (?: gff3? | gff3?\.gz | db | sqlite )$/xi ) {
 			$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta')
 				unless $SEQFASTA_OK;
 			if ($SEQFASTA_OK) {
@@ -519,7 +519,7 @@ sub get_db_name {
 	my $db_ref = ref $db;
 	return $db unless $db_ref;    # presumption that non-object is just a database name
 	my $db_name;
-	if ( $db_ref =~ /^Bio::DB::SeqFeature::Store/ ) {
+	if ( $db_ref =~ /^Bio::DB::SeqFeature::Store/x ) {
 
 		# a SeqFeature database, using any DBI adapter
 		$db_name = $db->{'dbh'}->{'name'};
@@ -566,7 +566,7 @@ sub get_dataset_list {
 	my @types;
 
 	# a SeqFeature database
-	if ( $db_ref =~ /^Bio::DB::SeqFeature::Store/ ) {
+	if ( $db_ref =~ /^Bio::DB::SeqFeature::Store/x ) {
 
 		# collect the database types,
 		# sort first by source, then by method
@@ -598,7 +598,7 @@ sub get_dataset_list {
 				elsif ( $attribute =~ m/name/i ) {
 					$name = $metadata->{$file}{$attribute};
 				}
-				elsif ( $attribute =~ m/^primary_tag|method$/i ) {
+				elsif ( $attribute =~ m/^primary_tag | method$/xi ) {
 					$primary = $metadata->{$file}{$attribute};
 				}
 			}
@@ -679,7 +679,7 @@ sub verify_or_request_feature_types {
 		foreach my $dataset (@list_to_check) {
 
 			# check for a remote file
-			if ( $dataset =~ /^(?: http | ftp) .+ \. (?: bam | bw | bb) $/xi ) {
+			if ( $dataset =~ m/^(?: http | ftp) .+ \. (?: bam | bw | bb) $/xi ) {
 
 				# a remote file
 				# assume it is good, no verification here though
@@ -688,7 +688,7 @@ sub verify_or_request_feature_types {
 			}
 
 			# a local file
-			elsif ( $dataset =~ /\.(?:bam|bw|bigwig|bb|bigbed|useq)$/i ) {
+			elsif ( $dataset =~ m/\. (?: bam | bw | bigwig | bb | bigbed | useq)$/xi ) {
 
 				# presume we have a local indexed data file
 
@@ -995,7 +995,7 @@ sub get_new_feature_list {
 
 	# Verify a SeqFeature::Store database
 	my $db_ref = ref $db;
-	unless ( $db_ref =~ /^Bio::DB::SeqFeature::Store/ ) {
+	unless ( $db_ref =~ m/^Bio::DB::SeqFeature::Store/x ) {
 		carp "Database type $db_ref doesn't support generating feature lists!\n";
 		return;
 	}
@@ -1221,7 +1221,7 @@ sub get_db_feature {
 
 		# I used to append aliases to the end of the name in old versions of biotoolbox
 		# crazy, I know, but just in case this happened, let's try breaking them apart
-		my $name2 = ( split( /\s*[;,\|]\s*/, $args{'name'} ) )[0];
+		my $name2 = ( split( /\s* [; , \|] \s*/x, $args{'name'} ) )[0];
 
 		# multiple names present using common delimiters ;,|
 		# take the first name only, assume others are aliases that we don't need
@@ -1382,11 +1382,11 @@ sub get_chromosome_list {
 	my $type = ref $db;
 
 	# SeqFeature::Store
-	if ( $type =~ /^Bio::DB::SeqFeature::Store/ ) {
+	if ( $type =~ m/^Bio::DB::SeqFeature::Store/x ) {
 		for my $chr ( $db->seq_ids ) {
 
 			# check for excluded chromosomes
-			next if ( defined $chr_exclude and $chr =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $chr =~ m/$chr_exclude/xi );
 
 			# get chromosome size
 			my ($seqf) = $db->get_features_by_name($chr);
@@ -1408,7 +1408,7 @@ sub get_chromosome_list {
 		foreach ( values %{ $chroms } ) {
 
 			# check for excluded chromosomes
-			next if ( defined $chr_exclude and $_->{name} =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $_->{name} =~ m/$chr_exclude/xi );
 			push @list, [ $_->{name}, $_->{length} ];
 		}
 
@@ -1421,7 +1421,7 @@ sub get_chromosome_list {
 		foreach my $chr ( $db->seq_ids ) {
 
 			# check for excluded chromosomes
-			next if ( defined $chr_exclude and $chr =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $chr =~ m/$chr_exclude/xi );
 
 			# get chromosome size
 			my $length = $db->length($chr);
@@ -1445,7 +1445,7 @@ sub get_chromosome_list {
 			my $length = $db->target_len($tid);
 
 			# check for excluded chromosomes
-			next if ( defined $chr_exclude and $chr =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $chr =~ m/$chr_exclude/xi );
 
 			# store
 			push @chrom_lengths, [ $chr, $length ];
@@ -1457,7 +1457,7 @@ sub get_chromosome_list {
 		for my $chr ( $db->get_all_sequence_ids ) {
 
 			# check for excluded
-			next if ( defined $chr_exclude and $chr =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $chr =~ m/$chr_exclude/xi );
 
 			# get length and store it
 			my $length = $db->length($chr);
@@ -1470,7 +1470,7 @@ sub get_chromosome_list {
 		for my $chr ( $db->get_all_ids ) {
 
 			# check for excluded chromosomes
-			next if ( defined $chr_exclude and $chr =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $chr =~ m/$chr_exclude/xi );
 
 			# get chromosome size
 			my $seq    = $db->get_Seq_by_id($chr);
@@ -1486,7 +1486,7 @@ sub get_chromosome_list {
 		foreach my $chr ( $db->seq_ids ) {
 
 			# check for excluded chromosomes
-			next if ( defined $chr_exclude and $chr =~ /$chr_exclude/i );
+			next if ( defined $chr_exclude and $chr =~ m/$chr_exclude/xi );
 
 			# generate a segment representing the chromosome
 			# due to fuzzy name matching, we may get more than one back
@@ -1621,12 +1621,12 @@ sub _lookup_db_method {
 
 	# determine the appropriate score method
 	my $score_method;
-	if ( $param->[DATA] =~ /^file|http|ftp/ ) {
+	if ( $param->[DATA] =~ m/^(?: file | http | ftp )/x ) {
 
 		# collect the data according to file type
 
 		# BigWig Data file
-		if ( $param->[DATA] =~ /\.(?:bw|bigwig)$/i ) {
+		if ( $param->[DATA] =~ m/\. (?: bw | bigwig )$/xi ) {
 
 			# file is in bigwig format
 			# get the dataset scores using Bio::ToolBox::db_helper::bigwig
@@ -1641,10 +1641,10 @@ sub _lookup_db_method {
 				elsif ( $param->[RETT] == 1 ) {
 					$score_method = \&collect_bigwig_scores;
 				}
-				elsif ( $param->[METH] =~ /min|max|mean/ ) {
+				elsif ( $param->[METH] =~ m/(?: min | max | mean )/x ) {
 					$score_method = \&collect_bigwig_score;
 				}
-				elsif ( $param->[METH] =~ /sum|count/ ) {
+				elsif ( $param->[METH] =~ m/sum|count/ ) {
 
 					# difference between ucsc and libBigWig libraries
 					$score_method =
@@ -1663,7 +1663,7 @@ sub _lookup_db_method {
 		}
 
 		# BigBed Data file
-		elsif ( $param->[DATA] =~ /\.(?:bb|bigbed)$/i ) {
+		elsif ( $param->[DATA] =~ m/\. (?: bb | bigbed )$/xi ) {
 
 			# data is in bigbed format
 			# get the dataset scores using Bio::ToolBox::db_helper::bigbed
@@ -1753,7 +1753,7 @@ sub _lookup_db_method {
 		elsif ( $param->[RETT] == 1 ) {
 			$score_method = \&collect_bigwigset_scores;
 		}
-		elsif ( $param->[METH] =~ /min|max|mean|sum|count/ ) {
+		elsif ( $param->[METH] =~ m/(?: min | max | mean | sum | count )/x ) {
 
 			# difference between ucsc and libBigWig libraries
 			# the ucsc library works with summaries and we can handle multiple of these
@@ -1860,11 +1860,11 @@ sub _load_bam_helper_module {
 
 sub _load_bigwig_helper_module {
 	if ($BIG_ADAPTER) {
-		if ( $BIG_ADAPTER =~ /ucsc|kent/i ) {
+		if ( $BIG_ADAPTER =~ m/ucsc|kent/i ) {
 			$BIGWIG_OK   = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
 			$BIG_ADAPTER = 'ucsc';    # for internal consistency
 		}
-		elsif ( $BIG_ADAPTER =~ /big/i ) {
+		elsif ( $BIG_ADAPTER =~ m/big/i ) {
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
 			$BIGBED_OK = $BIGWIG_OK;                                         # bigbed too!
 			$BIG_ADAPTER = 'big';    # for internal consistency
@@ -1902,11 +1902,11 @@ sub _load_bigwig_helper_module {
 
 sub _load_bigbed_helper_module {
 	if ($BIG_ADAPTER) {
-		if ( $BIG_ADAPTER =~ /ucsc|kent/i ) {
+		if ( $BIG_ADAPTER =~ m/ucsc|kent/i ) {
 			$BIGBED_OK   = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
 			$BIG_ADAPTER = 'ucsc';    # for internal consistency
 		}
-		elsif ( $BIG_ADAPTER =~ /big/i ) {
+		elsif ( $BIG_ADAPTER =~ m/big/i ) {
 			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
 			$BIGWIG_OK = $BIGBED_OK;                                         # bigwig too!
 			$BIG_ADAPTER = 'big';    # for internal consistency

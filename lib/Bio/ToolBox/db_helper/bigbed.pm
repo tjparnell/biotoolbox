@@ -282,7 +282,7 @@ sub sum_total_bigbed_features {
 	# Open BigBed file if necessary
 	my $bb;
 	my $bb_ref = ref $bb_file;
-	if ( $bb_ref =~ /Bio::DB::BigBed/ ) {
+	if ( $bb_ref =~ /Bio::DB::BigBed/x ) {
 
 		# we have an opened bigbed db object
 		$bb = $bb_file;

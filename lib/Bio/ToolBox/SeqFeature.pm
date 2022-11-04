@@ -582,7 +582,7 @@ sub gff_string {
 
 sub _encode {
 	my ( $self, $value ) = @_;
-	$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+	$value =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X", ord($1) )/xge;
 	return $value;
 }
 

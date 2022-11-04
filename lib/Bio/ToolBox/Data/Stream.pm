@@ -110,7 +110,7 @@ sub new {
 				carp 'unrecognized number of columns for ucsc format!';
 				return;
 			}
-			unless ( $self->extension =~ /ucsc|ref+lat|genepred/ ) {
+			unless ( $self->extension =~ m/(?: ucsc | ref+lat | genepred )/xi ) {
 				$self->{extension} = '.ucsc';
 			}
 		}

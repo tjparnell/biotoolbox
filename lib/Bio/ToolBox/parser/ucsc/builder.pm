@@ -517,11 +517,11 @@ sub build_transcript {
 	my ( $type, $biotype );
 	if ( exists $ensembldata->{ $self->name } ) {
 		my $t = $ensembldata->{ $self->name }->[1] || undef;
-		if ( $t and $t =~ /protein.coding/i ) {
+		if ( $t and $t =~ /protein.coding/xi ) {
 			$type    = 'mRNA';
 			$biotype = $t;
 		}
-		elsif ( $t and $t =~ /rna|transcript/i ) {
+		elsif ( $t and $t =~ /rna | transcript/xi ) {
 			$type    = $t;
 			$biotype = $t;
 		}

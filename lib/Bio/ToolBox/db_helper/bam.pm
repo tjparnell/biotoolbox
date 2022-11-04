@@ -94,7 +94,7 @@ sub check_bam_index {
 	# doesn't always work as expected. Best to create the index BEFORE opening
 
 	my $bamfile = shift;
-	return if ( $bamfile =~ /^(?:http|ftp)/i );    # I can't do much with remote files
+	return if ( $bamfile =~ /^(?:http | ftp)/xi );    # I can't do much with remote files
 
 	# we will check the modification time to make sure index is newer
 	my $bam_mtime = ( stat($bamfile) )[9];
@@ -262,7 +262,7 @@ sub sum_total_bam_alignments {
 	# Open Bam file if necessary
 	my $sam;
 	my $sam_ref = ref $sam_file;
-	if ( $sam_ref =~ /Bio::DB::Sam/ ) {
+	if ( $sam_ref =~ /Bio::DB::Sam/x ) {
 
 		# we have an opened sam db object
 		$sam = $sam_file;

@@ -233,7 +233,7 @@ sub sum_total_bam_alignments {
 	# Open Bam file if necessary
 	my $bam;
 	my $bam_ref = ref $sam_file;
-	if ( $bam_ref =~ /Bio::DB::HTS/ ) {
+	if ( $bam_ref =~ /Bio::DB::HTS/x ) {
 
 		# we have an opened sam db object
 		$bam = $sam_file;
