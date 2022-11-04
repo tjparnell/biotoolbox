@@ -18,11 +18,11 @@ sub new {
 	$args{in}  ||= $args{file} || undef;
 	$args{out} ||= undef;
 	unless ( $args{in} or $args{out} ) {
-		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
+		cluck q(a filename must be specified with 'in' or 'out' argument keys!);
 		return;
 	}
 	if ( defined $args{in} and defined $args{out} ) {
-		cluck "cannot define both 'in' and 'out' arguments!\n";
+		cluck q(cannot define both 'in' and 'out' arguments!);
 		return;
 	}
 	$args{noheader} ||= 0;
@@ -94,7 +94,7 @@ sub new {
 
 			# use standard names for the number of columns indicated
 			unless ( $args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3 ) {
-				carp "bed parameter must be an integer 3-12!";
+				carp 'bed parameter must be an integer 3-12!';
 				return;
 			}
 			$self->add_bed_metadata( $args{bed} );
@@ -107,7 +107,7 @@ sub new {
 			# a ucsc format such as refFlat, genePred, or genePredExt
 			my $u = $self->add_ucsc_metadata( $args{ucsc} );
 			unless ($u) {
-				carp "unrecognized number of columns for ucsc format!";
+				carp 'unrecognized number of columns for ucsc format!';
 				return;
 			}
 			unless ( $self->extension =~ /ucsc|ref+lat|genepred/ ) {
@@ -136,11 +136,11 @@ sub new {
 sub duplicate {
 	my ( $self, $filename ) = @_;
 	unless ($filename) {
-		carp "a new filename must be provided!";
+		carp 'a new filename must be provided!';
 		return;
 	}
 	if ( $filename eq $self->filename ) {
-		carp "provided filename is not unique from that in metadata!";
+		carp 'provided filename is not unique from that in metadata!';
 		return;
 	}
 
@@ -175,13 +175,13 @@ sub add_column {
 	my ( $self, $name ) = @_;
 	return unless $name;
 	unless ( $self->mode ) {
-		cluck "We have a read-only Stream object, cannot add columns";
+		cluck 'We have a read-only Stream object, cannot add columns';
 		return;
 	}
 	if ( defined $self->{fh} ) {
 
 		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
+		cluck 'Cannot modify columns when a Stream file handle is opened!';
 		return;
 	}
 
@@ -204,12 +204,12 @@ sub add_column {
 sub copy_column {
 	my $self = shift;
 	unless ( $self->mode ) {
-		confess "We have a read-only Stream object, cannot add columns";
+		confess 'We have a read-only Stream object, cannot add columns';
 	}
 	if ( defined $self->{fh} ) {
 
 		# Stream file handle is opened
-		confess "Cannot modify columns when a Stream file handle is opened!";
+		confess 'Cannot modify columns when a Stream file handle is opened!';
 	}
 	my $index = shift;
 	return unless defined $index;
@@ -235,7 +235,7 @@ sub copy_column {
 sub next_row {
 	my $self = shift;
 	if ( $self->{mode} ) {
-		confess "Stream object is write-only! cannot read";
+		confess 'Stream object is write-only! cannot read';
 	}
 
 	# read and add the next line in the file
@@ -264,7 +264,7 @@ sub write_row {
 	my $self = shift;
 	my $data = shift;
 	unless ( $self->{mode} ) {
-		confess "Stream object is read-only! cannot write";
+		confess 'Stream object is read-only! cannot write';
 	}
 
 	# open the file handle if it hasn't been opened yet
@@ -273,7 +273,7 @@ sub write_row {
 		# we first write a standard empty data file with metadata and headers
 		my $newfile = $self->write_file( $self->filename );
 		unless ($newfile) {
-			die "unable to write file!";
+			die 'unable to write file!';
 		}
 
 		# just in case the filename is changed when writing the file
@@ -292,12 +292,12 @@ sub write_row {
 	if ( $data_ref eq 'Bio::ToolBox::Data::Feature' ) {
 
 		# user passed a Feature object
-		$self->{fh}->print( join( "\t", ( $data->row_values ) ), "\n" );
+		$self->{fh}->printf( "%s\n", join( "\t", ( $data->row_values ) ) );
 	}
 	elsif ( $data_ref eq 'ARRAY' ) {
 
 		# user passed an array of values
-		$self->{fh}->print( join( "\t", @{ $data } ), "\n" );
+		$self->{fh}->printf( "%s\n", join( "\t", @{ $data } ) );
 	}
 	else {
 		# assume the passed data is a string
@@ -314,7 +314,7 @@ sub iterate {
 	my $self = shift;
 	my $code = shift;
 	unless ( ref $code eq 'CODE' ) {
-		cluck "iterate_function() method requires a code reference!";
+		cluck 'iterate_function() method requires a code reference!';
 		return;
 	}
 	while ( my $row = $self->next_row ) {

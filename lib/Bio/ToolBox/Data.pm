@@ -34,7 +34,7 @@ sub new {
 
 	# check for stream
 	if ( $args{stream} ) {
-		$class = "Bio::ToolBox::Data::Stream";
+		$class = 'Bio::ToolBox::Data::Stream';
 		load($class);
 		return $class->new(@_);
 	}
@@ -137,7 +137,7 @@ sub new {
 
 			# use standard names for the number of columns indicated
 			unless ( $args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3 ) {
-				carp "bed parameter must be an integer 3-12!";
+				carp 'bed parameter must be an integer 3-12!';
 				return;
 			}
 			$self->add_bed_metadata( $args{bed} );
@@ -150,7 +150,7 @@ sub new {
 			# a ucsc format such as refFlat, genePred, or genePredExt
 			my $u = $self->add_ucsc_metadata( $args{ucsc} );
 			unless ($u) {
-				carp "unrecognized number of columns for ucsc format!";
+				carp 'unrecognized number of columns for ucsc format!';
 				return;
 			}
 			unless ( $self->extension =~ /ucsc|ref+lat|genepred/ ) {
@@ -201,7 +201,7 @@ sub parse_table {
 		$args = {};      # empty hash for below
 	}
 	unless ($file) {
-		carp "no annotation file provided to parse!";
+		carp 'no annotation file provided to parse!';
 		return;
 	}
 
@@ -387,7 +387,7 @@ sub add_column {
 			}
 			else {
 				# different number of elements
-				cluck "array has different number of elements than Data table!\n";
+				cluck 'array has different number of elements than Data table!\n';
 				return;
 			}
 		}
@@ -466,7 +466,7 @@ sub add_row {
 		@row_data = map {'.'} ( 1 .. $self->{number_columns} );
 	}
 	if ( scalar @row_data > $self->{number_columns} ) {
-		cluck "row added has more elements than table columns! truncating row elements\n";
+		cluck 'row added has more elements than table columns! truncating row elements';
 		splice @row_data, 0, $self->{number_columns};
 	}
 	until ( scalar @row_data == $self->{number_columns} ) {
@@ -531,7 +531,7 @@ sub iterate {
 	my $self = shift;
 	my $code = shift;
 	unless ( ref $code eq 'CODE' ) {
-		confess "iterate_function() method requires a code reference!";
+		confess 'iterate_function() method requires a code reference!';
 	}
 	my $stream = $self->row_stream;
 	while ( my $row = $stream->next_row ) {
@@ -545,9 +545,9 @@ sub iterate {
 sub store_seqfeature {
 	my ( $self, $row_i, $seqfeature ) = @_;
 	unless ( defined $row_i and ref $seqfeature ) {
-		confess "must provide a row index and SeqFeature object!";
+		confess 'must provide a row index and SeqFeature object!';
 	}
-	confess "invalid row index" unless ( $row_i <= $self->last_row );
+	confess 'invalid row index' unless ( $row_i <= $self->last_row );
 	$self->{SeqFeatureObjects} ||= [];
 	$self->{SeqFeatureObjects}->[$row_i] = $seqfeature;
 	return 1;
@@ -555,7 +555,7 @@ sub store_seqfeature {
 
 sub delete_seqfeature {
 	my ( $self, $row_i ) = @_;
-	confess "invalid row index" unless ( $row_i <= $self->last_row );
+	confess 'invalid row index' unless ( $row_i <= $self->last_row );
 	return                      unless $self->{SeqFeatureObjects};
 	undef $self->{SeqFeatureObjects}->[$row_i];
 }
@@ -563,7 +563,7 @@ sub delete_seqfeature {
 sub collapse_gene_transcripts {
 	my $self = shift;
 	unless ( $self->feature_type eq 'named' ) {
-		carp "Table does not contain named features!";
+		carp 'Table does not contain named features!';
 		return;
 	}
 
@@ -585,7 +585,7 @@ sub collapse_gene_transcripts {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
 		my $db = $self->open_meta_database(1) or    # force open a new db connection
-			confess "No SeqFeature objects stored and no database connection!";
+			confess 'No SeqFeature objects stored and no database connection!';
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
 		my $type_i = $self->type_column;
@@ -608,7 +608,7 @@ sub add_transcript_length {
 	my $self       = shift;
 	my $subfeature = shift || 'exon';
 	unless ( exists $self->{SeqFeatureObjects} ) {
-		carp "no SeqFeature objects stored for collapsing!";
+		carp 'no SeqFeature objects stored for collapsing!';
 		return;
 	}
 
@@ -655,7 +655,7 @@ sub add_transcript_length {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
 		my $db = $self->open_meta_database(1) or    # force open a new db connection
-			confess "No SeqFeature objects stored and no database connection!";
+			confess 'No SeqFeature objects stored and no database connection!';
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
 		my $type_i = $self->type_column;
@@ -850,7 +850,7 @@ sub gsort_data {
 
 	# identify indices
 	unless ( $self->feature_type eq 'coordinate' ) {
-		carp "no chromosome and start/position columns to sort!\n";
+		carp 'no chromosome and start/position columns to sort!';
 		return;
 	}
 	my $chromo_i = $self->chromo_column;
@@ -900,7 +900,7 @@ sub splice_data {
 	my ( $self, $part, $total_parts ) = @_;
 
 	unless ( $part and $total_parts ) {
-		confess "ordinal part and total number of parts not passed\n";
+		confess 'ordinal part and total number of parts not passed';
 	}
 	my $part_length = int( $self->last_row / $total_parts );
 
@@ -965,7 +965,7 @@ sub reload_children {
 	return unless @files;
 
 	# prepare Stream
-	my $class = "Bio::ToolBox::Data::Stream";
+	my $class = 'Bio::ToolBox::Data::Stream';
 	load $class;
 
 	# open first stream
@@ -1060,7 +1060,7 @@ sub summary_file {
 
 	# Check required values
 	unless ( $self->verify ) {
-		cluck "bad data structure!";
+		cluck 'bad data structure!';
 		return;
 	}
 	unless ( defined $outfile ) {
@@ -1072,7 +1072,7 @@ sub summary_file {
 			$outfile = $self->path . $self->basename;
 		}
 		else {
-			cluck "no filename passed to write_summary_data!\n";
+			cluck 'no filename passed to write_summary_data!';
 			return;
 		}
 	}
@@ -1209,7 +1209,7 @@ sub summary_file {
 				# first do sanity check
 				if ( $summed_data->value( $row, 1 ) != $midpoint ) {
 					carp(
-"unable to summarize multiple datasets with nonequal columns of data!"
+'unable to summarize multiple datasets with nonequal columns of data!'
 					);
 					return;
 				}

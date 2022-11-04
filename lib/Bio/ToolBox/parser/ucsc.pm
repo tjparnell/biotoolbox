@@ -24,7 +24,7 @@ sub open_file {
 	# This is historical precedent from earlier versions, unfortunately.
 	# This may unnecessarily complicate and/or inflate memory....
 	unless ($filename) {
-		cluck("no file name passed!");
+		cluck 'no file name passed!';
 		return;
 	}
 
@@ -33,7 +33,7 @@ sub open_file {
 	unless ($filetype) {
 		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
 		unless ( $flavor eq 'ucsc' ) {
-			confess "File is not a UCSC-format file!!! How did we get here?";
+			confess 'File is not a UCSC-format file!!! How did we get here?';
 		}
 		$self->{filetype} = $filetype;
 	}
@@ -96,7 +96,7 @@ sub open_file {
 sub load_extra_data {
 	my ( $self, $file, $type ) = @_;
 	unless ($file) {
-		cluck "no file name passed!";
+		cluck 'no file name passed!';
 		return;
 	}
 
@@ -140,9 +140,8 @@ sub load_extra_data {
 			next if ( $line =~ /^#/ );
 			my @line_data = split /\t/, $line;
 			if ( scalar @line_data != 2 ) {
-				carp " file $file doesn't seem right!? Line has "
-					. scalar @line_data
-					. " elements!\n";
+				carp sprintf " file $file doesn't seem right!? Line has %d elements!",
+					scalar @line_data;
 				return;
 			}
 
@@ -228,7 +227,7 @@ sub next_feature {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		croak("no UCSC file loaded to parse!");
+		croak('no UCSC file loaded to parse!');
 	}
 	return if $self->{'eof'};
 
@@ -249,7 +248,7 @@ sub next_feature {
 		unless ($builder) {
 
 			# builder will print its own error message if fails
-			warn " unable to parse line number ", $self->{line_count}, "\n";
+			warn sprintf " unable to parse line number %d\n", $self->{line_count};
 			next;
 		}
 
@@ -276,7 +275,7 @@ sub parse_table {
 		$self->open_file(shift) or return;
 	}
 	unless ( $self->fh ) {
-		carp "must open a file first!";
+		carp 'must open a file first!';
 		return;
 	}
 	return if ( $self->{'eof'} );

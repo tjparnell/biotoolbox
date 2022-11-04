@@ -175,7 +175,7 @@ sub verify {
 		# check number of columns
 		if ( $self->{'number_columns'} != 9 ) {
 			$gff_check = 0;
-			$error .= " Number of columns not 9.";
+			$error .= ' Number of columns not 9.';
 		}
 
 		# check column indices
@@ -187,7 +187,7 @@ sub verify {
 			)
 		{
 			$gff_check = 0;
-			$error .= " Column 0 name not chromosome-like.";
+			$error .= ' Column 0 name not chromosome-like.';
 		}
 		if (
 			# column 3 should look like start
@@ -195,7 +195,7 @@ sub verify {
 			)
 		{
 			$gff_check = 0;
-			$error .= " Column 3 name not start-like.";
+			$error .= ' Column 3 name not start-like.';
 		}
 		if (
 			# column 4 should look like end
@@ -203,7 +203,7 @@ sub verify {
 			)
 		{
 			$gff_check = 0;
-			$error .= " Column 4 name not stop-like.";
+			$error .= ' Column 4 name not stop-like.';
 		}
 		if (
 			# column 6 should look like strand
@@ -211,21 +211,21 @@ sub verify {
 			)
 		{
 			$gff_check = 0;
-			$error .= " Column 6 name not strand-like.";
+			$error .= ' Column 6 name not strand-like.';
 		}
 
 		# check column data
 		unless ( $self->_column_is_integers( 3, 4 ) ) {
 			$gff_check = 0;
-			$error .= " Columns 3,4 not integers.";
+			$error .= ' Columns 3,4 not integers.';
 		}
 		unless ( $self->_column_is_numeric(5) ) {
 			$gff_check = 0;
-			$error .= " Column 5 not numeric.";
+			$error .= ' Column 5 not numeric.';
 		}
 		unless ( $self->_column_is_stranded(6) ) {
 			$gff_check = 0;
-			$error .= " Column 6 not strand values.";
+			$error .= ' Column 6 not strand values.';
 		}
 
 		# update gff value as necessary
@@ -255,7 +255,7 @@ sub verify {
 		# check number of columns
 		if ( $self->{'number_columns'} < 3 ) {
 			$bed_check = 0;
-			$error .= " Number of columns not at least 3.";
+			$error .= ' Number of columns not at least 3.';
 		}
 
 		# check column index names
@@ -264,78 +264,78 @@ sub verify {
 			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 0 name not chromosome-like.";
+			$error .= ' Column 0 name not chromosome-like.';
 		}
 		if ( exists $self->{1}
 			and $self->{1}{'name'} !~ m/start|pos|position/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 1 name not start-like.";
+			$error .= ' Column 1 name not start-like.';
 		}
 		if ( exists $self->{2}
 			and $self->{2}{'name'} !~ m/stop|end|pos|position/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 2 name not stop-like.";
+			$error .= ' Column 2 name not stop-like.';
 		}
 		if ( exists $self->{5}
 			and $self->{5}{'name'} !~ m/strand/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 5 name not strand-like.";
+			$error .= ' Column 5 name not strand-like.';
 		}
 		if (    exists $self->{6}
 			and $self->{'format'}  !~ /narrow|broad/i
 			and $self->{6}{'name'} !~ m/start|thick|cds/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 6 name not thickStart-like.";
+			$error .= ' Column 6 name not thickStart-like.';
 		}
 		if (    exists $self->{7}
 			and $self->{'format'}  !~ /narrow|broad/i
 			and $self->{7}{'name'} !~ m/end|stop|thick|cds/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 7 name not thickEnd-like.";
+			$error .= ' Column 7 name not thickEnd-like.';
 		}
 		if (    exists $self->{8}
 			and $self->{'format'}  !~ /narrow|broad/i
 			and $self->{8}{'name'} !~ m/item|rgb|color/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 8 name not itemRGB-like.";
+			$error .= ' Column 8 name not itemRGB-like.';
 		}
 		if (    exists $self->{9}
 			and $self->{'format'}  !~ /narrow|broad/i
 			and $self->{9}{'name'} !~ m/count|number|block|exon/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 9 name not blockCount-like.";
+			$error .= ' Column 9 name not blockCount-like.';
 		}
 		if ( exists $self->{10}
 			and $self->{10}{'name'} !~ m/size|length|block|exon/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 10 name not blockSizes-like.";
+			$error .= ' Column 10 name not blockSizes-like.';
 		}
 		if ( exists $self->{11}
 			and $self->{11}{'name'} !~ m/start|block|exon/i )
 		{
 			$bed_check = 0;
-			$error .= " Column 11 name not blockStarts-like.";
+			$error .= ' Column 11 name not blockStarts-like.';
 		}
 
 		# check column data
 		unless ( $self->_column_is_integers( 1, 2 ) ) {
 			$bed_check = 0;
-			$error .= " Columns 1,2 not integers.";
+			$error .= ' Columns 1,2 not integers.';
 		}
 		if ( $self->{'number_columns'} >= 5 ) {
 
 			# only check if it is actually present, since could be optional
 			unless ( $self->_column_is_numeric(4) ) {
 				$bed_check = 0;
-				$error .= " Column 4 not numeric.";
+				$error .= ' Column 4 not numeric.';
 			}
 		}
 		if ( $self->{'number_columns'} >= 6 ) {
@@ -343,7 +343,7 @@ sub verify {
 			# only check if it is actually present, since could be optional
 			unless ( $self->_column_is_stranded(5) ) {
 				$bed_check = 0;
-				$error .= " Column 5 not strand values.";
+				$error .= ' Column 5 not strand values.';
 			}
 		}
 		if (    $self->{'format'}
@@ -351,7 +351,7 @@ sub verify {
 		{
 			unless ( $self->_column_is_numeric( 6, 7, 8 ) ) {
 				$bed_check = 0;
-				$error .= " Columns 6,7,8 not numeric.";
+				$error .= ' Columns 6,7,8 not numeric.';
 			}
 		}
 		if ( $self->{'number_columns'} == 12 ) {
@@ -359,11 +359,11 @@ sub verify {
 			# bed12 has extra special limitations
 			unless ( $self->_column_is_integers( 6, 7, 9 ) ) {
 				$bed_check = 0;
-				$error .= " Column 6,7,9 not integers.";
+				$error .= ' Column 6,7,9 not integers.';
 			}
 			unless ( $self->_column_is_comma_integers( 10, 11 ) ) {
 				$bed_check = 0;
-				$error .= " Column 10,11 not comma-delimited integers.";
+				$error .= ' Column 10,11 not comma-delimited integers.';
 			}
 		}
 		if (    $self->{'number_columns'} == 15
@@ -372,15 +372,15 @@ sub verify {
 			# gappedPeak has extra special limitations
 			unless ( $self->_column_is_integers( 6, 7, 9 ) ) {
 				$bed_check = 0;
-				$error .= " Column 6,7,9 not integers.";
+				$error .= ' Column 6,7,9 not integers.';
 			}
 			unless ( $self->_column_is_comma_integers( 10, 11 ) ) {
 				$bed_check = 0;
-				$error .= " Column 10,11 not comma-delimited integers.";
+				$error .= ' Column 10,11 not comma-delimited integers.';
 			}
 			unless ( $self->_column_is_numeric( 12, 13, 14 ) ) {
 				$bed_check = 0;
-				$error .= " Columns 12,13,14 not numeric.";
+				$error .= ' Columns 12,13,14 not numeric.';
 			}
 		}
 
@@ -390,21 +390,21 @@ sub verify {
 			and $self->{'number_columns'} != 10 )
 		{
 			$bed_check = 0;
-			$error .= " NarrowPeak has 10 columns only.";
+			$error .= ' NarrowPeak has 10 columns only.';
 		}
 		if (    $self->{'format'}
 			and $self->{'format'} =~ /broadpeak/i
 			and $self->{'number_columns'} != 9 )
 		{
 			$bed_check = 0;
-			$error .= " BroadPeak has 9 columns only.";
+			$error .= ' BroadPeak has 9 columns only.';
 		}
 		if (    $self->{'format'}
 			and $self->{'format'} =~ /gappedpeak/i
 			and $self->{'number_columns'} != 15 )
 		{
 			$bed_check = 0;
-			$error .= " GappeddPeak has 15 columns only.";
+			$error .= ' GappeddPeak has 15 columns only.';
 		}
 
 		# reset the BED tag value as appropriate
@@ -450,35 +450,35 @@ sub verify {
 				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
 			{
 				$ucsc_check = 0;
-				$error .= " Column 2 name not chromosome-like.";
+				$error .= ' Column 2 name not chromosome-like.';
 			}
 			unless ( $self->{4}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 4 name not start-like.";
+				$error .= ' Column 4 name not start-like.';
 			}
 			unless ( $self->{5}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 5 name not stop-like.";
+				$error .= ' Column 5 name not stop-like.';
 			}
 			unless ( $self->{6}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 6 name not start-like.";
+				$error .= ' Column 6 name not start-like.';
 			}
 			unless ( $self->{7}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 7 name not stop-like.";
+				$error .= ' Column 7 name not stop-like.';
 			}
 			unless ( $self->_column_is_integers( 4, 5, 6, 7, 8 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 4,5,6,7,8 not integers.";
+				$error .= ' Columns 4,5,6,7,8 not integers.';
 			}
 			unless ( $self->_column_is_comma_integers( 9, 10 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 9,10 not comma-delimited integers.";
+				$error .= ' Columns 9,10 not comma-delimited integers.';
 			}
 			unless ( $self->_column_is_stranded(3) ) {
 				$ucsc_check = 0;
-				$error .= " Column 3 not strand values.";
+				$error .= ' Column 3 not strand values.';
 			}
 		}
 		elsif ( $colnumber == 15 or $colnumber == 12 ) {
@@ -495,35 +495,35 @@ sub verify {
 				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
 			{
 				$ucsc_check = 0;
-				$error .= " Column 1 name not chromosome-like.";
+				$error .= ' Column 1 name not chromosome-like.';
 			}
 			unless ( $self->{3}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 3 name not start-like.";
+				$error .= ' Column 3 name not start-like.';
 			}
 			unless ( $self->{4}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 4 name not stop-like.";
+				$error .= ' Column 4 name not stop-like.';
 			}
 			unless ( $self->{5}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 5 name not start-like.";
+				$error .= ' Column 5 name not start-like.';
 			}
 			unless ( $self->{6}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 6 name not stop-like.";
+				$error .= ' Column 6 name not stop-like.';
 			}
 			unless ( $self->_column_is_integers( 3, 4, 5, 6, 7 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 3,4,5,6,7 not integers.";
+				$error .= ' Columns 3,4,5,6,7 not integers.';
 			}
 			unless ( $self->_column_is_comma_integers( 8, 9 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 8,9 not comma-delimited integers.";
+				$error .= ' Columns 8,9 not comma-delimited integers.';
 			}
 			unless ( $self->_column_is_stranded(2) ) {
 				$ucsc_check = 0;
-				$error .= " Column 2 not strand values.";
+				$error .= ' Column 2 not strand values.';
 			}
 		}
 		elsif ( $colnumber == 11 ) {
@@ -535,35 +535,35 @@ sub verify {
 				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
 			{
 				$ucsc_check = 0;
-				$error .= " Column 2 name not chromosome-like.";
+				$error .= ' Column 2 name not chromosome-like.';
 			}
 			unless ( $self->{4}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 4 name not start-like.";
+				$error .= ' Column 4 name not start-like.';
 			}
 			unless ( $self->{5}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 5 name not stop-like.";
+				$error .= ' Column 5 name not stop-like.';
 			}
 			unless ( $self->{6}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 6 name not start-like.";
+				$error .= ' Column 6 name not start-like.';
 			}
 			unless ( $self->{7}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 7 name not stop-like.";
+				$error .= ' Column 7 name not stop-like.';
 			}
 			unless ( $self->_column_is_integers( 4, 5, 6, 7, 8 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 4,5,6,7,8 not integers.";
+				$error .= ' Columns 4,5,6,7,8 not integers.';
 			}
 			unless ( $self->_column_is_comma_integers( 9, 10 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 9,10 not comma-delimited integers.";
+				$error .= ' Columns 9,10 not comma-delimited integers.';
 			}
 			unless ( $self->_column_is_stranded(3) ) {
 				$ucsc_check = 0;
-				$error .= " Column 3 not strand values.";
+				$error .= ' Column 3 not strand values.';
 			}
 		}
 		elsif ( $colnumber == 10 ) {
@@ -575,41 +575,41 @@ sub verify {
 				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i )
 			{
 				$ucsc_check = 0;
-				$error .= " Column 1 name not chromosome-like.";
+				$error .= ' Column 1 name not chromosome-like.';
 			}
 			unless ( $self->{3}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 3 name not start-like.";
+				$error .= ' Column 3 name not start-like.';
 			}
 			unless ( $self->{4}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 4 name not stop-like.";
+				$error .= ' Column 4 name not stop-like.';
 			}
 			unless ( $self->{5}{name} =~ /start|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 5 name not start-like.";
+				$error .= ' Column 5 name not start-like.';
 			}
 			unless ( $self->{6}{name} =~ /stop|end|position/i ) {
 				$ucsc_check = 0;
-				$error .= " Column 6 name not stop-like.";
+				$error .= ' Column 6 name not stop-like.';
 			}
 			unless ( $self->_column_is_integers( 3, 4, 5, 6, 7 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 3,4,5,6,7 not integers.";
+				$error .= ' Columns 3,4,5,6,7 not integers.';
 			}
 			unless ( $self->_column_is_comma_integers( 8, 9 ) ) {
 				$ucsc_check = 0;
-				$error .= " Columns 8,9 not comma-delimited integers.";
+				$error .= ' Columns 8,9 not comma-delimited integers.';
 			}
 			unless ( $self->_column_is_stranded(2) ) {
 				$ucsc_check = 0;
-				$error .= " Column 2 not strand values.";
+				$error .= ' Column 2 not strand values.';
 			}
 		}
 		else {
 			$ucsc_type  = 'UCSC';
 			$ucsc_check = 0;
-			$error .= " Wrong # of columns.";
+			$error .= ' Wrong # of columns.';
 		}
 
 		if ( $ucsc_check == 0 ) {
@@ -641,25 +641,25 @@ sub verify {
 		# check number of columns
 		if ( $self->{'number_columns'} < 8 ) {
 			$vcf_check = 0;
-			$error .= " Number of Columns is too few.";
+			$error .= ' Number of Columns is too few.';
 		}
 
 		# check column index names
 		if ( $self->{0}{'name'} !~ m/chrom/i ) {
 			$vcf_check = 0;
-			$error .= " Column 0 name not chromosome.";
+			$error .= ' Column 0 name not chromosome.';
 		}
 		if ( exists $self->{1}
 			and $self->{1}{'name'} !~ m/^pos|start/i )
 		{
 			$vcf_check = 0;
-			$error .= " Column 1 name not position.";
+			$error .= ' Column 1 name not position.';
 		}
 
 		# check column data
 		unless ( $self->_column_is_integers(1) ) {
 			$vcf_check = 0;
-			$error .= " Columns 1 not integers.";
+			$error .= ' Columns 1 not integers.';
 		}
 
 		# reset the vcf tag value as appropriate
@@ -695,19 +695,19 @@ sub verify {
 		my $sgr_check = 1;
 		if ( $self->{'number_columns'} != 3 ) {
 			$sgr_check = 0;
-			$error .= " Column number is not 3.";
+			$error .= ' Column number is not 3.';
 		}
 		if ( $self->{0}{'name'} !~ m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i ) {
 			$sgr_check = 0;
-			$error .= " Column 0 name not chromosome-like.";
+			$error .= ' Column 0 name not chromosome-like.';
 		}
 		if ( $self->{1}{'name'} !~ /start|position/i ) {
 			$sgr_check = 0;
-			$error .= " Column 1 name not start-like.";
+			$error .= ' Column 1 name not start-like.';
 		}
 		unless ( $self->_column_is_integers(1) ) {
 			$sgr_check = 0;
-			$error .= " Columns 1 not integers.";
+			$error .= ' Columns 1 not integers.';
 		}
 		if ( $sgr_check == 0 ) {
 
@@ -891,18 +891,18 @@ sub delete_column {
 	# check for Stream
 	if ( ref $self eq 'Bio::ToolBox::Data::Stream' ) {
 		unless ( $self->mode ) {
-			cluck "We have a read-only Stream object, cannot add columns";
+			cluck 'We have a read-only Stream object, cannot add columns';
 			return;
 		}
 		if ( defined $self->{fh} ) {
 
 			# Stream file handle is opened
-			cluck "Cannot modify columns when a Stream file handle is opened!";
+			cluck 'Cannot modify columns when a Stream file handle is opened!';
 			return;
 		}
 	}
 	unless (@_) {
-		cluck "must provide a list";
+		cluck 'must provide a list';
 		return;
 	}
 
@@ -931,20 +931,20 @@ sub reorder_column {
 	# check for Stream
 	if ( ref $self eq 'Bio::ToolBox::Data::Stream' ) {
 		unless ( $self->mode ) {
-			cluck "We have a read-only Stream object, cannot add columns";
+			cluck 'We have a read-only Stream object, cannot add columns';
 			return;
 		}
 		if ( defined $self->{fh} ) {
 
 			# Stream file handle is opened
-			cluck "Cannot modify columns when a Stream file handle is opened!";
+			cluck 'Cannot modify columns when a Stream file handle is opened!';
 			return;
 		}
 	}
 
 	# reorder data table
 	unless (@_) {
-		carp "must provide a list";
+		carp 'must provide a list';
 		return;
 	}
 	my @order = @_;
@@ -998,7 +998,7 @@ sub feature {
 
 sub feature_type {
 	my $self = shift;
-	carp "feature_type is a read only method" if @_;
+	carp 'feature_type is a read only method' if @_;
 	if ( defined $self->{feature_type} ) {
 		return $self->{feature_type};
 	}
@@ -1090,49 +1090,49 @@ sub vcf {
 
 sub number_columns {
 	my $self = shift;
-	carp "number_columns is a read only method" if @_;
+	carp 'number_columns is a read only method' if @_;
 	return $self->{number_columns};
 }
 
 sub number_rows {
 	my $self = shift;
-	carp "number_rows is a read only method" if @_;
+	carp 'number_rows is a read only method' if @_;
 	return $self->{last_row};
 }
 
 sub last_column {
 	my $self = shift;
-	carp "last_column is a read only method" if @_;
+	carp 'last_column is a read only method' if @_;
 	return $self->{number_columns} - 1;
 }
 
 sub last_row {
 	my $self = shift;
-	carp "last_row is a read only method" if @_;
+	carp 'last_row is a read only method' if @_;
 	return $self->{last_row};
 }
 
 sub filename {
 	my $self = shift;
-	carp "filename is a read only method. Use add_file_metadata()." if @_;
+	carp 'filename is a read only method. Use add_file_metadata().' if @_;
 	return $self->{filename};
 }
 
 sub basename {
 	my $self = shift;
-	carp "basename is a read only method. Use add_file_metadata()." if @_;
+	carp 'basename is a read only method. Use add_file_metadata().' if @_;
 	return $self->{basename};
 }
 
 sub path {
 	my $self = shift;
-	carp "path is a read only method. Use add_file_metadata()." if @_;
+	carp 'path is a read only method. Use add_file_metadata().' if @_;
 	return $self->{path};
 }
 
 sub extension {
 	my $self = shift;
-	carp "extension() is a read only method. Use add_file_metadata()." if @_;
+	carp 'extension() is a read only method. Use add_file_metadata().' if @_;
 	return $self->{extension};
 }
 
@@ -1241,7 +1241,7 @@ sub rewrite_vcf_headers {
 
 sub list_columns {
 	my $self = shift;
-	carp "list_columns is a read only method" if @_;
+	carp 'list_columns is a read only method' if @_;
 	my @list;
 	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
 		push @list, $self->{$i}{'name'};
@@ -1568,7 +1568,7 @@ sub interbase {
 			$self->name( $i, 'Start' );
 		}
 		else {
-			carp "use 1 (true) or 0 (false) to set interbase mode";
+			carp 'use 1 (true) or 0 (false) to set interbase mode';
 		}
 	}
 	return $self->{zerostart};

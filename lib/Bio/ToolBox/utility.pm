@@ -34,7 +34,7 @@ sub parse_list {
 	my $string = shift;
 	return unless defined $string;
 	if ( $string =~ /[^\d,\-\s\&]/ ) {
-		carp " the string contains characters that can't be parsed\n";
+		carp ' the string contains characters that cannot be parsed';
 		return;
 	}
 	my @list;
@@ -76,7 +76,7 @@ sub format_with_commas {
 		$integers = $2;
 	}
 	else {
-		carp " the string contains characters that can't be parsed\n";
+		carp ' the string contains characters that cannot be parsed';
 		return $number;
 	}
 
@@ -108,7 +108,7 @@ sub ask_user_for_index {
 	my $Data = shift;
 	my $line = shift || ' Enter the desired column index   ';
 	unless ( ref $Data =~ /Bio::ToolBox::Data/ ) {
-		carp "Must pass a Bio::ToolBox::Data object!\n";
+		carp 'Must pass a Bio::ToolBox::Data object!';
 		return;
 	}
 
@@ -116,7 +116,7 @@ sub ask_user_for_index {
 	unless (
 		# we use filename and column number as indicators
 		$Data->filename eq $DATA_FILENAME
-		and join( ";", $Data->list_columns ) eq $DATA_COLNAMES
+		and join( ';', $Data->list_columns ) eq $DATA_COLNAMES
 		)
 	{
 		print " These are the columns in the file\n";
@@ -128,7 +128,7 @@ sub ask_user_for_index {
 
 		# remember for next time
 		$DATA_FILENAME = $Data->filename;
-		$DATA_COLNAMES = join( ";", $Data->list_columns );
+		$DATA_COLNAMES = join( ';', $Data->list_columns );
 	}
 	print $line;
 

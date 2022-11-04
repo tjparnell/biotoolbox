@@ -26,7 +26,7 @@ sub load_file {
 
 	# check that we have an empty table
 	if ( $self->last_row != 0 or $self->number_columns != 0 or $self->filename ) {
-		carp "Cannot load file onto an existing data table!";
+		carp 'Cannot load file onto an existing data table!';
 		return;
 	}
 
@@ -232,12 +232,12 @@ sub parse_headers {
 	}
 	else {
 		confess
-			" file metadata and/or open filehandle must be set before parsing headers!";
+			' file metadata and/or open filehandle must be set before parsing headers!';
 	}
 
 	# check that we have an empty table
 	if ( $self->last_row != 0 or $self->number_columns != 0 ) {
-		cluck "Cannot parse file headers onto an existing data table!";
+		cluck 'Cannot parse file headers onto an existing data table!';
 		return;
 	}
 
@@ -536,7 +536,7 @@ sub add_data_line {
 ### Parse the filename using the list suffix list
 sub add_file_metadata {
 	my ( $self, $filename ) = @_;
-	confess "no valid filename!" unless defined $filename;
+	confess 'no valid filename!' unless defined $filename;
 	my ( $basename, $path, $extension ) = fileparse( $filename, $SUFFIX );
 	unless ($extension) {
 
@@ -570,13 +570,13 @@ sub write_file {
 
 	# check the data
 	unless ( $self->verify ) {
-		cluck "bad data structure!";
+		cluck 'bad data structure!';
 		return;
 	}
 
 	# check filename
 	unless ( $args{'filename'} or $self->filename ) {
-		cluck "no filename given!\n";
+		cluck 'no filename given!';
 		return;
 	}
 
@@ -837,7 +837,7 @@ sub write_file {
 
 		# write gff statement if gff format
 		if ( $self->gff ) {
-			$fh->print( '##gff-version ' . $self->gff . "\n" );
+			$fh->printf( "##gff-version %s\n", $self->gff );
 		}
 
 		# Write the primary headers
@@ -850,33 +850,33 @@ sub write_file {
 			# we only write these for normal text files, not defined format files
 
 			if ( $self->program ) {
-				$fh->print( '# Program ' . $self->program . "\n" );
+				$fh->printf( "# Program %s\n", $self->program );
 			}
 			if ( $self->database ) {
-				$fh->print( '# Database ' . $self->database . "\n" );
+				$fh->printf( "# Database %s\n", $self->database );
 			}
 			if ( $self->feature ) {
-				$fh->print( '# Feature ' . $self->feature . "\n" );
+				$fh->printf( "# Feature %s\n", $self->feature );
 			}
 		}
 
 		# Write the miscellaneous headers
-		foreach ( @{ $self->{'comments'} } ) {
+		foreach my $c ( @{ $self->{'comments'} } ) {
 
 			# write remaining miscellaneous header lines if present
 			# we do this for all files
-			unless (/\n$/s) {
+			unless ( $c =~ /\n$/s ) {
 
 				# append newline if not present
-				$_ .= "\n";
+				$c .= "\n";
 			}
 
 			# check for comment character at beginning
 			if (/^#/) {
-				$fh->print($_);
+				$fh->print($c);
 			}
 			else {
-				$fh->print( "# " . $_ );
+				$fh->print("# $c");
 			}
 		}
 
@@ -931,7 +931,7 @@ sub write_file {
 			# semi-colon into a single string.
 			# The column identifier is comprised of the word 'Column'
 			# and the index number joined by '_'.
-			$fh->print( "# Column_$i ", join( ";", @pairs ), "\n" );
+			$fh->printf( "# Column_$i %s\n", join( ';', @pairs ) );
 		}
 	}
 
@@ -996,7 +996,7 @@ sub open_to_read_fh {
 		$file = $self->filename || undef;
 	}
 	unless ($file) {
-		carp " no filename provided or associated with object!";
+		carp ' no filename provided or associated with object!';
 		return;
 	}
 
@@ -1032,7 +1032,7 @@ sub open_to_write_fh {
 
 	# check filename
 	unless ($filename) {
-		carp " no filename to write!";
+		carp ' no filename to write!';
 		return;
 	}
 
@@ -1040,7 +1040,7 @@ sub open_to_write_fh {
 	# assuming a maximum of 256, at least on Mac with HFS+, don't know about Linux
 	my $name = fileparse($filename);
 	if ( length $name > 255 ) {
-		carp " filename is too long! please shorten\n";
+		carp ' filename is too long! please shorten';
 		return;
 	}
 
@@ -1075,7 +1075,7 @@ sub open_to_write_fh {
 			$gzip_app = which('gzip');
 		}
 		unless ($gzip_app) {
-			croak "no gzip application in PATH to open compressed file handle output!\n";
+			croak 'no gzip application in PATH to open compressed file handle output!';
 		}
 	}
 	elsif ( $gz == 2 and not $bgzip_app ) {
@@ -1090,7 +1090,7 @@ sub open_to_write_fh {
 			$bgzip_app .= ' -@ 3 -c';
 		}
 		unless ($bgzip_app) {
-			croak "no bgzip application in PATH to open compressed file handle output!\n";
+			croak 'no bgzip application in PATH to open compressed file handle output!';
 		}
 	}
 	my $gzipper = $gz == 1 ? $gzip_app : $gz == 2 ? $bgzip_app : undef;

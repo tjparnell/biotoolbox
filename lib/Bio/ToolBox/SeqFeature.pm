@@ -236,7 +236,7 @@ sub phase {
 	if (@_) {
 		my $p = $_[0];
 		unless ( $p =~ /^[012\.]$/ ) {
-			cluck "phase must be 0, 1, 2 or .!";
+			cluck 'phase must be 0, 1, 2 or .!';
 		}
 		$self->[PHASE] = $p;
 	}
@@ -272,7 +272,7 @@ sub add_SeqFeature {
 			$count++;
 		}
 		else {
-			cluck "please use SeqFeature objects when adding sub features!";
+			cluck 'please use SeqFeature objects when adding sub features!';
 		}
 	}
 	return $count;
@@ -490,7 +490,7 @@ sub subtract {
 sub version {
 	my $self = shift;
 	if ( @_ and $_[0] ne '3' ) {
-		carp "sorry, only GFF version 3 is currently supported!";
+		carp 'sorry, only GFF version 3 is currently supported!';
 	}
 	return 3;
 }
@@ -561,7 +561,7 @@ sub gff_string {
 		next if $tag eq 'Parent';
 		my $value = $self->get_tag_values($tag);
 		if ( ref $value eq 'ARRAY' ) {
-			$value = join( ",", map { $self->_encode($_) } @{ $value } );
+			$value = join( ',', map { $self->_encode($_) } @{ $value } );
 		}
 		else {
 			$value = $self->_encode($value);

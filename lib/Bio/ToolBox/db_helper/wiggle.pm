@@ -55,7 +55,7 @@ sub collect_wig_position_scores {
 	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 
 		my $feature = $param->[$d];
-		confess "dataset is not a seqfeature object!"
+		confess 'dataset is not a seqfeature object!'
 			unless ref $feature =~ /seqfeature/i;
 
 		# Check which data to take based on strand
@@ -80,7 +80,7 @@ sub collect_wig_position_scores {
 				# get wigfile name
 				my @wigfiles = $feature->get_tag_values('wigfile');
 				my $wigfile  = shift @wigfiles;    # there should only be one wigfile
-				confess " no wigfile passed!\n" unless $wigfile;
+				confess ' no wigfile passed!' unless $wigfile;
 
 				# check for opened wigfile
 				my $wig;

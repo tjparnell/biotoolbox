@@ -20,7 +20,7 @@ sub open_file {
 
 	# check file
 	if ( $filename and $self->file and $filename ne $self->file ) {
-		confess "Must open new files with new Parser object!";
+		confess 'Must open new files with new Parser object!';
 	}
 	$filename ||= $self->file;
 	unless ($filename) {
@@ -36,7 +36,7 @@ sub open_file {
 	unless ($filetype) {
 		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
 		unless ( $flavor eq 'bed' ) {
-			confess "File is not a BED file!!! How did we get here?";
+			confess 'File is not a BED file!!! How did we get here?';
 		}
 		$self->{filetype} = $filetype;
 	}
@@ -121,7 +121,7 @@ sub next_feature {
 
 	# check that we have an open filehandle and not finished
 	unless ( $self->fh ) {
-		croak("no Bed file loaded to parse!");
+		croak 'no Bed file loaded to parse!';
 	}
 	return if $self->{'eof'};
 
@@ -158,7 +158,7 @@ sub parse_file {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		confess("no file loaded to parse!");
+		confess 'no file loaded to parse!';
 	}
 	return 1 if $self->{'eof'};
 

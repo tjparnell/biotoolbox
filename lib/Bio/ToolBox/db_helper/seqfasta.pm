@@ -224,7 +224,7 @@ sub collect_store_scores {
 
 			# data is in bigwig format
 			# we are abandoning this support
-			die " Supporting bigWig files via seqfeature attribute is no longer "
+			die ' Supporting bigWig files via seqfeature attribute is no longer '
 				. "supported.\n Please use bigWig files directly\n";
 		}
 		else {

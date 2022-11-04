@@ -84,26 +84,28 @@ my %SCORE_CALCULATOR_SUB = (
 
 		# the range value is 'min-max'
 		my $s = shift;
-		return '.' unless scalar(@{ $s });
-		return range(@{ $s });
+		return '.' unless scalar( @{$s} );
+		return range( @{$s} );
 	},
 	'stddev' => sub {
 
 		# we are using the standard deviation of the population,
 		# since these are the only scores we are considering
 		my $s = shift;
-		return '.' unless scalar(@{ $s });
-		return stddevp(@{ $s });
+		return '.' unless scalar( @{$s} );
+		return stddevp( @{$s} );
 	},
 	'rpm' => sub {
-		confess " The rpm methods have been deprecated due to complexity and "
-			. "the variable way of calculating the value. Collect counts and "
-			. "calculate your preferred way.\n";
+		confess <<NORPM;
+The rpm methods have been deprecated due to complexity and the variable way of 
+calculating the value. Collect counts and calculate your preferred way.
+NORPM
 	},
 	'rpkm' => sub {
-		confess " The rpm methods have been deprecated due to complexity and "
-			. "the variable way of calculating the value. Collect counts and "
-			. "calculate your preferred way.\n";
+		confess <<NORPM;
+The rpm methods have been deprecated due to complexity and the variable way of 
+calculating the value. Collect counts and calculate your preferred way.
+NORPM
 	}
 );
 
@@ -195,13 +197,13 @@ sub open_db_connection {
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not open remote Bam file" . " '$database'! $!\n";
+					$error .= sprintf " ERROR: could not open remote Bam file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " Bam database cannot be loaded because\n"
-					. " Bio::DB::Sam or Bio::DB::HTS is not installed\n";
+				$error .=
+" Bam database cannot be loaded because Bio::DB::Sam or Bio::DB::HTS is not installed\n";
 			}
 		}
 
@@ -213,13 +215,14 @@ sub open_db_connection {
 			if ($BIGBED_OK) {
 				$db = open_bigbed_db($database);
 				unless ($db) {
-					$error = " ERROR: could not open remote BigBed file"
-						. " '$database'! $!\n";
+					$error .=
+						sprintf " ERROR: could not open remote BigBed file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " BigBed database cannot be loaded because\n"
-					. " Bio::DB::Big or Bio::DB::BigBed is not installed\n";
+				$error .=
+" BigBed database cannot be loaded because Bio::DB::Big or Bio::DB::BigBed is not installed\n";
 			}
 		}
 
@@ -231,13 +234,14 @@ sub open_db_connection {
 			if ($BIGWIG_OK) {
 				$db = open_bigwig_db($database);
 				unless ($db) {
-					$error = " ERROR: could not open remote BigWig file"
-						. " '$database'! $!\n";
+					$error .=
+						sprintf " ERROR: could not open remote BigWig file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " BigWig database cannot be loaded because\n"
-					. " Bio::DB::Big or Bio::DB::BigWig is not installed\n";
+				$error .=
+" BigWig database cannot be loaded because Bio::DB::Big or Bio::DB::BigWig is not installed\n";
 			}
 		}
 
@@ -245,14 +249,14 @@ sub open_db_connection {
 		elsif ( $database =~ /\.useq$/ ) {
 
 			# uh oh! remote useq files are not supported
-			$error = " ERROR: remote useq files are not supported!\n";
+			$error .= " ERROR: remote useq files are not supported!\n";
 		}
 
 		# a remote fasta file???
 		elsif ( $database =~ /\.fa(?:sta)?$/i ) {
 
 			# uh oh! remote fasta files are not supported
-			$error = " ERROR: remote fasta files are not supported!\n";
+			$error .= " ERROR: remote fasta files are not supported!\n";
 		}
 
 		# a presumed remote directory, presumably of bigwig files
@@ -263,13 +267,15 @@ sub open_db_connection {
 			if ($BIGWIG_OK) {
 				$db = open_bigwigset_db($database);
 				unless ($db) {
-					$error = " ERROR: could not open presumed remote "
-						. "BigWigSet directory '$database'! $!\n";
+					$error .=
+						sprintf
+						" ERROR: could not open remote BigWigSet directory '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " Presumed BigWigSet database cannot be loaded because\n"
-					. " Bio::DB::BigWigSet is not installed\n";
+				$error .=
+" Presumed BigWigSet database cannot be loaded because Bio::DB::BigWigSet is not installed\n";
 			}
 		}
 
@@ -284,16 +290,15 @@ sub open_db_connection {
 			# open using appropriate bam adaptor
 			_load_bam_helper_module() unless $BAM_OK;
 			if ($BAM_OK) {
-				undef $@;
 				$db = open_bam_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not open local Bam file" . " '$database'! $@\n";
+					$error .= sprintf " ERROR: could not open local Bam file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " Bam database cannot be loaded because\n"
-					. " Bio::DB::Sam or Bio::DB::HTS is not installed\n";
+				$error .=
+" Bam database cannot be loaded because Bio::DB::Sam or Bio::DB::HTS is not installed\n";
 			}
 		}
 
@@ -303,16 +308,16 @@ sub open_db_connection {
 			# open using BigBed adaptor
 			$BIGBED_OK = _load_bigbed_helper_module() unless $BIGBED_OK;
 			if ($BIGBED_OK) {
-				undef $@;
 				$db = open_bigbed_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not open local BigBed file" . " '$database'! $@\n";
+					$error .=
+						sprintf " ERROR: could not open local BigBed file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " BigBed database cannot be loaded because\n"
-					. " Big::DB::Big or Bio::DB::BigBed is not installed\n";
+				$error .=
+" BigBed database cannot be loaded because Big::DB::Big or Bio::DB::BigBed is not installed\n";
 			}
 		}
 
@@ -322,16 +327,16 @@ sub open_db_connection {
 			# open using BigWig adaptor
 			$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
-				undef $@;
 				$db = open_bigwig_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not open local BigWig file" . " '$database'! $@\n";
+					$error .=
+						sprintf " ERROR: could not open local BigWig file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " BigWig database cannot be loaded because\n"
-					. " Big::DB::Big or Bio::DB::BigWig is not installed\n";
+				$error .=
+" BigWig database cannot be loaded because Big::DB::Big or Bio::DB::BigWig is not installed\n";
 			}
 		}
 
@@ -344,13 +349,13 @@ sub open_db_connection {
 			if ($USEQ_OK) {
 				$db = open_useq_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not open local useq file" . " '$database'! $!\n";
+					$error .= sprintf " ERROR: could not open local useq file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " Useq database cannot be loaded because\n"
-					. " Bio::DB::USeq is not installed\n";
+				$error .=
+" Useq database cannot be loaded because Bio::DB::USeq is not installed\n";
 			}
 		}
 
@@ -362,7 +367,9 @@ sub open_db_connection {
 			if ($BAM_OK) {
 				$db = open_indexed_fasta($database);
 				unless ($db) {
-					$error .= " ERROR: could not open indexed fasta file '$database'!\n";
+					$error .=
+						sprintf " ERROR: could not open indexed fasta file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
@@ -372,15 +379,16 @@ sub open_db_connection {
 				if ($SEQFASTA_OK) {
 					$db = open_fasta_db($database);
 					unless ($db) {
-						$error .= " ERROR: could not open fasta file '$database'!\n";
+						$error .= sprintf " ERROR: could not open fasta file '%s'! %s\n",
+							$database, $!;
 						if ( -e "$database\.index" ) {
 							$error .= "   Try deleting $database\.index and try again\n";
 						}
 					}
 				}
 				else {
-					$error .= " Fasta file could not be loaded because neither"
-						. " Bio::DB::HTS, Bio::DB::Sam, or Bio::DB::Fasta is installed\n";
+					$error .=
+" Fasta file could not be loaded because neither Bio::DB::HTS, Bio::DB::Sam, or Bio::DB::Fasta is installed\n";
 				}
 			}
 		}
@@ -392,13 +400,14 @@ sub open_db_connection {
 			if ($SEQFASTA_OK) {
 				$db = open_store_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not load SeqFeature database file '$database'!\n";
+					$error .=
+						sprintf " ERROR: could not load SeqFeature database file '%s'\n",
+						$database;
 				}
 			}
 			else {
-				$error .= " Module Bio::DB::SeqFeature::Store is required to load "
-					. "GFF and database files\n";
+				$error .=
+" Module Bio::DB::SeqFeature::Store is required to load GFF and database files\n";
 			}
 		}
 
@@ -415,13 +424,13 @@ sub open_db_connection {
 				undef $@;
 				$db = open_bam_db($database);
 				unless ($db) {
-					$error =
-						" ERROR: could not open local Cram file" . " '$database'! $@\n";
+					$error .= sprintf " ERROR: could not open local Cram file '%s'! %s\n",
+						$database, $!;
 				}
 			}
 			else {
-				$error = " Cram database cannot be loaded because\n"
-					. " Bio::DB::HTS is not installed\n";
+				$error .=
+" Cram database cannot be loaded because Bio::DB::HTS is not installed\n";
 			}
 		}
 
@@ -440,14 +449,15 @@ sub open_db_connection {
 		if ($BIGWIG_OK) {
 			$db = open_bigwigset_db($database);
 			unless ($db) {
-				$error = " ERROR: could not open local BigWigSet "
-					. "directory '$database'!\n";
+				$error .=
+					sprintf " ERROR: could not open local BigWigSet directory '%s'! %s\n",
+					$database, $!;
 				$error .= "   Does directory contain bigWig .bw files?\n";
 			}
 		}
 		else {
-			$error = " Presumed BigWigSet database cannot be loaded because\n"
-				. " Bio::DB::Big or Bio::DB::BigWigSet is not installed\n";
+			$error .=
+" Presumed BigWigSet database cannot be loaded because Bio::DB::Big or Bio::DB::BigWigSet is not installed\n";
 		}
 
 		# try opening with the Fasta adaptor
@@ -458,13 +468,13 @@ sub open_db_connection {
 				$db = open_fasta_db($database);
 				unless ($db) {
 					$error .= " ERROR: could not open fasta directory '$database'!\n";
-					$error .= "   Does directory contain fasta files? If it contains a"
-						. " directory.index file,\n   try deleting it and try again.\n";
+					$error .=
+"   Does directory contain fasta files? If it contains a directory.index file,\n   try deleting it and try again.\n";
 				}
 			}
 			else {
-				$error .= " Module Bio::DB::Fasta is required to open presumed fasta "
-					. "directory\n";
+				$error .=
+" Module Bio::DB::Fasta is required to open presumed fasta directory\n";
 			}
 		}
 	}
@@ -482,8 +492,8 @@ sub open_db_connection {
 			}
 		}
 		else {
-			$error .= " Module Bio::DB::SeqFeature::Store is required to connect "
-				. "to databases\n";
+			$error .=
+" Module Bio::DB::SeqFeature::Store is required to connect to databases\n";
 		}
 	}
 
@@ -699,7 +709,7 @@ sub verify_or_request_feature_types {
 					}
 				}
 				if (@files) {
-					push @good_datasets, join( "&", @files );
+					push @good_datasets, join( '&', @files );
 				}
 				else {
 					push @bad_datasets, $dataset;
@@ -729,13 +739,13 @@ sub verify_or_request_feature_types {
 
 						# verify
 						unless (%db_features) {
-							carp " provided database has no feature types "
-								. "to verify dataset(s) against!\n";
+							carp
+' provided database has no feature types to verify dataset(s) against!';
 						}
 					}
 					else {
 						# we need a database
-						carp " unable to verify dataset without database";
+						carp ' unable to verify dataset without database';
 					}
 				}
 
@@ -790,13 +800,13 @@ sub verify_or_request_feature_types {
 
 			# verify
 			unless (%db_features) {
-				carp " provided database has no feature types " . "to collect!\n";
+				carp ' provided database has no feature types to collect!';
 				return;
 			}
 		}
 		else {
 			# we need a database
-			carp " no database provided from which to collect features!\n";
+			carp ' no database provided from which to collect features!';
 			return;
 		}
 
@@ -818,11 +828,10 @@ sub verify_or_request_feature_types {
 		else {
 			# generic prompt
 			if ( $args{'single'} ) {
-				print " Enter one number for the data set or feature   ";
+				print ' Enter one number for the data set or feature   ';
 			}
 			else {
-				print " Enter the number(s) or range of the data set(s) or"
-					. " feature(s)   ";
+				print ' Enter the number(s) or range of the data set(s) or feature(s)   ';
 			}
 		}
 
@@ -857,7 +866,7 @@ sub verify_or_request_feature_types {
 
 				# if all are good
 				if ($check) {
-					push @good_datasets, join( "&", map { $db_features{$_} } @list );
+					push @good_datasets, join( '&', map { $db_features{$_} } @list );
 				}
 				else {
 					push @bad_datasets, $answer;
@@ -925,8 +934,8 @@ sub check_dataset_for_rpm_support {
 			$rpm_read_sum = sum_total_bam_alignments( $dataset, 0, 0, $cpu );
 		}
 		else {
-			carp " Bam support is not available! "
-				. "Is Bio::DB::Sam or Bio::DB::HTS installed?\n";
+			carp
+' Bam support is not available! Is Bio::DB::Sam or Bio::DB::HTS installed?';
 			return;
 		}
 	}
@@ -944,7 +953,7 @@ sub check_dataset_for_rpm_support {
 			$rpm_read_sum = sum_total_bigbed_features($dataset);
 		}
 		else {
-			carp " BigBed support is not available! " . "Is Bio::DB::BigBed installed?\n";
+			carp ' BigBed support is not available! Is Bio::DB::BigBed installed?';
 			return;
 		}
 	}
@@ -968,7 +977,7 @@ sub get_new_feature_list {
 	# check data object
 	my $data = $args{data} || undef;
 	unless ($data) {
-		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
+		confess q(must pass a 'data' key and Bio::ToolBox::Data object!);
 		return;
 	}
 	unless ( ref $data eq 'Bio::ToolBox::Data' ) {
@@ -994,7 +1003,7 @@ sub get_new_feature_list {
 	# Features to search for
 	my $searchFeature = $args{'feature'} || $args{'features'} || undef;
 	unless ($searchFeature) {
-		carp "no search feature types passed!";
+		carp 'no search feature types passed!';
 		return;
 	}
 	my @classes = split /,/, $searchFeature;    # it may or may not be a list
@@ -1014,7 +1023,7 @@ sub get_new_feature_list {
 	unless ($iterator) {
 
 		# there should be some features found in the database
-		carp "could not get feature iterator for database";
+		carp 'could not get feature iterator for database';
 		return;
 	}
 
@@ -1050,7 +1059,7 @@ sub get_new_genome_list {
 	# check data object
 	my $data = $args{data} || undef;
 	unless ($data) {
-		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
+		confess q(must pass a 'data' key and Bio::ToolBox::Data object!);
 	}
 	unless ( ref $data eq 'Bio::ToolBox::Data' ) {
 		confess 'must pass a Bio::ToolBox::Data object!';
@@ -1079,7 +1088,7 @@ sub get_new_genome_list {
 	my $chr_exclude = $args{'skip'} || $args{'chrskip'} || undef;
 	my @chromosomes = get_chromosome_list( $db, $chr_exclude );
 	unless (@chromosomes) {
-		carp " no sequence IDs were found in the database!\n";
+		carp ' no sequence IDs were found in the database!';
 		return;
 	}
 
@@ -1106,11 +1115,11 @@ sub get_new_genome_list {
 				);
 			}
 			else {
-				carp " Set::IntervalTree must be installed to use exclusion intervals!";
+				carp ' Set::IntervalTree must be installed to use exclusion intervals!';
 			}
 		}
 		else {
-			confess " Exclusion data must be a Bio::ToolBox::Data object!";
+			confess ' Exclusion data must be a Bio::ToolBox::Data object!';
 		}
 	}
 
@@ -1136,7 +1145,7 @@ sub get_new_genome_list {
 			$data->add_row( [ $chr, $start, $end ] );
 		}
 	}
-	print "   Kept " . $data->{'last_row'} . " windows.\n";
+	printf "   Kept %d windows.\n", $data->number_rows;
 
 	# Return the data structure
 	return 1;
@@ -1281,7 +1290,7 @@ sub get_segment_score {
 	# we will be passing this array on as a reference to the appropriate
 	# imported helper subroutine
 	# chromosome, start, stop, strand, strandedness, method, return type, db, dataset
-	confess "incorrect number of parameters passed!" unless scalar @_ == 9;
+	confess 'incorrect number of parameters passed!' unless scalar @_ == 9;
 
 	# check the database
 	$_[DB] = open_db_connection( $_[DB] ) if ( $_[DB] and not ref( $_[DB] ) );
@@ -1512,14 +1521,14 @@ sub get_chromosome_list {
 
 	# Return
 	unless (@chrom_lengths) {
-		carp " no chromosome sequences identified in database!\n";
+		carp ' no chromosome sequences identified in database!';
 		return;
 	}
 	return @chrom_lengths;
 }
 
 sub low_level_bam_fetch {
-	confess "incorrect number of parameters passed!" unless scalar @_ == 6;
+	confess 'incorrect number of parameters passed!' unless scalar @_ == 6;
 	my ( $sam, $tid, $start, $stop, $callback, $data ) = @_;
 
 	# run the the low level bam fetch based on which adapter is being used
@@ -1541,12 +1550,12 @@ sub low_level_bam_fetch {
 		return $index->fetch( $sam->bam, $tid, $start, $stop, $callback, $data );
 	}
 	else {
-		confess "no bam adapter loaded!\n";
+		confess 'no bam adapter loaded!';
 	}
 }
 
 sub low_level_bam_coverage {
-	confess "incorrect number of parameters passed!" unless scalar @_ == 4;
+	confess 'incorrect number of parameters passed!' unless scalar @_ == 4;
 	my ( $sam, $tid, $start, $stop ) = @_;
 
 	# run the the low level bam coverage based on which adapter is being used
@@ -1568,12 +1577,12 @@ sub low_level_bam_coverage {
 		return $index->coverage( $sam->bam, $tid, $start, $stop );
 	}
 	else {
-		confess "no bam adapter loaded!\n";
+		confess 'no bam adapter loaded!';
 	}
 }
 
 sub get_genomic_sequence {
-	confess "incorrect number of parameters passed!" unless scalar @_ == 4;
+	confess 'incorrect number of parameters passed!' unless scalar @_ == 4;
 	my ( $db, $chrom, $start, $stop ) = @_;
 
 	# check database
@@ -1600,8 +1609,8 @@ sub get_genomic_sequence {
 ### deprecated methods
 # just in case
 sub validate_included_feature {
-	confess "validate_included_feature() is no longer a valid method. "
-		. "Please update your script to the current API.\n";
+	confess 'validate_included_feature() is no longer a valid method. '
+		. 'Please update your script to the current API.';
 }
 
 ### Internal subroutine to retrieve the scores from an established region object
@@ -1649,7 +1658,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak
-" BigWig support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?";
+' BigWig support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?';
 			}
 		}
 
@@ -1672,7 +1681,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak
-" BigBed support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?";
+' BigBed support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?';
 			}
 		}
 
@@ -1689,8 +1698,8 @@ sub _lookup_db_method {
 				$score_method = \&collect_bam_scores;
 			}
 			else {
-				croak " Bam support is not enabled! "
-					. "Is Bio::DB::HTS or Bio::DB::Sam installed?\n";
+				croak
+' Bam support is not enabled! Is Bio::DB::HTS or Bio::DB::Sam installed?';
 			}
 		}
 
@@ -1713,7 +1722,7 @@ sub _lookup_db_method {
 				}
 			}
 			else {
-				croak " USeq support is not enabled! " . "Is Bio::DB::USeq installed?\n";
+				croak ' USeq support is not enabled! Is Bio::DB::USeq installed?';
 			}
 		}
 
@@ -1734,7 +1743,7 @@ sub _lookup_db_method {
 		# duh! we should, we probably opened the stupid database!
 		$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
 		croak
-" BigWigSet support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?"
+' BigWigSet support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?'
 			unless $BIGWIG_OK;
 
 		# the data collection depends on the method
@@ -1782,16 +1791,16 @@ sub _lookup_db_method {
 			$score_method = \&collect_store_scores;
 		}
 		else {
-			croak " SeqFeature Store support is not enabled! "
-				. "Is BioPerl and Bio::DB::SeqFeature::Store properly installed?\n";
+			croak
+' SeqFeature Store support is not enabled! Is BioPerl and Bio::DB::SeqFeature::Store properly installed?';
 		}
 	}
 
 	### Some other database?
 	else {
-		confess "no recognizeable dataset provided!" unless $param->[DATA];
-		confess "no database passed!"                unless $param->[DB];
-		confess sprintf "something went wrong! parameters: %s", join ', ', @{ $param };
+		confess 'no recognizeable dataset provided!' unless $param->[DATA];
+		confess 'no database passed!'                unless $param->[DB];
+		confess sprintf "something went wrong! parameters: %s", join ', ', @{$param};
 	}
 
 	### Cache and return the results

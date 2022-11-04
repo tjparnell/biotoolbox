@@ -28,14 +28,14 @@ sub wig_to_bigwig_conversion {
 	# Collect passed arguments
 	my %args = @_;
 	unless (%args) {
-		cluck "no arguments passed!";
+		cluck 'no arguments passed!';
 		return;
 	}
 
 	# wigfile
 	$args{wig} ||= undef;
 	unless ( $args{wig} ) {
-		cluck "no wig file passed!";
+		cluck 'no wig file passed!';
 		return;
 	}
 
@@ -44,7 +44,7 @@ sub wig_to_bigwig_conversion {
 	unless ( $args{bwapppath} ) {
 
 		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig")
+		$args{bwapppath} = $BTB_CONFIG->param('applications.wigToBigWig')
 			|| undef;
 	}
 	unless ( $args{bwapppath} ) {
@@ -66,8 +66,7 @@ sub wig_to_bigwig_conversion {
 		};
 	}
 	unless ( $args{bwapppath} ) {
-		warn " Utility 'wigToBigWig' not specified and can not be found!"
-			. " Conversion failed!\n";
+		warn " Utility 'wigToBigWig' not specified and can not be found! Conversion failed!\n";
 		return;
 	}
 
@@ -79,8 +78,7 @@ sub wig_to_bigwig_conversion {
 		# need to generate one from the database
 		$args{db} ||= undef;
 		unless ( $args{db} ) {
-			carp " No requisite database or chromosome info file provided!"
-				. " Conversion failed\n";
+			carp " No requisite database or chromosome info file provided! Conversion failed\n";
 			return;
 		}
 		$args{chromo} = generate_chromosome_file( $args{db} );
@@ -146,14 +144,14 @@ sub open_wig_to_bigwig_fh {
 	# Collect passed arguments
 	my %args = @_;
 	unless (%args) {
-		cluck "no arguments passed!";
+		cluck 'no arguments passed!';
 		return;
 	}
 
 	# bigWig output file
 	$args{bw} ||= $args{wig} || $args{out} || $args{file} || undef;
 	unless ( $args{bw} ) {
-		cluck "no output bw file name passed!";
+		cluck 'no output bw file name passed!';
 		return;
 	}
 	unless ( $args{bw} =~ /\.bw$/i ) {
@@ -165,7 +163,7 @@ sub open_wig_to_bigwig_fh {
 	unless ( $args{bwapppath} ) {
 
 		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig") || undef;
+		$args{bwapppath} = $BTB_CONFIG->param('applications.wigToBigWig') || undef;
 	}
 	unless ( $args{bwapppath} ) {
 
@@ -185,8 +183,7 @@ sub open_wig_to_bigwig_fh {
 		# need to generate one from the database
 		$args{db} ||= undef;
 		unless ( $args{db} ) {
-			cluck " No requisite database or chromosome info file provided!"
-				. " Conversion failed\n";
+			cluck " No requisite database or chromosome info file provided! Conversion failed\n";
 			return;
 		}
 		$args{chrskip} ||= undef;
@@ -218,14 +215,14 @@ sub open_bigwig_to_wig_fh {
 	# Collect passed arguments
 	my %args = @_;
 	unless (%args) {
-		cluck "no arguments passed!";
+		cluck 'no arguments passed!';
 		return;
 	}
 
 	# bigWig output file
 	$args{bw} ||= $args{wig} || $args{file} || undef;
 	unless ( $args{bw} ) {
-		cluck "no input bw file name passed!";
+		cluck 'no input bw file name passed!';
 		return;
 	}
 	unless ( $args{bw} =~ /\.bw$/i ) {
@@ -237,7 +234,7 @@ sub open_bigwig_to_wig_fh {
 	unless ( $args{bwapppath} ) {
 
 		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param("applications.bigWigToWig") || undef;
+		$args{bwapppath} = $BTB_CONFIG->param('applications.bigWigToWig') || undef;
 	}
 	unless ( $args{bwapppath} ) {
 
@@ -270,14 +267,14 @@ sub bed_to_bigbed_conversion {
 	# Collect passed arguments
 	my %args = @_;
 	unless (%args) {
-		cluck "no arguments passed!";
+		cluck 'no arguments passed!';
 		return;
 	}
 
 	# bedfile
 	$args{bed} ||= undef;
 	unless ( $args{bed} ) {
-		cluck "no bed file passed!";
+		cluck 'no bed file passed!';
 		return;
 	}
 

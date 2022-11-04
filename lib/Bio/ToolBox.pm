@@ -50,7 +50,7 @@ sub new_data {
 
 sub open_file {
 	my $self = shift;
-	cluck("Bio::ToolBox->open_file has been replaced by read_file");
+	cluck('Bio::ToolBox->open_file has been replaced by read_file');
 	return Bio::ToolBox::Data->open_to_read_fh(@_);
 }
 

@@ -115,7 +115,7 @@ sub get_exons {
 
 	# initialize
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my @exons;
 	my @cdss;
 	my @transcripts;
@@ -224,7 +224,7 @@ sub get_alt_common_exons {
 
 sub get_introns {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my @introns;
 
 	# find the exons and/or CDSs
@@ -327,7 +327,7 @@ sub _get_alt_common_things {
 	if ( scalar @_ == 1 ) {
 
 		# someone passed a gene, get the transcripts
-		confess "not a SeqFeature object!" unless ref( $_[0] ) =~ /seqfeature/i;
+		confess 'not a SeqFeature object!' unless ref( $_[0] ) =~ /seqfeature/i;
 		@transcripts = get_transcripts( $_[0] );
 	}
 	elsif ( scalar @_ > 1 ) {
@@ -397,7 +397,7 @@ sub _get_alt_common_things {
 sub get_transcripts {
 	my $gene = shift;
 	return                             unless $gene;
-	confess "not a SeqFeature object!" unless ref $gene =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $gene =~ /seqfeature/i;
 	return $gene if ( $gene->primary_tag =~ /rna|transcript/i );
 	my @transcripts;
 	my @exons;
@@ -535,7 +535,7 @@ sub collapse_transcripts {
 
 sub get_transcript_length {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	if ( $transcript->primary_tag =~ /gene$/i ) {
 
 		# someone passed a gene object!!!!
@@ -559,7 +559,7 @@ sub get_transcript_length {
 sub is_coding {
 	my $transcript = shift;
 	return                             unless $transcript;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	if ( $transcript->primary_tag =~ /gene$/i ) {
 
 		# someone passed a gene, check its subfeatures
@@ -602,7 +602,7 @@ sub is_coding {
 sub get_cds {
 	my $transcript = shift;
 	return                             unless $transcript;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my @cds;
 	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
 		push @cds, $subfeat if $subfeat->primary_tag eq 'CDS';
@@ -616,7 +616,7 @@ sub get_cds {
 
 sub get_cdsStart {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
 	if ( $transcript->strand >= 0 ) {
@@ -636,7 +636,7 @@ sub get_cdsStart {
 
 sub get_cdsEnd {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
 	if ( $transcript->strand >= 0 ) {
@@ -655,7 +655,7 @@ sub get_cdsEnd {
 
 sub get_transcript_cds_length {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my $total = 0;
 	foreach my $subf ( $transcript->get_SeqFeatures ) {
 		next unless $subf->primary_tag eq 'CDS';
@@ -666,7 +666,7 @@ sub get_transcript_cds_length {
 
 sub get_start_codon {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my $start_codon;
 
 	# look for existing one
@@ -707,7 +707,7 @@ sub get_start_codon {
 
 sub get_stop_codon {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my $stop_codon;
 
 	# look for existing one
@@ -750,7 +750,7 @@ sub get_stop_codon {
 
 sub get_utrs {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 
 	# collect the various types of subfeatures
 	my @exons;
@@ -853,7 +853,7 @@ sub get_utrs {
 			}
 			else {
 				# geometric error
-				croak " programmer geometric error!";
+				croak ' programmer geometric error!';
 			}
 		}
 	}
@@ -868,7 +868,7 @@ sub get_utrs {
 
 sub get_transcript_utr_length {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 	my $utrs  = get_utrs($transcript);
 	my $total = 0;
 	foreach my $utr (@{ $utrs }) {
@@ -879,7 +879,7 @@ sub get_transcript_utr_length {
 
 sub get_5p_utrs {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
@@ -891,7 +891,7 @@ sub get_5p_utrs {
 
 sub get_3p_utrs {
 	my $transcript = shift;
-	confess "not a SeqFeature object!" unless ref $transcript =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $transcript =~ /seqfeature/i;
 
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
@@ -933,7 +933,7 @@ sub gff_string {
 sub gtf_string {
 	my $feature = shift;
 	my $gene    = shift || undef;    # only present when recursing
-	confess "not a SeqFeature object!" unless ref $feature =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $feature =~ /seqfeature/i;
 
 	# process a gene
 	if ( $feature->primary_tag =~ /gene$/i and not defined $gene ) {
@@ -1017,7 +1017,7 @@ sub gtf_string {
 
 sub ucsc_string {
 	my $feature = shift;
-	confess "not a SeqFeature object!" unless ref $feature =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $feature =~ /seqfeature/i;
 	my @ucsc_list;
 
 	# process according to type
@@ -1053,8 +1053,8 @@ sub ucsc_string {
 			$ucsc->{'cdsStart'},
 			$ucsc->{'cdsEnd'},
 			$ucsc->{'exonCount'},
-			join( ",", @{ $ucsc->{'exonStarts'} } ) . ',',
-			join( ",", @{ $ucsc->{'exonEnds'} } ) . ',',
+			join( ',', @{ $ucsc->{'exonStarts'} } ) . ',',
+			join( ',', @{ $ucsc->{'exonEnds'} } ) . ',',
 		);
 	}
 	return $string;
@@ -1062,7 +1062,7 @@ sub ucsc_string {
 
 sub bed_string {
 	my $feature = shift;
-	confess "not a SeqFeature object!" unless ref $feature =~ /seqfeature/i;
+	confess 'not a SeqFeature object!' unless ref $feature =~ /seqfeature/i;
 	my @ucsc_list;
 
 	# process according to type
@@ -1105,8 +1105,8 @@ sub bed_string {
 			$ucsc->{'cdsEnd'},
 			0,
 			$ucsc->{'exonCount'},
-			join( ",", @sizes ),
-			join( ",", map { $_ - $ucsc->{'txStart'} } @{ $ucsc->{'exonStarts'} } ),
+			join( ',', @sizes ),
+			join( ',', map { $_ - $ucsc->{'txStart'} } @{ $ucsc->{'exonStarts'} } ),
 		);
 	}
 	return $string;
@@ -1231,7 +1231,7 @@ sub filter_transcript_biotype {
 	my $gene = shift;
 	return unless $gene;
 	my $check = shift;
-	confess "no biotype value to check provided!" unless $check;
+	confess 'no biotype value to check provided!' unless $check;
 
 	# get transcripts
 	my @transcripts;

@@ -43,19 +43,19 @@ sub column_name {
 
 sub feature_type {
 	my $self = shift;
-	carp "feature_type is a read only method" if @_;
+	carp 'feature_type is a read only method' if @_;
 	return $self->{data}->feature_type;
 }
 
 sub row_index {
 	my $self = shift;
-	carp "row_index is a read only method" if @_;
+	carp 'row_index is a read only method' if @_;
 	return $self->{'index'};
 }
 
 sub line_number {
 	my $self = shift;
-	carp "line_number is a read only method" if @_;
+	carp 'line_number is a read only method' if @_;
 	if ( exists $self->{data}->{line_count} ) {
 		return $self->{data}->{line_count};
 	}
@@ -69,7 +69,7 @@ sub line_number {
 
 sub row_values {
 	my $self = shift;
-	carp "row_values is a read only method" if @_;
+	carp 'row_values is a read only method' if @_;
 	my $row  = $self->{'index'};
 	my @data = @{ $self->{data}->{data_table}->[$row] };
 	return wantarray ? @data : \@data;
@@ -100,10 +100,10 @@ sub seq_id {
 			$self->{seqid} = $_[0];
 		}
 		elsif ( exists $self->{feature} ) {
-			carp "Unable to update seq_id for parsed SeqFeature objects";
+			carp 'Unable to update seq_id for parsed SeqFeature objects';
 		}
 		else {
-			carp "No Chromosome column to update!";
+			carp 'No Chromosome column to update!';
 		}
 	}
 
@@ -158,13 +158,13 @@ sub start {
 			}
 		}
 		elsif ( not $d ) {
-			carp "Start coordinate value is not an integer";
+			carp 'Start coordinate value is not an integer';
 		}
 		elsif ( exists $self->{feature} ) {
-			carp "Unable to update Start coordinate for parsed SeqFeature objects";
+			carp 'Unable to update Start coordinate for parsed SeqFeature objects';
 		}
 		else {
-			carp "No Start coordinate column to update!";
+			carp 'No Start coordinate column to update!';
 		}
 	}
 
@@ -219,13 +219,13 @@ sub end {
 			$self->{end} = $_[0];
 		}
 		elsif ( not $d ) {
-			carp "End coordinate value is not an integer";
+			carp 'End coordinate value is not an integer';
 		}
 		elsif ( exists $self->{feature} ) {
-			carp "Unable to update End coordinate for parsed SeqFeature objects";
+			carp 'Unable to update End coordinate for parsed SeqFeature objects';
 		}
 		else {
-			carp "No End coordinate column to update!";
+			carp 'No End coordinate column to update!';
 		}
 	}
 
@@ -271,10 +271,10 @@ sub strand {
 			$self->{strand} = $self->_strand( $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
-			carp "Unable to update Strand for parsed SeqFeature objects";
+			carp 'Unable to update Strand for parsed SeqFeature objects';
 		}
 		else {
-			carp "No Strand column to update!";
+			carp 'No Strand column to update!';
 		}
 	}
 
@@ -388,10 +388,10 @@ sub display_name {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
-			carp "Unable to update display_name for parsed SeqFeature objects";
+			carp 'Unable to update display_name for parsed SeqFeature objects';
 		}
 		else {
-			carp "No Name column to update!";
+			carp 'No Name column to update!';
 		}
 	}
 
@@ -417,7 +417,7 @@ sub display_name {
 
 sub coordinate {
 	my $self = shift;
-	carp "name is a read only method" if @_;
+	carp 'name is a read only method' if @_;
 
 	# to avoid auto-converting start0 coordinates, which might confuse people or programs,
 	# we will take the start value as is when it's available, otherwise calculate start
@@ -442,10 +442,10 @@ sub type {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
-			carp "Unable to update primary_tag for parsed SeqFeature objects";
+			carp 'Unable to update primary_tag for parsed SeqFeature objects';
 		}
 		else {
-			carp "No Type column to update!";
+			carp 'No Type column to update!';
 		}
 	}
 
@@ -472,7 +472,7 @@ sub type {
 
 sub primary_id {
 	my $self = shift;
-	carp "id is a read only method" if @_;
+	carp 'id is a read only method' if @_;
 	my $i = $self->{data}->id_column;
 	my $v = $self->value($i) if defined $i;
 	if ( defined $v and $v ne '.' ) {
@@ -487,7 +487,7 @@ sub primary_id {
 
 sub length {
 	my $self = shift;
-	carp "length is a read only method" if @_;
+	carp 'length is a read only method' if @_;
 	if ( $self->{data}->vcf ) {
 
 		# special case for vcf files, measure the length of the ALT allele
@@ -600,7 +600,7 @@ sub rewrite_gff_attributes {
 		$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 		push @pairs, "$key=$value";
 	}
-	$self->value( 8, join( "; ", @pairs ) );
+	$self->value( 8, join( '; ', @pairs ) );
 	return 1;
 }
 
@@ -640,7 +640,7 @@ sub rewrite_vcf_attributes {
 	# SAMPLES
 	foreach my $i ( 9 .. $self->{data}->last_column ) {
 		if (@order) {
-			$self->value( $i, join( ":", map { $self->{attributes}{$i}{$_} } @order ) );
+			$self->value( $i, join( ':', map { $self->{attributes}{$i}{$_} } @order ) );
 		}
 		else {
 			$self->value( $i, '.' );
@@ -657,7 +657,7 @@ sub rewrite_vcf_attributes {
 sub seqfeature {
 	my $self  = shift;
 	my $force = shift || 0;
-	carp "feature is a read only method" if @_;
+	carp 'feature is a read only method' if @_;
 	return $self->{feature}              if exists $self->{feature};
 
 	# normally this is only for named features in a data table
@@ -686,7 +686,7 @@ sub seqfeature {
 
 sub segment {
 	my $self = shift;
-	carp "segment is a read only method" if @_;
+	carp 'segment is a read only method' if @_;
 	return unless $self->{data}->database;
 	if ( $self->feature_type eq 'coordinate' ) {
 		my $chromo = $self->seq_id;
@@ -708,7 +708,7 @@ sub get_features {
 	my $self = shift;
 	my %args = @_;
 	my $db   = $args{db} || $self->{data}->open_meta_database || undef;
-	carp "no database defined to get features!" unless defined $db;
+	carp 'no database defined to get features!' unless defined $db;
 	return                                      unless $db->can('features');
 
 	# convert the argument style for most bioperl db APIs
@@ -768,7 +768,7 @@ sub _get_subfeature_sequence {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless (@{ $subfeatures }) {
-		carp "no subfeatures available! Returning parent sequence!";
+		carp 'no subfeatures available! Returning parent sequence!';
 
 		# just return the parent
 		undef $args->{subfeature};
@@ -852,7 +852,7 @@ sub get_score {
 	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $db );
 	unless ( $args{dataset} ) {
 		croak
-"provided dataset was unrecognized format or otherwise could not be verified!";
+'provided dataset was unrecognized format or otherwise could not be verified!';
 	}
 
 	# get positioned scores over subfeatures only
@@ -893,7 +893,7 @@ sub get_score {
 	}
 	else {
 		croak
-"data table does not have identifiable coordinate or feature identification columns for score collection";
+'data table does not have identifiable coordinate or feature identification columns for score collection';
 	}
 
 	# adjust coordinates as necessary
@@ -934,7 +934,7 @@ sub _get_subfeature_scores {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless (@{ $subfeatures }) {
-		carp "no subfeatures available! Returning parent score data!";
+		carp 'no subfeatures available! Returning parent score data!';
 
 		# just return the parent
 		undef $args->{subfeature};
@@ -973,7 +973,7 @@ sub get_relative_point_position_scores {
 	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $ddb );
 	unless ( $args{dataset} ) {
 		croak
-"provided dataset was unrecognized format or otherwise could not be verified!\n";
+'provided dataset was unrecognized format or otherwise could not be verified!';
 	}
 
 	# assign some defaults
@@ -983,7 +983,7 @@ sub get_relative_point_position_scores {
 	$args{avoid}        ||= undef;
 	$args{'method'}     ||= 'mean';    # in most cases this doesn't do anything
 	unless ( $args{extend} ) {
-		croak "must provide an extend value!";
+		croak 'must provide an extend value!';
 	}
 	$args{avoid} = undef unless ( $args{db} or $self->{data}->open_meta_database );
 
@@ -1036,7 +1036,7 @@ sub get_region_position_scores {
 	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $ddb );
 	unless ( $args{dataset} ) {
 		croak
-"provided dataset was unrecognized format or otherwise could not be verified!\n";
+'provided dataset was unrecognized format or otherwise could not be verified!\n';
 	}
 
 	# assign some defaults here, in case we get passed on to subfeature method
@@ -1104,7 +1104,7 @@ sub _get_subfeature_position_scores {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless (@{ $subfeatures }) {
-		carp "no subfeatures available! Returning parent score data!";
+		carp 'no subfeatures available! Returning parent score data!';
 
 		# just return the parent
 		undef $args->{subfeature};
@@ -1265,7 +1265,7 @@ sub calculate_reference {
 		$coordinate = $self->peak;
 	}
 	else {
-		confess "position must be one of 5, 3, 4, or 9";
+		confess 'position must be one of 5, 3, 4, or 9';
 	}
 	return $coordinate;
 }
@@ -1396,13 +1396,13 @@ sub fetch_alignments {
 
 	# verify - trusting that these are valid, else they will fail lower down in the code
 	unless ( $args{db} ) {
-		croak "must provide a Bam object database to fetch alignments!\n";
+		croak 'must provide a Bam object database to fetch alignments!';
 	}
 	unless ( $args{data} and ref( $args{data} ) eq 'HASH' ) {
-		croak "must provide a data HASH for the fetch callback!\n";
+		croak 'must provide a data HASH for the fetch callback!';
 	}
 	unless ( $args{callback} ) {
-		croak "must provide a callback code reference!\n";
+		croak 'must provide a callback code reference!';
 	}
 
 	# array of features to iterate, probably just one or subfeatures
@@ -1460,8 +1460,8 @@ sub bed_string {
 	my $self = shift;
 	my %args = @_;
 	$args{bed} ||= 6;    # number of bed columns
-	croak "bed count must be an integer!" unless $args{bed} =~ /^\d+$/;
-	croak "bed count must be at least 3!" unless $args{bed} >= 3;
+	croak 'bed count must be an integer!' unless $args{bed} =~ /^\d+$/;
+	croak 'bed count must be at least 3!' unless $args{bed} >= 3;
 
 	# coordinate information
 	$self->seqfeature;    # retrieve the seqfeature object first

@@ -21,11 +21,11 @@ sub open_file {
 
 	# check file
 	if ( $filename and $self->file and $filename ne $self->file ) {
-		confess "Must open new files with new Parser object!";
+		confess 'Must open new files with new Parser object!';
 	}
 	$filename ||= $self->file;
 	unless ($filename) {
-		cluck "No file name passed!\n";
+		cluck 'No file name passed!';
 		return;
 	}
 	if ( defined $self->{fh} ) {
@@ -37,7 +37,7 @@ sub open_file {
 	unless ($filetype) {
 		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
 		unless ( $flavor eq 'gff' ) {
-			confess "File is not a GFF file!!! How did we get here?";
+			confess 'File is not a GFF file!!! How did we get here?';
 		}
 		$self->{filetype} = $filetype;
 		if ( $filetype eq 'gtf' ) {
@@ -97,7 +97,7 @@ sub next_feature {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		croak("no GFF file loaded to parse!");
+		croak('no GFF file loaded to parse!');
 	}
 	return if $self->{'eof'};
 
@@ -222,7 +222,7 @@ sub parse_file {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		confess("no file loaded to parse!");
+		confess 'no file loaded to parse!';
 	}
 	return 1 if $self->{'eof'};
 
@@ -345,7 +345,7 @@ TOP_FEATURE_LOOP:
 			printf
 " GFF errors: %d features could not be associated with reported parents!\n",
 				scalar @{ $self->{orphans} };
-			printf " List: %s\n", join ", ", map { $_->primary_id } @{ $self->{orphans} };
+			printf " List: %s\n", join ', ', map { $_->primary_id } @{ $self->{orphans} };
 		}
 	}
 
@@ -353,7 +353,7 @@ TOP_FEATURE_LOOP:
 	if ( keys %{ $self->{duplicate_ids} } ) {
 		printf " GFF errors: %d IDs were duplicated\n",
 			scalar( keys %{ $self->{duplicate_ids} } );
-		printf " List: %s\n", join ", ", keys %{ $self->{duplicate_ids} };
+		printf " List: %s\n", join ', ', keys %{ $self->{duplicate_ids} };
 	}
 
 	return 1;

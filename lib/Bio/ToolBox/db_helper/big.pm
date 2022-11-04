@@ -499,7 +499,7 @@ sub collect_bigwigset_score {
 	my $ids = _lookup_bigwigset_wigs($param);
 	return unless scalar(@{ $ids }) > 0;
 	croak(
-"multiple selected bigWig files from a BigWigSet is not supported with single score method"
+'multiple selected bigWig files from a BigWigSet is not supported with single score method'
 	) if scalar(@{ $ids }) > 1;
 	push @{ $param }, @{ $ids };
 
@@ -681,7 +681,7 @@ use File::Spec;
 
 sub new {
 	my ( $class, $dir ) = @_;
-	croak "must call method new with a directory path!" unless $dir;
+	croak 'must call method new with a directory path!' unless $dir;
 	croak "BigWigSet '$dir' is not a directory path!"   unless -d $dir;
 	my $self = {
 		dir      => $dir,
@@ -720,7 +720,7 @@ sub new {
 
 					# a metadata line
 					croak
-"malformed metadata file! no bw file stanza header before metadata line!"
+'malformed metadata file! no bw file stanza header before metadata line!'
 						unless defined $current_bw;
 					$self->{metadata}{$current_bw}{$1} = $2;
 				}
@@ -912,12 +912,12 @@ sub new {
 	# check the bigBed object
 	my $bb = shift;
 	unless ( ref $bb eq 'Bio::DB::Big::File' and $bb->is_big_bed ) {
-		confess "passed big object is not a bigBed file!";
+		confess 'passed big object is not a bigBed file!';
 	}
 
 	# get coordinates
 	my ( $seqid, $start, $end ) = @_;
-	confess "no coordinates!"
+	confess 'no coordinates!'
 		unless ( defined $seqid and defined $start and defined $end );
 	$start -= 1;    # compensate for 0-based coordinates
 

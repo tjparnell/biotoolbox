@@ -138,8 +138,8 @@ sub _rewrite_config {
 			return 1;
 		}
 		else {
-			carp "unable to write updated configuration to $file!\n"
-				. $BTB_CONFIG->error . "\n";
+			carp sprintf "unable to write updated configuration to %s!\n%s\n",
+				$file, $BTB_CONFIG->error;
 			return;
 		}
 	}

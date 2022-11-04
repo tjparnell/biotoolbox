@@ -228,7 +228,7 @@ sub new {
 	}
 	else {
 		# unrecognized line format
-		carp "unrecognized format, line has " . scalar @{ $linedata } . "elements";
+		carp sprintf "unrecognized format, line has %d elements", scalar @{ $linedata };
 		return;
 	}
 
@@ -803,11 +803,10 @@ UTR_LOOP:
 
 		# Something else?
 		else {
-			my $warning = "Warning: A malformed UTR that doesn't match known criteria: ";
-			$warning .= "cdsStart " . $self->cdsStart;
-			$warning .= ", cdsEnd " . $self->cdsEnd;
-			$warning .= ", exonStart " . $self->exonStarts->[$i];
-			$warning .= ", exonEnd " . $self->exonEnds->[$i];
+			my $warning = sprintf
+"Warning: A malformed UTR that doesn't match known criteria: cdsStart %d, cdsEnd %d, exonStart %d, exonEnd %d",
+				$self->cdsStart, $self->cdsEnd, $self->exonStarts->[$i],
+				$self->exonEnds->[$i];
 			warn $warning;
 			next UTR_LOOP;
 		}
@@ -858,9 +857,9 @@ UTR_LOOP:
 					-strand      => $transcript->strand,
 					-phase       => '.',
 					-primary_tag => $tag2,
-					-primary_id  => $transcript->primary_id . ".utr$number" . "a",
+					-primary_id  => sprintf("%s.utr%da", $transcript->primary_id, $number),
 				);
-				$utr2->display_name( $transcript->display_name . ".utr$number" . "a" )
+				$utr2->display_name( sprintf("%s.utr%da", $transcript->display_name, $number) )
 					if $ucsc->do_name;
 			}
 
@@ -966,11 +965,10 @@ CDS_LOOP:
 
 		# Something else?
 		else {
-			my $warning = "Warning: A malformed CDS that doesn't match known criteria: ";
-			$warning .= "cdsStart " . $self->cdsStart;
-			$warning .= ", cdsEnd " . $self->cdsEnd;
-			$warning .= ", exonStart " . $self->exonStarts->[$j];
-			$warning .= ", exonEnd " . $self->exonEnds->[$j];
+			my $warning = sprintf
+"Warning: A malformed CDS that doesn't match known criteria: cdsStart %d, cdsEnd %d, exonStart %d, exonEnd %d",
+				$self->cdsStart, $self->cdsEnd, $self->exonStarts->[$j], 
+				$self->exonEnds->[$j];
 			warn $warning;
 			next CDS_LOOP;
 		}
@@ -984,8 +982,8 @@ CDS_LOOP:
 			-strand       => $transcript->strand,
 			-phase        => $phase,
 			-primary_tag  => 'CDS',
-			-primary_id   => $transcript->primary_id . ".cds$i",
-			-display_name => $transcript->display_name . ".cds$i",
+			-primary_id   => sprintf("%s.cds%d", $transcript->primary_id, $i),
+			-display_name => sprintf("%s.cds%d", $transcript->display_name, $i),
 		);
 
 		# the id and name still use $i for labeling to ensure numbering from 0

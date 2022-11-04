@@ -226,7 +226,7 @@ sub sum_total_bam_alignments {
 	my $cpu      = shift || 2;    # number of forks to execute in parallel
 	$cpu = 1 unless ($parallel);
 	unless ($sam_file) {
-		carp " no Bam file or bam db object passed!\n";
+		carp ' no Bam file or bam db object passed!';
 		return;
 	}
 

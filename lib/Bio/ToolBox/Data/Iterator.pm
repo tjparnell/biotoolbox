@@ -35,7 +35,7 @@ sub next_row {
 
 sub row_index {
 	my $self = shift;
-	carp "row_index is a read only method" if @_;
+	carp 'row_index is a read only method' if @_;
 	return $self->{'index'};
 }
 

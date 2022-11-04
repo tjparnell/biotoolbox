@@ -107,7 +107,7 @@ our %MULTI_SUMMARY_METHOD = (
 		return $count;
 	},
 	'stddev' => sub {
-		croak "cannot calculate stddev value from multiple bigWig Summary objects!";
+		croak 'cannot calculate stddev value from multiple bigWig Summary objects!';
 	},
 );
 
