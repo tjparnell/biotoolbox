@@ -64,7 +64,7 @@ sub verify {
 
 	# check for data table
 	unless ( defined $self->{'data_table'}
-		and ref $self->{'data_table'} eq 'ARRAY' )
+		and ref( $self->{'data_table'} ) eq 'ARRAY' )
 	{
 		carp sprintf "\n DATA INTEGRITY ERROR: No data table in %s object!", ref $self
 			unless $silence;
@@ -84,8 +84,7 @@ sub verify {
 	}
 	else {
 		# define it for them
-		$self->{'last_row'} =
-			scalar( @{ $self->{'data_table'} } ) - 1;
+		$self->{'last_row'} = scalar( @{ $self->{'data_table'} } ) - 1;
 	}
 
 	# check for consistent number of columns
@@ -183,7 +182,7 @@ sub verify {
 			# column 0 should look like chromosome
 			exists $self->{0}
 			and $self->{0}{'name'} !~
-			m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi
+			m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi
 			)
 		{
 			$gff_check = 0;
@@ -261,7 +260,7 @@ sub verify {
 		# check column index names
 		if ( exists $self->{0}
 			and $self->{0}{'name'} !~
-			m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+			m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 		{
 			$bed_check = 0;
 			$error .= ' Column 0 name not chromosome-like.';
@@ -447,7 +446,7 @@ sub verify {
 			# exonCount exonStarts exonEnds score name2 cdsStartSt
 			# cdsEndStat exonFrames
 			unless ( $self->{2}{name} =~
-				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 2 name not chromosome-like.';
@@ -464,7 +463,7 @@ sub verify {
 				$ucsc_check = 0;
 				$error .= ' Column 6 name not start-like.';
 			}
-			unless ( $self->{7}{name} =~ m/start | pos | position/xi ) {
+			unless ( $self->{7}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
 				$error .= ' Column 7 name not stop-like.';
 			}
@@ -492,7 +491,7 @@ sub verify {
 			# name chrom strand txStart txEnd cdsStart cdsEnd
 			# exonCount exonStarts exonEnds proteinID alignID
 			unless ( $self->{1}{name} =~
-				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 1 name not chromosome-like.';
@@ -532,7 +531,7 @@ sub verify {
 			# geneName transcriptName chrom strand txStart txEnd
 			# cdsStart cdsEnd exonCount exonStarts exonEnds
 			unless ( $self->{2}{name} =~
-				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 2 name not chromosome-like.';
@@ -572,7 +571,7 @@ sub verify {
 			# name chrom strand txStart txEnd cdsStart cdsEnd
 			# exonCount exonStarts exonEnds
 			unless ( $self->{1}{name} =~
-				m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 1 name not chromosome-like.';
@@ -698,7 +697,7 @@ sub verify {
 			$error .= ' Column number is not 3.';
 		}
 		if ( $self->{0}{'name'} !~
-			m/^#? (?: chr | chromo | seq | refseq | ref_seq | seq | seq_id )/xi )
+			m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 		{
 			$sgr_check = 0;
 			$error .= ' Column 0 name not chromosome-like.';
@@ -782,7 +781,7 @@ sub _column_is_numeric {
 
 			# we have a very loose definition of numeric: exponents, signs, commas
 			return 0 unless ( $self->{data_table}->[$row][$i] =~
-				m/^[ \d \- \+ \. , e E ]+$/x );
+				m/^ [\d\-\+\.,eE]+ $/x );
 		}
 	}
 	return 1;
@@ -893,7 +892,7 @@ sub delete_column {
 	my $self = shift;
 
 	# check for Stream
-	if ( ref $self eq 'Bio::ToolBox::Data::Stream' ) {
+	if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
 		unless ( $self->mode ) {
 			cluck 'We have a read-only Stream object, cannot add columns';
 			return;
@@ -933,7 +932,7 @@ sub reorder_column {
 	my $self = shift;
 
 	# check for Stream
-	if ( ref $self eq 'Bio::ToolBox::Data::Stream' ) {
+	if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
 		unless ( $self->mode ) {
 			cluck 'We have a read-only Stream object, cannot add columns';
 			return;
@@ -1179,7 +1178,7 @@ sub vcf_headers {
 	my $headers = {};
 	foreach my $comment ( $self->comments ) {
 		my ( $key, $value );
-		if ( $comment =~ m/^## ([\w \- \. ]+) = (.+)$/x ) {
+		if ( $comment =~ m/^ \#\# ( [\w\-\.]+ ) = (.+) $/x ) {
 			$key   = $1;
 			$value = $2;
 		}
@@ -1195,7 +1194,7 @@ sub vcf_headers {
 		else {
 			# process complex values
 			# extract ID with regex which should have
-			my $id = ( $value =~ m/ID = ([ \w \- \. : ]+)/x )[0];
+			my $id = ( $value =~ m/ID = ( [\w\-\.:]+ )/x )[0];
 			$headers->{$key}{$id} = $value;
 		}
 	}
@@ -1217,7 +1216,7 @@ sub rewrite_vcf_headers {
 	# common attributes
 	foreach my $key ( sort { $a cmp $b } keys %{ $self->{vcf_headers} } ) {
 		next if $key eq 'fileformat';
-		if ( ref $self->{vcf_headers}{$key} eq 'HASH' ) {
+		if ( ref( $self->{vcf_headers}{$key} ) eq 'HASH' ) {
 
 			# we have a complex VCF header with multiple keys
 			# we will rewrite for each ID
@@ -1384,7 +1383,7 @@ sub _find_column_indices {
 		# check if ID or name id looks like a coordinate string
 		if ( defined $id and defined $self->{data_table}->[1] ) {
 			if ( $self->{data_table}->[1][$id] =~
-				m/^[\w \- \.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
+				m/^ [\w\-\.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
 			{
 
 				# first value looks like a coordinate string
@@ -1396,7 +1395,7 @@ sub _find_column_indices {
 			and defined defined $self->{data_table}->[1] )
 		{
 			if ( $self->{data_table}->[1][$name] =~ 
-				m/^[\w \- \.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
+				m/^ [\w\-\.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
 			{
 				# first value looks like a coordinate string
 				$coord = $name;
@@ -1591,7 +1590,7 @@ sub interbase {
 # objects inherit from Data::core, this is in here.
 sub get_seqfeature {
 	my ( $self, $row ) = @_;
-	return unless ( ref $self eq 'Bio::ToolBox::Data' );
+	return unless ( ref($self) eq 'Bio::ToolBox::Data' );
 	return unless ( $row and $row <= $self->{last_row} );
 	return unless exists $self->{SeqFeatureObjects};
 	return $self->{SeqFeatureObjects}->[$row] || undef;

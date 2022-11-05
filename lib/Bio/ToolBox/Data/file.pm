@@ -276,28 +276,28 @@ sub parse_headers {
 		}
 
 		# the generating program
-		elsif ( $line =~ m/^#\ Program\ (.+)$/x ) {
+		if ( $line =~ m/^\#\ Program\ (.+)$/x ) {
 			my $p = $1;
 			$self->program($p);
 			$header_line_count++;
 		}
 
 		# the source database
-		elsif ( $line =~ m/^#\ Database\ (.+)$/x ) {
+		elsif ( $line =~ m/^\#\ Database\ (.+)$/x ) {
 			my $d = $1;
 			$self->database($d);
 			$header_line_count++;
 		}
 
 		# the type of feature in this datafile
-		elsif ( $line =~ m/^#\ Feature\ (.+)$/x ) {
+		elsif ( $line =~ m/^\#\ Feature\ (.+)$/x ) {
 			my $f = $1;
 			$self->feature($f);
 			$header_line_count++;
 		}
 
 		# column or dataset specific information
-		elsif ( $line =~ m/^#\ Column_(\d+)/x ) {
+		elsif ( $line =~ m/^\#\ Column_(\d+)/x ) {
 
 			# the column number will become the index number
 			my $index = $1;
@@ -306,7 +306,7 @@ sub parse_headers {
 		}
 
 		# gff version header
-		elsif ( $line =~ m/^## (g[vf]f) . version\s+ ( [\d\.]+ )$/x ) {
+		elsif ( $line =~ m/^\#\# (g[vf]f) . version\s+ ( [\d\.]+ )$/x ) {
 
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
@@ -334,7 +334,7 @@ sub parse_headers {
 		}
 
 		# VCF version header
-		elsif ( $line =~ m/^## fileformat=VCFv ( [\d\.]+ )$/x ) {
+		elsif ( $line =~ m/^\#\#\ fileformat=VCFv ( [\d\.]+ )$/x ) {
 
 			# store the VCF version in the hash
 			# this may or may not be present in the vcf file, but want to keep
@@ -347,7 +347,7 @@ sub parse_headers {
 		}
 
 		# any other nonstandard header
-		elsif ( $line =~ /^#/ ) {
+		elsif ( $line =~ /^\#/ ) {
 			$self->add_comment($line);
 			$header_line_count++;
 		}
@@ -487,7 +487,7 @@ sub parse_headers {
 			my $i = $self->add_column('Column1');
 			$self->reorder_column( $i, 0 .. $old_last );
 		}
-		if ( ref $self eq 'Bio::ToolBox::Data::Stream' ) {
+		if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
 
 			# store an example first line for Stream objects
 			chomp $nextdata[-1];
@@ -503,7 +503,7 @@ sub parse_headers {
 	$fh->close if $fh;    # may have been closed from the sanity check above
 	$fh = $self->open_to_read_fh;
 	for ( 1 .. $header_line_count ) {
-		my $line = $fh->getline;
+		my $discard = $fh->getline;
 	}
 	$self->{header_line_count} = $header_line_count;
 	$self->{fh}                = $fh;
@@ -872,7 +872,7 @@ sub write_file {
 			}
 
 			# check for comment character at beginning
-			if (/^#/) {
+			if ($c =~ /^#/) {
 				$fh->print($c);
 			}
 			else {
@@ -989,7 +989,7 @@ sub save {
 sub open_to_read_fh {
 	my $self = shift;
 	my $file = shift || undef;
-	my $obj  = ref $self =~ /^Bio::ToolBox/x ? 1 : 0;
+	my $obj  = ref($self) =~ /^Bio::ToolBox/x ? 1 : 0;
 
 	# check file
 	if ( not $file and $obj ) {
@@ -1138,7 +1138,7 @@ sub check_file {
 		# try adding some common file extensions in case those are missing
 		my $new_filename;
 		foreach my $ext (qw(.gz .txt .txt.gz .bed .bed.gz)) {
-			if ( -e $filename . $ext ) {
+			if ( -e "$filename\.$ext" ) {
 				$new_filename = $filename . $ext;
 				last;
 			}
@@ -1186,7 +1186,7 @@ sub add_column_metadata {
 
 	# strip the Column metadata identifier
 	chomp $line;
-	$line =~ s/^#\ Column_\d+\ //x;
+	$line =~ s/^\#\ Column_\d+\ //x;
 
 	# break up the column metadata
 	my %temphash;    # a temporary hash to put the column metadata into

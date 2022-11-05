@@ -93,7 +93,7 @@ sub open_store_db {
 
 		# check for empty passwords
 		# config::simple passes an empty array when nothing was defined
-		if ( ref $pass eq 'ARRAY' and scalar @{ $pass } == 0 ) { $pass = undef }
+		if ( ref($pass) eq 'ARRAY' and scalar @{ $pass } == 0 ) { $pass = undef }
 
 		# set up the dsn
 		# it can be specifically defined

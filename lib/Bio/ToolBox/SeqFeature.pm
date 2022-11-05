@@ -107,7 +107,7 @@ sub new {
 	if ( exists $args{-segments} ) {
 		$self->[SUBF] = [];
 		foreach my $s ( @{ $args{-segments} } ) {
-			unless ( ref $s eq $class ) {
+			unless ( ref($s) eq $class ) {
 				croak "segments should be passed as $class objects!";
 			}
 			push @{ $self->[SUBF] }, $s;
@@ -264,7 +264,7 @@ sub add_SeqFeature {
 	$self->[SUBF] ||= [];
 	my $count = 0;
 	foreach my $s (@_) {
-		if ( ref $s eq ref $self ) {
+		if ( ref($s) eq ref($self) ) {
 			$s->seq_id( $self->seq_id )         unless ( $s->seq_id );
 			$s->strand( $self->strand )         unless ( $s->strand );
 			$s->source_tag( $self->source_tag ) unless ( $s->source_tag );
@@ -379,7 +379,7 @@ sub length {
 
 sub overlaps {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref $other );
+	return unless ( $other and ref($other) );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return not( $self->start > $other->end
 		or $self->end < $other->start );
@@ -387,21 +387,21 @@ sub overlaps {
 
 sub contains {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref $other );
+	return unless ( $other and ref($other) );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return ( $other->start >= $self->start and $other->end <= $self->end );
 }
 
 sub equals {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref $other );
+	return unless ( $other and ref($other) );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return ( $other->start == $self->start and $other->end == $self->end );
 }
 
 sub intersection {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref $other );
+	return unless ( $other and ref($other) );
 	return unless ( $self->seq_id eq $other->seq_id );
 	my ( $start, $stop );
 	if ( $self->start >= $other->start ) {
@@ -426,7 +426,7 @@ sub intersection {
 
 sub union {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref $other );
+	return unless ( $other and ref($other) );
 	return unless ( $self->seq_id eq $other->seq_id );
 	my ( $start, $stop );
 	if ( $self->start <= $other->start ) {
@@ -451,7 +451,7 @@ sub union {
 
 sub subtract {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref $other );
+	return unless ( $other and ref($other) );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return if $self->equals($other);
 	my @pieces;
@@ -560,7 +560,7 @@ sub gff_string {
 		next if $tag eq 'ID';
 		next if $tag eq 'Parent';
 		my $value = $self->get_tag_values($tag);
-		if ( ref $value eq 'ARRAY' ) {
+		if ( ref($value) eq 'ARRAY' ) {
 			$value = join( ',', map { $self->_encode($_) } @{ $value } );
 		}
 		else {

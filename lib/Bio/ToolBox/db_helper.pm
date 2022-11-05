@@ -67,7 +67,7 @@ my %SCORE_CALCULATOR_SUB = (
 		my $s = shift;
 		my %name2count;
 		foreach my $n (@{ $s }) {
-			if ( ref $n eq 'ARRAY' ) {
+			if ( ref($n) eq 'ARRAY' ) {
 
 				# this is likely from a ncount indexed hash
 				foreach (@{ $n }) {
@@ -633,7 +633,7 @@ sub verify_or_request_feature_types {
 	# Collect the datasets
 	my @datasets;
 	$args{'feature'} ||= undef;
-	if ( ref $args{'feature'} eq 'ARRAY' ) {
+	if ( ref( $args{'feature'} ) eq 'ARRAY' ) {
 
 		# an anonymous array of datasets
 		@datasets = @{ $args{'feature'} };
@@ -980,7 +980,7 @@ sub get_new_feature_list {
 		confess q(must pass a 'data' key and Bio::ToolBox::Data object!);
 		return;
 	}
-	unless ( ref $data eq 'Bio::ToolBox::Data' ) {
+	unless ( ref($data) eq 'Bio::ToolBox::Data' ) {
 		confess 'must pass a Bio::ToolBox::Data object!';
 		return;
 	}
@@ -1061,7 +1061,7 @@ sub get_new_genome_list {
 	unless ($data) {
 		confess q(must pass a 'data' key and Bio::ToolBox::Data object!);
 	}
-	unless ( ref $data eq 'Bio::ToolBox::Data' ) {
+	unless ( ref($data) eq 'Bio::ToolBox::Data' ) {
 		confess 'must pass a Bio::ToolBox::Data object!';
 	}
 
@@ -1221,7 +1221,7 @@ sub get_db_feature {
 
 		# I used to append aliases to the end of the name in old versions of biotoolbox
 		# crazy, I know, but just in case this happened, let's try breaking them apart
-		my $name2 = ( split( /\s* [; , \|] \s*/x, $args{'name'} ) )[0];
+		my $name2 = ( split( /\s* [;,\|] \s*/x, $args{'name'} ) )[0];
 
 		# multiple names present using common delimiters ;,|
 		# take the first name only, assume others are aliases that we don't need
@@ -1322,7 +1322,7 @@ sub get_segment_score {
 
 		# this might be an array reference of scores that need to be combined
 		# or it could be a single scalar score which just needs to be returned
-		if ( ref $scores ) {
+		if ( ref($scores) eq 'ARRAY' ) {
 			return calculate_score( $_[METH], $scores );
 		}
 		else {
@@ -1361,7 +1361,7 @@ sub get_chromosome_list {
 
 	# Check for BigWigSet database
 	# these need to be handled a little differently
-	if ( ref $db =~ /BigWigSet/ ) {
+	if ( ref($db) =~ /BigWigSet/ ) {
 
 		# BigWigSet databases are the only databases that don't
 		# support the seq_ids method
@@ -1533,7 +1533,7 @@ sub low_level_bam_fetch {
 
 	# run the the low level bam fetch based on which adapter is being used
 	unless ($BAM_ADAPTER) {
-		$BAM_ADAPTER = ref $sam =~ /hts/i ? 'hts' : 'sam';
+		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
 	}
 	if ( $BAM_ADAPTER eq 'hts' ) {
 
@@ -1560,7 +1560,7 @@ sub low_level_bam_coverage {
 
 	# run the the low level bam coverage based on which adapter is being used
 	unless ($BAM_ADAPTER) {
-		$BAM_ADAPTER = ref $sam =~ /hts/i ? 'hts' : 'sam';
+		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
 	}
 	if ( $BAM_ADAPTER eq 'hts' ) {
 

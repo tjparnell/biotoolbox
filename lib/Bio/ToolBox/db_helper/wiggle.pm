@@ -56,7 +56,7 @@ sub collect_wig_position_scores {
 
 		my $feature = $param->[$d];
 		confess 'dataset is not a seqfeature object!'
-			unless ref $feature =~ /seqfeature/i;
+			unless ref($feature) =~ /seqfeature/i;
 
 		# Check which data to take based on strand
 		if (

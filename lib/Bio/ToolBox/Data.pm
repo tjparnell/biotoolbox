@@ -192,7 +192,7 @@ sub parse_table {
 	my $self = shift;
 	my $args = shift;
 	my $file;
-	if ( ref $args eq 'HASH' ) {
+	if ( ref($args) eq 'HASH' ) {
 		$file = $args->{file} || q();
 	}
 	else {
@@ -453,10 +453,10 @@ sub copy_column {
 sub add_row {
 	my $self = shift;
 	my @row_data;
-	if ( $_[0] and ref $_[0] eq 'ARRAY' ) {
+	if ( $_[0] and ref($_[0]) eq 'ARRAY' ) {
 		@row_data = @{ $_[0] };
 	}
-	elsif ( $_[0] and ref $_[0] eq 'Bio::ToolBox::Data::Feature' ) {
+	elsif ( $_[0] and ref($_[0]) eq 'Bio::ToolBox::Data::Feature' ) {
 		@row_data = $_[0]->row_values;
 	}
 	elsif ( $_[0] and $_[0] =~ /\t/ ) {
@@ -530,7 +530,7 @@ sub row_stream {
 sub iterate {
 	my $self = shift;
 	my $code = shift;
-	unless ( ref $code eq 'CODE' ) {
+	unless ( ref($code) eq 'CODE' ) {
 		confess 'iterate_function() method requires a code reference!';
 	}
 	my $stream = $self->row_stream;
@@ -544,7 +544,7 @@ sub iterate {
 
 sub store_seqfeature {
 	my ( $self, $row_i, $seqfeature ) = @_;
-	unless ( defined $row_i and ref $seqfeature ) {
+	unless ( defined $row_i and ref($seqfeature) ) {
 		confess 'must provide a row index and SeqFeature object!';
 	}
 	confess 'invalid row index' unless ( $row_i <= $self->last_row );
@@ -1036,25 +1036,25 @@ sub summary_file {
 	# either one or more datasets can be summarized
 	my $outfile = $args{'filename'} || undef;
 	my @datasets;
-	if ( $args{dataset} and ref $args{dataset} eq 'ARRAY' ) {
+	if ( $args{dataset} and ref( $args{dataset} ) eq 'ARRAY' ) {
 		@datasets = @{ $args{dataset} };
 	}
-	elsif ( $args{dataset} and ref $args{dataset} eq 'SCALAR' ) {
+	elsif ( $args{dataset} and ref( $args{dataset} ) eq 'SCALAR' ) {
 		push @datasets, $args{dataset};
 	}
 	my @startcolumns;
-	if ( $args{startcolumn} and ref $args{startcolumn} eq 'ARRAY' ) {
+	if ( $args{startcolumn} and ref( $args{startcolumn} ) eq 'ARRAY' ) {
 		@startcolumns = @{ $args{startcolumn} };
 	}
-	elsif ( $args{startcolumn} and ref $args{startcolumn} eq 'SCALAR' ) {
+	elsif ( $args{startcolumn} and ref( $args{startcolumn} ) eq 'SCALAR' ) {
 		push @startcolumns, $args{startcolumn};
 	}
 	my @endcolumns;
 	$args{endcolumn} ||= $args{stopcolumn};
-	if ( $args{endcolumn} and ref $args{endcolumn} eq 'ARRAY' ) {
+	if ( $args{endcolumn} and ref( $args{endcolumn} ) eq 'ARRAY' ) {
 		@endcolumns = @{ $args{endcolumn} };
 	}
-	elsif ( $args{endcolumn} and ref $args{endcolumn} eq 'SCALAR' ) {
+	elsif ( $args{endcolumn} and ref( $args{endcolumn} ) eq 'SCALAR' ) {
 		push @endcolumns, $args{endcolumn};
 	}
 

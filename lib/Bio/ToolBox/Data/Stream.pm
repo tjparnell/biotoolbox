@@ -313,7 +313,7 @@ sub write_row {
 sub iterate {
 	my $self = shift;
 	my $code = shift;
-	unless ( ref $code eq 'CODE' ) {
+	unless ( ref($code) eq 'CODE' ) {
 		cluck 'iterate_function() method requires a code reference!';
 		return;
 	}

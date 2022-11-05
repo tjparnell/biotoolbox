@@ -107,7 +107,7 @@ sub format_with_commas {
 sub ask_user_for_index {
 	my $Data = shift;
 	my $line = shift || ' Enter the desired column index   ';
-	unless ( ref $Data =~ /Bio::ToolBox::Data/x ) {
+	unless ( ref($Data) =~ /Bio::ToolBox::Data/x ) {
 		carp 'Must pass a Bio::ToolBox::Data object!';
 		return;
 	}
@@ -204,7 +204,7 @@ sub sane_chromo_sort {
 	foreach my $c (@chroms) {
 
 		my $name;
-		if ( ref $c eq 'ARRAY' ) {
+		if ( ref($c) eq 'ARRAY' ) {
 			$name = $c->[0];
 		}
 		else {

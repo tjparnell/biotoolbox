@@ -911,7 +911,7 @@ sub new {
 
 	# check the bigBed object
 	my $bb = shift;
-	unless ( ref $bb eq 'Bio::DB::Big::File' and $bb->is_big_bed ) {
+	unless ( ref($bb) eq 'Bio::DB::Big::File' and $bb->is_big_bed ) {
 		confess 'passed big object is not a bigBed file!';
 	}
 

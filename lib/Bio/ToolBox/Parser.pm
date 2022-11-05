@@ -175,7 +175,7 @@ sub new {
 
 sub do_gene {
 	my $self = shift;
-	return 0 if ( ref $self eq 'Bio::ToolBox::parser::bed' );
+	return 0 if ( ref($self) eq 'Bio::ToolBox::parser::bed' );
 	if (@_) {
 		$self->{'do_gene'} = shift;
 	}
@@ -216,7 +216,7 @@ sub do_codon {
 
 sub do_name {
 	my $self = shift;
-	return 0 unless ( ref $self eq 'Bio::ToolBox::parser::ucsc' );
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::ucsc' );
 
 	# does nothing with gff and bed
 	if (@_) {
@@ -227,7 +227,7 @@ sub do_name {
 
 sub share {
 	my $self = shift;
-	return 0 unless ( ref $self eq 'Bio::ToolBox::parser::ucsc' );
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::ucsc' );
 
 	# does nothing with gff and bed
 	if (@_) {
@@ -238,7 +238,7 @@ sub share {
 
 sub simplify {
 	my $self = shift;
-	return 0 unless ( ref $self eq 'Bio::ToolBox::parser::gff' );
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::gff' );
 
 	# does nothing with ucsc and bed
 	if ( defined $_[0] ) {

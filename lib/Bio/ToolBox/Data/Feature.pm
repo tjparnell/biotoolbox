@@ -530,7 +530,7 @@ sub gff_attributes {
 
 		# unescape URL encoded values, borrowed from Bio::DB::GFF
 		$value =~ tr/+/ /;
-		$value =~ s/%( [0-9 a-f A-F]{2} )/chr hex($1)/xge;
+		$value =~ s/%( [0-9a-fA-F]{2} )/chr hex($1)/xge;
 		$self->{attributes}->{$tag} = $value;
 	}
 	return $self->{attributes};
@@ -1274,7 +1274,7 @@ sub _avoid_positions {
 	my ( $self, $pos2data, $args, $seqid, $start, $stop ) = @_;
 
 	# first check the list of avoid types
-	if ( ref $args->{avoid} eq 'ARRAY' ) {
+	if ( ref( $args->{avoid} ) eq 'ARRAY' ) {
 
 		# we have types, presume they're ok
 	}

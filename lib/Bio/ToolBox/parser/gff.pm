@@ -116,7 +116,7 @@ sub next_feature {
 				$self->check_orphanage;
 				next;
 			}
-			elsif ( $line =~ m/^##sequence . region/xi ) {
+			elsif ( $line =~ m/^\#\#sequence . region/xi ) {
 
 				# sequence region pragma
 				my ( $pragma, $seq_id, $start, $stop ) = split /\s+/, $line;
