@@ -6,13 +6,13 @@ use Carp;
 use File::Spec;
 require Exporter;
 
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 ### Variables
 # Export
 our @ISA    = qw(Exporter);
 
-our @EXPORT = qw(
+our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 	ask_user_for_index
@@ -98,8 +98,8 @@ sub format_with_commas {
 	}
 
 	# finished
-	my $final = $sign ? $sign : '';
-	$final .= join( "", @formatted );
+	my $final = $sign ? $sign : q();
+	$final .= join( q(), @formatted );
 	$final .= '.' . $decimals if defined $decimals;
 	return $final;
 }
@@ -274,7 +274,7 @@ sub sane_chromo_sort {
 				$c =~ s/V/5/;
 				$c =~ s/I/1/g;
 				my $n = 0;
-				foreach ( split q(), $c ) {
+				foreach ( split m//, $c ) {
 					if ( $_ eq 'X' ) {
 						$n += 10;
 					}

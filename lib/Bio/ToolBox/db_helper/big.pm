@@ -3,12 +3,13 @@ package Bio::ToolBox::db_helper::big;
 use warnings;
 use strict;
 use Carp;
+use English qw(-no_match_vars);
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Big;
 require Exporter;
 
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 # Initialize CURL buffers
 BEGIN {
@@ -78,7 +79,7 @@ my %BIGWIGSET_WIGS;
 sub open_bigwig_db {
 	my $path = shift;
 	my $bw   = _open_big($path)
-		or croak " Unable to open bigWig file '$path'! $@\n";
+		or croak " Unable to open bigWig file '$path'!";
 	unless ( $bw->is_big_wig ) {
 		croak " $path is not a bigWig file!\n";
 	}
@@ -257,7 +258,7 @@ sub collect_bigwig_position_scores {
 sub open_bigbed_db {
 	my $path = shift;
 	my $bb   = _open_big($path)
-		or croak " Unable to open bigBed file '$path'! $@\n";
+		or croak " Unable to open bigBed file '$path'!";
 	unless ( $bb->is_big_bed ) {
 		croak " $path is not a bigBed file!\n";
 	}
@@ -544,8 +545,17 @@ sub _open_big {
 	$path =~ s/^file://;    # clean up file prefix if present
 	my $big;
 	eval { $big = Bio::DB::Big->open($path); };
-	return $big if $big;
-	return;
+	if ($big) {
+		return $big;
+	}
+	elsif ($EVAL_ERROR or $OS_ERROR) {
+		carp $EVAL_ERROR;
+		carp $OS_ERROR;
+		return;
+	}
+	else {
+		return;
+	}
 }
 
 sub _get_bigwig {
@@ -554,7 +564,7 @@ sub _get_bigwig {
 
 	# open and cache the bigFile object
 	my $bw = _open_big($file)
-		or croak " Unable to open big file '$file'! $@\n";
+		or croak " Unable to open big file '$file'! $OS_ERROR\n";
 	unless ( $bw->is_big_wig ) {
 		croak " $file is not a bigWig file!\n";
 	}
@@ -569,7 +579,7 @@ sub _get_bigbed {
 
 	# open and cache the bigFile object
 	my $bb = _open_big($file)
-		or croak " Unable to open big file '$file'! $@\n";
+		or croak " Unable to open big file '$file'! $OS_ERROR\n";
 	unless ( $bb->is_big_bed ) {
 		croak " $file is not a bigBed file!\n";
 	}
@@ -677,6 +687,7 @@ package Bio::ToolBox::db_helper::big::BigWigSet;
 use Carp;
 use IO::Dir;
 use IO::File;
+use English qw(-no_match_vars);
 use File::Spec;
 
 sub new {
@@ -690,7 +701,7 @@ sub new {
 	};
 
 	# read directory
-	my $D = IO::Dir->new($dir) or croak "unable to open $dir! $!";
+	my $D = IO::Dir->new($dir) or croak "unable to open $dir! $OS_ERROR";
 	while ( my $f = $D->read ) {
 		my $f_path = File::Spec->catfile( $dir, $f );
 		next unless -f $f_path;
@@ -704,7 +715,7 @@ sub new {
 			# a genuine metadata file - excellent!
 			# let's open it and parse the contents
 			my $fh = IO::File->new($f_path)
-				or croak "unable to read metadata file '$f_path'! $!";
+				or croak "unable to read metadata file '$f_path'! $OS_ERROR";
 			my $current_bw;    # the current bigwig file we're describing
 			while ( my $line = $fh->getline ) {
 				next if $line =~ /^#/;

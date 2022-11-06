@@ -5,7 +5,7 @@ use strict;
 use Carp qw(carp cluck croak confess);
 require Exporter;
 
-our $VERSION = '1.67';
+our $VERSION = '1.70';
 
 ### Export
 our @ISA       = qw(Exporter);
@@ -233,13 +233,13 @@ sub get_introns {
 	return if ( scalar(@exons) == 1 );
 
 	# identify the last exon index position
-	my $last = scalar(@exons) - 1;
+	my $last_i = scalar(@exons) - 1;
 
 	# forward strand
 	if ( $transcript->strand >= 0 ) {
 
 		# each intron is created based on the previous exon
-		for ( my $i = 0; $i < $last; $i++ ) {
+		for ( my $i = 0; $i < $last_i; $i++ ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
 				-seq_id       => $e->seq_id,
@@ -259,7 +259,7 @@ sub get_introns {
 	else {
 		# each intron is created based on the previous exon
 		# ordering from 5' to 3' end direction for convenience in naming
-		for ( my $i = $last; $i > 0; $i-- ) {
+		for ( my $i = $last_i; $i > 0; $i-- ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
 				-seq_id      => $e->seq_id,

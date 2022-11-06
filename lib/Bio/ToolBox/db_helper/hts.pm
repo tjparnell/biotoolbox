@@ -3,6 +3,7 @@ package Bio::ToolBox::db_helper::hts;
 use warnings;
 use strict;
 use Carp;
+use English qw(-no_match_vars);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::db_helper::alignment_callbacks;
 use Bio::DB::HTS;
@@ -15,7 +16,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '1.63';
+our $VERSION = '1.70';
 
 # Exported names
 our @ISA    = qw(Exporter);
@@ -63,13 +64,20 @@ sub open_bam_db {
 	check_bam_index($path);
 
 	# open the bam database object
+	# we specifically do not cache the bam object or chromosome names here
 	my $sam;
 	eval { $sam = Bio::DB::HTS->new( -bam => $path ); };
-	return unless $sam;
-
-	# we specifically do not cache the bam object or chromosome names here
-
-	return $sam;
+	if ($sam) {
+		return $sam;
+	}
+	elsif ($EVAL_ERROR or $OS_ERROR) {
+		carp $EVAL_ERROR;
+		carp $OS_ERROR;
+		return;
+	}
+	else {
+		return;
+	}
 }
 
 ### Open an indexed fasta file
@@ -132,7 +140,7 @@ sub collect_bam_scores {
 
 			# open and cache the bam file
 			$bam = open_bam_db($bamfile)
-				or croak " Unable to open bam file '$bamfile'! $!\n";
+				or croak " Unable to open bam file '$bamfile'!";
 			$OPENED_BAM{$bamfile} = $bam;
 
 			# record the chromosomes and possible variants
@@ -257,7 +265,7 @@ sub sum_total_bam_alignments {
 				$tid, 0,
 				$bam->target_len($tid),
 				sub {
-					my ( $a, $number ) = @_;
+					my ( $a, $n ) = @_;
 
 					# check alignment
 					my $flag = $a->flag;
@@ -273,7 +281,7 @@ sub sum_total_bam_alignments {
 					return if $a->qual < $min_mapq;
 
 					# count this fragment
-					$$number++;
+					${$n}++;
 				},
 				\$number
 			);
@@ -286,7 +294,7 @@ sub sum_total_bam_alignments {
 				$tid, 0,
 				$bam->target_len($tid),
 				sub {
-					my ( $a, $number ) = @_;
+					my ( $a, $n ) = @_;
 
 					# check alignment
 					my $flag = $a->flag;
@@ -297,7 +305,7 @@ sub sum_total_bam_alignments {
 					return if $a->qual < $min_mapq;
 
 					# count this fragment
-					$$number++;
+					${$n}++;
 				},
 				\$number
 			);
@@ -329,7 +337,7 @@ sub sum_total_bam_alignments {
 			sub {
 				my ( $pid, $exit_code, $ident, $exit_signal, $core_dump, $count ) =
 					@_;
-				$total_read_number += $$count;
+				$total_read_number += ${$count};
 			}
 		);
 

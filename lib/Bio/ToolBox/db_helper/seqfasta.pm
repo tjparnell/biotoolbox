@@ -3,6 +3,7 @@ package Bio::ToolBox::db_helper::seqfasta;
 use warnings;
 use strict;
 use Carp;
+use English qw(-no_match_vars);
 use Module::Load;    # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
@@ -12,7 +13,7 @@ use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 require Exporter;
 
-our $VERSION   = '1.54';
+our $VERSION   = '1.70';
 
 # Exported names
 our @ISA    = qw(Exporter);
@@ -194,8 +195,7 @@ sub collect_store_scores {
 			unless ($WIGGLE_OK) {
 				eval {
 					my $class = 'Bio::ToolBox::db_helper::wiggle';
-					load $class;
-					$class->import;
+					autoload $class;
 					$WIGGLE_OK = 1;
 				};
 			}
@@ -214,8 +214,7 @@ sub collect_store_scores {
 				}
 			}
 			else {
-				croak " Wiggle support is not enabled! $@\n"
-					. "Is Bio::Graphics::Wiggle installed?\n";
+				croak " Wiggle support is not enabled! $EVAL_ERROR\n";
 			}
 		}
 

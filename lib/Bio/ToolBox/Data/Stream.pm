@@ -6,7 +6,7 @@ use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Feature;
 
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 #### Initialize ####
 
@@ -318,7 +318,7 @@ sub iterate {
 		return;
 	}
 	while ( my $row = $self->next_row ) {
-		&$code($row);
+		&{$code}($row);
 	}
 	return 1;
 }

@@ -2,6 +2,7 @@ package Bio::ToolBox::Data::Feature;
 
 use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Carp qw(carp cluck croak confess);
 use Module::Load;
 use Bio::ToolBox::db_helper qw(
@@ -13,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::constants;
 
-our $VERSION = '1.691';
+our $VERSION = '1.70';
 
 my $GENETOOL_LOADED = 0;
 
@@ -474,9 +475,11 @@ sub primary_id {
 	my $self = shift;
 	carp 'id is a read only method' if @_;
 	my $i = $self->{data}->id_column;
-	my $v = $self->value($i) if defined $i;
-	if ( defined $v and $v ne '.' ) {
-		return $v;
+	if (defined $i) {
+		my $v = $self->value($i);
+		if ( defined $v and $v ne '.' ) {
+			return $v;
+		}
 	}
 	return $self->{feature}->primary_id if exists $self->{feature};
 	if ( my $att = $self->gff_attributes ) {
@@ -548,7 +551,7 @@ sub vcf_attributes {
 		%info = map { $_->[0] => defined $_->[1] ? $_->[1] : undef }
 
 			# some tags are simple and have no value, eg SOMATIC
-			map { [ split( /=/, $_ ) ] }
+			map { [ split( /=/ ) ] }
 			split( /;/, $self->value(7) );
 	}
 	$self->{attributes}->{INFO} = \%info;
@@ -807,8 +810,8 @@ sub _get_subfeatures {
 			'Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs
 				get_introns)
 		);
-		if ($@) {
-			croak "missing required modules! $@";
+		if ($EVAL_ERROR) {
+			croak "missing required modules! $EVAL_ERROR";
 		}
 		else {
 			$GENETOOL_LOADED = 1;
@@ -1320,14 +1323,14 @@ sub _avoid_positions {
 			next if ( $feat->primary_id eq $primary );
 
 			# now eliminate those scores which overlap this feature
-			my $start = $feat->start;
-			my $stop  = $feat->end;
+			my $f_start = $feat->start;
+			my $f_stop  = $feat->end;
 			foreach my $position ( keys %{ $pos2data } ) {
 
 				# delete the scored position if it overlaps with
 				# the offending feature
-				if (    $position >= $start
-					and $position <= $stop )
+				if (    $position >= $f_start
+					and $position <= $f_stop )
 				{
 					delete $pos2data->{$position};
 				}

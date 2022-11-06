@@ -535,7 +535,7 @@ sub iterate {
 	}
 	my $stream = $self->row_stream;
 	while ( my $row = $stream->next_row ) {
-		&$code($row);
+		&{$code}($row);
 	}
 	return 1;
 }
@@ -647,7 +647,7 @@ sub add_transcript_length {
 		# we should have stored SeqFeature objects, probably from parsed table
 		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
 			my $feature = $self->{SeqFeatureObjects}->[$i] or next;
-			my $length  = &$length_calculator($feature);
+			my $length  = &{$length_calculator}($feature);
 			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
 		}
 	}
@@ -666,7 +666,7 @@ sub add_transcript_length {
 				type => $self->value( $i, $type_i ) || undef,
 				id   => $self->value( $i, $id_i )   || undef,
 			) or next;
-			my $length = &$length_calculator($feature);
+			my $length = &{$length_calculator}($feature);
 			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
 			$self->store_seqfeature( $i, $feature );
 
@@ -1008,15 +1008,15 @@ sub reload_children {
 
 	# load remaining files
 	foreach my $file (@files) {
-		my $Stream = $class->new( in => $file );
-		if ( $Stream->number_columns != $self->number_columns ) {
+		my $Stream1 = $class->new( in => $file );
+		if ( $Stream1->number_columns != $self->number_columns ) {
 			confess "fatal error: child file $file has a different number of columns!";
 		}
-		while ( my $row = $Stream->next_row ) {
+		while ( my $row = $Stream1->next_row ) {
 			my $a = $row->row_values;
 			$self->add_row($a);
 		}
-		$Stream->close_fh;
+		$Stream1->close_fh;
 	}
 	$self->verify;
 

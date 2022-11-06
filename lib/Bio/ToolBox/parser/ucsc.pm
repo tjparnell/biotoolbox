@@ -123,7 +123,7 @@ sub load_extra_data {
 
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($file);
 	unless ($fh) {
-		carp "unable to open file '$file'! $!";
+		carp "unable to open file '$file'!";
 		return;
 	}
 

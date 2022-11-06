@@ -2,6 +2,7 @@ package Bio::ToolBox::Data::file;
 
 use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use File::Which;
@@ -1006,18 +1007,18 @@ sub open_to_read_fh {
 
 		# the file is compressed with gzip
 		$fh = IO::File->new("gzip -dc $file |")
-			or carp "unable to read '$file' $!\n";
+			or carp "unable to read '$file': $OS_ERROR\n";
 	}
 	elsif ( $file =~ /\.bz2$/i ) {
 
 		# the file is compressed with bzip2
 		$fh = IO::File->new("bzip2 -dc $file |")
-			or carp "unable to read '$file' $!\n";
+			or carp "unable to read '$file': $OS_ERROR\n";
 	}
 	else {
 		# the file is uncompressed and space hogging
 		$fh = IO::File->new( $file, 'r' )
-			or carp "unable to read '$file' $!\n";
+			or carp "unable to read '$file': $OS_ERROR\n";
 	}
 
 	if ($obj) {
@@ -1106,19 +1107,19 @@ sub open_to_write_fh {
 	my $fh;
 	if ( not $gzipper and not $append ) {
 		$fh = IO::File->new( $filename, 'w' )
-			or carp "cannot write to file '$filename' $!\n";
+			or carp "cannot write to file '$filename': $OS_ERROR\n";
 	}
-	elsif ( $gzipper and !$append ) {
+	elsif ( $gzipper and not $append ) {
 		$fh = IO::File->new("| $gzipper >$filename")
-			or carp "cannot write to compressed file '$filename' $!\n";
+			or carp "cannot write to compressed file '$filename': $OS_ERROR\n";
 	}
 	elsif ( not $gzipper and $append ) {
 		$fh = IO::File->new(">> $filename")
-			or carp "cannot append to file '$filename' $!\n";
+			or carp "cannot append to file '$filename': $OS_ERROR\n";
 	}
 	elsif ( $gzipper and $append ) {
 		$fh = IO::File->new("| $gzipper >>$filename")
-			or carp "cannot append to compressed file '$filename' $!\n";
+			or carp "cannot append to compressed file '$filename': $OS_ERROR\n";
 	}
 	return $fh if defined $fh;
 }

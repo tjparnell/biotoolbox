@@ -3,13 +3,14 @@ package Bio::ToolBox::db_helper::bigwig;
 use warnings;
 use strict;
 use Carp;
+use English qw(-no_match_vars);
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
 require Exporter;
 
-our $VERSION = '1.51';
+our $VERSION = '1.70';
 
 # Exported names
 our @ISA    = qw(Exporter);
@@ -308,9 +309,17 @@ sub open_bigwig_db {
 	# open
 	my $bw;
 	eval { $bw = Bio::DB::BigWig->new( -bigwig => $path ); };
-	return unless $bw;
-
-	return $bw;
+	if ($bw) {
+		return $bw;
+	}
+	elsif ( $EVAL_ERROR or $OS_ERROR ) {
+		carp $EVAL_ERROR;
+		carp $OS_ERROR;
+		return;
+	}
+	else {
+		return;
+	}
 }
 
 ### Open a bigWigSet database connection
@@ -333,7 +342,11 @@ sub open_bigwigset_db {
 			-feature_type => 'region',
 		);
 	};
-	return unless $bws;
+	if ( not $bws and ($EVAL_ERROR or $OS_ERROR) ) {
+		carp $EVAL_ERROR;
+		carp $OS_ERROR;
+		return;
+	}
 
 	# check that we haven't just opened a new empty bigwigset object
 	my @paths = $bws->bigwigs;
@@ -399,7 +412,7 @@ sub _get_bw {
 
 	# open and cache the bigWig object
 	my $bw = open_bigwig_db($bwfile)
-		or croak " Unable to open bigWig file '$bwfile'! $!\n";
+		or croak " Unable to open bigWig file '$bwfile'!";
 	$OPENED_BW{$bwfile} = $bw;
 	_record_seqids( $bwfile, $bw );
 	return $bw;

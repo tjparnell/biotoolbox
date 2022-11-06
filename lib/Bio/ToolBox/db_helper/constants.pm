@@ -3,6 +3,8 @@ package Bio::ToolBox::db_helper::constants;
 use strict;
 require Exporter;
 
+our $VERSION = '1.70';
+
 use constant {
 	CHR  => 0,    # chromosome
 	STRT => 1,    # start

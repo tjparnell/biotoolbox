@@ -3,7 +3,9 @@ package Bio::ToolBox::db_helper::config;
 use warnings;
 use strict;
 use Carp;
+use English qw(-no_match_vars);
 use File::Spec;
+use IO::File;
 use Config::Simple;
 require Exporter;
 
@@ -113,17 +115,15 @@ sub add_program {
 }
 
 sub _write_new_config {
-	open( FH, '>', $default_path )
-		or croak "Cannot write biotoolbox configuration file $default_path!\n$!\n";
-	print FH $default;
-	close FH;
+	my $fh = IO::File->new( '>', $default_path )
+		or croak "Cannot write biotoolbox configuration file $default_path! $OS_ERROR\n";
+	$fh->print($default);
+	$fh->close;
 	$config_path = $default_path;
 	$BTB_CONFIG->read($default_path);
 }
 
 sub _rewrite_config {
-
-	# write new config file
 	my $updated;
 	if ( -w $config_path ) {
 		$updated = $BTB_CONFIG->write;

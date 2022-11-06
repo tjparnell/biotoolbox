@@ -2,6 +2,7 @@ package Bio::ToolBox::db_helper::useq;
 
 use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Carp;
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
@@ -9,7 +10,7 @@ use Bio::ToolBox::db_helper::constants;
 use Bio::DB::USeq;
 require Exporter;
 
-our $VERSION = '1.51';
+our $VERSION = '1.70';
 
 # Exported names
 our @ISA    = qw(Exporter);
@@ -298,7 +299,7 @@ sub _get_useq {
 
 	# open and cache the USeq object
 	my $useq = open_useq_db($useqfile)
-		or croak " Unable to open USeq file '$useqfile'! $!\n";
+		or croak " Unable to open USeq file '$useqfile'! $OS_ERROR\n";
 	$OPENED_USEQ{$useqfile} = $useq;
 
 	# record the chromosomes and possible variants

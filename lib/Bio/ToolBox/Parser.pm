@@ -2,9 +2,10 @@ package Bio::ToolBox::Parser;
 
 use warnings;
 use strict;
+use English qw(-no_match_vars);
+use Carp qw(carp cluck croak confess);
 use Module::Load;
 use Bio::ToolBox::Data;
-use Carp qw(carp cluck croak confess);
 use Bio::ToolBox::SeqFeature;    # alternative to Bio::SeqFeature::Lite
 
 our $VERSION = 1.70;
@@ -125,8 +126,8 @@ sub new {
 	if ( exists $args{class} ) {
 		my $class = $args{class};
 		eval { load $class; };
-		if ($@) {
-			croak $@;
+		if ($EVAL_ERROR) {
+			croak $EVAL_ERROR;
 		}
 		else {
 			$self->{sfclass} = $class;

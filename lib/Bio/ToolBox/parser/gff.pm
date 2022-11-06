@@ -420,7 +420,7 @@ sub _gff3_to_seqf {
 	my $feature = $self->_gff_to_seqf($fields);
 
 	# process the group tags
-	my %att = map { split /=/, $_ } split /;\s?/, $fields->[8];
+	my %att = map { split /=/ } split /;\s?/, $fields->[8];
 
 	# add essential attributes
 	if ( exists $att{'ID'} ) {

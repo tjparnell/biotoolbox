@@ -3,22 +3,27 @@ package Bio::ToolBox::db_helper;
 use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
+use English qw(-no_match_vars);
 use Module::Load;    # for dynamic loading during runtime
 use List::Util qw(min max sum0 uniq);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::constants;
-use Bio::ToolBox::utility;
+use Bio::ToolBox::utility qw(
+	parse_list
+	format_with_commas
+	sane_chromo_sort
+);
 require Exporter;
 
 our $VERSION = '1.70';
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources
-our $BAM_OK      = 0;
-our $BIGBED_OK   = 0;
-our $BIGWIG_OK   = 0;
-our $SEQFASTA_OK = 0;
-our $USEQ_OK     = 0;
+my $BAM_OK      = 0;
+my $BIGBED_OK   = 0;
+my $BIGWIG_OK   = 0;
+my $SEQFASTA_OK = 0;
+my $USEQ_OK     = 0;
 our $BAM_ADAPTER = undef;    # preference for which bam adapter to use
 our $BIG_ADAPTER = undef;
 
@@ -197,8 +202,8 @@ sub open_db_connection {
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
 				unless ($db) {
-					$error .= sprintf " ERROR: could not open remote Bam file '%s'! %s\n",
-						$database, $!;
+					$error .= sprintf " ERROR: could not open remote Bam file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -216,8 +221,8 @@ sub open_db_connection {
 				$db = open_bigbed_db($database);
 				unless ($db) {
 					$error .=
-						sprintf " ERROR: could not open remote BigBed file '%s'! %s\n",
-						$database, $!;
+						sprintf " ERROR: could not open remote BigBed file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -235,8 +240,8 @@ sub open_db_connection {
 				$db = open_bigwig_db($database);
 				unless ($db) {
 					$error .=
-						sprintf " ERROR: could not open remote BigWig file '%s'! %s\n",
-						$database, $!;
+						sprintf " ERROR: could not open remote BigWig file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -269,8 +274,8 @@ sub open_db_connection {
 				unless ($db) {
 					$error .=
 						sprintf
-						" ERROR: could not open remote BigWigSet directory '%s'! %s\n",
-						$database, $!;
+						" ERROR: could not open remote BigWigSet directory '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -292,8 +297,8 @@ sub open_db_connection {
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
 				unless ($db) {
-					$error .= sprintf " ERROR: could not open local Bam file '%s'! %s\n",
-						$database, $!;
+					$error .= sprintf " ERROR: could not open local Bam file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -311,8 +316,8 @@ sub open_db_connection {
 				$db = open_bigbed_db($database);
 				unless ($db) {
 					$error .=
-						sprintf " ERROR: could not open local BigBed file '%s'! %s\n",
-						$database, $!;
+						sprintf " ERROR: could not open local BigBed file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -330,8 +335,8 @@ sub open_db_connection {
 				$db = open_bigwig_db($database);
 				unless ($db) {
 					$error .=
-						sprintf " ERROR: could not open local BigWig file '%s'! %s\n",
-						$database, $!;
+						sprintf " ERROR: could not open local BigWig file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -349,8 +354,8 @@ sub open_db_connection {
 			if ($USEQ_OK) {
 				$db = open_useq_db($database);
 				unless ($db) {
-					$error .= sprintf " ERROR: could not open local useq file '%s'! %s\n",
-						$database, $!;
+					$error .= sprintf " ERROR: could not open local useq file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -368,8 +373,8 @@ sub open_db_connection {
 				$db = open_indexed_fasta($database);
 				unless ($db) {
 					$error .=
-						sprintf " ERROR: could not open indexed fasta file '%s'! %s\n",
-						$database, $!;
+						sprintf " ERROR: could not open indexed fasta file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -379,8 +384,8 @@ sub open_db_connection {
 				if ($SEQFASTA_OK) {
 					$db = open_fasta_db($database);
 					unless ($db) {
-						$error .= sprintf " ERROR: could not open fasta file '%s'! %s\n",
-							$database, $!;
+						$error .= sprintf " ERROR: could not open fasta file '%s'!\n",
+							$database;
 						if ( -e "$database\.index" ) {
 							$error .= "   Try deleting $database\.index and try again\n";
 						}
@@ -421,11 +426,10 @@ sub open_db_connection {
 			}
 			_load_bam_helper_module() unless $BAM_OK;
 			if ($BAM_OK) {
-				undef $@;
 				$db = open_bam_db($database);
 				unless ($db) {
-					$error .= sprintf " ERROR: could not open local Cram file '%s'! %s\n",
-						$database, $!;
+					$error .= sprintf " ERROR: could not open local Cram file '%s'!\n",
+						$database;
 				}
 			}
 			else {
@@ -450,8 +454,8 @@ sub open_db_connection {
 			$db = open_bigwigset_db($database);
 			unless ($db) {
 				$error .=
-					sprintf " ERROR: could not open local BigWigSet directory '%s'! %s\n",
-					$database, $!;
+					sprintf " ERROR: could not open local BigWigSet directory '%s'!\n",
+					$database;
 				$error .= "   Does directory contain bigWig .bw files?\n";
 			}
 		}
@@ -571,10 +575,10 @@ sub get_dataset_list {
 		# collect the database types,
 		# sort first by source, then by method
 		@types = (
-			map $_->[2],
+			map { $_->[2] }
 			sort { ( $a->[0] cmp $b->[0] ) or ( $a->[1] cmp $b->[1] ) }
-				map [ $_->source, $_->method, $_ ],
-			$db->types
+			map { [ $_->source, $_->method, $_ ] }
+			( $db->types )
 		);
 	}
 
@@ -1297,7 +1301,7 @@ sub get_segment_score {
 
 	# check for combined datasets
 	if ( $_[DATA] =~ /&/ ) {
-		push @_, ( split '&', pop @_ );
+		push @_, ( split /&/, pop @_ );
 	}
 
 	# determine method
@@ -1831,28 +1835,29 @@ sub _load_bam_helper_module {
 			$BAM_ADAPTER = 'hts';    # for internal consistency
 		}
 		elsif ( $BAM_ADAPTER =~ /none/i ) {
-
-			# basically for testing purposes, don't use a module
-			return 0;
+			return 0;  # basically for testing purposes, don't use a module
 		}
-		else {
-			# unrecognized
-			$@ = 'unrecognized';
-		}
-		if ( not $BAM_OK ) {
-			print "Requested '$BAM_ADAPTER' adapter could not be loaded: $@\n";
+		if (not $BAM_OK and $EVAL_ERROR) {
+			carp $EVAL_ERROR;
 		}
 	}
 	else {
 		# try hts first, then sam
 		# be sure to set BAM_ADAPTER upon success
-		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+		eval {
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+		};
 		if ($BAM_OK) {
 			$BAM_ADAPTER = 'hts';
 		}
 		else {
 			$BAM_OK      = _load_helper_module('Bio::ToolBox::db_helper::bam');
-			$BAM_ADAPTER = 'sam' if $BAM_OK;
+			if ($BAM_OK) {
+				$BAM_ADAPTER = 'sam';
+			}
+			else {
+				carp "Neither Bio::DB::HTS or Bio::DB::Sam are installed";
+			}
 		}
 	}
 	return $BAM_OK;
@@ -1866,20 +1871,14 @@ sub _load_bigwig_helper_module {
 		}
 		elsif ( $BIG_ADAPTER =~ m/big/i ) {
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
-			$BIGBED_OK = $BIGWIG_OK;                                         # bigbed too!
-			$BIG_ADAPTER = 'big';    # for internal consistency
+			$BIGBED_OK = $BIGWIG_OK;  # bigbed too!
+			$BIG_ADAPTER = 'big';     # for internal consistency
 		}
 		elsif ( $BIG_ADAPTER =~ /none/i ) {
-
-			# basically for testing purposes, don't use a module
-			return 0;
+			return 0; # basically for testing purposes, don't use a module
 		}
-		else {
-			# unrecognized
-			$@ = 'unrecognized';
-		}
-		if ( not $BIGWIG_OK ) {
-			print "Requested '$BIG_ADAPTER' adapter could not be loaded: $@\n";
+		if (not $BIGWIG_OK and $EVAL_ERROR) {
+			carp $EVAL_ERROR;
 		}
 	}
 	else {
@@ -1887,14 +1886,17 @@ sub _load_bigwig_helper_module {
 		# try the modern big adapter first
 		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
 		if ($BIGWIG_OK) {
-
-			# success!
-			$BIGBED_OK   = $BIGWIG_OK;            # bigbed too!
-			$BIG_ADAPTER = 'big' if $BIGWIG_OK;
+			$BIGBED_OK   = $BIGWIG_OK;  # bigbed too!
+			$BIG_ADAPTER = 'big';
 		}
 		else {
 			$BIGWIG_OK   = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
-			$BIG_ADAPTER = 'ucsc' if $BIGWIG_OK;
+			if ($BIGWIG_OK) {
+				$BIG_ADAPTER = 'ucsc';
+			}
+			else {
+				carp "Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
+			}
 		}
 	}
 	return $BIGWIG_OK;
@@ -1912,17 +1914,10 @@ sub _load_bigbed_helper_module {
 			$BIG_ADAPTER = 'big';    # for internal consistency
 		}
 		elsif ( $BIG_ADAPTER =~ /none/i ) {
-
-			# basically for testing purposes, don't use a module
-			return 0;
+			return 0;  # basically for testing purposes, don't use a module
 		}
-		elsif ( $BAM_ADAPTER =~ /\w+/ ) {
-
-			# unrecognized
-			$@ = 'unrecognized';
-		}
-		if ( not $BIGWIG_OK ) {
-			print "Requested '$BIG_ADAPTER' adapter could not be loaded: $@\n";
+		if (not $BIGBED_OK and $EVAL_ERROR) {
+			carp $EVAL_ERROR;
 		}
 	}
 	else {
@@ -1930,14 +1925,17 @@ sub _load_bigbed_helper_module {
 		# try the modern big adapter first
 		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
 		if ($BIGBED_OK) {
-
-			# success!
-			$BIGWIG_OK   = $BIGBED_OK;            # bigwig too!
-			$BIG_ADAPTER = 'big' if $BIGBED_OK;
+			$BIGWIG_OK   = $BIGBED_OK;  # bigwig too!
+			$BIG_ADAPTER = 'big';
 		}
 		else {
 			$BIGBED_OK   = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
-			$BIG_ADAPTER = 'ucsc' if $BIGBED_OK;
+			if ($BIGBED_OK) {
+				$BIG_ADAPTER = 'ucsc';
+			}
+			else {
+				carp "Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
+			}
 		}
 	}
 	return $BIGBED_OK;

@@ -9,7 +9,13 @@ BEGIN {
     plan tests => 19;
 }
 
-use_ok 'Bio::ToolBox::utility'
+use_ok('Bio::ToolBox::utility', qw(
+	parse_list
+	format_with_commas
+	ask_user_for_index
+	simplify_dataset_name
+	sane_chromo_sort
+) )
   or BAIL_OUT "Cannot load Bio::ToolBox::utility";
 
 ### parse list

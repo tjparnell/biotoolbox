@@ -3,13 +3,14 @@ package Bio::ToolBox::db_helper::bigbed;
 use warnings;
 use strict;
 use Carp;
+use English qw(-no_match_vars);
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigBed;
 require Exporter;
 
-our $VERSION = '1.51';
+our $VERSION = '1.70';
 
 # Exported names
 our @ISA    = qw(Exporter);
@@ -264,9 +265,17 @@ sub open_bigbed_db {
 	# open
 	my $bb;
 	eval { $bb = Bio::DB::BigBed->new($path); };
-	return unless $bb;
-
-	return $bb;
+	if ($bb) {
+		return $bb;
+	}
+	elsif ($EVAL_ERROR or $OS_ERROR) {
+		carp $EVAL_ERROR;
+		carp $OS_ERROR;
+		return;
+	}
+	else {
+		return;
+	}
 }
 
 ### Sum the total number of features in the bigBed file
@@ -311,7 +320,7 @@ sub _get_bb {
 
 	# open and cache the bigWig object
 	my $bb = open_bigbed_db($bbfile)
-		or croak " Unable to open bigBed file '$bbfile'! $!\n";
+		or croak " Unable to open bigBed file '$bbfile'!";
 	$OPENED_BB{$bbfile} = $bb;
 
 	# record the chromosomes and possible variants
