@@ -7,6 +7,7 @@ use English qw(-no_match_vars);
 use Module::Load;    # for dynamic loading during runtime
 use List::Util qw(min max sum0 uniq);
 use Statistics::Lite qw(median range stddevp);
+use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility qw(
 	parse_list
@@ -822,26 +823,20 @@ sub verify_or_request_feature_types {
 			print "  $_\t$db_features{$_}\n";
 		}
 
-		# prompt the user
+		# set a generic prompt as necessary
 		$args{'prompt'} ||= undef;
-		if ( $args{'prompt'} ) {
-
-			# provided custom prompt
-			print $args{'prompt'};
-		}
-		else {
-			# generic prompt
+		if ( not defined $args{'prompt'} ) {
 			if ( $args{'single'} ) {
-				print ' Enter one number for the data set or feature   ';
+				$args{'prompt'} = ' Enter one number for the data set or feature   ';
 			}
 			else {
-				print ' Enter the number(s) or range of the data set(s) or feature(s)   ';
+				$args{'prompt'} = 
+					' Enter the number(s) or range of the data set(s) or feature(s)   ';
 			}
 		}
 
 		# get answer from the user
-		my $answer = <STDIN>;
-		chomp $answer;
+		my $answer = prompt( $args{'prompt'} );
 		my @answer_list = parse_list($answer);
 
 		# take the first one if requested

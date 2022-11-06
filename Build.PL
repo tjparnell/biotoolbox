@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
-use strict;
 use warnings;
+use strict;
 use Module::Build;
 
 
@@ -18,7 +18,7 @@ check_sam();
 check_big();
 
 ### Build the script
-my $build = Module::Build->new(%$options);
+my $build = Module::Build->new( %{$options} );
 $build->create_build_script;
 exit 0;
 
@@ -54,6 +54,7 @@ sub get_base_options {
 			'List::MoreUtils'         => 0.400,
 			'File::Which'             => 1.17,
 			'Getopt::Long'            => 2.24,
+			'IO::Prompt::Tiny'        => 0.003,
 		},
 		recommends        => {
 			'Net::FTP'                => 0,

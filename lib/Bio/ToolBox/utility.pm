@@ -4,6 +4,7 @@ use warnings;
 use strict;
 use Carp;
 use File::Spec;
+use IO::Prompt::Tiny qw(prompt);
 require Exporter;
 
 our $VERSION = '1.70';
@@ -133,8 +134,7 @@ sub ask_user_for_index {
 	print $line;
 
 	# get response
-	my $response = <STDIN>;
-	chomp $response;
+	my $response = prompt($line);
 	my @indices = parse_list($response);
 
 	# verify
