@@ -21,8 +21,8 @@ our @EXPORT_OK = qw(
 	sane_chromo_sort
 );
 
-my $DATA_COLNAMES = undef;
-my $DATA_FILENAME = undef;
+my $DATA_COLNAMES = q();
+my $DATA_FILENAME = q();
 
 ### Parse string into list
 sub parse_list {
@@ -131,7 +131,6 @@ sub ask_user_for_index {
 		$DATA_FILENAME = $Data->filename;
 		$DATA_COLNAMES = join( ';', $Data->list_columns );
 	}
-	print $line;
 
 	# get response
 	my $response = prompt($line);

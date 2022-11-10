@@ -12,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Module::Load;
 
-our $VERSION = '1.69';
+our $VERSION = '1.70';
 
 #### Initialization and verification ###############################################
 
@@ -39,10 +39,10 @@ sub new {
 		'last_row'          => 0,
 		'headers'           => 1,
 		'column_names'      => [],
-		'filename'          => undef,
-		'basename'          => undef,
-		'extension'         => undef,
-		'path'              => undef,
+		'filename'          => q(),
+		'basename'          => q(),
+		'extension'         => q(),
+		'path'              => q(),
 		'comments'          => [],
 		'data_table'        => [],
 		'header_line_count' => 0,

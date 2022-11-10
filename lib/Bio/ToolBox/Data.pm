@@ -344,9 +344,9 @@ PARSEFAIL
 		$self->add_file_metadata($file);
 
 		# but delete some stuff, just want basename
-		undef $self->{extension};
-		undef $self->{filename};
-		undef $self->{path};
+		$self->{extension} = q();
+		$self->{filename} = q();
+		$self->{path} = q();
 	}
 
 	# successfully parsed
