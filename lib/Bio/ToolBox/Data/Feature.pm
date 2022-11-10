@@ -81,11 +81,11 @@ sub value {
 	return unless defined $column;
 	my $row = $self->{'index'};
 
+	# set a value
 	if ( defined $value ) {
-
-		# set a value
 		$self->{data}->{data_table}->[$row][$column] = $value;
 	}
+
 	my $v = $self->{data}->{data_table}->[$row][$column];
 	return length($v) ? $v : '.';    # internal null value, inherited from GFF definition
 }
@@ -116,13 +116,9 @@ sub seq_id {
 	my $i = $self->{data}->chromo_column;
 	my $j = $self->{data}->coord_column;
 	if ( defined $i ) {
-
-		# collect from table
 		$c = $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
-
-		# seqfeature
 		$c = $self->{feature}->seq_id;
 	}
 	elsif ( defined $j ) {
@@ -181,14 +177,10 @@ sub start {
 		# collect from table
 		$s = $self->value($i);
 		if ( $self->{data}->interbase ) {
-
-			# compensate for 0-based index
-			$s += 1;
+			$s += 1; # compensate for 0-based index
 		}
 	}
 	elsif ( exists $self->{feature} ) {
-
-		# seqfeature
 		$s = $self->{feature}->start;
 	}
 	elsif ( defined $j ) {
@@ -238,13 +230,9 @@ sub end {
 	my $i = $self->{data}->stop_column;
 	my $j = $self->{data}->coord_column;
 	if ( defined $i ) {
-
-		# collect from table
 		$e = $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
-
-		# seqfeature
 		$e = $self->{feature}->end;
 	}
 	elsif ( defined $j ) {
@@ -285,13 +273,9 @@ sub strand {
 	# get strand value
 	my $s = 0;
 	if ( my $i = $self->{data}->strand_column ) {
-
-		# collect from table
 		$s = $self->_strand( $self->value($i) );
 	}
 	elsif ( exists $self->{feature} ) {
-
-		# seqfeature
 		$s = $self->{feature}->strand;
 	}
 	elsif ( $self->feature_type eq 'named' ) {
@@ -1087,8 +1071,6 @@ sub get_region_position_scores {
 
 	# covert to relative positions
 	if ( $args{absolute} ) {
-
-		# do not convert to relative positions
 		return wantarray ? %{ $pos2data } : $pos2data;
 	}
 	else {
@@ -1193,8 +1175,6 @@ sub _get_subfeature_position_scores {
 
 	# covert to relative positions
 	if ( $args->{absolute} ) {
-
-		# do not convert to relative positions
 		return wantarray ? %{ $pos2data } : $pos2data;
 	}
 	else {
@@ -1263,8 +1243,6 @@ sub calculate_reference {
 		}
 	}
 	elsif ( $args->{position} == 9 ) {
-
-		# narrowPeak coordinate
 		$coordinate = $self->peak;
 	}
 	else {
