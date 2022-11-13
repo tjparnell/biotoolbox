@@ -89,7 +89,7 @@ sub verify {
 
 	# check for consistent number of columns
 	if ( defined $self->{'number_columns'} ) {
-		my $number = $self->{'number_columns'};
+		my $number = $self->{'number_columns'} + 1;   # account for base 1 column indexing
 		my @problems;
 		my $too_low  = 0;
 		my $too_high = 0;
@@ -99,11 +99,12 @@ sub verify {
 				push @problems, $row;
 				$too_low++  if $count < $number;
 				$too_high++ if $count > $number;
-				while ( $count < $number ) {
 
-					# we can sort-of-fix this problem
-					$self->{'data_table'}->[$row][$count] = '.';
-					$count++;
+				# add null values
+				if ( $count < $number ) {
+					for ( $count .. $number ) {
+						push @{ $self->{'data_table'}->[$row] }, '.';
+					}
 				}
 			}
 		}
@@ -111,52 +112,58 @@ sub verify {
 		# we found errors
 		if (@problems) {
 
-			# collapse problem list into compact string
-			# from http://www.perlmonks.org/?node_id=87538
-			my $problem = join( ',', @problems );
-			$problem =~ s/(?<!\d) (\d+) (?: ,((??{$++1})) (?!\d) )+/$1-$+/xg;
+			unless ($silence) {
 
-			if ($too_low) {
-				print
-"\n COLUMN INCONSISTENCY ERRORS: $too_low rows had fewer than expected "
-					. "columns!\n  padded rows $problem with null values\n"
-					unless $silence;
-			}
-			if ($too_high) {
-				print
-"\n COLUMN INCONSISTENCY ERRORS: $too_high rows had more columns than "
-					. "expected!\n  Problem rows: $problem\n"
-					unless $silence;
-				return;
+				# collapse problem list into compact string
+				# from http://www.perlmonks.org/?node_id=87538
+				my $problem = join( ',', @problems );
+				$problem =~ s/(?<!\d) (\d+) (?: ,((??{$++1})) (?!\d) )+/$1-$+/xg;
+
+				if ($too_low) {
+					print "
+ COLUMN INCONSISTENCY ERRORS: $too_low rows had fewer than expected columns!
+ padded rows $problem with null values\n";
+				}
+				if ($too_high) {
+					print "
+ COLUMN INCONSISTENCY ERRORS: $too_high rows had more columns than 
+ expected!\n  Problem rows: $problem\n";
+				}
 			}
 		}
 	}
 	else {
 		# this wasn't set???? then set it
 		$self->{'number_columns'} =
-			scalar @{ $self->{'data_table'}->[0] };
+			scalar @{ $self->{'data_table'}->[0] } - 1;
 	}
 
 	# check metadata and table names
 	my $mdcheck = 0;
-	for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
-		unless ( $self->{$i}{'name'} eq $self->{'data_table'}->[0][$i] ) {
-			printf(
-				"\n TABLE/METADATA MISMATCH ERROR: Column header names don't"
-					. " match metadata name values for index $i!"
-					. "\n  compare '%s' with '%s'\n",
-				$self->{'data_table'}->[0][$i],
-				$self->{$i}{'name'}
-			) unless $silence;
+	for my $i ( 1 .. $self->{'number_columns'} ) {
+		if ( not exists $self->{$i} ) {
+			unless ($silence) {
+				print " METADATA ERROR: No metadata hash for column $i!";
+			}
+			$mdcheck++;
+			next;    # the other tests will fail anyway
+		}
+		if ( $self->{$i}{'name'} ne $self->{'data_table'}->[0][$i] ) {
+			unless ($silence) {
+				printf "
+TABLE/METADATA MISMATCH ERROR: Column header names don't match metadata 
+name values for index $i! compare '%s' with '%s'\n",
+					$self->{'data_table'}->[0][$i], $self->{$i}{'name'};
+			}
 			$mdcheck++;
 		}
-		unless ( $self->{$i}{'index'} == $i ) {
-			printf(
-				"\n METADATA INDEX ERROR: index $i metadata doesn't match its "
-					. "index value %s\n",
-				$self->{$i}{'index'}
-			) unless $silence;
-			$mdcheck++;
+		if ( $self->{$i}{'index'} != $i ) {
+			unless ($silence) {
+				printf "
+ METADATA INDEX ERROR: index $i metadata doesn't match its index value %s\n",
+					$self->{$i}{'index'};
+				$mdcheck++;
+			}
 		}
 	}
 	return if $mdcheck;
@@ -179,52 +186,53 @@ sub verify {
 
 		# check column indices
 		if (
-			# column 0 should look like chromosome
-			exists $self->{0}
-			and $self->{0}{'name'} !~
+			# column 1 should look like chromosome
+			exists $self->{1}
+			and $self->{1}{'name'} !~
 			m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi
 			)
 		{
 			$gff_check = 0;
-			$error .= ' Column 0 name not chromosome-like.';
+			$error .= ' Column 1 name not chromosome-like.';
 		}
 		if (
-			# column 3 should look like start
-			exists $self->{3} and $self->{3}{'name'} !~ m/start | pos | position/xi
+			# column 4 should look like start
+			exists $self->{4} and $self->{4}{'name'} !~ m/start | pos | position/xi
 			)
 		{
 			$gff_check = 0;
-			$error .= ' Column 3 name not start-like.';
+			$error .= ' Column 4 name not start-like.';
 		}
 		if (
-			# column 4 should look like end
-			exists $self->{4} and $self->{4}{'name'} !~ m/stop | end | pos | position/xi
+			# column 5 should look like end
+			exists $self->{5}
+			and $self->{5}{'name'} !~ m/stop | end | pos | position/xi
 			)
 		{
 			$gff_check = 0;
-			$error .= ' Column 4 name not stop-like.';
+			$error .= ' Column 5 name not stop-like.';
 		}
 		if (
-			# column 6 should look like strand
-			exists $self->{6} and $self->{6}{'name'} !~ m/strand/i
+			# column 7 should look like strand
+			exists $self->{7} and $self->{7}{'name'} !~ m/strand/i
 			)
 		{
 			$gff_check = 0;
-			$error .= ' Column 6 name not strand-like.';
+			$error .= ' Column 7 name not strand-like.';
 		}
 
 		# check column data
-		unless ( $self->_column_is_integers( 3, 4 ) ) {
+		unless ( $self->_column_is_integers( 4, 5 ) ) {
 			$gff_check = 0;
-			$error .= ' Columns 3,4 not integers.';
+			$error .= ' Columns 4 and 5 not integers.';
 		}
-		unless ( $self->_column_is_numeric(5) ) {
+		unless ( $self->_column_is_numeric(6) ) {
 			$gff_check = 0;
-			$error .= ' Column 5 not numeric.';
+			$error .= ' Column 6 not numeric.';
 		}
-		unless ( $self->_column_is_stranded(6) ) {
+		unless ( $self->_column_is_stranded(7) ) {
 			$gff_check = 0;
-			$error .= ' Column 6 not strand values.';
+			$error .= ' Column 7 not strand values.';
 		}
 
 		# update gff value as necessary
@@ -235,7 +243,7 @@ sub verify {
 			$self->{'headers'} = 1;
 
 			# remove the AUTO key from the metadata
-			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
+			for my $i ( 1 .. $self->{'number_columns'} ) {
 				if ( exists $self->{$i}{'AUTO'} ) {
 					delete $self->{$i}{'AUTO'};
 				}
@@ -258,128 +266,136 @@ sub verify {
 		}
 
 		# check column index names
-		if ( exists $self->{0}
-			and $self->{0}{'name'} !~
+		if ( exists $self->{1}
+			and $self->{1}{'name'} !~
 			m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 0 name not chromosome-like.';
-		}
-		if ( exists $self->{1}
-			and $self->{1}{'name'} !~ m/start | pos | position/xi )
-		{
-			$bed_check = 0;
-			$error .= ' Column 1 name not start-like.';
+			$error .= ' Column 1 name not chromosome-like.';
 		}
 		if ( exists $self->{2}
-			and $self->{2}{'name'} !~ m/stop | end | pos | position/xi )
+			and $self->{2}{'name'} !~ m/start | pos | position/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 2 name not stop-like.';
+			$error .= ' Column 2 name not start-like.';
 		}
-		if ( exists $self->{5}
-			and $self->{5}{'name'} !~ m/strand/i )
+		if ( exists $self->{3}
+			and $self->{3}{'name'} !~ m/stop | end | pos | position/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 5 name not strand-like.';
+			$error .= ' Column 3 name not stop-like.';
 		}
-		if (    exists $self->{6}
-			and $self->{'format'}  !~ /narrow | broad/xi
-			and $self->{6}{'name'} !~ m/start | thick | cds/xi )
+		if ( exists $self->{6}
+			and $self->{6}{'name'} !~ m/strand/i )
 		{
 			$bed_check = 0;
-			$error .= ' Column 6 name not thickStart-like.';
+			$error .= ' Column 6 name not strand-like.';
 		}
 		if (    exists $self->{7}
 			and $self->{'format'}  !~ /narrow | broad/xi
-			and $self->{7}{'name'} !~ m/end | stop | thick | cds/xi )
+			and $self->{7}{'name'} !~ m/start | thick | cds/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 7 name not thickEnd-like.';
+			$error .= ' Column 7 name not thickStart-like.';
 		}
 		if (    exists $self->{8}
 			and $self->{'format'}  !~ /narrow | broad/xi
-			and $self->{8}{'name'} !~ m/item | rgb | color/xi )
+			and $self->{8}{'name'} !~ m/end | stop | thick | cds/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 8 name not itemRGB-like.';
+			$error .= ' Column 8 name not thickEnd-like.';
 		}
 		if (    exists $self->{9}
 			and $self->{'format'}  !~ /narrow | broad/xi
-			and $self->{9}{'name'} !~ m/count | number | block | exon/xi )
+			and $self->{9}{'name'} !~ m/item | rgb | color/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 9 name not blockCount-like.';
+			$error .= ' Column 9 name not itemRGB-like.';
 		}
-		if ( exists $self->{10}
-			and $self->{10}{'name'} !~ m/size | length | block | exon/xi )
+		if (    exists $self->{10}
+			and $self->{'format'}   !~ /narrow | broad/xi
+			and $self->{10}{'name'} !~ m/count | number | block | exon/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 10 name not blockSizes-like.';
+			$error .= ' Column 10 name not blockCount-like.';
 		}
 		if ( exists $self->{11}
-			and $self->{11}{'name'} !~ m/start | block | exon/xi )
+			and $self->{11}{'name'} !~ m/size | length | block | exon/xi )
 		{
 			$bed_check = 0;
-			$error .= ' Column 11 name not blockStarts-like.';
+			$error .= ' Column 11 name not blockSizes-like.';
+		}
+		if ( exists $self->{12}
+			and $self->{12}{'name'} !~ m/start | block | exon/xi )
+		{
+			$bed_check = 0;
+			$error .= ' Column 12 name not blockStarts-like.';
 		}
 
 		# check column data
-		unless ( $self->_column_is_integers( 1, 2 ) ) {
+		unless ( $self->_column_is_integers( 2, 3 ) ) {
 			$bed_check = 0;
-			$error .= ' Columns 1,2 not integers.';
+			$error .= ' Columns 2 and 3 not integers.';
 		}
 		if ( $self->{'number_columns'} >= 5 ) {
 
 			# only check if it is actually present, since could be optional
-			unless ( $self->_column_is_numeric(4) ) {
+			unless ( $self->_column_is_numeric(5) ) {
 				$bed_check = 0;
-				$error .= ' Column 4 not numeric.';
+				$error .= ' Column 5 not numeric.';
 			}
 		}
 		if ( $self->{'number_columns'} >= 6 ) {
 
 			# only check if it is actually present, since could be optional
-			unless ( $self->_column_is_stranded(5) ) {
+			unless ( $self->_column_is_stranded(6) ) {
 				$bed_check = 0;
-				$error .= ' Column 5 not strand values.';
+				$error .= ' Column 6 not strand values.';
 			}
 		}
 		if (    $self->{'format'}
 			and $self->{'format'} =~ /narrow | broad/xi )
 		{
-			unless ( $self->_column_is_numeric( 6, 7, 8 ) ) {
+			unless ( $self->_column_is_numeric( 7, 8, 9 ) ) {
 				$bed_check = 0;
-				$error .= ' Columns 6,7,8 not numeric.';
+				$error .= ' Columns 7,8,9 not numeric.';
+			}
+		}
+		if (    $self->{'format'}
+			and $self->{'format'} =~ /narrow/i )
+		{
+			unless ( $self->_column_is_integers(10) ) {
+				$bed_check = 0;
+				$error .= ' Column 10 is not integers.';
 			}
 		}
 		if ( $self->{'number_columns'} == 12 ) {
 
 			# bed12 has extra special limitations
-			unless ( $self->_column_is_integers( 6, 7, 9 ) ) {
+			unless ( $self->_column_is_integers( 7, 8, 10 ) ) {
 				$bed_check = 0;
-				$error .= ' Column 6,7,9 not integers.';
+				$error .= ' Column 7,8,10 not integers.';
 			}
-			unless ( $self->_column_is_comma_integers( 10, 11 ) ) {
+			unless ( $self->_column_is_comma_integers( 11, 12 ) ) {
 				$bed_check = 0;
-				$error .= ' Column 10,11 not comma-delimited integers.';
+				$error .= ' Column 11,12 not comma-delimited integers.';
 			}
 		}
 		if (    $self->{'number_columns'} == 15
 			and $self->{'format'} =~ /gapped/i )
 		{
 			# gappedPeak has extra special limitations
-			unless ( $self->_column_is_integers( 6, 7, 9 ) ) {
+			unless ( $self->_column_is_integers( 7, 8, 10 ) ) {
 				$bed_check = 0;
-				$error .= ' Column 6,7,9 not integers.';
+				$error .= ' Column 7,8,10 not integers.';
 			}
-			unless ( $self->_column_is_comma_integers( 10, 11 ) ) {
+			unless ( $self->_column_is_comma_integers( 11, 12 ) ) {
 				$bed_check = 0;
-				$error .= ' Column 10,11 not comma-delimited integers.';
+				$error .= ' Column 11,12 not comma-delimited integers.';
 			}
-			unless ( $self->_column_is_numeric( 12, 13, 14 ) ) {
+			unless ( $self->_column_is_numeric( 13, 14, 15 ) ) {
 				$bed_check = 0;
-				$error .= ' Columns 12,13,14 not numeric.';
+				$error .= ' Columns 13,14,15 not numeric.';
 			}
 		}
 
@@ -389,21 +405,21 @@ sub verify {
 			and $self->{'number_columns'} != 10 )
 		{
 			$bed_check = 0;
-			$error .= ' NarrowPeak has 10 columns only.';
+			$error .= ' NarrowPeak has 10 columns.';
 		}
 		if (    $self->{'format'}
 			and $self->{'format'} =~ /broadpeak/i
 			and $self->{'number_columns'} != 9 )
 		{
 			$bed_check = 0;
-			$error .= ' BroadPeak has 9 columns only.';
+			$error .= ' BroadPeak has 9 columns.';
 		}
 		if (    $self->{'format'}
 			and $self->{'format'} =~ /gappedpeak/i
 			and $self->{'number_columns'} != 15 )
 		{
 			$bed_check = 0;
-			$error .= ' GappeddPeak has 15 columns only.';
+			$error .= ' GappeddPeak has 15 columns.';
 		}
 
 		# reset the BED tag value as appropriate
@@ -420,7 +436,7 @@ sub verify {
 			$self->{'format'}    = q();
 
 			# remove the AUTO key from the metadata
-			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
+			for my $i ( 1 .. $self->{'number_columns'} ) {
 				if ( exists $self->{$i}{'AUTO'} ) {
 					delete $self->{$i}{'AUTO'};
 				}
@@ -445,39 +461,43 @@ sub verify {
 			# bin name chrom strand txStart txEnd cdsStart cdsEnd
 			# exonCount exonStarts exonEnds score name2 cdsStartSt
 			# cdsEndStat exonFrames
-			unless ( $self->{2}{name} =~
+			unless ( $self->{3}{name} =~
 				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
-				$error .= ' Column 2 name not chromosome-like.';
+				$error .= ' Column 3 name not chromosome-like.';
 			}
-			unless ( $self->{4}{name} =~ m/start | pos | position/xi ) {
+			unless ( $self->{4}{name} =~ m/strand/i ) {
 				$ucsc_check = 0;
-				$error .= ' Column 4 name not start-like.';
+				$error .= ' Column 4 name not strand-like.';
 			}
-			unless ( $self->{5}{name} =~ m/stop | end | pos | position/xi ) {
+			unless ( $self->{5}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
-				$error .= ' Column 5 name not stop-like.';
+				$error .= ' Column 5 name not start-like.';
 			}
-			unless ( $self->{6}{name} =~ m/start | pos | position/xi ) {
+			unless ( $self->{6}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
-				$error .= ' Column 6 name not start-like.';
+				$error .= ' Column 6 name not stop-like.';
 			}
-			unless ( $self->{7}{name} =~ m/stop | end | pos | position/xi ) {
+			unless ( $self->{7}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
-				$error .= ' Column 7 name not stop-like.';
+				$error .= ' Column 7 name not start-like.';
 			}
-			unless ( $self->_column_is_integers( 4, 5, 6, 7, 8 ) ) {
+			unless ( $self->{8}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
-				$error .= ' Columns 4,5,6,7,8 not integers.';
+				$error .= ' Column 8 name not stop-like.';
 			}
-			unless ( $self->_column_is_comma_integers( 9, 10 ) ) {
+			unless ( $self->_column_is_integers( 5, 6, 7, 8, 9 ) ) {
 				$ucsc_check = 0;
-				$error .= ' Columns 9,10 not comma-delimited integers.';
+				$error .= ' Columns 5,6,7,8,9 not integers.';
 			}
-			unless ( $self->_column_is_stranded(3) ) {
+			unless ( $self->_column_is_comma_integers( 10, 11 ) ) {
 				$ucsc_check = 0;
-				$error .= ' Column 3 not strand values.';
+				$error .= ' Columns 10,11 not comma-delimited integers.';
+			}
+			unless ( $self->_column_is_stranded(4) ) {
+				$ucsc_check = 0;
+				$error .= ' Column 4 not strand values.';
 			}
 		}
 		elsif ( $colnumber == 15 or $colnumber == 12 ) {
@@ -490,51 +510,15 @@ sub verify {
 			# or knownGene
 			# name chrom strand txStart txEnd cdsStart cdsEnd
 			# exonCount exonStarts exonEnds proteinID alignID
-			unless ( $self->{1}{name} =~
-				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
-			{
-				$ucsc_check = 0;
-				$error .= ' Column 1 name not chromosome-like.';
-			}
-			unless ( $self->{3}{name} =~ m/start | pos | position/xi ) {
-				$ucsc_check = 0;
-				$error .= ' Column 3 name not start-like.';
-			}
-			unless ( $self->{4}{name} =~ m/stop | end | pos | position/xi ) {
-				$ucsc_check = 0;
-				$error .= ' Column 4 name not stop-like.';
-			}
-			unless ( $self->{5}{name} =~  m/start | pos | position/xi ) {
-				$ucsc_check = 0;
-				$error .= ' Column 5 name not start-like.';
-			}
-			unless ( $self->{6}{name} =~ m/stop | end | pos | position/xi ) {
-				$ucsc_check = 0;
-				$error .= ' Column 6 name not stop-like.';
-			}
-			unless ( $self->_column_is_integers( 3, 4, 5, 6, 7 ) ) {
-				$ucsc_check = 0;
-				$error .= ' Columns 3,4,5,6,7 not integers.';
-			}
-			unless ( $self->_column_is_comma_integers( 8, 9 ) ) {
-				$ucsc_check = 0;
-				$error .= ' Columns 8,9 not comma-delimited integers.';
-			}
-			unless ( $self->_column_is_stranded(2) ) {
-				$ucsc_check = 0;
-				$error .= ' Column 2 not strand values.';
-			}
-		}
-		elsif ( $colnumber == 11 ) {
-			$ucsc_type = 'refFlat';
-
-			# geneName transcriptName chrom strand txStart txEnd
-			# cdsStart cdsEnd exonCount exonStarts exonEnds
 			unless ( $self->{2}{name} =~
 				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
 				$error .= ' Column 2 name not chromosome-like.';
+			}
+			unless ( $self->{3}{name} =~ m/strand/i ) {
+				$ucsc_check = 0;
+				$error .= ' Column 3 name not strand-like.';
 			}
 			unless ( $self->{4}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
@@ -565,24 +549,20 @@ sub verify {
 				$error .= ' Column 3 not strand values.';
 			}
 		}
-		elsif ( $colnumber == 10 ) {
-			$ucsc_type = 'genePred';
+		elsif ( $colnumber == 11 ) {
+			$ucsc_type = 'refFlat';
 
-			# name chrom strand txStart txEnd cdsStart cdsEnd
-			# exonCount exonStarts exonEnds
-			unless ( $self->{1}{name} =~
+			# geneName transcriptName chrom strand txStart txEnd
+			# cdsStart cdsEnd exonCount exonStarts exonEnds
+			unless ( $self->{3}{name} =~
 				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 			{
 				$ucsc_check = 0;
-				$error .= ' Column 1 name not chromosome-like.';
+				$error .= ' Column 3 name not chromosome-like.';
 			}
-			unless ( $self->{3}{name} =~ m/start | pos | position/xi ) {
+			unless ( $self->{4}{name} =~ m/strand/i ) {
 				$ucsc_check = 0;
-				$error .= ' Column 3 name not start-like.';
-			}
-			unless ( $self->{4}{name} =~ m/stop | end | pos | position/xi ) {
-				$ucsc_check = 0;
-				$error .= ' Column 4 name not stop-like.';
+				$error .= ' Column 4 name not strand-like.';
 			}
 			unless ( $self->{5}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
@@ -592,17 +572,69 @@ sub verify {
 				$ucsc_check = 0;
 				$error .= ' Column 6 name not stop-like.';
 			}
-			unless ( $self->_column_is_integers( 3, 4, 5, 6, 7 ) ) {
+			unless ( $self->{7}{name} =~ m/start | pos | position/xi ) {
 				$ucsc_check = 0;
-				$error .= ' Columns 3,4,5,6,7 not integers.';
+				$error .= ' Column 7 name not start-like.';
 			}
-			unless ( $self->_column_is_comma_integers( 8, 9 ) ) {
+			unless ( $self->{8}{name} =~ m/stop | end | pos | position/xi ) {
 				$ucsc_check = 0;
-				$error .= ' Columns 8,9 not comma-delimited integers.';
+				$error .= ' Column 8 name not stop-like.';
 			}
-			unless ( $self->_column_is_stranded(2) ) {
+			unless ( $self->_column_is_integers( 5, 6, 7, 8, 9 ) ) {
 				$ucsc_check = 0;
-				$error .= ' Column 2 not strand values.';
+				$error .= ' Columns 5,6,7,8,9 not integers.';
+			}
+			unless ( $self->_column_is_comma_integers( 10, 11 ) ) {
+				$ucsc_check = 0;
+				$error .= ' Columns 10,11 not comma-delimited integers.';
+			}
+			unless ( $self->_column_is_stranded(4) ) {
+				$ucsc_check = 0;
+				$error .= ' Column 4 not strand values.';
+			}
+		}
+		elsif ( $colnumber == 10 ) {
+			$ucsc_type = 'genePred';
+
+			# name chrom strand txStart txEnd cdsStart cdsEnd
+			# exonCount exonStarts exonEnds
+			unless ( $self->{2}{name} =~
+				m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
+			{
+				$ucsc_check = 0;
+				$error .= ' Column 2 name not chromosome-like.';
+			}
+			unless ( $self->{3}{name} =~ m/strand/i ) {
+				$ucsc_check = 0;
+				$error .= ' Column 3 name not strand-like.';
+			}
+			unless ( $self->{4}{name} =~ m/start | pos | position/xi ) {
+				$ucsc_check = 0;
+				$error .= ' Column 4 name not start-like.';
+			}
+			unless ( $self->{5}{name} =~ m/stop | end | pos | position/xi ) {
+				$ucsc_check = 0;
+				$error .= ' Column 5 name not stop-like.';
+			}
+			unless ( $self->{6}{name} =~ m/start | pos | position/xi ) {
+				$ucsc_check = 0;
+				$error .= ' Column 6 name not start-like.';
+			}
+			unless ( $self->{7}{name} =~ m/stop | end | pos | position/xi ) {
+				$ucsc_check = 0;
+				$error .= ' Column 7 name not stop-like.';
+			}
+			unless ( $self->_column_is_integers( 4, 5, 6, 7, 8 ) ) {
+				$ucsc_check = 0;
+				$error .= ' Columns 4,5,6,7,8 not integers.';
+			}
+			unless ( $self->_column_is_comma_integers( 9, 10 ) ) {
+				$ucsc_check = 0;
+				$error .= ' Columns 9,10 not comma-delimited integers.';
+			}
+			unless ( $self->_column_is_stranded(3) ) {
+				$ucsc_check = 0;
+				$error .= ' Column 3 not strand values.';
 			}
 		}
 		else {
@@ -621,7 +653,7 @@ sub verify {
 			$self->{'format'}    = q();
 
 			# remove the AUTO key
-			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
+			for my $i ( 1 .. $self->{'number_columns'} ) {
 				if ( exists $self->{$i}{'AUTO'} ) {
 					delete $self->{$i}{'AUTO'};
 				}
@@ -644,21 +676,19 @@ sub verify {
 		}
 
 		# check column index names
-		if ( $self->{0}{'name'} !~ m/chrom/i ) {
+		if ( $self->{1}{'name'} !~ m/chrom/i ) {
 			$vcf_check = 0;
-			$error .= ' Column 0 name not chromosome.';
+			$error .= ' Column 1 name not chromosome.';
 		}
-		if ( exists $self->{1}
-			and $self->{1}{'name'} !~ m/^pos|start/i )
-		{
+		if ( $self->{2}{'name'} !~ m/^pos|start/i ) {
 			$vcf_check = 0;
-			$error .= ' Column 1 name not position.';
+			$error .= ' Column 2 name not position.';
 		}
 
 		# check column data
-		unless ( $self->_column_is_integers(1) ) {
+		unless ( $self->_column_is_integers(2) ) {
 			$vcf_check = 0;
-			$error .= ' Columns 1 not integers.';
+			$error .= ' Columns 2 not integers.';
 		}
 
 		# reset the vcf tag value as appropriate
@@ -674,7 +704,7 @@ sub verify {
 			$self->{'format'}  = q();
 
 			# remove the AUTO key from the metadata
-			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
+			for my $i ( 1 .. $self->{'number_columns'} ) {
 				if ( exists $self->{$i}{'AUTO'} ) {
 					delete $self->{$i}{'AUTO'};
 				}
@@ -696,19 +726,19 @@ sub verify {
 			$sgr_check = 0;
 			$error .= ' Column number is not 3.';
 		}
-		if ( $self->{0}{'name'} !~
+		if ( $self->{1}{'name'} !~
 			m/^\#? (?: chr | chromo | chromosome | seq | seq.id )/xi )
 		{
 			$sgr_check = 0;
-			$error .= ' Column 0 name not chromosome-like.';
+			$error .= ' Column 1 name not chromosome-like.';
 		}
-		if ( $self->{1}{'name'} !~ m/start | pos | position/xi ) {
+		if ( $self->{2}{'name'} !~ m/start | pos | position/xi ) {
 			$sgr_check = 0;
-			$error .= ' Column 1 name not start-like.';
+			$error .= ' Column 2 name not start-like.';
 		}
-		unless ( $self->_column_is_integers(1) ) {
+		unless ( $self->_column_is_integers(2) ) {
 			$sgr_check = 0;
-			$error .= ' Columns 1 not integers.';
+			$error .= ' Columns 2 not integers.';
 		}
 		if ( $sgr_check == 0 ) {
 
@@ -721,7 +751,7 @@ sub verify {
 			$self->{'format'}  = q();
 
 			# remove the AUTO key from the metadata
-			for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
+			for my $i ( 1 .. $self->{'number_columns'} ) {
 				if ( exists $self->{$i}{'AUTO'} ) {
 					delete $self->{$i}{'AUTO'};
 				}
@@ -780,8 +810,7 @@ sub _column_is_numeric {
 		for my $i (@index) {
 
 			# we have a very loose definition of numeric: exponents, signs, commas
-			return 0 unless ( $self->{data_table}->[$row][$i] =~
-				m/^ [\d\-\+\.,eE]+ $/x );
+			return 0 unless ( $self->{data_table}->[$row][$i] =~ m/^ [\d\-\+\.,eE]+ $/x );
 		}
 	}
 	return 1;
@@ -808,8 +837,9 @@ sub _column_is_stranded {
 	my ( $self, $index ) = @_;
 	return unless exists $self->{$index};
 	for my $row ( 1 .. $self->{last_row} ) {
-		return 0 if ( $self->{data_table}->[$row][$index] !~
-			m/^(?: \-1 | 0 | 1 | \+ | \- | \. )$/x );
+		return 0
+			if ( $self->{data_table}->[$row][$index] !~
+				m/^(?: \-1 | 0 | 1 | \+ | \- | \. )$/x );
 	}
 	return 1;
 }
@@ -909,20 +939,18 @@ sub delete_column {
 		return;
 	}
 
+	# identify columns to retain
 	my @deletion_list = sort { $a <=> $b } @_;
 	my @retain_list;
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+	for my $i ( 1 .. $self->{'number_columns'} ) {
 
 		# compare each current index with the first one in the list of
 		# deleted indices. if it matches, delete. if not, keep
-		if ( $i == $deletion_list[0] ) {
-
-			# this particular index should be deleted
-			shift @deletion_list;
+		if ( @deletion_list and $i == $deletion_list[0] ) {
+			shift @deletion_list;    # this particular index should be deleted
 		}
 		else {
-			# this particular index should be kept
-			push @retain_list, $i;
+			push @retain_list, $i;    # this particular index should be kept
 		}
 	}
 	return $self->reorder_column(@retain_list);
@@ -951,35 +979,37 @@ sub reorder_column {
 		return;
 	}
 	my @order = @_;
-	for ( my $row = 0; $row <= $self->last_row; $row++ ) {
-		my @old = $self->row_values($row);
+	unshift @order, 0;    # to maintain 1-based indexing
+	for my $r ( 0 .. $self->last_row ) {
+		my @old = $self->row_values($r);    # this is an array copy
+		unshift @old, q();                  # to maintain 1-based indexing
 		my @new = map { $old[$_] } @order;
-		splice( @{ $self->{data_table} }, $row, 1, \@new );
+		splice( @{ $self->{data_table} }, $r, 1, \@new );
 	}
+	$self->{data_table}->[0][0] = 'BLANK';    # not necessary but consistent
 
 	# reorder metadata
+	# copy the current metadata info hash into a temporary hash
+	# then copy back from the old_metadata into the main data hash
+	# using the new index number in the @order array
+	# must regenerate the hash, not just link to the old anonymous hash, in
+	# case we're duplicating columns
 	my %old_metadata;
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
-
-		# copy the metadata info hash into a temporary hash
+	for my $i ( 1 .. $self->{'number_columns'} ) {
 		$old_metadata{$i} = $self->{$i};
-		delete $self->{$i};    # delete original
+		delete $self->{$i};
 	}
-	for ( my $i = 0; $i < scalar(@order); $i++ ) {
-
-		# now copy back from the old_metadata into the main data hash
-		# using the new index number in the @order array
-		# must regenerate the hash, not just link to the old anonymous hash, in
-		# case we're duplicating columns
+	for my $i ( 1 .. ( scalar(@order) - 1 ) ) {
+		#specifically skipping 0 because it doesn't have metadata
 		$self->{$i} = {};
 		foreach my $k ( keys %{ $old_metadata{ $order[$i] } } ) {
 			$self->{$i}{$k} = $old_metadata{ $order[$i] }{$k};
 		}
-
-		# assign new index number
-		$self->{$i}{'index'} = $i;
+		$self->{$i}{'index'} = $i;    # reset index
 	}
-	$self->{'number_columns'} = scalar @order;
+
+	# additional metadata
+	$self->{'number_columns'} = scalar(@order) - 1;    # ignore first index
 	delete $self->{column_indices} if exists $self->{column_indices};
 	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
 
@@ -1094,7 +1124,7 @@ sub vcf {
 sub number_columns {
 	my $self = shift;
 	carp 'number_columns is a read only method' if @_;
-	return $self->{number_columns};
+	return $self->{'number_columns'};
 }
 
 sub number_rows {
@@ -1106,7 +1136,7 @@ sub number_rows {
 sub last_column {
 	my $self = shift;
 	carp 'last_column is a read only method' if @_;
-	return $self->{number_columns} - 1;
+	return $self->{'number_columns'};
 }
 
 sub last_row {
@@ -1245,10 +1275,7 @@ sub rewrite_vcf_headers {
 sub list_columns {
 	my $self = shift;
 	carp 'list_columns is a read only method' if @_;
-	my @list;
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
-		push @list, $self->{$i}{'name'};
-	}
+	my @list = map { $self->name($_) } ( 1 .. $self->{'number_columns'} );
 	return wantarray ? @list : \@list;
 }
 
@@ -1256,17 +1283,12 @@ sub name {
 	my $self = shift;
 	my ( $index, $new_name ) = @_;
 	return unless defined $index;
-	return unless exists $self->{$index}{name};
+	return unless exists $self->{$index};
 	if ( defined $new_name ) {
 		$self->{$index}{name} = $new_name;
-		if ( exists $self->{data_table} ) {
-			$self->{data_table}->[0][$index] = $new_name;
-		}
-		elsif ( exists $self->{column_names} ) {
-			$self->{column_names}->[$index] = $new_name;
-		}
+		$self->{data_table}->[0][$index] = $new_name;
 	}
-	return $self->{$index}{name};
+	return $self->{$index}{'name'};
 }
 
 sub metadata {
@@ -1327,7 +1349,7 @@ sub copy_metadata {
 	delete $md->{name};
 	delete $md->{'index'};
 	delete $md->{'AUTO'} if exists $md->{'AUTO'};   # presume this is no longer auto index
-	foreach ( keys %{ $md } ) {
+	foreach ( keys %{$md} ) {
 		$self->{$target}{$_} = $md->{$_};
 	}
 	return 1;
@@ -1346,11 +1368,9 @@ sub find_column {
 	# grouping purposes while maintaining the anchors
 	$name =~ s/ \A (\^?) (.+) (\$?)\Z /$1#?(?:$2)$3/x;
 
-	# walk through each column index
+	# walk through each column index and check the name
 	my $index;
-	for ( my $i = 0; $i < $self->{'number_columns'}; $i++ ) {
-
-		# check the names of each column
+	for my $i ( 1 .. $self->{'number_columns'} ) {
 		if ( $self->{$i}{'name'} =~ /$name/i ) {
 			$index = $i;
 			last;
@@ -1392,9 +1412,9 @@ sub _find_column_indices {
 		}
 		if (    not defined $coord
 			and defined $name
-			and defined defined $self->{data_table}->[1] )
+			and defined $self->{data_table}->[1] )
 		{
-			if ( $self->{data_table}->[1][$name] =~ 
+			if ( $self->{data_table}->[1][$name] =~
 				m/^ [\w\-\.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
 			{
 				# first value looks like a coordinate string
@@ -1432,7 +1452,7 @@ sub chromo_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{chromo} = $_[0];
 		}
 		else {
@@ -1446,7 +1466,7 @@ sub start_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{start} = $_[0];
 		}
 		else {
@@ -1460,7 +1480,7 @@ sub stop_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{stop} = $_[0];
 		}
 		else {
@@ -1471,13 +1491,13 @@ sub stop_column {
 }
 
 *end_column = \&stop_column;
-*end_column if 0;  # avoid once warning
+*end_column if 0;    # avoid once warning
 
 sub coord_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{coord} = $_[0];
 		}
 		else {
@@ -1491,7 +1511,7 @@ sub strand_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{strand} = $_[0];
 		}
 		else {
@@ -1505,7 +1525,7 @@ sub name_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{name} = $_[0];
 		}
 		else {
@@ -1519,7 +1539,7 @@ sub type_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{type} = $_[0];
 		}
 		else {
@@ -1533,7 +1553,7 @@ sub id_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{id} = $_[0];
 		}
 		else {
@@ -1547,7 +1567,7 @@ sub score_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	if ( defined $_[0] ) {
-		if ( $_[0] =~ /^\d+$/ and $_[0] < $self->{number_columns} ) {
+		if ( $_[0] =~ /^\d+$/ and $_[0] <= $self->{'number_columns'} ) {
 			$self->{column_indices}{score} = $_[0];
 		}
 		else {
@@ -1558,7 +1578,7 @@ sub score_column {
 }
 
 *zero_start = \&interbase;
-*zero_start if 0;  # avoid once warning
+*zero_start if 0;    # avoid once warning
 
 sub interbase {
 	my $self = shift;

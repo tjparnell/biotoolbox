@@ -297,8 +297,17 @@ sub parse_headers {
 			$header_line_count++;
 		}
 
-		# column or dataset specific information
+		# column or dataset specific information for BioToolBox versions < 1.70
 		elsif ( $line =~ m/^\#\ Column_(\d+)/x ) {
+
+			# change index from 0-based to 1-base
+			my $index = $1 + 1;
+			$self->add_column_metadata( $line, $index );
+			$header_line_count++;
+		}
+
+		# column or dataset specific information for BioToolBox versions >= 1.70
+		elsif ( $line =~ m/^\#\ Column(\d+):/x ) {
 
 			# the column number will become the index number
 			my $index = $1;
@@ -381,7 +390,9 @@ sub parse_headers {
 				# that really contains the column headers
 
 				# process the real header line
-				$self->add_standard_metadata( pop @{ $self->{'comments'} } );
+				my @header_names = split /\t/, pop @{ $self->{'comments'} };
+				chomp $header_names[-1];
+				$self->add_standard_metadata( 0, \@header_names );    # do not force
 			}
 
 			# we will continue here in case the commented header line was part of a
@@ -422,7 +433,9 @@ sub parse_headers {
 
 				# we have not yet parsed the row of data column names
 				# we will do so now
-				$self->add_standard_metadata($line);
+				chomp $line;
+				my @header_names = split /\t/, $line;
+				$self->add_standard_metadata( 0, \@header_names );    # do not force
 
 				# count as a header line
 				$header_line_count++;
@@ -445,7 +458,9 @@ sub parse_headers {
 		and $self->{comments}->[-1] =~ /\t/ )
 	{
 		# process the real header line
-		$self->add_standard_metadata( pop @{ $self->{'comments'} } );
+		my @header_names = split /\t/, pop @{ $self->{'comments'} };
+		chomp $header_names[-1];
+		$self->add_standard_metadata( 0, \@header_names );
 	}
 
 	# No header was requested
@@ -458,7 +473,7 @@ sub parse_headers {
 		# which means that what we used as a header is actually the first data row
 
 		# fix the column names
-		for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+		for my $i ( 1 .. $self->number_columns ) {
 			my $name = $self->name($i);
 			$self->name( $i, "Column$i ($name)" );
 			$self->{$i}{'AUTO'} = 3;
@@ -486,7 +501,7 @@ sub parse_headers {
 
 			# add a new "column" (just metadata for now) and move it to the beginning
 			my $i = $self->add_column('Column1');
-			$self->reorder_column( $i, 0 .. $old_last );
+			$self->reorder_column( $i, 1 .. $old_last );
 		}
 		if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
 
@@ -529,6 +544,7 @@ sub add_data_line {
 	}
 
 	# add the line of data
+	unshift @linedata, q();    # empty blank column
 	push @{ $self->{data_table} }, \@linedata;
 	$self->{last_row} += 1;
 	return 1;
@@ -680,7 +696,7 @@ sub write_file {
 				$extension =~ s/\d+$//;    # remove any digit after the bed format
 			}
 			elsif ( $self->number_columns == 4
-				and $self->name(3) =~ /score/i )
+				and $self->name(4) =~ /score/i )
 			{
 				$extension = '.bdg';       # looks like a bedGraph file
 			}
@@ -882,7 +898,7 @@ sub write_file {
 		}
 
 		# Write the column metadata headers
-		for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+		for my $i ( 1 .. $self->number_columns ) {
 
 			# each column metadata in the hash is referenced by the column's
 			# index number as the key
@@ -932,13 +948,17 @@ sub write_file {
 			# semi-colon into a single string.
 			# The column identifier is comprised of the word 'Column'
 			# and the index number joined by '_'.
-			$fh->printf( "# Column_$i %s\n", join( ';', @pairs ) );
+			$fh->printf( "# Column%d: %s\n", $i, join( ';', @pairs ) );
 		}
 	}
 
-	# Write the table column headers
+	# Write the table column headers, skipping the first column
 	if ( $self->{'headers'} == 1 ) {
-		$fh->printf( "%s\n", join( "\t", @{ $self->{'data_table'}[0] } ) );
+		$fh->printf(
+			"%s\n",
+			join( "\t",
+				@{ $self->{'data_table'}[0] }[ 1 .. $#{ $self->{'data_table'}[0] } ] )
+		);
 	}
 
 	# Write the data table
@@ -948,17 +968,11 @@ sub write_file {
 		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
 
 			# we will step though the data_table array one row at a time
-			# convert the non-value '.' to undefined
+			# skipping the first (empty) element
+			# convert any non-value '.' to empty
 			# and print using a tab-delimited format
-			my @linedata;
-			foreach ( @{ $self->{'data_table'}[$i] } ) {
-				if ( $_ eq '.' ) {
-					push @linedata, undef;
-				}
-				else {
-					push @linedata, $_;
-				}
-			}
+			my @linedata = map { q() if $_ eq '.' }
+				@{ $self->{'data_table'}[$i] }[ 1 .. $#{ $self->{'data_table'}[$i] } ];
 			$fh->printf( "%s\n", join( "\t", @linedata ) );
 		}
 	}
@@ -969,8 +983,13 @@ sub write_file {
 
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
-			# using a tab-delimited format
-			$fh->printf( "%s\n", join( "\t", @{ $self->{'data_table'}[$i] } ) );
+			# using a tab-delimited format, skipping the first (empty) element
+			$fh->printf(
+				"%s\n",
+				join( "\t",
+					@{ $self->{'data_table'}[$i] }
+						[ 1 .. $#{ $self->{'data_table'}[$i] } ] )
+			);
 		}
 	}
 
@@ -1187,45 +1206,26 @@ sub add_column_metadata {
 
 	# strip the Column metadata identifier
 	chomp $line;
-	$line =~ s/^\#\ Column_\d+\ //x;
+	$line =~ s/^\#\ Column _? \d+ :? \ //x;
 
 	# break up the column metadata
 	my %temphash;    # a temporary hash to put the column metadata into
 	foreach my $pair ( split /;/, $line ) {
 		my ( $key, $value ) = split /=/, $pair;
-		if ( $key eq 'index' ) {
-			if ( $index != $value ) {
-
-				# the value from the metadata index key should be
-				# correct, so we will use that
-				$index = $value;
-			}
-		}
-
-		# store the key & value
+		next if $key eq 'index';    # very old versions may include this
 		$temphash{$key} = $value;
 	}
-
-	# create a index metadata key if not already present
-	# the rest of biotoolbox may expect this to be present
-	unless ( exists $temphash{'index'} ) {
-		$temphash{'index'} = $index;
-	}
+	$temphash{'index'} = $index;
 
 	# store the column metadata hash into the main data hash
-	# use the index as the key
 	if ( exists $data->{$index} ) {
 
-		# we will simply overwrite the previous metadata hash
-		# harsh, I know, but what to do?
-		# if it was canned metadata for a gff file, that's ok
-		warn "Warning: more than one metadata line exists for index $index!\n";
-		$data->{$index} = \%temphash;
+		# this should never happen unless there is more than column metadata line
+		# automatic metadata from standard formats should come later
+		print "WARNING: more than one metadata line exists for index $index!\n";
 	}
-	else {
-		# metadata hash doesn't exist, so we will add it
-		$data->{$index} = \%temphash;
-	}
+	$data->{$index} = \%temphash;
+
 	return 1;
 }
 
@@ -1271,39 +1271,16 @@ sub add_gff_metadata {
 		}
 	}
 
-	# set the metadata for the each column
-	# some of these may already be defined if there was a
-	# column metadata specific column in the file
-	my $column_names = $self->standard_column_names('gff');
-	for ( my $i = 0; $i < 9; $i++ ) {
-
-		# loop for each column
-		# set metadata unless it's already loaded
-		if ( $force or not exists $self->{$i} ) {
-			$self->{$i}{'name'}  = $column_names->[$i];
-			$self->{$i}{'index'} = $i;
-			$self->{$i}{'AUTO'}  = 3;
-		}
-
-		# assign the name to the column header
-		if ( $force or not defined $self->{'column_names'}->[$i] ) {
-			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
-		}
+	# set the metadata
+	$self->add_standard_metadata( $force, $self->standard_column_names('gff') );
+	$self->{'zerostart'} = 0;
+	unless ( $self->{1}{'name'} =~ /^#/ ) {
+		$self->{'headers'} = 0;
 	}
-	$self->{data_table}->[0] = $self->{'column_names'};
-
-	# set column number always to 9
-	if ( $force or $self->{'number_columns'} == 0 ) {
-		$self->{'number_columns'} = 9;
-	}
-
-	# set headers flag to false
-	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
-
-	# set the feature type
 	unless ( defined $self->{'feature'} ) {
 		$self->{'feature'} = 'region';
 	}
+
 	return 1;
 }
 
@@ -1324,50 +1301,46 @@ sub add_bed_metadata {
 	my $force = shift || 0;
 
 	# check bed type and set metadata appropriately
-	my $bed_names;
-	if ( $self->format =~ /bedgraph/i or $self->extension =~ m/(?: bg | bdg | graph )/xi ) {
-
-		# bedGraph format, enforce uniformity
-		$self->format('bedGraph');    # possibly redundant
-		$self->bed($column_count);
-		$bed_names = $self->standard_column_names('bdg');
+	my $column_names;
+	if ( $self->format =~ /bedgraph/i or $self->extension =~ m/(?: bg | bdg | graph )/xi )
+	{
+		$self->format('bedGraph');
+		$column_names = $self->standard_column_names('bedgraph');
 	}
 	else {
-		# other bed format
 		$self->format( sprintf "bed%d", $column_count );
-		$self->bed($column_count);
-		$bed_names = $self->standard_column_names('bed12');
-	}
-	$self->{'number_columns'} = $column_count;
-	$self->{'zerostart'}      = 1;
+		my $names = $self->standard_column_names('bed12');
+		if ( $column_count < scalar @{$names} ) {
 
-	# set the metadata for each column
-	# some of these may already be defined if there was a
-	# column metadata specific column in the file
-	for ( my $i = 0; $i < $column_count; $i++ ) {
-
-		# loop for each column
-		# set name unless it already has one from metadata
-		if ( $force or not exists $self->{$i} ) {
-			$self->{$i}{'name'}  = $bed_names->[$i] || 'extraColumn';
-			$self->{$i}{'index'} = $i;
-			$self->{$i}{'AUTO'}  = 3;
+			# subset names as appropriate
+			my $n            = $column_count - 1;
+			my @wanted_names = @{$names}[ 0 .. $n ];
+			$column_names = \@wanted_names;
 		}
+		elsif ( $column_count > scalar @{$names} ) {
 
-		# assign the name to the column header
-		if ( $force or not defined $self->{'column_names'}->[$i] ) {
-			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+			# add additional names as appropriate
+			my $n = scalar( @{$column_names} ) + 1;
+			for my $i ( $n .. $column_count ) {
+				push @{$column_names}, sprintf "Column_$i";
+			}
+		}
+		else {
+			$column_names = $names;
 		}
 	}
-	$self->{data_table}->[0] = $self->{'column_names'};
+	$self->add_standard_metadata( $force, $column_names );
 
-	# set the feature type
+	# add additional metadata
+	$self->{'bed'}       = $column_count;
+	$self->{'zerostart'} = 1;
+	unless ( $self->{1}{'name'} =~ /^#/ ) {
+		$self->{'headers'} = 0;
+	}
 	unless ( defined $self->{'feature'} ) {
 		$self->{'feature'} = 'region';
 	}
 
-	# set headers flag to false
-	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1393,39 +1366,31 @@ sub add_peak_metadata {
 	}
 	elsif ( $self->format =~ /gapped/i or $self->extension =~ /gapped/i ) {
 		$self->format('gappedPeak');    # possibly redundant
-		$self->bed($column_count);
 		$column_names = $self->standard_column_names('gappedpeak');
 	}
 	else {
 		# how did we get here???? Hope for the best.....
 		$self->bed($column_count);
 		$column_names = $self->standard_column_names('bed12');
-	}
-	$self->{'number_columns'} = $column_count;
-	$self->{'zerostart'}      = 1;
-
-	# add metadata
-	for ( my $i = 0; $i < $column_count; $i++ ) {
-		if ( $force or not exists $self->{$i} ) {
-			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
-			$self->{$i}{'index'} = $i;
-			$self->{$i}{'AUTO'}  = 3;
-		}
-
-		# assign the name to the column header
-		if ( $force or not defined $self->{'column_names'}->[$i] ) {
-			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		if ( $column_count > scalar @{$column_names} ) {
+			my $n = scalar( @{$column_names} ) + 1;
+			for my $i ( $n .. $column_count ) {
+				push @{$column_names}, sprintf "Column_$i";
+			}
 		}
 	}
-	$self->{data_table}->[0] = $self->{'column_names'};
+	$self->add_standard_metadata( $force, $column_names );
 
-	# set the feature type
+	# add additional metadata
+	$self->{'bed'}       = $column_count;
+	$self->{'zerostart'} = 1;
+	unless ( $self->{1}{'name'} =~ /^#/ ) {
+		$self->{'headers'} = 0;
+	}
 	unless ( defined $self->{'feature'} ) {
 		$self->{'feature'} = 'region';
 	}
 
-	# set headers flag to false
-	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1438,10 +1403,6 @@ sub add_peak_metadata {
 sub add_ucsc_metadata {
 	my ( $self, $column_count ) = @_;
 	my $force = shift || 0;
-
-	# set metadata
-	$self->{'number_columns'} = $column_count;
-	$self->{'ucsc'}           = $column_count;
 
 	# set format and determine column names;
 	my $column_names;
@@ -1465,33 +1426,18 @@ sub add_ucsc_metadata {
 		$self->format('genePred');
 		$column_names = $self->standard_column_names('ucsc10');
 	}
+	$self->add_standard_metadata( $force, $column_names );
+
+	# set additional metadata
+	$self->{'ucsc'}      = $column_count;
 	$self->{'zerostart'} = 1;
-
-	# assign the column names and metadata
-	for ( my $i = 0; $i < $column_count; $i++ ) {
-
-		# loop for each column
-		# set name unless it already has one from metadata
-		if ( $force or not exists $self->{$i} ) {
-			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
-			$self->{$i}{'index'} = $i;
-			$self->{$i}{'AUTO'}  = 3;
-		}
-
-		# assign the name to the column header
-		if ( $force or not defined $self->{'column_names'}->[$i] ) {
-			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
-		}
+	unless ( $self->{1}{'name'} =~ /^#/ ) {
+		$self->{'headers'} = 0;
 	}
-	$self->{data_table}->[0] = $self->{'column_names'};
-
-	# set the feature type
 	unless ( defined $self->{'feature'} ) {
 		$self->{'feature'} = 'gene';
 	}
 
-	# set headers flag to false
-	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1504,82 +1450,67 @@ sub add_sgr_metadata {
 	my $force = shift || 0;
 
 	# set column metadata
-	my $column_names = $self->standard_column_names('sgr');
-	for ( my $i = 0; $i < 3; $i++ ) {
+	$self->add_standard_metadata( $force, $self->standard_column_names('sgr') );
 
-		# loop for each column
-		# set name unless it already has one from metadata
-		if ( $force or not exists $self->{$i} ) {
-			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
-			$self->{$i}{'index'} = $i;
-			$self->{$i}{'AUTO'}  = 3;
-		}
-
-		# assign the name to the column header
-		if ( $force or not defined $self->{'column_names'}->[$i] ) {
-			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
-		}
-	}
-	$self->{data_table}->[0] = $self->{'column_names'};
-	$self->{'number_columns'} = 3;
+	# set additional metadata
 	$self->format('sgr');
-
-	# set headers flag to false
-	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
-
-	# set the feature type
+	unless ( $self->{1}{'name'} =~ /^#/ ) {
+		$self->{'headers'} = 0;
+	}
 	unless ( defined $self->{'feature'} ) {
 		$self->{'feature'} = 'region';
 	}
+
 	return 1;
 }
 
 ### Internal subroutine to generate metadata for standard files
 sub add_standard_metadata {
-	my ( $self, $line ) = @_;
+	my ( $self, $force, $namelist ) = @_;
 
-	my @namelist = split /\t/, $line;
-	chomp $namelist[-1];
+	# add first data table row of names
+	# the first column will always be blank to fake base 1 column indexing
+	$self->{'data_table'}->[0] ||= ['BLANK'];
 
 	# we will define the columns based on
-	for my $i ( 0 .. $#namelist ) {
+	for my $i ( 0 .. $#{$namelist} ) {
 
-		# make up a name if one doesn't exist
-		$namelist[$i] ||= "Column_$i";
+		# columns are indexed in the metadata as base 1 integers
+		my $j = $i + 1;
 
-		# confirm that a file metadata exists for this column
-		if ( exists $self->{$i} ) {
-			unless ( $namelist[$i] eq $self->{$i}->{'name'} ) {
-				warn "metadata and header names for column $i do not match!";
+		# add file metadata for this column
+		if ( exists $self->{$j} ) {
 
-				# set the name to match the actual column name
-				$self->{$i}->{'name'} = $namelist[$i];
+			# set the name to match the actual column name
+			if ( $namelist->[$i] ne $self->{$j}->{'name'} ) {
+				unless ($force) {
+					print "WARN: metadata and header names for column $j do not match!\n";
+				}
+				$self->{$j}->{'name'} = $namelist->[$i];
 			}
 		}
-
-		# otherwise be nice and generate it here
 		else {
-			$self->{$i} = {
-				'name'  => $namelist[$i],
-				'index' => $i,
+			$self->{$j} = {
+				'name'  => $namelist->[$i],
+				'index' => $j,
 				'AUTO'  => 3,
 			};
+		}
+
+		# assign table name
+		if ( $force or not defined $self->{'data_table'}->[0]->[$j] ) {
+			$self->{'data_table'}->[0]->[$j] = $self->{$j}{'name'};
 		}
 	}
 
 	# check the number of columns
-	if ( scalar @namelist != $self->{'number_columns'} ) {
-
-		# adjust to match actual content
-		$self->{'number_columns'} = scalar @namelist;
+	if ( scalar @{$namelist} != $self->{'number_columns'} ) {
+		$self->{'number_columns'} = scalar @{$namelist};
 	}
 
-	# put the column names in the metadata
-	$self->{'column_names'} = \@namelist;
-	$self->{data_table}->[0] = $self->{'column_names'};
-
-	# set headers flag to true
+	# set headers flag to true - this may be reversed for specific file formats
 	$self->{'headers'} = 1;
+
 	return 1;
 }
 

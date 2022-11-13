@@ -121,7 +121,7 @@ sub ask_user_for_index {
 		)
 	{
 		print " These are the columns in the file\n";
-		my $i = 0;
+		my $i = 1;
 		foreach ( $Data->list_columns ) {
 			print "  $i\t$_\n";
 			$i++;

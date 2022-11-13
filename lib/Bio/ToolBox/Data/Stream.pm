@@ -185,13 +185,13 @@ sub add_column {
 		return;
 	}
 
-	my $column = $self->number_columns;
+	my $column = $self->number_columns + 1;
 	$self->{$column} = {
 		'name'  => $name,
 		'index' => $column,
 	};
 	$self->{data_table}->[0][$column] = $name;
-	$self->{number_columns}++;
+	$self->{number_columns} = $column;
 	delete $self->{column_indices} if exists $self->{column_indices};
 	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
 

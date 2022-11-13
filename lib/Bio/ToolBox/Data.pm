@@ -366,7 +366,8 @@ sub column_values {
 sub add_column {
 	my ( $self, $name ) = @_;
 	return unless $name;
-	my $column = $self->{number_columns};
+	my $column = $self->number_columns + 1;
+	$self->{'data_table'}->[0] ||= ['BLANK'];    # make sure we have a header row
 
 	# check for array of column data
 	my $name_ref = ref $name;
@@ -397,11 +398,13 @@ sub add_column {
 				'name'  => $name->[0],
 				'index' => $column,
 			};
-			for ( my $i = 0; $i < scalar @{ $name }; $i++ ) {
-				$self->value( $i, $column, $name->[$i] );
+			for my $r ( 0 .. $#{$name} ) {
+				$self->{data_table}->[$r][$column] = $name->[$r];
+
+				# this may auto-vivify an undefined value as first element
 			}
-			$self->{last_row} = scalar @{ $name } - 1;
-			$self->{headers}  = 1;    # boolean to indicate the table now has headers
+			$self->{last_row} = $#{$name};
+			$self->{headers} = 1;
 		}
 	}
 	elsif ( $name_ref eq 'Bio::DB::GFF::Typename' ) {
@@ -412,6 +415,7 @@ sub add_column {
 			'index' => $column,
 		};
 		$self->{data_table}->[0][$column] = $name->asString;
+		$self->{headers} = 1;
 	}
 	elsif ( $name_ref eq q() ) {
 
@@ -428,7 +432,8 @@ sub add_column {
 		return;
 	}
 
-	$self->{number_columns}++;
+	# update metadata
+	$self->{number_columns} = $column;
 	delete $self->{column_indices} if exists $self->{column_indices};
 	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
 
@@ -469,9 +474,10 @@ sub add_row {
 		cluck 'row added has more elements than table columns! truncating row elements';
 		splice @row_data, 0, $self->{number_columns};
 	}
-	until ( scalar @row_data == $self->{number_columns} ) {
-		push @row_data, '.';
+	elsif ( scalar(@row_data) < $self->{number_columns} ) {
+		push @row_data, ( '.' x ( $self->{number_columns} - scalar(@row_data) ) );
 	}
+	unshift @row_data, q();    # blank element to shift index
 	my $row_index = $self->{last_row} + 1;
 	$self->{data_table}->[$row_index] = \@row_data;
 	$self->{last_row}++;
@@ -508,8 +514,9 @@ sub delete_row {
 }
 
 sub row_values {
-	my ( $self, $row ) = @_;
-	my @data = @{ $self->{data_table}->[$row] };
+	my ( $self, $index ) = @_;
+	my @data =    # skip first value
+		@{ $self->{data_table}->[$index] }[ 1 .. $#{ $self->{data_table}->[$index] } ];
 	return wantarray ? @data : \@data;
 }
 
@@ -978,7 +985,7 @@ sub reload_children {
 
 	# destroy current data table and metadata
 	$self->{data_table} = [];
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+	for my $i ( 1 .. $self->number_columns ) {
 		delete $self->{$i};
 	}
 
@@ -988,9 +995,9 @@ sub reload_children {
 		# various keys
 		$self->{$_} = $Stream->{$_};
 	}
-	for ( my $i = 0; $i < $Stream->number_columns; $i++ ) {
 
 		# column metadata
+	for my $i ( 1 .. $Stream->number_columns ) {
 		my %md = $Stream->metadata($i);
 		$self->{$i} = \%md;
 	}
@@ -1086,7 +1093,7 @@ sub summary_file {
 
 	# walk through the dataset names
 	$possibles{unknown} = [];
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+	for my $i ( 1 .. $self->number_columns ) {
 		if ( not exists $skip{ lc $self->{$i}{'name'} } ) {
 			my $d = $self->metadata( $i, 'dataset' ) || undef;
 			if ( defined $d ) {

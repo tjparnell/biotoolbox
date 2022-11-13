@@ -72,7 +72,8 @@ sub row_values {
 	my $self = shift;
 	carp 'row_values is a read only method' if @_;
 	my $row  = $self->{'index'};
-	my @data = @{ $self->{data}->{data_table}->[$row] };
+	my @data = @{ $self->{data}->{data_table}->[$row] }
+		[ 1 .. $#{ $self->{data}->{data_table}->[$row] } ];
 	return wantarray ? @data : \@data;
 }
 
@@ -340,7 +341,8 @@ sub peak {
 			return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
 		}
 		else {
-			return $self->value(1) + $self->value(9) + 1;
+			# hard coded start and peak columns
+			return $self->value(2) + $self->value(10) + 1;
 		}
 	}
 	else {
@@ -478,7 +480,7 @@ sub length {
 	if ( $self->{data}->vcf ) {
 
 		# special case for vcf files, measure the length of the ALT allele
-		return CORE::length( $self->value(4) );
+		return CORE::length( $self->value(5) );
 	}
 	my $s = $self->start;
 	my $e = $self->end;
@@ -511,7 +513,7 @@ sub gff_attributes {
 	return unless ( $self->{data}->gff );
 	return $self->{attributes} if ( exists $self->{attributes} );
 	$self->{attributes} = {};
-	foreach my $g ( split( /\s*;\s*/, $self->value(8) ) ) {
+	foreach my $g ( split( /\s*;\s*/, $self->value(9) ) ) {
 		my ( $tag, $value ) = split /\s+|=/, $g;
 		next unless ( $tag and $value );
 
@@ -531,20 +533,20 @@ sub vcf_attributes {
 
 	# INFO attributes
 	my %info;
-	if ( $self->{data}->name(7) eq 'INFO' ) {
+	if ( $self->{data}->name(8) eq 'INFO' ) {
 		%info = map { $_->[0] => defined $_->[1] ? $_->[1] : undef }
 
 			# some tags are simple and have no value, eg SOMATIC
-			map { [ split( /=/ ) ] }
+			map { [ split(/=/) ] }
 			split( /;/, $self->value(7) );
 	}
 	$self->{attributes}->{INFO} = \%info;
-	$self->{attributes}->{7}    = \%info;
+	$self->{attributes}->{8}    = \%info;
 
 	# Sample attributes
-	if ( $self->{data}->number_columns > 8 ) {
-		my @formatKeys = split /:/, $self->value(8);
-		foreach my $i ( 9 .. $self->{data}->last_column ) {
+	if ( $self->{data}->number_columns > 9 ) {
+		my @formatKeys = split /:/, $self->value(9);
+		foreach my $i ( 10 .. $self->{data}->last_column ) {
 			my $name       = $self->{data}->name($i);
 			my @sampleVals = split /:/, $self->value($i);
 			my %sample     = map {
@@ -587,7 +589,7 @@ sub rewrite_gff_attributes {
 		$value =~ s/( [\t\n\r%&\=;,\ ] ) /sprintf("%%%X",ord($1))/xge;
 		push @pairs, "$key=$value";
 	}
-	$self->value( 8, join( '; ', @pairs ) );
+	$self->value( 9, join( '; ', @pairs ) );
 	return 1;
 }
 
@@ -608,24 +610,24 @@ sub rewrite_vcf_attributes {
 			keys %{ $self->{attributes}->{INFO} }
 	);
 	$info ||= '.';    # sometimes we have nothing left
-	$self->value( 7, $info );
+	$self->value( 8, $info );
 
 	# FORMAT
 	my @order;
-	push @order, 'GT' if exists $self->{attributes}{9}{GT};
-	foreach my $key ( sort { $a cmp $b } keys %{ $self->{attributes}{9} } ) {
+	push @order, 'GT' if exists $self->{attributes}{10}{GT};
+	foreach my $key ( sort { $a cmp $b } keys %{ $self->{attributes}{10} } ) {
 		next if $key eq 'GT';
 		push @order, $key;
 	}
 	if (@order) {
-		$self->value( 8, join( ':', @order ) );
+		$self->value( 9, join( ':', @order ) );
 	}
 	else {
-		$self->value( 8, '.' );
+		$self->value( 9, '.' );
 	}
 
 	# SAMPLES
-	foreach my $i ( 9 .. $self->{data}->last_column ) {
+	foreach my $i ( 10 .. $self->{data}->last_column ) {
 		if (@order) {
 			$self->value( $i, join( ':', map { $self->{attributes}{$i}{$_} } @order ) );
 		}
