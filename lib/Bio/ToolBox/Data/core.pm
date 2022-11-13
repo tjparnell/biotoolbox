@@ -38,7 +38,6 @@ sub new {
 		'number_columns'    => 0,
 		'last_row'          => 0,
 		'headers'           => 1,
-		'column_names'      => [],
 		'filename'          => q(),
 		'basename'          => q(),
 		'extension'         => q(),

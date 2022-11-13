@@ -79,7 +79,6 @@ sub taste_file {
 	$Taste->parse_headers;
 
 	# load first 10 data lines
-	$Taste->{data_table}->[0] = $Taste->{'column_names'};    # set table header names
 	for ( my $i = 1; $i <= 10; $i++ ) {
 		my $line = $Taste->fh->getline or last;
 		next if $line !~ m/\w+/;
