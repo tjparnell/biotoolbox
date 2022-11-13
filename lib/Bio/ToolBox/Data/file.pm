@@ -1517,72 +1517,54 @@ sub add_standard_metadata {
 sub standard_column_names {
 	my ( $self, $type ) = @_;
 
-	if ( $type eq 'gff' ) {
-		return [qw(Chromosome Source Type Start Stop Score Strand Phase Group)];
-	}
-	elsif ( $type eq 'bed12' ) {
-		return [
+	my %column_names = (
+		'gff'   => [qw(Chromosome Source Type Start Stop Score Strand Phase Group)],
+		'bed12' => [
 			qw(Chromosome Start0 End Name Score Strand
 				thickStart0 thickEnd itemRGB blockCount blockSizes blockStarts0)
-		];
-	}
-	elsif ( $type eq 'bed6' ) {
-		return [qw(Chromosome Start0 End Name Score Strand)];
-	}
-	elsif ( $type eq 'bdg' ) {
-		return [qw(Chromosome Start0 End Score)];
-	}
-	elsif ( $type eq 'narrowpeak' ) {
-		return [
+		],
+		'bed6'       => [qw(Chromosome Start0 End Name Score Strand)],
+		'bdg'        => [qw(Chromosome Start0 End Score)],
+		'narrowpeak' => [
 			qw(Chromosome Start0 End Name Score Strand signalValue
 				pValue qValue peak)
-		];
-	}
-	elsif ( $type eq 'broadpeak' ) {
-		return [
-			qw(Chromosome Start0 End Name Score Strand signalValue
-				pValue qValue)
-		];
-	}
-	elsif ( $type eq 'gappedpeak' ) {
-		return [
+		],
+		'broadpeak' =>
+			[qw(Chromosome Start0 End Name Score Strand signalValue pValue qValue)],
+		'gappedpeak' => [
 			qw(Chromosome Start0 End Name Score Strand
 				thickStart0 thickEnd itemRGB blockCount blockSizes blockStarts0
 				signalValue pValue qValue)
-		];
-	}
-	elsif ( $type eq 'sgr' ) {
-		return [qw(Chromo Start Score)];
-	}
-	elsif ( $type eq 'ucsc16' ) {
-		return [
+		],
+		'sgr'    => [qw(Chromo Start Score)],
+		'ucsc16' => [
 			qw(bin name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount
 				exonStarts0 exonEnds score name2 cdsStartSt cdsEndStat exonFrames)
-		];
-	}
-	elsif ( $type eq 'ucsc15' or $type eq 'genepredext' ) {
-		return [
+		],
+		'ucsc15' => [    # genepredext
 			qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount
 				exonStarts0 exonEnds score name2 cdsStartSt cdsEndStat exonFrames)
-		];
-	}
-	elsif ( $type eq 'ucsc12' or $type eq 'knowngene' ) {
-		return [
+		],
+		'ucsc12' => [    # knowngene
 			qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount
 				exonStarts0 exonEnds proteinID alignID)
-		];
-	}
-	elsif ( $type eq 'ucsc11' or $type eq 'refflat' ) {
-		return [
+		],
+		'ucsc11' => [    # refflat
 			qw(geneName transcriptName chrom strand txStart0 txEnd cdsStart0
 				cdsEnd exonCount exonStarts0 exonEnds)
-		];
-	}
-	elsif ( $type eq 'ucsc10' or $type eq 'genepred' ) {
-		return [
+		],
+		'ucsc10' => [    # genepred
 			qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount
 				exonStarts exonEnds)
-		];
+		],
+	);
+	$column_names{'genepredext'} = $column_names{'ucsc15'};
+	$column_names{'knowngene'}   = $column_names{'ucsc12'};
+	$column_names{'refflat'}     = $column_names{'ucsc11'};
+	$column_names{'genepred'}    = $column_names{'ucsc10'};
+
+	if ( exists $column_names{$type} ) {
+		return $column_names{$type};
 	}
 	else {
 		confess "unrecognized standard column name format '$type'!";
