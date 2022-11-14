@@ -79,11 +79,12 @@ sub taste_file {
 	$Taste->parse_headers;
 
 	# load first 10 data lines
-	for ( my $i = 1; $i <= 10; $i++ ) {
+	my $i = 0;
+	while ( $i < 10 ) {
 		my $line = $Taste->fh->getline or last;
 		next if $line !~ m/\w+/;
 		next if $line =~ /^#/;
-		$Taste->add_data_line($line);
+		$i += $Taste->add_data_line($line);
 	}
 	$Taste->close_fh;
 	$Taste->verify(1);    # silently check the integrity of the file
@@ -960,7 +961,7 @@ sub write_file {
 	if ( $args{'format'} eq 'simple' ) {
 
 		# the simple format will strip the non-value '.' from the table
-		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
+		for my $i ( 1 .. $self->last_row ) {
 
 			# we will step though the data_table array one row at a time
 			# skipping the first (empty) element
@@ -974,7 +975,7 @@ sub write_file {
 
 	else {
 		# normal data files
-		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
+		for my $i ( 1 .. $self->last_row ) {
 
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print

@@ -88,7 +88,7 @@ sub verify {
 		my @problems;
 		my $too_low  = 0;
 		my $too_high = 0;
-		for ( my $row = 0; $row <= $self->{'last_row'}; $row++ ) {
+		for my $row ( 0 .. $self->{'last_row'} ) {
 			my $count = scalar @{ $self->{'data_table'}->[$row] };
 			if ( $count != $number ) {
 				push @problems, $row;

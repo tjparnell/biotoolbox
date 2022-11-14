@@ -171,7 +171,7 @@ sub duplicate {
 		or return;
 
 	# copy the metadata
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+	for my $i ( 1 .. $self->number_columns ) {
 
 		# column metadata
 		my %md = $self->metadata($i);
@@ -382,7 +382,7 @@ sub add_column {
 					'name'  => $name->[0],
 					'index' => $column,
 				};
-				for ( my $r = 0; $r <= $self->last_row; $r++ ) {
+				for my $r ( 0 .. $self->last_row ) {
 					$self->{data_table}->[$r][$column] = $name->[$r];
 				}
 			}
@@ -578,7 +578,7 @@ sub collapse_gene_transcripts {
 	if ( exists $self->{SeqFeatureObjects} ) {
 
 		# we should have stored SeqFeature objects, probably from parsed table
-		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
+		for my $i ( 0 .. $self->last_row ) {
 			my $feature     = $self->{SeqFeatureObjects}->[$i] or next;
 			my $collSeqFeat = collapse_transcripts($feature)   or next;
 			$success += $self->store_seqfeature( $i, $collSeqFeat );
@@ -592,7 +592,7 @@ sub collapse_gene_transcripts {
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
 		my $type_i = $self->type_column;
-		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
+		for my $i ( 0 .. $self->last_row ) {
 			my $feature = get_db_feature(
 				db   => $db,
 				name => $self->value( $i, $name_i ) || undef,
@@ -648,7 +648,7 @@ sub add_transcript_length {
 	if ( exists $self->{SeqFeatureObjects} ) {
 
 		# we should have stored SeqFeature objects, probably from parsed table
-		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
+		for my $i ( 0 .. $self->last_row ) {
 			my $feature = $self->{SeqFeatureObjects}->[$i] or next;
 			my $length  = &{$length_calculator}($feature);
 			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
@@ -662,7 +662,7 @@ sub add_transcript_length {
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
 		my $type_i = $self->type_column;
-		for ( my $i = 1; $i <= $self->last_row; $i++ ) {
+		for my $i ( 0 .. $self->last_row ) {
 			my $feature = get_db_feature(
 				db   => $db,
 				name => $self->value( $i, $name_i ) || undef,
@@ -698,15 +698,13 @@ sub sort_data {
 	# Sample the dataset values
 	# this will be used to guess the sort method, below
 	my $example;    # an example of the dataset
-	foreach ( my $i = 1; $i <= $self->last_row; $i++ ) {
+	for my $r ( 1 .. $self->last_row ) {
 
 		# we want to avoid null values, so keep trying
 		# null being . or any variation of N/A, NaN, inf
-		my $v = $self->value( $i, $index );
+		my $v = $self->value( $r, $index );
 		if ( defined $v and $v !~ m/^(?: \. | n\/?a | nan | \-?inf )$/xi ) {
-
-			# a non-null value, take it
-			$example = $v;
+			$example = $v;    # a non-null value, take it
 			last;
 		}
 	}
@@ -1155,7 +1153,7 @@ sub summary_file {
 		my $row = 1;
 
 		# Collect summarized data
-		for ( my $column = $startcolumns[$d]; $column <= $endcolumns[$d]; $column++ ) {
+		for my $column ( $startcolumns[$d] .. $endcolumns[$d] ) {
 
 			# determine the midpoint position of the window
 			# this assumes the column metadata has start and stop

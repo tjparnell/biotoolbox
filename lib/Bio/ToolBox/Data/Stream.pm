@@ -152,7 +152,7 @@ sub duplicate {
 	) or return;
 
 	# copy the metadata
-	for ( my $i = 0; $i < $self->number_columns; $i++ ) {
+	for my $i ( 1 .. $self->number_columns ) {
 
 		# column metadata
 		my %md = $self->metadata($i);
