@@ -584,99 +584,45 @@ sub write_file {
 	$args{'format'}   ||= undef;
 	unless ( exists $args{'gz'} ) { $args{'gz'} = undef }
 
-	# check the data
-	unless ( $self->verify ) {
-		cluck 'bad data structure!';
-		return;
-	}
-
 	# check filename
-	unless ( $args{'filename'} or $self->filename ) {
-		cluck 'no filename given!';
-		return;
+	if ( not $args{'filename'} ) {
+		
+		# user did not provide a filename, so we create one from the metadata
+		# but first check the format
+		if ( $self->verify ) {
+			
+			# recreate the filename from metadata
+			# the extension may have been automatically changed by verify method
+			# the user will have been warned
+			my $name = $self->path . $self->basename . $self->extension;
+			if ($name) {
+				$args{'filename'} = $name;
+			}
+			else {
+				cluck 'no passed filename or original filename metadata!';
+				return;
+			}
+		}
+		else {
+			cluck 'bad data structure!';
+			return;
+		}
 	}
 
 	# split filename into its base components
 	my ( $name, $path, $extension ) =
 		fileparse( $args{'filename'} || $self->filename, $SUFFIX );
+	
+	# check extension
+	unless ($extension) {
 
-	# Adjust filename extension if necessary
-	if ( $extension =~ /(g[tf]f)/i ) {
-		if ( not $self->gff ) {
-
-			# let's set it to true and see if it passes verification
-			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3;    # default
-			unless ( $self->verify and $self->gff ) {
-				warn
-" GFF structure changed, re-setting extension from $extension to .txt\n";
-				$extension =~ s/g[tf]f3?/txt/i;
-			}
+		# try some possibilities
+		if ($name =~ /^(.+)(\.\w+)(\.gz)?$/xi) {
+			# nonstandard extension
+			$extension = $2 . $3 || q();
+			$name      = $1;
 		}
-	}
-	elsif ( $extension =~ m/(?: bedgraph | bed | bdg | narrowpeak | broadpeak )/xi ) {
-		if ( not $self->bed ) {
-
-			# let's set it to true and see if it passes verification
-			$self->{'bed'} = 1;                                 # a fake true
-			unless ( $self->verify and $self->bed ) {
-				warn
-" BED structure changed, re-setting extension from $extension to .txt\n";
-				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
-			}
-		}
-	}
-	elsif ( $extension =~ /vcf/i ) {
-		if ( not $self->vcf ) {
-
-			# let's set it to true and see if it passes verification
-			$self->{'vcf'} = 1;                                 # a fake true
-			unless ( $self->verify and $self->vcf ) {
-				warn
-" VCF structure changed, re-setting extension from $extension to .txt\n";
-				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
-			}
-		}
-	}
-	elsif ( $extension =~ /sgr/i ) {
-		unless ( $self->{'extension'} =~ /sgr/i ) {
-
-			# original file was not SGR
-			# let's pretend it was and see if still passes
-			# the sgr verification relies on the recorded extension
-			$self->{'extension'} = '.sgr';
-			$self->verify;
-			if ( $self->extension =~ /txt/ ) {
-				warn
-" SGR structure changed, re-setting extension from $extension to .txt\n";
-			}
-			$extension = $self->{'extension'};
-		}
-	}
-	elsif ( $extension =~ m/(?: reff?lat | genepred | ucsc )/xi ) {
-		if ( $self->ucsc != $self->number_columns ) {
-
-			# it's not set as a ucsc data
-			# let's set it to true and see if it passes verification
-			$self->ucsc( $self->number_columns );
-			unless ( $self->verify and $self->ucsc ) {
-				warn
-" UCSC structure changed, re-setting extension from $extension to .txt\n";
-				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
-			}
-		}
-	}
-	elsif ( $extension =~ /txt/i ) {
-
-		# plain old text file, sounds good to me
-		# make sure headers are enabled
-		$self->{'headers'} = 1 unless $self->{'headers'} == -1;    # original noheader
-	}
-	elsif ( not $extension ) {
-
-		# no extension was available
-		# try and determine one from metadata
-
-		if ( $self->gff ) {
+		elsif ( $self->gff ) {
 			if ( $self->gff == 3 ) {
 				$extension = '.gff3';
 			}
@@ -717,38 +663,88 @@ sub write_file {
 		elsif ( $self->vcf ) {
 			$extension = '.vcf';
 		}
-		elsif ( $name =~ m/( \.\w{3} (?:\.gz)? )$/xi ) {
-
-			# a non-standard 3 letter file extension
-			# anything else might be construed as part of the filename, so run the
-			# risk of adding a default extension below
-			$extension = $1;
-			$name =~ s/$extension\Z//x;
-		}
-		elsif ( $self->extension ) {
-
-			# original file had an extension, re-use it if appropriate
-			# why wouldn't this get picked up above???? probably old cruft,
-			# or a non-standard or unknown file extension
-			# leave it in for the time being, shouldn't hurt anything
-			if ( $self->extension =~ /g[tf]f/i ) {
-				$extension = $self->gff ? $self->extension : '.txt';
-			}
-			elsif ( $self->extension =~ m/(?: bed | bdg | peak )/xi ) {
-				$extension = $self->bed ? $self->extension : '.txt';
-			}
-			else {
-				# an unstructured format
-				$extension = $self->extension;
-			}
-		}
 		else {
-			# normal data text file
+			# presume a standard text file
 			$extension = '.txt';
 		}
 	}
 
-	# otherwise the extension must be good, hope for the best
+	# Verify and adjust filename extension if necessary for specific formats
+	if ( $extension =~ /(g[tf]f)/i ) {
+		if ( not $self->gff ) {
+
+			# let's set it to true and see if it passes verification
+			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3;    # default
+			unless ( $self->verify and $self->gff ) {
+				warn sprintf 
+					" GFF structure invalid, re-setting extension from %s to %s\n",
+					$extension, $self->extension;
+				$extension = $self->extension;
+			}
+		}
+	}
+	elsif ( $extension =~ m/(?: bedgraph | bed | bdg | narrowpeak | broadpeak )/xi ) {
+		if ( not $self->bed ) {
+
+			# let's set it to true and see if it passes verification
+			$self->{'bed'} = 1;                                 # a fake true
+			unless ( $self->verify and $self->bed ) {
+				warn sprintf
+					" BED structure invalid, re-setting extension from %s to %s\n",
+					$extension, $self->extension;
+				$extension = $self->extension;
+			}
+		}
+	}
+	elsif ( $extension =~ /vcf/i ) {
+		if ( not $self->vcf ) {
+
+			# let's set it to true and see if it passes verification
+			$self->{'vcf'} = 1;                                 # a fake true
+			unless ( $self->verify and $self->vcf ) {
+				warn sprintf
+					" VCF structure changed, re-setting extension from %s to %s\n",
+					$extension, $self->extension;
+				$extension = $self->extension;
+			}
+		}
+	}
+	elsif ( $extension =~ /sgr/i ) {
+		unless ( $self->{'extension'} =~ /sgr/i ) {
+
+			# original file was not SGR
+			# let's pretend it was and see if still passes
+			# the sgr verification relies on the recorded extension
+			$self->{'extension'} = '.sgr';
+			$self->verify;
+			if ( $self->extension =~ /txt/ ) {
+				warn
+" SGR structure invalid, re-setting extension from $extension to .txt\n";
+			}
+			$extension = $self->{'extension'};
+		}
+	}
+	elsif ( $extension =~ m/(?: reff?lat | genepred | ucsc )/xi ) {
+		if ( $self->ucsc != $self->number_columns ) {
+
+			# it's not set as a ucsc data
+			# let's set it to true and see if it passes verification
+			$self->ucsc( $self->number_columns );
+			unless ( $self->verify and $self->ucsc ) {
+				warn sprintf
+					" UCSC structure invalid, re-setting extension from %s to %s\n",
+					$extension, $self->extension;
+				$extension = $self->extension;
+			}
+		}
+	}
+	elsif ( $extension =~ /txt/i ) {
+
+		# plain old text file, sounds good to me
+		# make sure headers are enabled
+		$self->{'headers'} = 1 unless $self->{'headers'} == -1;    # original noheader
+	}
+
 
 	# determine format
 	# this is an arcane specification of whether we want a "simple" no metadata
