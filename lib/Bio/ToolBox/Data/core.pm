@@ -1064,12 +1064,12 @@ sub feature_type {
 		return $self->{feature_type};
 	}
 	my $feature_type;
-	if ( defined $self->chromo_column and defined $self->start_column ) {
+	if ( $self->chromo_column and $self->start_column ) {
 		$feature_type = 'coordinate';
 	}
-	elsif (defined $self->id_column
-		or ( defined $self->type_column and defined $self->name_column )
-		or ( defined $self->feature     and defined $self->name_column ) )
+	elsif ( $self->id_column
+		or ( $self->type_column and $self->name_column )
+		or ( $self->feature     and $self->name_column ) )
 	{
 		$feature_type = 'named';
 	}
@@ -1426,10 +1426,10 @@ sub _find_column_indices {
 
 	# check for coordinate string
 	my $coord = $self->find_column('^coordinate$');
-	if ( not defined $coord and not defined $chromo and not defined $start ) {
+	if ( not $coord and not $chromo and not $start ) {
 
 		# check if ID or name id looks like a coordinate string
-		if ( defined $id and defined $self->{data_table}->[1] ) {
+		if ( $id and $self->{data_table}->[1] ) {
 			if ( $self->{data_table}->[1][$id] =~
 				m/^ [\w\-\.]+: \d+ (?: [\-\.]{1,2} \d+ )?$/x )
 			{
@@ -1438,8 +1438,8 @@ sub _find_column_indices {
 				$coord = $id;
 			}
 		}
-		if (    not defined $coord
-			and defined $name
+		if (    not $coord
+			and $name
 			and defined $self->{data_table}->[1] )
 		{
 			if ( $self->{data_table}->[1][$name] =~
@@ -1453,7 +1453,7 @@ sub _find_column_indices {
 
 	# determine zero-based start coordinates
 	if (    $self->{zerostart} == 0
-		and defined $start
+		and $start
 		and substr( $self->name($start), -1 ) eq '0' )
 	{
 		$self->{zerostart} = 1;

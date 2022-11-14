@@ -97,7 +97,7 @@ sub seq_id {
 		my $i = $self->{data}->chromo_column;
 
 		# update only if we have an actual column
-		if ( defined $i ) {
+		if ( $i ) {
 			$self->value( $i, $_[0] );
 			$self->{seqid} = $_[0];
 		}
@@ -116,13 +116,13 @@ sub seq_id {
 	my $c;
 	my $i = $self->{data}->chromo_column;
 	my $j = $self->{data}->coord_column;
-	if ( defined $i ) {
+	if ( $i ) {
 		$c = $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
 		$c = $self->{feature}->seq_id;
 	}
-	elsif ( defined $j ) {
+	elsif ( $j ) {
 		$self->_from_coordinate_string($j);
 		return $self->{seqid};
 	}
@@ -143,7 +143,7 @@ sub start {
 
 		# update only if we have an actual column
 		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;    # looks like an integer
-		if ( defined $i and $d ) {
+		if ( $i and $d ) {
 			if ( $self->{data}->interbase ) {
 
 				# compensate for 0-based, assuming we're always working with 1-based
@@ -173,7 +173,7 @@ sub start {
 	my $s;
 	my $i = $self->{data}->start_column;
 	my $j = $self->{data}->coord_column;
-	if ( defined $i ) {
+	if ( $i ) {
 
 		# collect from table
 		$s = $self->value($i);
@@ -184,7 +184,7 @@ sub start {
 	elsif ( exists $self->{feature} ) {
 		$s = $self->{feature}->start;
 	}
-	elsif ( defined $j ) {
+	elsif ( $j ) {
 		$self->_from_coordinate_string($j);
 		return $self->{start};
 	}
@@ -208,7 +208,7 @@ sub end {
 
 		# update only if we have an actual column
 		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
-		if ( defined $i and $d ) {
+		if ( $i and $d ) {
 			$self->value( $i, $_[0] );
 			$self->{end} = $_[0];
 		}
@@ -230,13 +230,13 @@ sub end {
 	my $e;
 	my $i = $self->{data}->stop_column;
 	my $j = $self->{data}->coord_column;
-	if ( defined $i ) {
+	if ( $i ) {
 		$e = $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
 		$e = $self->{feature}->end;
 	}
-	elsif ( defined $j ) {
+	elsif ( $j ) {
 		$self->_from_coordinate_string($j);
 		return $self->{end};
 	}
@@ -256,7 +256,7 @@ sub strand {
 
 		# update only if we have an actual column
 		my $i = $self->{data}->strand_column;
-		if ( defined $i ) {
+		if ( $i ) {
 			$self->value( $i, $_[0] );
 			$self->{strand} = $self->_strand( $_[0] );
 		}
@@ -371,7 +371,7 @@ sub display_name {
 
 		# update only if we have an actual column
 		my $i = $self->{data}->name_column;
-		if ( defined $i ) {
+		if ( $i ) {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
@@ -389,7 +389,7 @@ sub display_name {
 
 	# collect from table
 	my $i = $self->{data}->name_column;
-	if ( defined $i ) {
+	if ( $i ) {
 		return $self->value($i);
 	}
 	elsif ( my $att = $self->gff_attributes ) {
@@ -411,7 +411,7 @@ sub coordinate {
 	my $start_i = $self->{data}->start_column;
 	my $coord   = sprintf( "%s:%d",
 		$self->seq_id,
-		defined $start_i          ? $self->value($start_i)
+		$start_i                  ? $self->value($start_i)
 		: exists $self->{feature} ? $self->{feature}->start
 		:                           0 );
 	my $end = $self->end;
@@ -425,7 +425,7 @@ sub type {
 
 		# update only if we have an actual column
 		my $i = $self->{data}->type_column;
-		if ( defined $i ) {
+		if ( $i ) {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
@@ -438,7 +438,7 @@ sub type {
 
 	# collect from table
 	my $i = $self->{data}->type_column;
-	if ( defined $i ) {
+	if ( $i ) {
 		return $self->value($i);
 	}
 
@@ -461,7 +461,7 @@ sub primary_id {
 	my $self = shift;
 	carp 'id is a read only method' if @_;
 	my $i = $self->{data}->id_column;
-	if (defined $i) {
+	if ( $i ) {
 		my $v = $self->value($i);
 		if ( defined $v and $v ne '.' ) {
 			return $v;
@@ -498,7 +498,7 @@ sub length {
 sub score {
 	my $self = shift;
 	my $c    = $self->{data}->score_column;
-	return defined $c ? $self->value($c) : undef;
+	return $c ? $self->value($c) : undef;
 }
 
 sub attributes {

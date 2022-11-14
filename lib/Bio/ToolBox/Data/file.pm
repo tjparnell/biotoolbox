@@ -815,7 +815,7 @@ sub write_file {
 
 	# Convert strand information
 	my $strand_i = $self->strand_column;
-	if ( defined $strand_i and ( $self->gff or $self->bed or $self->ucsc ) ) {
+	if ( $strand_i and ( $self->gff or $self->bed or $self->ucsc ) ) {
 
 		# convert to +/-/. nomenclature as necessary
 		if ( $self->gff ) {
