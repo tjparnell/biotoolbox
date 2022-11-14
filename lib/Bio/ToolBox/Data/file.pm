@@ -540,7 +540,7 @@ sub add_data_line {
 	# check for extra remaining tabs
 	if ( index( $linedata[-1], "\t" ) != -1 ) {
 		die
-"FILE INCONSISTENCY ERRORS! line has additional tabs (columns) than headers!\n $line";
+"FILE INCONSISTENCY ERRORS! line has additional tabs (columns) than headers!\n $line\n";
 	}
 
 	# add the line of data
@@ -677,7 +677,7 @@ sub write_file {
 			# let's set it to true and see if it passes verification
 			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3;    # default
 			unless ( $self->verify and $self->gff ) {
-				warn sprintf 
+				printf STDERR 
 					" GFF structure invalid, re-setting extension from %s to %s\n",
 					$extension, $self->extension;
 				$extension = $self->extension;
@@ -690,7 +690,7 @@ sub write_file {
 			# let's set it to true and see if it passes verification
 			$self->{'bed'} = 1;                                 # a fake true
 			unless ( $self->verify and $self->bed ) {
-				warn sprintf
+				printf STDERR
 					" BED structure invalid, re-setting extension from %s to %s\n",
 					$extension, $self->extension;
 				$extension = $self->extension;
@@ -703,7 +703,7 @@ sub write_file {
 			# let's set it to true and see if it passes verification
 			$self->{'vcf'} = 1;                                 # a fake true
 			unless ( $self->verify and $self->vcf ) {
-				warn sprintf
+				printf STDERR
 					" VCF structure changed, re-setting extension from %s to %s\n",
 					$extension, $self->extension;
 				$extension = $self->extension;
@@ -719,7 +719,7 @@ sub write_file {
 			$self->{'extension'} = '.sgr';
 			$self->verify;
 			if ( $self->extension =~ /txt/ ) {
-				warn
+				print STDERR
 " SGR structure invalid, re-setting extension from $extension to .txt\n";
 			}
 			$extension = $self->{'extension'};
@@ -732,7 +732,7 @@ sub write_file {
 			# let's set it to true and see if it passes verification
 			$self->ucsc( $self->number_columns );
 			unless ( $self->verify and $self->ucsc ) {
-				warn sprintf
+				printf STDERR
 					" UCSC structure invalid, re-setting extension from %s to %s\n",
 					$extension, $self->extension;
 				$extension = $self->extension;
@@ -808,7 +808,7 @@ sub write_file {
 	if ( length( $name . $extension ) > 255 ) {
 		my $limit = 253 - length($extension);
 		$name = substr( $name, 0, $limit ) . '..';
-		warn " filename too long! Truncating to $limit characters\n";
+		print STDERR " WARNING: filename too long! Truncating to $limit characters\n";
 	}
 
 	# generate the new filename

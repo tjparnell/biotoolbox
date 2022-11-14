@@ -269,7 +269,7 @@ sub write_row {
 		# we first write a standard empty data file with metadata and headers
 		my $newfile = $self->write_file( $self->filename );
 		unless ($newfile) {
-			die 'unable to write file!';
+			die "unable to write file!\n";
 		}
 
 		# just in case the filename is changed when writing the file
@@ -279,7 +279,7 @@ sub write_row {
 
 		# then we re-open the file for appending
 		my $fh = $self->open_to_write_fh( $newfile, undef, 1 )
-			or die "unable to append to file $newfile!";
+			or die "unable to append to file $newfile!\n";
 		$self->{fh} = $fh;
 	}
 

@@ -1191,7 +1191,7 @@ sub get_db_feature {
 		else {
 			# the primary_ids are out of date
 			unless ($PRIMARY_ID_WARNING) {
-				warn "CAUTION: Some primary IDs in Input file appear to be out of date\n";
+				print STDERR "CAUTION: Some primary IDs in Input file appear to be out of date\n";
 				$PRIMARY_ID_WARNING++;
 			}
 		}
