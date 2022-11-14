@@ -97,7 +97,7 @@ sub seq_id {
 		my $i = $self->{data}->chromo_column;
 
 		# update only if we have an actual column
-		if ( $i ) {
+		if ($i) {
 			$self->value( $i, $_[0] );
 			$self->{seqid} = $_[0];
 		}
@@ -116,13 +116,13 @@ sub seq_id {
 	my $c;
 	my $i = $self->{data}->chromo_column;
 	my $j = $self->{data}->coord_column;
-	if ( $i ) {
+	if ($i) {
 		$c = $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
 		$c = $self->{feature}->seq_id;
 	}
-	elsif ( $j ) {
+	elsif ($j) {
 		$self->_from_coordinate_string($j);
 		return $self->{seqid};
 	}
@@ -173,18 +173,18 @@ sub start {
 	my $s;
 	my $i = $self->{data}->start_column;
 	my $j = $self->{data}->coord_column;
-	if ( $i ) {
+	if ($i) {
 
 		# collect from table
 		$s = $self->value($i);
 		if ( $self->{data}->interbase ) {
-			$s += 1; # compensate for 0-based index
+			$s += 1;    # compensate for 0-based index
 		}
 	}
 	elsif ( exists $self->{feature} ) {
 		$s = $self->{feature}->start;
 	}
-	elsif ( $j ) {
+	elsif ($j) {
 		$self->_from_coordinate_string($j);
 		return $self->{start};
 	}
@@ -199,7 +199,7 @@ sub start {
 }
 
 *stop = \&end;
-*stop if 0;  # avoid once warning
+*stop if 0;    # avoid once warning
 
 sub end {
 	my $self = shift;
@@ -230,13 +230,13 @@ sub end {
 	my $e;
 	my $i = $self->{data}->stop_column;
 	my $j = $self->{data}->coord_column;
-	if ( $i ) {
+	if ($i) {
 		$e = $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
 		$e = $self->{feature}->end;
 	}
-	elsif ( $j ) {
+	elsif ($j) {
 		$self->_from_coordinate_string($j);
 		return $self->{end};
 	}
@@ -256,7 +256,7 @@ sub strand {
 
 		# update only if we have an actual column
 		my $i = $self->{data}->strand_column;
-		if ( $i ) {
+		if ($i) {
 			$self->value( $i, $_[0] );
 			$self->{strand} = $self->_strand( $_[0] );
 		}
@@ -363,7 +363,7 @@ sub midpoint {
 }
 
 *name = \&display_name;
-*name if 0;  # avoid once warning
+*name if 0;    # avoid once warning
 
 sub display_name {
 	my $self = shift;
@@ -371,7 +371,7 @@ sub display_name {
 
 		# update only if we have an actual column
 		my $i = $self->{data}->name_column;
-		if ( $i ) {
+		if ($i) {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
@@ -389,7 +389,7 @@ sub display_name {
 
 	# collect from table
 	my $i = $self->{data}->name_column;
-	if ( $i ) {
+	if ($i) {
 		return $self->value($i);
 	}
 	elsif ( my $att = $self->gff_attributes ) {
@@ -425,7 +425,7 @@ sub type {
 
 		# update only if we have an actual column
 		my $i = $self->{data}->type_column;
-		if ( $i ) {
+		if ($i) {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
@@ -438,7 +438,7 @@ sub type {
 
 	# collect from table
 	my $i = $self->{data}->type_column;
-	if ( $i ) {
+	if ($i) {
 		return $self->value($i);
 	}
 
@@ -455,13 +455,13 @@ sub type {
 }
 
 *id = \&primary_id;
-*id if 0;  # avoid once warning
+*id if 0;    # avoid once warning
 
 sub primary_id {
 	my $self = shift;
 	carp 'id is a read only method' if @_;
 	my $i = $self->{data}->id_column;
-	if ( $i ) {
+	if ($i) {
 		my $v = $self->value($i);
 		if ( defined $v and $v ne '.' ) {
 			return $v;
@@ -641,7 +641,7 @@ sub rewrite_vcf_attributes {
 ### Data collection convenience methods
 
 *feature = \&seqfeature;
-*feature if 0;  # avoid once warning
+*feature if 0;    # avoid once warning
 
 sub seqfeature {
 	my $self  = shift;
@@ -756,12 +756,12 @@ sub _get_subfeature_sequence {
 
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
-	unless (@{ $subfeatures }) {
+	unless ( @{$subfeatures} ) {
 		carp 'no subfeatures available! Returning parent sequence!';
 
 		# just return the parent
 		undef $args->{subfeature};
-		return $self->get_sequence(@{ $args });
+		return $self->get_sequence( @{$args} );
 	}
 
 	# sort subfeatures
@@ -769,7 +769,7 @@ sub _get_subfeature_sequence {
 	# note that this does NOT merge redundant or overlapping exons!!!!
 	my @sorted = map { $_->[0] }
 		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-		map { [ $_, $_->start, $_->end ] } @{ $subfeatures };
+		map { [ $_, $_->start, $_->end ] } @{$subfeatures};
 
 	# collect sequence
 	my $sequence;
@@ -922,18 +922,18 @@ sub _get_subfeature_scores {
 
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
-	unless (@{ $subfeatures }) {
+	unless ( @{$subfeatures} ) {
 		carp 'no subfeatures available! Returning parent score data!';
 
 		# just return the parent
 		undef $args->{subfeature};
 		delete $args->{exon} if exists $args->{exon};
-		return $self->get_score(@{ $args });
+		return $self->get_score( @{$args} );
 	}
 
 	# collect over each subfeature
 	my @scores;
-	foreach my $exon (@{ $subfeatures }) {
+	foreach my $exon ( @{$subfeatures} ) {
 		my @params;            # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
 		$params[STRT] = $exon->start;
@@ -946,7 +946,7 @@ sub _get_subfeature_scores {
 		$params[DATA] = $args->{dataset};
 
 		my $exon_scores = get_segment_score(@params);
-		push @scores, @{ $exon_scores } if defined $exon_scores;
+		push @scores, @{$exon_scores} if defined $exon_scores;
 	}
 
 	# combine all the scores based on the requested method
@@ -1007,7 +1007,7 @@ sub get_relative_point_position_scores {
 	if ( $args{absolute} ) {
 
 		# do not convert to relative positions
-		return wantarray ? %{ $pos2data } : $pos2data;
+		return wantarray ? %{$pos2data} : $pos2data;
 	}
 	else {
 		# return the collected dataset hash
@@ -1073,7 +1073,7 @@ sub get_region_position_scores {
 
 	# covert to relative positions
 	if ( $args{absolute} ) {
-		return wantarray ? %{ $pos2data } : $pos2data;
+		return wantarray ? %{$pos2data} : $pos2data;
 	}
 	else {
 		# return data converted to relative positions
@@ -1090,13 +1090,13 @@ sub _get_subfeature_position_scores {
 
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
-	unless (@{ $subfeatures }) {
+	unless ( @{$subfeatures} ) {
 		carp 'no subfeatures available! Returning parent score data!';
 
 		# just return the parent
 		undef $args->{subfeature};
 		delete $args->{exon} if exists $args->{exon};
-		return $self->get_sequence(@{ $args });
+		return $self->get_sequence( @{$args} );
 	}
 
 	# reset the practical start and stop to the actual subfeatures' final start and stop
@@ -1114,7 +1114,7 @@ sub _get_subfeature_position_scores {
 	my $current_end = $practical_start;
 	my $adjustment  = 0;
 	my $fstrand     = defined $args->{strand} ? $args->{strand} : $self->strand;
-	foreach my $exon (@{ $subfeatures }) {
+	foreach my $exon ( @{$subfeatures} ) {
 
 		my @params;          # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
@@ -1177,7 +1177,7 @@ sub _get_subfeature_position_scores {
 
 	# covert to relative positions
 	if ( $args->{absolute} ) {
-		return wantarray ? %{ $pos2data } : $pos2data;
+		return wantarray ? %{$pos2data} : $pos2data;
 	}
 	else {
 		# return data converted to relative positions
@@ -1305,7 +1305,7 @@ sub _avoid_positions {
 			# now eliminate those scores which overlap this feature
 			my $f_start = $feat->start;
 			my $f_stop  = $feat->end;
-			foreach my $position ( keys %{ $pos2data } ) {
+			foreach my $position ( keys %{$pos2data} ) {
 
 				# delete the scored position if it overlaps with
 				# the offending feature
@@ -1324,12 +1324,12 @@ sub _convert_to_relative_positions {
 
 	my %relative_pos2data;
 	if ( $strand >= 0 ) {
-		foreach my $p ( keys %{ $pos2data } ) {
+		foreach my $p ( keys %{$pos2data} ) {
 			$relative_pos2data{ $p - $position } = $pos2data->{$p};
 		}
 	}
 	elsif ( $strand < 0 ) {
-		foreach my $p ( keys %{ $pos2data } ) {
+		foreach my $p ( keys %{$pos2data} ) {
 			$relative_pos2data{ $position - $p } = $pos2data->{$p};
 		}
 	}
@@ -1344,7 +1344,7 @@ sub _process_exon_scores {
 	if ( $method eq 'ncount' ) {
 
 		# we need to check both names and adjust position
-		foreach my $p ( keys %{ $exon_scores } ) {
+		foreach my $p ( keys %{$exon_scores} ) {
 			next unless ( $p >= $start and $p <= $end );
 			foreach my $n ( @{ $exon_scores->{$p} } ) {
 				if ( exists $namecheck->{$n} ) {
@@ -1362,7 +1362,7 @@ sub _process_exon_scores {
 	}
 	else {
 		# just adjust scores
-		foreach my $p ( keys %{ $exon_scores } ) {
+		foreach my $p ( keys %{$exon_scores} ) {
 			next unless ( $p >= $start and $p <= $end );
 			$pos2data->{ $p - $adjustment } = $exon_scores->{$p};
 		}
@@ -1396,8 +1396,8 @@ sub fetch_alignments {
 
 		# get the subfeatures
 		my $subfeatures = $self->_get_subfeatures( $args{subfeature} );
-		if (@{ $subfeatures }) {
-			foreach my $sf (@{ $subfeatures }) {
+		if ( @{$subfeatures} ) {
+			foreach my $sf ( @{$subfeatures} ) {
 				push @intervals, [ $sf->start - 1, $sf->end ];
 			}
 		}

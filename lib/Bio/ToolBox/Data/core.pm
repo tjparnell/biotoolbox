@@ -232,15 +232,15 @@ name values for index $i! compare '%s' with '%s'\n",
 
 		# update metadata as necessary
 		if ( $gff_check == 1 ) {
-			$self->{'bed'}       = 0;
-			$self->{'ucsc'}      = 0;
-			$self->{'vcf'}       = 0;
-			$self->{'headers'}   = 0;
+			$self->{'bed'}     = 0;
+			$self->{'ucsc'}    = 0;
+			$self->{'vcf'}     = 0;
+			$self->{'headers'} = 0;
 			if ( $self->{'format'} and $self->{'format'} !~ m/g[tvf]f/i ) {
-				$self->{'format'} = 'gff';   # generic
+				$self->{'format'} = 'gff';    # generic
 			}
 			if ( $self->{'extension'} and $self->{'extension'} !~ m/\.g[tvf]f/i ) {
-				$self->{'extension'} = '.gff';  # generic????
+				$self->{'extension'} = '.gff';    # generic????
 			}
 		}
 		else {
@@ -431,26 +431,26 @@ name values for index $i! compare '%s' with '%s'\n",
 
 		# update metadata as necessary
 		if ( $bed_check == 1 ) {
-			$self->{'bed'}       = $self->{'number_columns'};
-			$self->{'gff'}       = 0;
-			$self->{'ucsc'}      = 0;
-			$self->{'vcf'}       = 0;
-			$self->{'headers'}   = 0;
-			if ( $self->{'format'} and
-				$self->{'format'} !~ m/ (?: bed | peak ) /xi )
+			$self->{'bed'}     = $self->{'number_columns'};
+			$self->{'gff'}     = 0;
+			$self->{'ucsc'}    = 0;
+			$self->{'vcf'}     = 0;
+			$self->{'headers'} = 0;
+			if (    $self->{'format'}
+				and $self->{'format'} !~ m/ (?: bed | peak ) /xi )
 			{
 				$self->{'format'} = sprintf "bed%d", $self->{'number_columns'};
 			}
-			if ( $self->{'extension'} and
-				$self->{'extension'} !~ m/ (?: bed | peak ) /xi )
+			if (    $self->{'extension'}
+				and $self->{'extension'} !~ m/ (?: bed | peak ) /xi )
 			{
 				$self->{'extension'} = sprintf ".%s",
 					$self->{'format'} =~ /peak/ ? lc $self->{'format'} : 'bed';
 			}
 		}
 		else {
-			$self->{'bed'}     = 0;
-			$self->{'headers'} = 1;
+			$self->{'bed'}       = 0;
+			$self->{'headers'}   = 1;
 			$self->{'extension'} = '.txt';
 			$self->{'format'}    = q();
 
@@ -664,14 +664,14 @@ name values for index $i! compare '%s' with '%s'\n",
 
 		# update metadata as necessary
 		if ( $ucsc_check == 1 ) {
-			$self->{'bed'}       = 0;
-			$self->{'gff'}       = 0;
-			$self->{'vcf'}       = 0;
-			$self->{'format'}    = $ucsc_type;
-			if ( $self->{'extension'}
+			$self->{'bed'}    = 0;
+			$self->{'gff'}    = 0;
+			$self->{'vcf'}    = 0;
+			$self->{'format'} = $ucsc_type;
+			if (    $self->{'extension'}
 				and $self->{'extension'} !~ m/(?: ucsc | txt | $ucsc_type )/xi )
 			{
-				$self->{'extension'} = ".ucsc";  # generic extension
+				$self->{'extension'} = ".ucsc";    # generic extension
 			}
 		}
 		else {
@@ -721,21 +721,21 @@ name values for index $i! compare '%s' with '%s'\n",
 		# reset the vcf tag value as appropriate
 		# update metadata as necessary
 		if ( $vcf_check == 1 ) {
-			$self->{'bed'}       = 0;
-			$self->{'gff'}       = 0;
-			$self->{'ucsc'}      = 0;
+			$self->{'bed'}  = 0;
+			$self->{'gff'}  = 0;
+			$self->{'ucsc'} = 0;
 			if ( $self->{'format'} and $self->{'format'} !~ m/vcf/i ) {
-				$self->{'format'} = 'vcf'; # generic
+				$self->{'format'} = 'vcf';    # generic
 			}
-			if ( $self->{'extension'} and $self->{'extension' !~ /\.vcf/} ) {
+			if ( $self->{'extension'} and $self->{ 'extension' !~ /\.vcf/ } ) {
 				$self->{'extension'} = '.vcf';
 			}
 		}
 		else {
 			# reset metadata
-			$self->{'vcf'}     = 0;
-			$self->{'headers'} = 1;
-			$self->{'format'}  = q();
+			$self->{'vcf'}       = 0;
+			$self->{'headers'}   = 1;
+			$self->{'format'}    = q();
 			$self->{'extension'} = '.txt';
 
 			# remove the AUTO key from the metadata
@@ -778,15 +778,15 @@ name values for index $i! compare '%s' with '%s'\n",
 
 		# update metadata as necessary
 		if ( $sgr_check == 1 ) {
-			$self->{'bed'}       = 0;
-			$self->{'gff'}       = 0;
-			$self->{'ucsc'}      = 0;
-			$self->{'vcf'}       = 0;
-			$self->{'headers'}   = 0;
+			$self->{'bed'}     = 0;
+			$self->{'gff'}     = 0;
+			$self->{'ucsc'}    = 0;
+			$self->{'vcf'}     = 0;
+			$self->{'headers'} = 0;
 			if ( $self->{'format'} and $self->{'format'} !~ m/sgr/i ) {
 				$self->{'format'} = 'sgr';
 			}
-			if ( $self->{'extension'} and $self->{'extension' !~ /\.sgr/} ) {
+			if ( $self->{'extension'} and $self->{ 'extension' !~ /\.sgr/ } ) {
 				$self->{'extension'} = '.sgr';
 			}
 		}
@@ -1032,6 +1032,7 @@ sub reorder_column {
 		delete $self->{$i};
 	}
 	for my $i ( 1 .. ( scalar(@order) - 1 ) ) {
+
 		#specifically skipping 0 because it doesn't have metadata
 		$self->{$i} = {};
 		foreach my $k ( keys %{ $old_metadata{ $order[$i] } } ) {
@@ -1067,7 +1068,7 @@ sub feature_type {
 	if ( $self->chromo_column and $self->start_column ) {
 		$feature_type = 'coordinate';
 	}
-	elsif ( $self->id_column
+	elsif ($self->id_column
 		or ( $self->type_column and $self->name_column )
 		or ( $self->feature     and $self->name_column ) )
 	{

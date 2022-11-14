@@ -219,7 +219,7 @@ sub copy_column {
 
 # aliases
 *next_line = *read_line = \&next_row;
-*add_row = *add_line = *write_line = \&write_row;
+*add_row   = *add_line  = *write_line = \&write_row;
 
 # stop once warnings
 *next_line  if 0;
@@ -293,7 +293,7 @@ sub write_row {
 	elsif ( $data_ref eq 'ARRAY' ) {
 
 		# user passed an array of values
-		$self->{fh}->printf( "%s\n", join( "\t", @{ $data } ) );
+		$self->{fh}->printf( "%s\n", join( "\t", @{$data} ) );
 	}
 	else {
 		# assume the passed data is a string

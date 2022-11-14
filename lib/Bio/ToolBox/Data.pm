@@ -50,7 +50,8 @@ sub new {
 		unless ( $self->parse_table( \%args ) ) {
 			my $l = $self->load_file( $args{file} );
 			return unless $l;
-			if ( $self->database =~ /^Parsed:(.+)$/x and $self->feature_type eq 'named' ) {
+			if ( $self->database =~ /^Parsed:(.+)$/x and $self->feature_type eq 'named' )
+			{
 
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
@@ -345,8 +346,8 @@ PARSEFAIL
 
 		# but delete some stuff, just want basename
 		$self->{extension} = q();
-		$self->{filename} = q();
-		$self->{path} = q();
+		$self->{filename}  = q();
+		$self->{path}      = q();
 	}
 
 	# successfully parsed
@@ -358,7 +359,7 @@ PARSEFAIL
 sub column_values {
 	my ( $self, $column ) = @_;
 	return unless defined $column;
-	return unless exists $self->{$column}{name};
+	return unless exists $self->{$column};
 	my @values = map { $self->value( $_, $column ) } ( 0 .. $self->last_row );
 	return wantarray ? @values : \@values;
 }
@@ -375,7 +376,7 @@ sub add_column {
 		if ( $self->last_row > 1 ) {
 
 			# table has existing data beyond column headers
-			if ( $self->last_row == ( scalar @{ $name } - 1 ) ) {
+			if ( $self->last_row == ( scalar @{$name} - 1 ) ) {
 
 				# same number of elements, add it the table
 				$self->{$column} = {
@@ -404,7 +405,7 @@ sub add_column {
 				# this may auto-vivify an undefined value as first element
 			}
 			$self->{last_row} = $#{$name};
-			$self->{headers} = 1;
+			$self->{headers}  = 1;
 		}
 	}
 	elsif ( $name_ref eq 'Bio::DB::GFF::Typename' ) {
@@ -454,10 +455,10 @@ sub copy_column {
 sub add_row {
 	my $self = shift;
 	my @row_data;
-	if ( $_[0] and ref($_[0]) eq 'ARRAY' ) {
+	if ( $_[0] and ref( $_[0] ) eq 'ARRAY' ) {
 		@row_data = @{ $_[0] };
 	}
-	elsif ( $_[0] and ref($_[0]) eq 'Bio::ToolBox::Data::Feature' ) {
+	elsif ( $_[0] and ref( $_[0] ) eq 'Bio::ToolBox::Data::Feature' ) {
 		@row_data = $_[0]->row_values;
 	}
 	elsif ( $_[0] and $_[0] =~ /\t/ ) {
@@ -466,7 +467,7 @@ sub add_row {
 	else {
 		@row_data = map {'.'} ( 1 .. $self->{number_columns} );
 	}
-	if ( scalar @row_data > $self->{number_columns} ) {
+	if ( scalar(@row_data) > $self->{number_columns} ) {
 		cluck 'row added has more elements than table columns! truncating row elements';
 		splice @row_data, 0, $self->{number_columns};
 	}
@@ -906,7 +907,10 @@ sub splice_data {
 	my $part_length = int( $self->last_row / $total_parts );
 
 	# check for SeqFeatureObjects array
-	if ( exists $self->{SeqFeatureObjects} ) {
+	if ( exists $self->{SeqFeatureObjects}
+		and scalar @{ $self->{SeqFeatureObjects} } !=
+		scalar @{ $self->{data_table} } )
+	{
 
 		# it needs to be the same length as the data table, it should be
 		while ( scalar @{ $self->{SeqFeatureObjects} } < scalar @{ $self->{data_table} } )
@@ -985,18 +989,13 @@ sub reload_children {
 
 	# copy the metadata
 	foreach (qw(program feature db bed gff ucsc headers number_columns last_row)) {
-
-		# various keys
 		$self->{$_} = $Stream->{$_};
 	}
-
-		# column metadata
 	for my $i ( 1 .. $Stream->number_columns ) {
 		my %md = $Stream->metadata($i);
 		$self->{$i} = \%md;
 	}
-	my @comments = $Stream->comments;
-	push @{ $self->{other} }, @comments;
+	push @{ $self->{comments} }, ( $Stream->comments );
 
 	# first row column headers
 	$self->{data_table}->[0] = [ @{ $Stream->{data_table}->[0] } ];
@@ -1101,7 +1100,7 @@ sub summary_file {
 
 	# check datasets
 	unless (@datasets) {
-		if ( scalar keys %possibles > 1 ) {
+		if ( scalar( keys %possibles ) > 1 ) {
 
 			# we will always have the unknown category, so anything more than one
 			# means we found legitimate dataset columns

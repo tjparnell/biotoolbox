@@ -11,7 +11,7 @@ our $VERSION = '1.70';
 
 ### Variables
 # Export
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 our @EXPORT_OK = qw(
 	parse_list
@@ -134,7 +134,7 @@ sub ask_user_for_index {
 
 	# get response
 	my $response = prompt($line);
-	my @indices = parse_list($response);
+	my @indices  = parse_list($response);
 
 	# verify
 	my @good;
@@ -291,8 +291,7 @@ sub sane_chromo_sort {
 	push @sorted, map { $_->[1] } sort { $a->[0] <=> $b->[0] } @numeric;
 	push @sorted, map { $_->[1] } sort { $a->[0] cmp $b->[0] } @sex;
 	push @sorted, map { $_->[1] } sort { $a->[0] cmp $b->[0] } @mito;
-	push @sorted,
-		map { $_->[3] }
+	push @sorted, map { $_->[3] }
 		sort { $a->[0] cmp $b->[0] or $a->[1] <=> $b->[1] or $a->[2] cmp $b->[2] } @mixed;
 	push @sorted, map { $_->[1] } sort { $a->[0] cmp $b->[0] } @alphic;
 

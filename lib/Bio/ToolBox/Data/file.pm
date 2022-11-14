@@ -587,11 +587,11 @@ sub write_file {
 
 	# check filename
 	if ( not $args{'filename'} ) {
-		
+
 		# user did not provide a filename, so we create one from the metadata
 		# but first check the format
 		if ( $self->verify ) {
-			
+
 			# recreate the filename from metadata
 			# the extension may have been automatically changed by verify method
 			# the user will have been warned
@@ -613,12 +613,13 @@ sub write_file {
 	# split filename into its base components
 	my ( $name, $path, $extension ) =
 		fileparse( $args{'filename'} || $self->filename, $SUFFIX );
-	
+
 	# check extension
 	unless ($extension) {
 
 		# try some possibilities
-		if ($name =~ /^(.+)(\.\w+)(\.gz)?$/xi) {
+		if ( $name =~ /^(.+)(\.\w+)(\.gz)?$/xi ) {
+
 			# nonstandard extension
 			$extension = $2 . $3 || q();
 			$name      = $1;
@@ -677,7 +678,7 @@ sub write_file {
 			# let's set it to true and see if it passes verification
 			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3;    # default
 			unless ( $self->verify and $self->gff ) {
-				printf STDERR 
+				printf STDERR
 					" GFF structure invalid, re-setting extension from %s to %s\n",
 					$extension, $self->extension;
 				$extension = $self->extension;
@@ -688,7 +689,7 @@ sub write_file {
 		if ( not $self->bed ) {
 
 			# let's set it to true and see if it passes verification
-			$self->{'bed'} = 1;                                 # a fake true
+			$self->{'bed'} = 1;    # a fake true
 			unless ( $self->verify and $self->bed ) {
 				printf STDERR
 					" BED structure invalid, re-setting extension from %s to %s\n",
@@ -701,7 +702,7 @@ sub write_file {
 		if ( not $self->vcf ) {
 
 			# let's set it to true and see if it passes verification
-			$self->{'vcf'} = 1;                                 # a fake true
+			$self->{'vcf'} = 1;    # a fake true
 			unless ( $self->verify and $self->vcf ) {
 				printf STDERR
 					" VCF structure changed, re-setting extension from %s to %s\n",
@@ -745,7 +746,6 @@ sub write_file {
 		# make sure headers are enabled
 		$self->{'headers'} = 1 unless $self->{'headers'} == -1;    # original noheader
 	}
-
 
 	# determine format
 	# this is an arcane specification of whether we want a "simple" no metadata
@@ -885,7 +885,7 @@ sub write_file {
 			}
 
 			# check for comment character at beginning
-			if ($c =~ /^#/) {
+			if ( $c =~ /^#/ ) {
 				$fh->print($c);
 			}
 			else {
@@ -920,7 +920,10 @@ sub write_file {
 				# these are so simple it's not worth writing them
 				next;
 			}
-			elsif ( $extension =~ m/(?: sgr | kgg | cdt )/xi or $self->ucsc or $self->vcf ) {
+			elsif ($extension =~ m/(?: sgr | kgg | cdt )/xi
+				or $self->ucsc
+				or $self->vcf )
+			{
 
 				# these do not support metadata lines
 				next;

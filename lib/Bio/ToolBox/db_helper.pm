@@ -38,45 +38,45 @@ my %DB_METHODS;              # cache for database score methods
 my %SCORE_CALCULATOR_SUB = (
 	'mean' => sub {
 		my $s = shift;
-		return sum0(@{ $s }) / ( scalar(@{ $s }) || 1 );
+		return sum0( @{$s} ) / ( scalar( @{$s} ) || 1 );
 	},
 	'sum' => sub {
 		my $s = shift;
-		return sum0(@{ $s });
+		return sum0( @{$s} );
 	},
 	'median' => sub {
 		my $s = shift;
-		return '.' unless scalar(@{ $s });
-		return median(@{ $s });
+		return '.' unless scalar( @{$s} );
+		return median( @{$s} );
 	},
 	'min' => sub {
 		my $s = shift;
-		return '.' unless scalar(@{ $s });
-		return min(@{ $s });
+		return '.' unless scalar( @{$s} );
+		return min( @{$s} );
 	},
 	'max' => sub {
 		my $s = shift;
-		return '.' unless scalar(@{ $s });
-		return max(@{ $s });
+		return '.' unless scalar( @{$s} );
+		return max( @{$s} );
 	},
 	'count' => sub {
 		my $s = shift;
-		return scalar(@{ $s });
+		return scalar( @{$s} );
 	},
 	'pcount' => sub {
 		my $s = shift;
-		return scalar(@{ $s });
+		return scalar( @{$s} );
 	},
 	'ncount' => sub {
 
 		# Convert names into unique counts
 		my $s = shift;
 		my %name2count;
-		foreach my $n (@{ $s }) {
+		foreach my $n ( @{$s} ) {
 			if ( ref($n) eq 'ARRAY' ) {
 
 				# this is likely from a ncount indexed hash
-				foreach (@{ $n }) {
+				foreach ( @{$n} ) {
 					$name2count{$_} += 1;
 				}
 			}
@@ -576,10 +576,9 @@ sub get_dataset_list {
 		# collect the database types,
 		# sort first by source, then by method
 		@types = (
-			map { $_->[2] }
+			map  { $_->[2] }
 			sort { ( $a->[0] cmp $b->[0] ) or ( $a->[1] cmp $b->[1] ) }
-			map { [ $_->source, $_->method, $_ ] }
-			( $db->types )
+			map  { [ $_->source, $_->method, $_ ] } ( $db->types )
 		);
 	}
 
@@ -830,13 +829,13 @@ sub verify_or_request_feature_types {
 				$args{'prompt'} = ' Enter one number for the data set or feature   ';
 			}
 			else {
-				$args{'prompt'} = 
+				$args{'prompt'} =
 					' Enter the number(s) or range of the data set(s) or feature(s)   ';
 			}
 		}
 
 		# get answer from the user
-		my $answer = prompt( $args{'prompt'} );
+		my $answer      = prompt( $args{'prompt'} );
 		my @answer_list = parse_list($answer);
 
 		# take the first one if requested
@@ -1191,7 +1190,8 @@ sub get_db_feature {
 		else {
 			# the primary_ids are out of date
 			unless ($PRIMARY_ID_WARNING) {
-				print STDERR "CAUTION: Some primary IDs in Input file appear to be out of date\n";
+				print STDERR
+					"CAUTION: Some primary IDs in Input file appear to be out of date\n";
 				$PRIMARY_ID_WARNING++;
 			}
 		}
@@ -1404,7 +1404,7 @@ sub get_chromosome_list {
 		my $chroms = $db->chroms();
 
 		my @list;
-		foreach ( values %{ $chroms } ) {
+		foreach ( values %{$chroms} ) {
 
 			# check for excluded chromosomes
 			next if ( defined $chr_exclude and $_->{name} =~ m/$chr_exclude/xi );
@@ -1830,23 +1830,21 @@ sub _load_bam_helper_module {
 			$BAM_ADAPTER = 'hts';    # for internal consistency
 		}
 		elsif ( $BAM_ADAPTER =~ /none/i ) {
-			return 0;  # basically for testing purposes, don't use a module
+			return 0;                # basically for testing purposes, don't use a module
 		}
-		if (not $BAM_OK and $EVAL_ERROR) {
+		if ( not $BAM_OK and $EVAL_ERROR ) {
 			carp $EVAL_ERROR;
 		}
 	}
 	else {
 		# try hts first, then sam
 		# be sure to set BAM_ADAPTER upon success
-		eval {
-			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
-		};
+		eval { $BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts'); };
 		if ($BAM_OK) {
 			$BAM_ADAPTER = 'hts';
 		}
 		else {
-			$BAM_OK      = _load_helper_module('Bio::ToolBox::db_helper::bam');
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
 			if ($BAM_OK) {
 				$BAM_ADAPTER = 'sam';
 			}
@@ -1866,13 +1864,13 @@ sub _load_bigwig_helper_module {
 		}
 		elsif ( $BIG_ADAPTER =~ m/big/i ) {
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
-			$BIGBED_OK = $BIGWIG_OK;  # bigbed too!
-			$BIG_ADAPTER = 'big';     # for internal consistency
+			$BIGBED_OK = $BIGWIG_OK;                                         # bigbed too!
+			$BIG_ADAPTER = 'big';    # for internal consistency
 		}
 		elsif ( $BIG_ADAPTER =~ /none/i ) {
-			return 0; # basically for testing purposes, don't use a module
+			return 0;                # basically for testing purposes, don't use a module
 		}
-		if (not $BIGWIG_OK and $EVAL_ERROR) {
+		if ( not $BIGWIG_OK and $EVAL_ERROR ) {
 			carp $EVAL_ERROR;
 		}
 	}
@@ -1881,16 +1879,17 @@ sub _load_bigwig_helper_module {
 		# try the modern big adapter first
 		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
 		if ($BIGWIG_OK) {
-			$BIGBED_OK   = $BIGWIG_OK;  # bigbed too!
+			$BIGBED_OK   = $BIGWIG_OK;    # bigbed too!
 			$BIG_ADAPTER = 'big';
 		}
 		else {
-			$BIGWIG_OK   = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
 			if ($BIGWIG_OK) {
 				$BIG_ADAPTER = 'ucsc';
 			}
 			else {
-				carp "Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
+				carp
+"Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
 			}
 		}
 	}
@@ -1909,9 +1908,9 @@ sub _load_bigbed_helper_module {
 			$BIG_ADAPTER = 'big';    # for internal consistency
 		}
 		elsif ( $BIG_ADAPTER =~ /none/i ) {
-			return 0;  # basically for testing purposes, don't use a module
+			return 0;                # basically for testing purposes, don't use a module
 		}
-		if (not $BIGBED_OK and $EVAL_ERROR) {
+		if ( not $BIGBED_OK and $EVAL_ERROR ) {
 			carp $EVAL_ERROR;
 		}
 	}
@@ -1920,16 +1919,17 @@ sub _load_bigbed_helper_module {
 		# try the modern big adapter first
 		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
 		if ($BIGBED_OK) {
-			$BIGWIG_OK   = $BIGBED_OK;  # bigwig too!
+			$BIGWIG_OK   = $BIGBED_OK;    # bigwig too!
 			$BIG_ADAPTER = 'big';
 		}
 		else {
-			$BIGBED_OK   = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
 			if ($BIGBED_OK) {
 				$BIG_ADAPTER = 'ucsc';
 			}
 			else {
-				carp "Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
+				carp
+"Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
 			}
 		}
 	}
