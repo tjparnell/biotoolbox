@@ -37,7 +37,7 @@ is( $Data->feature_type, 'named',    'feature type' );
 is( $Data->program,      undef,      'program' );
 is( $Data->gff,          0,          'gff format' );
 is( $Data->bed,          0,          'bed format' );
-is( $Data->filename,     undef,      'filename' );
+is( $Data->filename,     q(),        'filename' );
 
 # check data table
 is( $Data->number_columns, 3,  'number of columns' );
@@ -45,9 +45,9 @@ is( $Data->last_row,       33, 'last row' )
   ;    # this now includes dubious genes as of 1.54
 
 # columns
-is( $Data->id_column,   0, 'primary ID column' );
-is( $Data->name_column, 1, 'identify name column' );
-is( $Data->type_column, 2, 'identify type column' );
+is( $Data->id_column,   1, 'primary ID column' );
+is( $Data->name_column, 2, 'identify name column' );
+is( $Data->type_column, 3, 'identify type column' );
 
 # test database
 is( $Data->database, 'mem_test_file', 'database name' );
@@ -57,7 +57,7 @@ isa_ok( $db, 'Bio::DB::SeqFeature::Store', 'opened database' );
 # since we are dealing with a memory database, the features returned
 # are not in a predictable order suitable for testing
 # so we will sort the data table by increasing name
-$Data->sort_data( 1, 'i' );
+$Data->sort_data( 2, 'i' );
 
 # test row_stream
 my $stream = $Data->row_stream;
@@ -294,12 +294,12 @@ is( $Data->number_columns, 3, 'number of columns' );
 is( $Data->last_row,       4, 'last row' );
 
 # columns
-is( $Data->id_column,   0, 'primary ID column' );
-is( $Data->name_column, 1, 'identify name column' );
-is( $Data->type_column, 2, 'identify type column' );
+is( $Data->id_column,   1, 'primary ID column' );
+is( $Data->name_column, 2, 'identify name column' );
+is( $Data->type_column, 3, 'identify type column' );
 
 # check first feature
-$Data->sort_data( 1, 'i' );
+$Data->sort_data( 2, 'i' );
 $stream = $Data->row_stream;
 isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
 $row = $stream->next_row;

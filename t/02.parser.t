@@ -656,10 +656,10 @@ sub test_parsed_gff_table {
     is( $Data->number_columns, 2,                 'number of columns' );
     is( $Data->last_row,       33,                'number of rows' );
     is( $Data->database,       "Parsed:$gfffile", 'database source' );
-    is( $Data->name(0),        'Primary_ID',      'First column name' );
-    is( $Data->name(1),        'Name',            'Second column name' );
-    is( $Data->value( 1, 0 ),  'YAL069W',         'First row ID' );
-    is( $Data->value( 1, 1 ),  'YAL069W',         'First row Name' );
+    is( $Data->name(1),        'Primary_ID',      'First column name' );
+    is( $Data->name(2),        'Name',            'Second column name' );
+    is( $Data->value( 1, 1 ),  'YAL069W',         'First row ID' );
+    is( $Data->value( 1, 2 ),  'YAL069W',         'First row Name' );
 
     # test seqfeature
     my $f = $Data->get_seqfeature(1);
@@ -730,7 +730,7 @@ sub test_parsed_ucsc_table {
     isa_ok( $Data, 'Bio::ToolBox::Data', 'New Data object' );
     my ( $flavor, $format ) = $Data->taste_file($ucscfile);
     is( $flavor, 'ucsc',        'UCSC file flavor' );
-    is( $format, 'genePredExt', 'UCSC file format' );
+    is( $format, 'genePredExtBin', 'UCSC file format' );
     my $p = $Data->parse_table($ucscfile);
     is( $p, 1, 'parsed UCSC table' );
 
@@ -738,10 +738,10 @@ sub test_parsed_ucsc_table {
     is( $Data->number_columns, 2,                  'number of columns' );
     is( $Data->last_row,       5,                  'number of rows' );
     is( $Data->database,       "Parsed:$ucscfile", 'database source' );
-    is( $Data->name(0),        'Primary_ID',       'First column name' );
-    is( $Data->name(1),        'Name',             'Second column name' );
-    is( $Data->value( 1, 0 ),  'ENSG00000125826',  'First row ID' );
-    is( $Data->value( 1, 1 ),  'ENSG00000125826',  'First row Name' );
+    is( $Data->name(1),        'Primary_ID',       'First column name' );
+    is( $Data->name(2),        'Name',             'Second column name' );
+    is( $Data->value( 1, 1 ),  'ENSG00000125826',  'First row ID' );
+    is( $Data->value( 1, 2 ),  'ENSG00000125826',  'First row Name' );
 
     # seqfeature and subfeatures
     my $f = $Data->get_seqfeature(1);
@@ -782,8 +782,8 @@ sub test_parsed_ucsc_table {
 
     # technically there should be 8 mRNAs, not 10, but nonsense_mediated_decay
     # appears as an mRNA without the extra ensemblSource data
-    is( $Data->value( 1, 0 ), 'ENST00000411647', 'First row ID' );
-    is( $Data->value( 1, 1 ), 'ENST00000411647', 'First row Name' );
+    is( $Data->value( 1, 1 ), 'ENST00000411647', 'First row ID' );
+    is( $Data->value( 1, 2 ), 'ENST00000411647', 'First row Name' );
     $f = $Data->get_seqfeature(1);
     isa_ok( $f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object' );
     is( $f->display_name, 'ENST00000411647', 'SeqFeature display name' );
@@ -811,10 +811,10 @@ sub test_parsed_bed6_table {
     is( $Data->number_columns, 2,                  'number of columns' );
     is( $Data->last_row,       5,                  'number of rows' );
     is( $Data->database,       "Parsed:$bed6file", 'database source' );
-    is( $Data->name(0),        'Primary_ID',       'First column name' );
-    is( $Data->name(1),        'Name',             'Second column name' );
-    is( $Data->value( 1, 0 ),  'chrI:54988-56857', 'First row ID' );
-    is( $Data->value( 1, 1 ),  'YAL047C',          'First row Name' );
+    is( $Data->name(1),        'Primary_ID',       'First column name' );
+    is( $Data->name(2),        'Name',             'Second column name' );
+    is( $Data->value( 1, 1 ),  'chrI:54988-56857', 'First row ID' );
+    is( $Data->value( 1, 2 ),  'YAL047C',          'First row Name' );
 
     # seqfeature
     my $f = $Data->get_seqfeature(1);
@@ -866,10 +866,10 @@ sub test_parsed_bed12_table {
     is( $Data->number_columns, 2,                     'number of columns' );
     is( $Data->last_row,       17,                    'number of rows' );
     is( $Data->database,       "Parsed:$bed12file",   'database source' );
-    is( $Data->name(0),        'Primary_ID',          'First column name' );
-    is( $Data->name(1),        'Name',                'Second column name' );
-    is( $Data->value( 1, 0 ),  'chr20:388141-398466', 'First row ID' );
-    is( $Data->value( 1, 1 ),  'ENST00000411647',     'First row Name' );
+    is( $Data->name(1),        'Primary_ID',          'First column name' );
+    is( $Data->name(2),        'Name',                'Second column name' );
+    is( $Data->value( 1, 1 ),  'chr20:388141-398466', 'First row ID' );
+    is( $Data->value( 1, 2 ),  'ENST00000411647',     'First row Name' );
 
     # seqfeature
     my $f = $Data->get_seqfeature(1);
@@ -922,8 +922,8 @@ sub test_parsed_narrowPeak_table {
     is( $Data->number_columns, 2,                  'number of columns' );
     is( $Data->last_row,       5,                  'number of rows' );
     is( $Data->database,       "Parsed:$peakfile", 'database source' );
-    is( $Data->name(0),        'Primary_ID',       'First column name' );
-    is( $Data->name(1),        'Name',             'Second column name' );
+    is( $Data->name(1),        'Primary_ID',       'First column name' );
+    is( $Data->name(2),        'Name',             'Second column name' );
 
     # row
     my $row = $Data->get_row(1);
@@ -973,10 +973,10 @@ sub test_parsed_gappedPeak_table {
     is( $Data->number_columns, 2,                 'number of columns' );
     is( $Data->last_row,       5,                 'number of rows' );
     is( $Data->database,       "Parsed:$gapfile", 'database source' );
-    is( $Data->name(0),        'Primary_ID',      'First column name' );
-    is( $Data->name(1),        'Name',            'Second column name' );
-    is( $Data->value( 1, 0 ),  'chr1:5055-5366',  'First row ID' );
-    is( $Data->value( 1, 1 ),  'peak_1',          'First row Name' );
+    is( $Data->name(1),        'Primary_ID',      'First column name' );
+    is( $Data->name(2),        'Name',            'Second column name' );
+    is( $Data->value( 1, 1 ),  'chr1:5055-5366',  'First row ID' );
+    is( $Data->value( 1, 2 ),  'peak_1',          'First row Name' );
 
     # seqfeature
     my $f = $Data->get_seqfeature(1);
