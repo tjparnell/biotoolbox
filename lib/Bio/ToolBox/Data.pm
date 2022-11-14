@@ -435,11 +435,7 @@ sub add_column {
 	# update metadata
 	$self->{number_columns} = $column;
 	delete $self->{column_indices} if exists $self->{column_indices};
-	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
 
-		# check if we maintain integrity, at least insofar what we test
-		$self->verify(1);    # silence so user doesn't get these messages
-	}
 	return $column;
 }
 
@@ -1066,10 +1062,6 @@ sub summary_file {
 	}
 
 	# Check required values
-	unless ( $self->verify ) {
-		cluck 'bad data structure!';
-		return;
-	}
 	unless ( defined $outfile ) {
 		if ( $self->basename ) {
 

@@ -193,11 +193,7 @@ sub add_column {
 	$self->{data_table}->[0][$column] = $name;
 	$self->{number_columns} = $column;
 	delete $self->{column_indices} if exists $self->{column_indices};
-	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
 
-		# check if we maintain integrity, at least insofar what we test
-		$self->verify(1);    # silence so user doesn't get these messages
-	}
 	return $column;
 }
 

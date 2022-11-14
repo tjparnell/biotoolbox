@@ -1043,11 +1043,7 @@ sub reorder_column {
 	# additional metadata
 	$self->{'number_columns'} = scalar(@order) - 1;    # ignore first index
 	delete $self->{column_indices} if exists $self->{column_indices};
-	if ( $self->gff or $self->bed or $self->ucsc or $self->vcf ) {
 
-		# check if we maintain integrity, at least insofar what we test
-		$self->verify(1);    # silence so user doesn't get these messages
-	}
 	return 1;
 }
 
