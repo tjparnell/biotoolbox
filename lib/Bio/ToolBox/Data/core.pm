@@ -74,10 +74,6 @@ sub verify {
 	if ( defined $self->{'last_row'} ) {
 		my $number = scalar( @{ $self->{'data_table'} } ) - 1;
 		if ( $self->{'last_row'} != $number ) {
-
-# 			carp sprintf "TABLE INTEGRITY ERROR: data table last_row index [%d] doesn't match " .
-# 				"metadata value [%d]!\n",  $number, $self->{'last_row'};
-# fix it for them
 			$self->{'last_row'} = $number;
 		}
 	}
@@ -234,12 +230,24 @@ name values for index $i! compare '%s' with '%s'\n",
 			$error .= ' Column 7 not strand values.';
 		}
 
-		# update gff value as necessary
-		if ( $gff_check == 0 ) {
-
-			# reset metadata
-			$self->{'gff'}     = 0;
-			$self->{'headers'} = 1;
+		# update metadata as necessary
+		if ( $gff_check == 1 ) {
+			$self->{'bed'}       = 0;
+			$self->{'ucsc'}      = 0;
+			$self->{'vcf'}       = 0;
+			$self->{'headers'}   = 0;
+			if ( $self->{'format'} and $self->{'format'} !~ m/g[tvf]f/i ) {
+				$self->{'format'} = 'gff';   # generic
+			}
+			if ( $self->{'extension'} and $self->{'extension'} !~ m/\.g[tvf]f/i ) {
+				$self->{'extension'} = '.gff';  # generic????
+			}
+		}
+		else {
+			$self->{'gff'}       = 0;
+			$self->{'headers'}   = 1;
+			$self->{'extension'} = '.txt';
+			$self->{'format'}    = q();
 
 			# remove the AUTO key from the metadata
 			for my $i ( 1 .. $self->{'number_columns'} ) {
@@ -421,16 +429,28 @@ name values for index $i! compare '%s' with '%s'\n",
 			$error .= ' GappeddPeak has 15 columns.';
 		}
 
-		# reset the BED tag value as appropriate
-		if ($bed_check) {
-			$self->{'bed'} = $self->{'number_columns'};    # in case we had a fake true
+		# update metadata as necessary
+		if ( $bed_check == 1 ) {
+			$self->{'bed'}       = $self->{'number_columns'};
+			$self->{'gff'}       = 0;
+			$self->{'ucsc'}      = 0;
+			$self->{'vcf'}       = 0;
+			$self->{'headers'}   = 0;
+			if ( $self->{'format'} and
+				$self->{'format'} !~ m/ (?: bed | peak ) /xi )
+			{
+				$self->{'format'} = sprintf "bed%d", $self->{'number_columns'};
+			}
+			if ( $self->{'extension'} and
+				$self->{'extension'} !~ m/ (?: bed | peak ) /xi )
+			{
+				$self->{'extension'} = sprintf ".%s",
+					$self->{'format'} =~ /peak/ ? lc $self->{'format'} : 'bed';
+			}
 		}
 		else {
-			# reset metadata
 			$self->{'bed'}     = 0;
 			$self->{'headers'} = 1;
-			my $ext = $self->{'extension'};
-			$self->{'filename'} =~ s/$ext/.txt/;
 			$self->{'extension'} = '.txt';
 			$self->{'format'}    = q();
 
@@ -642,13 +662,21 @@ name values for index $i! compare '%s' with '%s'\n",
 			$error .= ' Wrong # of columns.';
 		}
 
-		if ( $ucsc_check == 0 ) {
-
-			# failed the check
-			my $ext = $self->{'extension'};
-			$self->{'filename'} =~ s/$ext/.txt/;
-			$self->{'extension'} = '.txt';
+		# update metadata as necessary
+		if ( $ucsc_check == 1 ) {
+			$self->{'bed'}       = 0;
+			$self->{'gff'}       = 0;
+			$self->{'vcf'}       = 0;
+			$self->{'format'}    = $ucsc_type;
+			if ( $self->{'extension'}
+				and $self->{'extension'} !~ m/(?: ucsc | txt | $ucsc_type )/xi )
+			{
+				$self->{'extension'} = ".ucsc";  # generic extension
+			}
+		}
+		else {
 			$self->{'ucsc'}      = 0;
+			$self->{'extension'} = '.txt';
 			$self->{'format'}    = q();
 
 			# remove the AUTO key
@@ -691,16 +719,24 @@ name values for index $i! compare '%s' with '%s'\n",
 		}
 
 		# reset the vcf tag value as appropriate
-		if ($vcf_check) {
-
-			# in case we had a fake true set it to a more reasonable value?
-			$self->{'vcf'} = 4 if $self->{'vcf'} == 1;
+		# update metadata as necessary
+		if ( $vcf_check == 1 ) {
+			$self->{'bed'}       = 0;
+			$self->{'gff'}       = 0;
+			$self->{'ucsc'}      = 0;
+			if ( $self->{'format'} and $self->{'format'} !~ m/vcf/i ) {
+				$self->{'format'} = 'vcf'; # generic
+			}
+			if ( $self->{'extension'} and $self->{'extension' !~ /\.vcf/} ) {
+				$self->{'extension'} = '.vcf';
+			}
 		}
 		else {
 			# reset metadata
 			$self->{'vcf'}     = 0;
 			$self->{'headers'} = 1;
 			$self->{'format'}  = q();
+			$self->{'extension'} = '.txt';
 
 			# remove the AUTO key from the metadata
 			for my $i ( 1 .. $self->{'number_columns'} ) {
@@ -739,13 +775,27 @@ name values for index $i! compare '%s' with '%s'\n",
 			$sgr_check = 0;
 			$error .= ' Columns 2 not integers.';
 		}
-		if ( $sgr_check == 0 ) {
+
+		# update metadata as necessary
+		if ( $sgr_check == 1 ) {
+			$self->{'bed'}       = 0;
+			$self->{'gff'}       = 0;
+			$self->{'ucsc'}      = 0;
+			$self->{'vcf'}       = 0;
+			$self->{'headers'}   = 0;
+			if ( $self->{'format'} and $self->{'format'} !~ m/sgr/i ) {
+				$self->{'format'} = 'sgr';
+			}
+			if ( $self->{'extension'} and $self->{'extension' !~ /\.sgr/} ) {
+				$self->{'extension'} = '.sgr';
+			}
+		}
+		else {
 
 			# doesn't smell like a SGR file
 			# change the extension so the write subroutine won't think it is
 			# make it a text file
 			$self->{'extension'} =~ s/sgr/txt/i;
-			$self->{'filename'}  =~ s/sgr/txt/i;
 			$self->{'headers'} = 1;
 			$self->{'format'}  = q();
 
@@ -757,23 +807,6 @@ name values for index $i! compare '%s' with '%s'\n",
 			}
 			print "\n SGR FILE FORMAT ERROR: $error\n" unless $silence;
 		}
-	}
-
-	# check file headers value because this may have changed
-	# this can happen when we reset bed/gff/vcf flags when we add columns
-	if (   $self->{'bed'}
-		or $self->{'gff'}
-		or $self->{'ucsc'}
-		or ( $self->{'extension'} and $self->{'extension'} =~ /sgr/i ) )
-	{
-		$self->{'headers'} = 0;
-	}
-	elsif ( $self->{'bed'} == 0
-		and $self->{'gff'} == 0
-		and $self->{'ucsc'} == 0
-		and ( $self->{'extension'} and $self->{'extension'} !~ /sgr/i ) )
-	{
-		$self->{'headers'} = 1 unless $self->{'headers'} == -1;
 	}
 
 	# if we have made it here, then there were no major structural problems
