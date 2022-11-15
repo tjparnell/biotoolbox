@@ -513,7 +513,7 @@ sub delete_row {
 sub row_values {
 	my ( $self, $index ) = @_;
 	my @data =    # skip first value
-		@{ $self->{data_table}->[$index] }[ 1 .. $#{ $self->{data_table}->[$index] } ];
+		@{ $self->{data_table}->[$index] }[ 1 .. $self->{number_columns} ];
 	return wantarray ? @data : \@data;
 }
 

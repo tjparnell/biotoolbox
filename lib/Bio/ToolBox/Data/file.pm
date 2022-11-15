@@ -956,14 +956,14 @@ sub write_file {
 		$fh->printf(
 			"%s\n",
 			join( "\t",
-				@{ $self->{'data_table'}[0] }[ 1 .. $#{ $self->{'data_table'}[0] } ] )
-		);
+				@{ $self->{'data_table'}[0] }[ 1 .. $self->{'number_columns'} ] ) );
 	}
 
 	# Write the data table
 	if ( $args{'format'} eq 'simple' ) {
 
 		# the simple format will strip the non-value '.' from the table
+		my $n = $self->{'number_columns'};
 		for my $i ( 1 .. $self->last_row ) {
 
 			# we will step though the data_table array one row at a time
@@ -971,24 +971,21 @@ sub write_file {
 			# convert any non-value '.' to empty
 			# and print using a tab-delimited format
 			my @linedata = map { q() if $_ eq '.' }
-				@{ $self->{'data_table'}[$i] }[ 1 .. $#{ $self->{'data_table'}[$i] } ];
+				@{ $self->{'data_table'}[$i] }[ 1 .. $n ];
 			$fh->printf( "%s\n", join( "\t", @linedata ) );
 		}
 	}
 
 	else {
 		# normal data files
+		my $n = $self->{'number_columns'};
 		for my $i ( 1 .. $self->last_row ) {
 
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
 			# using a tab-delimited format, skipping the first (empty) element
 			$fh->printf(
-				"%s\n",
-				join( "\t",
-					@{ $self->{'data_table'}[$i] }
-						[ 1 .. $#{ $self->{'data_table'}[$i] } ] )
-			);
+				"%s\n", join( "\t", @{ $self->{'data_table'}[$i] }[ 1 .. $n ] ) );
 		}
 	}
 
