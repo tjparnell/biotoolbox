@@ -338,11 +338,12 @@ sub peak {
 	my $self = shift;
 	if ( $self->{data}->format eq 'narrowPeak' ) {
 		if ( exists $self->{feature} and $self->{feature}->has_tag('peak') ) {
-			return $self->{feature}->get_tag_values('peak') + $self->{feature}->start;
+			return ( int( $self->{feature}->get_tag_values('peak') )
+						+ $self->{feature}->start );
 		}
 		else {
 			# hard coded start and peak columns
-			return $self->value(2) + $self->value(10) + 1;
+			return ( int $self->value(2) + int $self->value(10) + 1 );
 		}
 	}
 	else {
@@ -1244,11 +1245,13 @@ sub calculate_reference {
 			$coordinate = $self->midpoint;
 		}
 	}
-	elsif ( $args->{position} == 9 ) {
+	elsif ( $args->{position} == 10 or $args->{position} == 9 ) {
+		
+		# also accept old 0-based index of 9 for narrowPeak
 		$coordinate = $self->peak;
 	}
 	else {
-		confess 'position must be one of 5, 3, 4, or 9';
+		confess 'position must be one of 5, 3, 4, or 10';
 	}
 	return $coordinate;
 }
