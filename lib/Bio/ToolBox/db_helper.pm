@@ -1302,7 +1302,7 @@ sub get_segment_score {
 	# determine method
 	# yes, we're only checking the first dataset, but they should all
 	# be the same type
-	my $db_method = $DB_METHODS{ $_[METH] }{ $_[RETT] }{ $_[DB] }{ $_[DATA] }
+	my $db_method = $DB_METHODS{ $_[METH] }{ $_[RETT] }{ $_[DB] || '.' }{ $_[DATA] }
 		|| _lookup_db_method( \@_ );
 
 	# return type values
@@ -1733,7 +1733,7 @@ sub _lookup_db_method {
 	}
 
 	### BigWigSet database
-	elsif ( ref( $param->[DB] ) =~ m/BigWigSet/ ) {
+	elsif ( $param->[DB] and ref( $param->[DB] ) =~ m/BigWigSet/ ) {
 
 		# calling features from a BigWigSet database object
 		# this uses either Bio::DB::BigWig or Bio::DB::Big
@@ -1768,7 +1768,7 @@ sub _lookup_db_method {
 	}
 
 	### BioPerl style database
-	elsif ( ref( $param->[DB] ) =~ m/^Bio::DB/ ) {
+	elsif ( $param->[DB] and ref( $param->[DB] ) =~ m/^Bio::DB/ ) {
 
 		# a BioPerl style database, including Bio::DB::SeqFeature::Store
 		# most or all Bio::DB databases support generic get_seq_stream() methods
@@ -1803,7 +1803,7 @@ sub _lookup_db_method {
 	}
 
 	### Cache and return the results
-	$DB_METHODS{ $param->[METH] }{ $param->[RETT] }{ $param->[DB] }{ $param->[DATA] } =
+	$DB_METHODS{ $param->[METH] }{ $param->[RETT] }{ $param->[DB] || '.' }{ $param->[DATA] } =
 		$score_method;
 	return $score_method;
 }
