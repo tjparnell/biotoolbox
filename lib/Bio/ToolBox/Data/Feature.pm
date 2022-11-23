@@ -79,7 +79,7 @@ sub row_values {
 
 sub value {
 	my ( $self, $column, $value ) = @_;
-	return unless defined $column;
+	return unless ( defined $column and $column =~ /^\d+/ );
 	my $row = $self->{'index'};
 
 	# set a value
