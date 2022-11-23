@@ -176,7 +176,7 @@ sub start {
 	if ($i) {
 
 		# collect from table
-		$s = $self->value($i);
+		$s = int $self->value($i);
 		if ( $self->{data}->interbase ) {
 			$s += 1;    # compensate for 0-based index
 		}
@@ -231,7 +231,7 @@ sub end {
 	my $i = $self->{data}->stop_column;
 	my $j = $self->{data}->coord_column;
 	if ($i) {
-		$e = $self->value($i);
+		$e = int $self->value($i);
 	}
 	elsif ( exists $self->{feature} ) {
 		$e = $self->{feature}->end;
@@ -321,16 +321,18 @@ sub _strand {
 
 sub _from_coordinate_string {
 	my ( $self, $i ) = shift;
-	my ( $chr, $start, $end, $str ) = split m/(?: \- | \.\. | \s )/x, $self->value($i);
-	$self->{seqid} = $chr   unless exists $self->{seqid};
-	$self->{start} = $start unless exists $self->{start};
-
-	# we assume this is a 1-based coordinate
-	$self->{end} = $end unless exists $self->{end};
-	if ( defined $str and not exists $self->{strand} ) {
-
-		# you never know, the strand may be added to the string
-		$self->{strand} = $self->_strand($str);
+	if ( $self->value($i) =~ /^ ([\w\.\-]+) : (\d+) (?: \.\. | \-) (\d+) $/x ) {
+		
+		# chromosome:start-end or chromosome:start..end
+		$self->{seqid} = $1 unless exists $self->{seqid};
+		$self->{start} = $2 unless exists $self->{start};
+		$self->{end}   = $3 unless exists $self->{end};
+	}
+	elsif ( $self->value($i) =~ /^([\w\.\-]+) : (\d+) $/x ) {
+		
+		# chromosome:start
+		$self->{seqid} = $1 unless exists $self->{seqid};
+		$self->{start} = $2 unless exists $self->{start};
 	}
 }
 
