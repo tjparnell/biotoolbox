@@ -49,14 +49,14 @@ sub new {
 		$self{exonCount}  = $linedata->[8];
 		$self{exonStarts} = $linedata->[9];
 		$self{exonEnds}   = $linedata->[10];
-		$self{name2}      = $linedata->[12] || undef;
+		$self{name2}      = $linedata->[12] || q();
 		$self{gene_name} =
 			   $ucsc->{ensembldata}->{ $linedata->[1] }->[0]
 			|| $linedata->[12]
-			|| undef;
-		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[1] }->[1]  || undef;
-		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[1] }->[0] || undef;
-		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[1] }->[0]  || undef;
+			|| q();
+		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[1] }->[1]  || q();
+		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[1] }->[0] || q();
+		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[1] }->[0]  || q();
 
 		if ( $linedata->[1] =~ /^N[MR]_\d+/ ) {
 			$self{refseq} = $linedata->[1];
@@ -95,14 +95,14 @@ sub new {
 		$self{exonCount}  = $linedata->[7];
 		$self{exonStarts} = $linedata->[8];
 		$self{exonEnds}   = $linedata->[9];
-		$self{name2}      = $linedata->[11] || undef;
+		$self{name2}      = $linedata->[11] || q();
 		$self{gene_name} =
 			   $ucsc->{ensembldata}->{ $linedata->[0] }->[0]
 			|| $linedata->[11]
-			|| undef;
-		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1]  || undef;
-		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0] || undef;
-		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0]  || undef;
+			|| q();
+		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1]  || q();
+		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0] || q();
+		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0]  || q();
 
 		if ( $linedata->[0] =~ /^N[MR]_\d+/ ) {
 			$self{refseq} = $linedata->[0];
@@ -140,15 +140,15 @@ sub new {
 			$ucsc->{kgxref}->{ $linedata->[0] }->[0] ||                    # mRNA id
 			$ucsc->{kgxref}->{ $linedata->[0] }->[4] ||                    # refSeq id
 			$linedata->[0];                                                # ugly default
-		$self{note}         = $ucsc->{kgxref}->{ $linedata->[0] }->[6]    || undef;
-		$self{refseq}       = $ucsc->{kgxref}->{ $linedata->[0] }->[4]    || undef;
-		$self{status}       = $ucsc->{refseqstat}->{ $self{refseq} }->[0] || undef;
-		$self{completeness} = $ucsc->{refseqsum}->{ $self{refseq} }->[0]  || undef;
-		$self{spid} = $ucsc->{kgxref}->{ $linedata->[0] }->[1] || undef;    # SwissProt ID
+		$self{note}         = $ucsc->{kgxref}->{ $linedata->[0] }->[6]    || q();
+		$self{refseq}       = $ucsc->{kgxref}->{ $linedata->[0] }->[4]    || q();
+		$self{status}       = $ucsc->{refseqstat}->{ $self{refseq} }->[0] || q();
+		$self{completeness} = $ucsc->{refseqsum}->{ $self{refseq} }->[0]  || q();
+		$self{spid} = $ucsc->{kgxref}->{ $linedata->[0] }->[1] || q();    # SwissProt ID
 		$self{spdid} =
-			$ucsc->{kgxref}->{ $linedata->[0] }->[2] || undef;    # SwissProt display ID
+			$ucsc->{kgxref}->{ $linedata->[0] }->[2] || q();    # SwissProt display ID
 		$self{protacc} =
-			$ucsc->{kgxref}->{ $linedata->[0] }->[5] || undef;    # NCBI protein accession
+			$ucsc->{kgxref}->{ $linedata->[0] }->[5] || q();    # NCBI protein accession
 	}
 	### refFlat or Gene Prediction Table ###
 	elsif ( scalar @{ $linedata } == 11 ) {
@@ -169,7 +169,7 @@ sub new {
 		$self{gene_name} =
 			   $ucsc->{ensembldata}->{ $linedata->[1] }->[0]
 			|| $linedata->[0]
-			|| undef;
+			|| q();
 		$self{name2}        = $linedata->[0];
 		$self{name}         = $linedata->[1];
 		$self{chrom}        = $linedata->[2];
@@ -181,9 +181,9 @@ sub new {
 		$self{exonCount}    = $linedata->[8];
 		$self{exonStarts}   = $linedata->[9];
 		$self{exonEnds}     = $linedata->[10];
-		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[1] }->[1]  || undef;
-		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[1] }->[0] || undef;
-		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[1] }->[0]  || undef;
+		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[1] }->[1]  || q();
+		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[1] }->[0] || q();
+		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[1] }->[0]  || q();
 
 		if ( $linedata->[1] =~ /^N[MR]_\d+/ ) {
 			$self{refseq} = $linedata->[1];
@@ -218,9 +218,9 @@ sub new {
 		$self{exonEnds}     = $linedata->[9];
 		$self{name2}        = $linedata->[0];       # re-use transcript name
 		$self{gene_name}    = $linedata->[0];       # re-use transcript name
-		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1]  || undef;
-		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0] || undef;
-		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0]  || undef;
+		$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1]  || q();
+		$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0] || q();
+		$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0]  || q();
 
 		if ( $linedata->[0] =~ /^N[MR]_\d+/ ) {
 			$self{refseq} = $linedata->[0];
@@ -254,7 +254,7 @@ sub new {
 	$self{exonEnds}   = [ ( split /,/, $self{exonEnds} ) ];
 
 	# Attempt to identify the transcript type
-	my $type = $ucsc->{ensembldata}->{ $self{name} }->[1] || undef;
+	my $type = $ucsc->{ensembldata}->{ $self{name} }->[1] || q();
 
 	# check if we have loaded ensembl source data and use that if available
 	if ( $self{cdsStart} - 1 == $self{cdsEnd} ) {
@@ -356,22 +356,39 @@ sub type {
 
 sub refseq {
 	my $self = shift;
-	return exists $self->{refseq} ? $self->{refseq} : undef;
+	if ( exists $self->{refseq} and $self->{refseq} ) {
+		return $self->{refseq};
+	} else {
+		return q();
+	};
 }
 
 sub note {
 	my $self = shift;
-	return exists $self->{note} ? $self->{note} : undef;
+	if ( exists $self->{note} and $self->{note} ) {
+		return $self->{note};
+	} else {
+		return q();
+	};
 }
 
 sub status {
 	my $self = shift;
 	return exists $self->{status} ? $self->{status} : undef;
+	if ( exists $self->{status} and $self->{status} ) {
+		return $self->{status};
+	} else {
+		return q();
+	};
 }
 
 sub completeness {
 	my $self = shift;
-	return exists $self->{completeness} ? $self->{completeness} : undef;
+	if ( exists $self->{completeness} and $self->{completeness} ) {
+		return $self->{completeness};
+	} else {
+		return q();
+	};
 }
 
 sub ucsc {
@@ -601,27 +618,27 @@ sub update_attributes {
 	my ( $self, $seqf ) = @_;
 
 	# add Note if possible
-	if ( defined $self->note ) {
+	if ( $self->note ) {
 		$self->add_unique_attribute( $seqf, 'Note', $self->note );
 	}
 
 	# add refSeq identifier if possible
-	if ( defined $self->refseq ) {
+	if ( $self->refseq ) {
 		$self->add_unique_attribute( $seqf, 'Dbxref', 'RefSeq:' . $self->refseq );
 	}
 
 	# add SwissProt identifier if possible
-	if ( exists $self->{spid} and defined $self->{spid} ) {
+	if ( exists $self->{spid} and $self->{spid} ) {
 		$self->add_unique_attribute( $seqf, 'Dbxref', 'Swiss-Prot:' . $self->{spid} );
 	}
 
 	# add SwissProt display identifier if possible
-	if ( exists $self->{spdid} and defined $self->{spdid} ) {
+	if ( exists $self->{spdid} and $self->{spdid} ) {
 		$self->add_unique_attribute( $seqf, 'swiss-prot_display_id', $self->{spdid} );
 	}
 
 	# add NCBI protein access identifier if possible
-	if ( exists $self->{protacc} and defined $self->{protacc} ) {
+	if ( exists $self->{protacc} and $self->{protacc} ) {
 		$self->add_unique_attribute( $seqf, 'Dbxref', 'RefSeq:' . $self->{protacc} );
 	}
 }
