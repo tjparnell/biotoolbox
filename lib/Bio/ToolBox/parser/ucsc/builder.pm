@@ -329,24 +329,15 @@ sub new {
 	$self{exonEnds}   = [ ( split /,/, $self{exonEnds} ) ];
 
 	# Attempt to identify the transcript type
-	my $type = $ucsc->{ensembldata}->{ $self{name} }->[1] || q();
-
-	# check if we have loaded ensembl source data and use that if available
 	if ( $self{cdsStart} - 1 == $self{cdsEnd} ) {
 
 		# there appears to be no coding potential when
 		# txEnd = cdsStart = cdsEnd
 		# if you'll look, all of the exon phases should also be -1
 
-		if ($type) {
-
-			# we have an ensembl source type, so prefer to use that
-			$self{type} = $type;
-		}
-
 		# otherwise, we may be able to infer some certain
 		# types from the gene name
-		elsif ( $self{name2} =~ /^mir/i ) {
+		if ( $self{name2} =~ /^mir/i ) {
 
 			# a noncoding gene whose name begins with mir is likely a micro RNA
 			$self{type} = 'miRNA';
@@ -368,7 +359,7 @@ sub new {
 	}
 	else {
 		# the transcript has an identifiable CDS so likely a mRNA
-		$self{type} = defined $type ? $type : 'mRNA';
+		$self{type} = 'mRNA';
 	}
 
 	# add the ucsc object
@@ -604,35 +595,12 @@ sub build_transcript {
 		$id2count->{ lc $id } = 0;
 	}
 
-	# identify the primary_tag value
-	my ( $type, $biotype );
-	if ( exists $ensembldata->{ $self->name } ) {
-		my $t = $ensembldata->{ $self->name }->[1] || undef;
-		if ( $t and $t =~ /protein.coding/xi ) {
-			$type    = 'mRNA';
-			$biotype = $t;
-		}
-		elsif ( $t and $t =~ /rna | transcript/xi ) {
-			$type    = $t;
-			$biotype = $t;
-		}
-		elsif ($t) {
-			$type    = 'transcript';
-			$biotype = $t;
-		}
-		else {
-			$type = $self->type;
-		}
-	}
-	else {
-		$type = $self->type;
-	}
 
 	# Generate the transcript SeqFeature object
 	my $transcript = $ucsc->{sfclass}->new(
 		-seq_id       => $self->chrom,
 		-source       => $ucsc->source,
-		-primary_tag  => $type,
+		-primary_tag  => $self->type,
 		-start        => $self->txStart,
 		-end          => $self->txEnd,
 		-strand       => $self->strand,
@@ -646,6 +614,23 @@ sub build_transcript {
 		$transcript->add_tag_value( 'Alias', $self->gene_name );
 	}
 
+	# adjust the primary_tag and biotype values as necessary
+	if ( exists $ensembldata->{ $self->name } ) {
+		my $t = $ensembldata->{ $self->name }->[1] || q();
+		if ( $t =~ /protein.coding/xi ) {
+			$transcript->primary_tag('mRNA');
+			$transcript->add_tag_value( 'biotype', $t );
+		}
+		elsif ( $t =~ /(?: rna | transcript )/xi ) {
+			$transcript->primary_tag($t); # this is redundant????
+			$transcript->add_tag_value( 'biotype', $t );
+		}
+		elsif ($t) {
+			$transcript->primary_tag('transcript');
+			$transcript->add_tag_value( 'biotype', $t );
+		}
+	}
+
 	# update extra attributes as necessary
 	$self->update_attributes($transcript);
 
@@ -656,10 +641,6 @@ sub build_transcript {
 	if ( defined $self->status ) {
 		$transcript->add_tag_value( 'status', $self->status );
 	}
-	if ($biotype) {
-		$transcript->add_tag_value( 'biotype', $biotype );
-	}
-
 	# add the exons
 	if ( $ucsc->do_exon ) {
 		$self->add_exons( $transcript, $gene );
@@ -682,7 +663,7 @@ sub build_transcript {
 	}
 
 	# record the type of transcript
-	$ucsc->{counts}{$type} += 1;
+	$ucsc->{counts}{ $transcript->primary_tag } += 1;
 
 	# transcript is complete
 	return $transcript;
