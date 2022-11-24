@@ -10,7 +10,7 @@ use Bio::ToolBox::db_helper qw(get_chromosome_list);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG);
 require Exporter;
 
-our $VERSION = '1.68';
+our $VERSION = '1.70';
 
 ### Export
 our @ISA    = qw(Exporter);
