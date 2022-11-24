@@ -209,16 +209,23 @@ sub load_extra_data {
 
 sub typelist {
 	my $self = shift;
-	my @items;
-	foreach my $k ( keys %{ $self->{counts} } ) {
-		push @items, $k if $self->{counts}{$k} > 0;
-	}
-	if (@items) {
+	
+	if ( keys %{ $self->{counts} } ) {
+		# actual list of counted types
+		my @items;
+		foreach my $k ( keys %{ $self->{counts} } ) {
+			push @items, $k if $self->{counts}{$k} > 0;
+		}
 		return join( ',', @items );
 	}
 	else {
-		# return generic list
-		return $self->do_gene ? 'gene,mRNA,ncRNA,exon,CDS' : 'mRNA,ncRNA,exon,CDS';
+		# generic list based on expectations
+		if ($self->filetype eq 'genePred') {
+			return 'mRNA,ncRNA,exon,CDS';
+		}
+		else {
+			return 'gene,mRNA,ncRNA,exon,CDS';
+		}
 	}
 }
 
