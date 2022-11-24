@@ -241,7 +241,7 @@ sub parse_table {
 	# set feature based on the type list from the parser
 	my $typelist = $parser->typelist;
 	unless ($feature) {
-		if ( $typelist =~ /gene/i ) {
+		if ( $typelist =~ /\b gene \b/xi ) {
 			$feature = 'gene';
 		}
 		elsif ( $typelist =~ /rna/i ) {
