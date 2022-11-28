@@ -2,15 +2,16 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Bio::ToolBox::db_helper qw(
-	open_db_connection
-);
+use IO::Prompt::Tiny qw(prompt);
+use Bio::ToolBox::db_helper qw(open_db_connection);
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
-my $VERSION = '1.67';
+use Bio::ToolBox::utility qw( format_with_commas parse_list );
+
+our $VERSION = '1.70';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -77,7 +78,7 @@ unless ( defined $gz ) { $gz = 0 }
 # load file
 my $Data = Bio::ToolBox::Data->new( file => $infile )
 	or die " Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+printf " Loaded %s features from %s.\n", format_with_commas( $Data->last_row ), $infile;
 
 if ($use_type) {
 
@@ -96,11 +97,13 @@ if ($use_type) {
 	my $id_i   = $Data->id_column;
 	my $type_i = $Data->type_column;
 	unless ( defined $name_i or defined $id_i ) {
-		die " unable to identify a name or ID column. Database lookup unlikely to work\n";
+		print STDERR 
+" FATAL: unable to identify a name or ID column. Database lookup unlikely to work\n";
+		exit 1;
 	}
 	unless ( defined $type_i or $use_type ) {
-		warn
-" No type column present or type specified. Database lookup may have problems\n";
+		print
+" WARNING: No type column present or type specified. Database lookup may have problems\n";
 	}
 }
 
@@ -114,7 +117,7 @@ if ($database) {
 
 	# check if we have a real file
 	if ( -e $database ) {
-		if ( $database =~ /(?:db|database|sqlite)$/i ) {
+		if ( $database =~ /(?: db | database | sqlite )$/xi ) {
 
 			# looks like maybe a SQLite file
 			$Data->database($database);
@@ -137,7 +140,8 @@ if ($database) {
 			# this may fail if not everything can be loaded
 		}
 		else {
-			die " unrecognized database file!\n";
+			print STDERR " FATAL: unrecognized database file!\n";
+			exit 1;
 		}
 	}
 	else {
@@ -150,7 +154,7 @@ if ($database) {
 elsif ( $Data->database ) {
 
 	# use metadata-specified database
-	if ( $Data->database =~ /^Parsed:(.+)$/ ) {
+	if ( $Data->database =~ /^Parsed: (.+)$/x ) {
 
 		# there was a parsed annotation file, try and re-parse it
 		$Data->parse_table(
@@ -171,7 +175,8 @@ elsif ( $Data->database ) {
 	}
 }
 else {
-	die "No database defined! See help\n";
+	print STDERR " FATAL: No database defined! See help\n";
+	exit 1;
 }
 
 ### Determine the attribute to collect
@@ -267,9 +272,8 @@ sub get_attribute_list_from_user {
 		}
 
 		# collect the user response
-		print " Enter the attribute number(s) to collect, comma-delimited or range  ";
-		my $answer = <STDIN>;
-		chomp $answer;
+		my $p = ' Enter the attribute number(s) to collect, comma-delimited or range ';
+		my $answer  = prompt($p);
 		my @answers = parse_list($answer);
 
 		# check the answers
@@ -278,7 +282,7 @@ sub get_attribute_list_from_user {
 				push @list, $index2att{$_};
 			}
 			else {
-				warn " unknown response '$_'!\n";
+				print " unknown response '$_'!\n";
 			}
 		}
 	}
@@ -309,10 +313,10 @@ sub get_attribute_method {
 	elsif ( $attrib =~ /^length$/i ) {
 		$method = \&get_length;
 	}
-	elsif ( $attrib =~ /^gene.?length$/i ) {
+	elsif ( $attrib =~ /^gene.?length$/xi ) {
 		$method = \&get_gene_length;
 	}
-	elsif ( $attrib =~ /^transcript.?length$/i ) {
+	elsif ( $attrib =~ /^transcript.?length$/xi ) {
 		$method = \&get_transcript_length;
 	}
 	elsif ( $attrib =~ /^strand$/i ) {
@@ -324,16 +328,16 @@ sub get_attribute_method {
 	elsif ( $attrib =~ /^score$/i ) {
 		$method = \&get_score;
 	}
-	elsif ( $attrib =~ /^rna.?count$/i ) {
+	elsif ( $attrib =~ /^rna.?count$/xi ) {
 		$method = \&get_rna_number;
 	}
-	elsif ( $attrib =~ /^exon.?count$/i ) {
+	elsif ( $attrib =~ /^exon.?count$/xi ) {
 		$method = \&get_exon_number;
 	}
 	elsif ( $attrib =~ /^parent$/i ) {
 		$method = \&get_parent;
 	}
-	elsif ( $attrib =~ /^primary.?id$/i ) {
+	elsif ( $attrib =~ /^primary.?id$/xi ) {
 		$method = \&get_primary_id;
 	}
 	elsif ( $attrib =~ /^name$/i ) {
@@ -345,7 +349,7 @@ sub get_attribute_method {
 	elsif ( $attrib =~ /^type$/i ) {
 		$method = \&get_type;
 	}
-	elsif ( $attrib =~ /^primary.?tag$/i ) {
+	elsif ( $attrib =~ /^primary.?tag$/xi ) {
 		$method = \&get_primary_tag;
 	}
 	else {
@@ -438,20 +442,20 @@ sub get_gene_length {
 		if ( $subfeat->primary_tag =~ /exon/i ) {
 			push @exons, $subfeat;
 		}
-		elsif ( $subfeat->primary_tag =~ /utr|untranslated/i ) {
+		elsif ( $subfeat->primary_tag =~ /utr | untranslated/xi ) {
 			push @cdss, $subfeat;
 		}
 		elsif ( $subfeat->primary_tag =~ /cds/i ) {
 			push @cdss, $subfeat;
 		}
-		elsif ( $subfeat->primary_tag =~ /rna|transcript/i ) {
+		elsif ( $subfeat->primary_tag =~ /rna | transcript/xi ) {
 
 			# an RNA subfeature, keep going down another level
 			foreach my $f ( $subfeat->get_SeqFeatures ) {
 				if ( $f->primary_tag =~ /exon/i ) {
 					push @exons, $f;
 				}
-				elsif ( $f->primary_tag =~ /utr|untranslated/i ) {
+				elsif ( $f->primary_tag =~ /utr | untranslated/xi ) {
 					push @cdss, $f;
 				}
 				elsif ( $f->primary_tag =~ /cds/i ) {
@@ -572,7 +576,7 @@ sub get_rna_number {
 	return 0 unless $feature;
 	my $rna_count = 0;
 	foreach my $f ( $feature->get_SeqFeatures ) {
-		if ( $f->primary_tag =~ /rna|transcript/i ) {
+		if ( $f->primary_tag =~ /rna | transcript/xi ) {
 
 			# an RNA transcript
 			$rna_count++;
@@ -595,7 +599,7 @@ sub get_exon_number {
 		elsif ( $f->primary_tag =~ /cds/i ) {
 			$cds_count++;
 		}
-		elsif ( $f->primary_tag =~ /rna|transcript/i ) {
+		elsif ( $f->primary_tag =~ /rna | transcript/xi ) {
 
 			# an RNA transcript, go one more level
 			foreach my $sf ( $f->get_SeqFeatures ) {
