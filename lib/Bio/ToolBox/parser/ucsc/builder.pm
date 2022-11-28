@@ -49,33 +49,38 @@ sub new {
 		$self{exonCount}  = $linedata->[8];
 		$self{exonStarts} = $linedata->[9];
 		$self{exonEnds}   = $linedata->[10];
-		$self{name2}      = $linedata->[12] || q();
+		$self{name2}      = $linedata->[12];
 
 		if (exists $ucsc->{ensembldata}->{ $linedata->[1] } ) {
-		   $self{gene_name}     = $ucsc->{ensembldata}->{ $linedata->[1] }->[0]
+			if ( $ucsc->{ensembldata}->{ $linedata->[1] }->[0] ) {
+				$self{gene_name} = $ucsc->{ensembldata}->{ $linedata->[1] }->[0];
+			}
+			else {
+				$self{gene_name} = $linedata->[12];
+			}
 		}
 		else {
-			$self{gene_name}    = $linedata->[12];
+			$self{gene_name}     = $linedata->[12];
 		}
 
 		if ( exists $ucsc->{refseqsum}->{ $linedata->[1] } ) {
-			$self{note}         = $ucsc->{refseqsum}->{ $linedata->[1] }->[1];
-			$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[1] }->[0];
+			$self{note}          = $ucsc->{refseqsum}->{ $linedata->[1] }->[1] || q();
+			$self{completeness}  = $ucsc->{refseqsum}->{ $linedata->[1] }->[0] || q();
 		}
 		else {
-			$self{note}         = q();
-			$self{completeness} = q();
+			$self{note}          = q();
+			$self{completeness}  = q();
 		}
 
 		if ( exists $ucsc->{refseqstat}->{ $linedata->[1] } ) {
-			$self{status}       = $ucsc->{refseqstat}->{ $linedata->[1] }->[0];
+			$self{status}        = $ucsc->{refseqstat}->{ $linedata->[1] }->[0] || q();
 		}
 		else {
-			$self{status}       = q();
+			$self{status}        = q();
 		}
 
 		if ( $linedata->[1] =~ /^N[MR]_\d+/ ) {
-			$self{refseq}       = $linedata->[1];
+			$self{refseq}        = $linedata->[1];
 		}
 	}
 	### Extended Gene Prediction Table ###
@@ -111,33 +116,38 @@ sub new {
 		$self{exonCount}  = $linedata->[7];
 		$self{exonStarts} = $linedata->[8];
 		$self{exonEnds}   = $linedata->[9];
-		$self{name2}      = $linedata->[11] || q();
+		$self{name2}      = $linedata->[11];
 
 		if (exists $ucsc->{ensembldata}->{ $linedata->[0] } ) {
-		   $self{gene_name}     = $ucsc->{ensembldata}->{ $linedata->[0] }->[0]
+			if ( $ucsc->{ensembldata}->{ $linedata->[0] }->[0] ) {
+				$self{gene_name} = $ucsc->{ensembldata}->{ $linedata->[0] }->[0];
+			}
+			else {
+				$self{gene_name} = $linedata->[11];
+			}
 		}
 		else {
-			$self{gene_name}    = $linedata->[11];
+			$self{gene_name}     = $linedata->[11];
 		}
 
 		if ( exists $ucsc->{refseqsum}->{ $linedata->[0] } ) {
-			$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1];
-			$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0];
+			$self{note}          = $ucsc->{refseqsum}->{ $linedata->[0] }->[1] || q();
+			$self{completeness}  = $ucsc->{refseqsum}->{ $linedata->[0] }->[0] || q();
 		}
 		else {
-			$self{note}         = q();
-			$self{completeness} = q();
+			$self{note}          = q();
+			$self{completeness}  = q();
 		}
 
 		if ( exists $ucsc->{refseqstat}->{ $linedata->[0] } ) {
-			$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0];
+			$self{status}        = $ucsc->{refseqstat}->{ $linedata->[0] }->[0] || q();
 		}
 		else {
-			$self{status}       = q();
+			$self{status}        = q();
 		}
 
 		if ( $linedata->[0] =~ /^N[MR]_\d+/ ) {
-			$self{refseq}       = $linedata->[0];
+			$self{refseq}        = $linedata->[0];
 		}
 	}
 	### Known Gene Table ###
@@ -228,27 +238,32 @@ sub new {
 		$self{exonEnds}     = $linedata->[10];
 
 		if ( exists $ucsc->{ensembldata}->{ $linedata->[1] } ) {
-			$self{gene_name}    = $ucsc->{ensembldata}->{ $linedata->[1] }->[0];
+			if ( $ucsc->{ensembldata}->{ $linedata->[1] }->[0] ) {
+				$self{gene_name} = $ucsc->{ensembldata}->{ $linedata->[1] }->[0];
+			}
+			else {
+				$self{gene_name} = $linedata->[0];
+			}
 		}
 
 		if ( exists $ucsc->{refseqsum}->{ $linedata->[1] } ) {
-			$self{note}         = $ucsc->{refseqsum}->{ $linedata->[1] }->[1];
-			$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[1] }->[0];
+			$self{note}          = $ucsc->{refseqsum}->{ $linedata->[1] }->[1]  || q();
+			$self{completeness}  = $ucsc->{refseqsum}->{ $linedata->[1] }->[0]  || q();
 		}
 		else {
-			$self{note}         = q();
-			$self{completeness} = q();
+			$self{note}          = q();
+			$self{completeness}  = q();
 		}
 
 		if ( exists $ucsc->{refseqstat}->{ $linedata->[1] } ) {
-			$self{status}       = $ucsc->{refseqstat}->{ $linedata->[1] }->[0];
+			$self{status}        = $ucsc->{refseqstat}->{ $linedata->[1] }->[0] || q();
 		}
 		else {
-			$self{status}       = q();
+			$self{status}        = q();
 		}
 
 		if ( $linedata->[1] =~ /^N[MR]_\d+/ ) {
-			$self{refseq}       = $linedata->[1];
+			$self{refseq}        = $linedata->[1];
 		}
 	}
 	### Gene Prediction Table ###
@@ -282,8 +297,8 @@ sub new {
 		$self{gene_name}    = $linedata->[0];       # re-use transcript name
 		
 		if ( exists $ucsc->{refseqsum}->{ $linedata->[0] } ) {
-			$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1];
-			$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0];
+			$self{note}         = $ucsc->{refseqsum}->{ $linedata->[0] }->[1]  || q();
+			$self{completeness} = $ucsc->{refseqsum}->{ $linedata->[0] }->[0]  || q();
 		}
 		else {
 			$self{note}         = q();
@@ -291,7 +306,7 @@ sub new {
 		}
 
 		if ( exists $ucsc->{refseqstat}->{ $linedata->[0] } ) {
-			$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0];
+			$self{status}       = $ucsc->{refseqstat}->{ $linedata->[0] }->[0] || q();
 		}
 		else {
 			$self{status}       = q();
