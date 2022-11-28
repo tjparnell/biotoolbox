@@ -2,8 +2,8 @@
 
 # documentation at end of file
 
-use strict;
 use warnings;
+use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::Range;
@@ -13,8 +13,9 @@ use Bio::ToolBox::db_helper qw(
 	verify_or_request_feature_types
 	get_chromosome_list
 );
-use Bio::ToolBox::utility;
-my $VERSION = 1.60;
+use Bio::ToolBox::utility qw(format_with_commas);
+
+our $VERSION = 1.70;
 
 print "\n A script to pull out overlapping features\n\n";
 
@@ -32,7 +33,7 @@ unless (@ARGV) {
 }
 
 ### Command line options
-my ( $infile, $database, $search_feature, $start, $stop, $extend, $adjustment_position,
+my ( $infile, $database, $start, $stop, $extend, $adjustment_position,
 	$reference_position, $outfile, $gz, $help, $print_version, );
 my @search_features;
 GetOptions(
@@ -76,7 +77,13 @@ if ($print_version) {
 
 ### Check for required values and assign defaults
 unless ($infile) {
-	$infile = shift @ARGV || die " no input file specified\n";
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		print STDERR " FATAL: no input file! use --help for more information\n";
+		exit 1;
+	}
 }
 unless ($reference_position) {
 	$reference_position = 'start';
@@ -101,7 +108,7 @@ printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_ro
 ### Open database connection
 if ($database) {
 	if ( $Data->database and $Data->database ne $database ) {
-		warn " provided database '$database' does not match file metadata!\n"
+		print " WARNING: provided database '$database' does not match file metadata!\n"
 			. " overriding metadata and using '$database'\n";
 	}
 	$Data->database($database);
@@ -161,8 +168,10 @@ sub find_overlapping_features {
 	}
 	else {
 		# unable to identify
-		die " unable to identify feature information columns in source file "
+		print STDERR
+" FATAL: unable to identify feature information columns in source file "
 			. "'$infile'\n No chromosome, start, stop, name, ID,  and/or type columns\n";
+		exit 1;
 	}
 }
 
@@ -290,9 +299,9 @@ sub intersect_named_features {
 		}
 		else {
 			# no region defined
-			my $w = sprintf " unable to establish region for %s %s\n",
+			printf " WARNING: unable to establish region for %s %s\n",
 				$row->type, $row->name;
-			warn $w;
+			
 
 			# fill in table anyway
 			process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,
@@ -378,8 +387,8 @@ sub intersect_genome_features {
 		}
 		else {
 			# no region defined
-			warn sprintf( " unable to establish region for %s:%s..%s\n",
-				$row->seq_id, $row->start, $row->end );
+			printf " WARNING: unable to establish region for %s:%s..%s\n",
+				$row->seq_id, $row->start, $row->end;
 
 			# fill in table anyway
 			process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,
@@ -775,8 +784,6 @@ reference points for measuring the distance is by default the start or 5' end
 of the features, or optionally the midpoints. Note that the distance 
 measurement is relative to the coordinates after adjustment with the --start, 
 --stop, and --extend options.
-
-A standard BioToolBox data text file is written.
 
 =head1 AUTHOR
 
