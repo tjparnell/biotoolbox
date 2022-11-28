@@ -2,8 +2,10 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Pod::Usage;
+use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
@@ -13,14 +15,15 @@ use Bio::ToolBox::db_helper qw(
 	$BAM_ADAPTER
 	$BIG_ADAPTER
 );
-use Bio::ToolBox::utility;
+use Bio::ToolBox::utility qw( format_with_commas simplify_dataset_name );
 my $parallel;
 eval {
 	# check for parallel support
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.68';
+
+our $VERSION = '1.70';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -122,7 +125,8 @@ if ($infile) {
 			format_with_commas( $Data->last_row );
 	}
 	else {
-		die " No features loaded!\n";
+		print STDERR " FATAL: No features loaded from file '$infile'!\n";
+		exit 1;
 	}
 
 	# update main database as necessary
@@ -155,10 +159,10 @@ else {
 		feature => $feature,
 	) or die " unable to generate new feature list\n";
 }
-$Data->program("$0, v $VERSION");
+$Data->program("$PROGRAM_NAME, v $VERSION");
 
 # the number of columns already in the data array
-my $beginningcolumn = $Data->last_column;
+my $beginningcolumn = $Data->last_column + 1;
 my $startcolumn;    # this is now calculated separately for each datasets
 
 # Check output file name
@@ -167,7 +171,8 @@ unless ($outfile) {
 		$outfile = $Data->path . $Data->basename;
 	}
 	else {
-		die " No output file provided!\n";
+		print STDERR " FATAL: No output file provided!\n";
+		exit 1;
 	}
 }
 
@@ -250,13 +255,13 @@ else {
 # write the column group file
 if ($groupcol) {
 	my $groupfile = $written_file;
-	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
+	$groupfile =~ s/\.txt (?:\.gz)? $/.groups.txt/x;
 	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
 	$fh->print("Name\tDataset\n");
-	for ( my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++ ) {
+	for my $i ( $beginningcolumn .. $Data->last_column ) {
 		my $name    = $Data->name($i);
 		my $dataset = $name;
-		$dataset =~ s/:[\-\d%bp]+$//;
+		$dataset =~ s/: [\-\d%bp]+ $//x;
 		$fh->print("$name\t$dataset\n");
 	}
 	$fh->close;
@@ -274,12 +279,15 @@ sub check_defaults {
 
 		# a database must be defined
 		# a tim data file used as an input file would also define one
-		die " You must define a database or input file!\n";
+		print STDERR " FATAL: You must define a database or input file!\n";
+		exit 1;
 	}
 	$parse = 1 if ( $infile and not defined $parse );
 
 	unless ( $outfile or $infile ) {
-		die " You must define an output filename !\n Use --help for more information\n";
+		print STDERR
+" FATAL: You must define an output filename !\n Use --help for more information\n";
+		exit 1;
 	}
 
 	# check datasets
@@ -302,8 +310,9 @@ sub check_defaults {
 			or $stranded eq 'antisense'
 			or $stranded eq 'all' )
 		{
-			die
-" '$stranded' is not recognized for strand\n Use --help for more information\n";
+			print STDERR
+" FATAL: '$stranded' is not recognized for strand\n Use --help for more information\n";
+			exit 1;
 		}
 	}
 	else {
@@ -320,8 +329,9 @@ sub check_defaults {
 			or $method eq 'stddev'
 			or $method =~ /^\w?count/ )
 		{
-			die
-" '$method' is not recognized for method\n Use --help for more information\n";
+			print STDERR
+" FATAL: '$method' is not recognized for method\n Use --help for more information\n";
+			exit 1;
 		}
 
 	}
@@ -331,17 +341,19 @@ sub check_defaults {
 
 	# subfeatures
 	if ( $subfeature and $long_data ) {
-		die
-" Long data collection is incompatible with subfeatures\n Use --help for more information\n";
+		print STDERR
+" FATAL: Long data collection is incompatible with subfeatures\n Use --help for more information\n";
+		exit 1;
 	}
 	if ($exon_subfeature) {
 
 		# legacy option
 		$subfeature = 'exon';
 	}
-	if ( $subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/ ) {
-		die
-" unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+	if ( $subfeature and $subfeature !~ /^ (?: exon | cds | 5p_utr | 3p_utr )$/x ) {
+		print STDERR
+" FATAL: unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+		exit 1;
 	}
 
 	# assign default window bin values
@@ -381,7 +393,7 @@ sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
 
 	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$";
+	my $child_base_name = $outfile . ".$PID";
 
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i ( 1 .. $cpu ) {
@@ -413,7 +425,7 @@ sub parallel_execution {
 		foreach my $dataset (@datasets) {
 
 			# new start column for this dataset
-			$startcolumn = $Data->number_columns;
+			$startcolumn = $Data->number_columns + 1;
 
 			# Prepare the metadata and header names
 			my $binsize = ( 100 / $bins );
@@ -469,7 +481,11 @@ sub parallel_execution {
 sub single_execution {
 
 	# collapse transcripts if needed
-	if ( $feature eq 'gene' and $subfeature eq 'exon' ) {
+	if (
+		$feature
+		and $feature eq 'gene'
+		and $subfeature eq 'exon'
+	) {
 		$Data->collapse_gene_transcripts;
 	}
 
@@ -482,7 +498,7 @@ sub single_execution {
 	foreach my $dataset (@datasets) {
 
 		# new start column for this dataset
-		$startcolumn = $Data->number_columns;
+		$startcolumn = $Data->number_columns + 1;
 
 		# Prepare the metadata and header names
 		my $binsize = ( 100 / $bins );
@@ -684,7 +700,7 @@ sub record_the_bin_values {
 		# value reported
 
 		# record nulls if no data returned
-		unless ( scalar keys %$regionscores ) {
+		unless ( scalar keys %{$regionscores} ) {
 			$row->value( $column, calculate_score( $method, undef ) );
 			next;
 		}
@@ -728,7 +744,7 @@ sub record_the_bin_values {
 		# collect the scores for this window
 		my @scores = map { $regionscores->{$_} }
 			grep { $_ >= $start and $_ <= $stop }
-			keys %$regionscores;
+			keys %{$regionscores};
 
 		# calculate the value
 		my $window_score = calculate_score( $method, \@scores );
@@ -810,7 +826,6 @@ sub prepare_bins {
 	# bin(s) on 5' flank
 	if ($extension) {
 
-		# 5' bins are requested
 		if ($extension_size) {
 
 			# extended bins should be of specific bp size
@@ -840,7 +855,6 @@ sub prepare_bins {
 	# bin(s) on 3' flank
 	if ($extension) {
 
-		# 5' bins are requested
 		if ($extension_size) {
 
 			# extended bins should be of specific bp size
