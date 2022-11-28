@@ -2,13 +2,17 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Pod::Usage;
 use Getopt::Long qw(:config no_ignore_case bundling);
-use Statistics::Lite qw(:all);
+use IO::Prompt::Tiny qw(prompt);
+use List::Util qw(min max sum0);
+use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
-my $VERSION = '1.69';
+use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
+
+our $VERSION = '1.70';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -24,24 +28,11 @@ unless (@ARGV) {    # when no command line options are present
 }
 
 ### Get command line options and initialize values
-my (    # command line option variables
-	$infile,
-	$outfile,
-	$function,
-	$opt_index,
-	$opt_numerator,
-	$opt_denominator,
-	$opt_target,
-	$opt_placement,
-	$opt_exception,
-	$opt_zero,
-	$opt_direction,
-	$opt_name,
-	$opt_log,
-	$noheader,
-	$gz,
-	$bgz,
-	$help,
+my (
+	$infile,        $outfile,         $function,   $opt_index,
+	$opt_numerator, $opt_denominator, $opt_target, $opt_placement,
+	$opt_zero,      $opt_direction,   $opt_name,   $opt_log,
+	$noheader,      $gz,              $bgz,        $help,
 	$print_version,
 );
 
@@ -55,7 +46,6 @@ GetOptions(
 	'd|con|den=i' => \$opt_denominator,    # index number of denominator dataset
 	't|target=s'  => \$opt_target,         # target
 	'place=s'     => \$opt_placement,      # placement of transformed dataset
-	'except=s'    => \$opt_exception,      # old argument exception to deal with 0 values
 	'zero!'       => \$opt_zero,           # include 0 values
 	'dir=s'       => \$opt_direction,      # sort order
 	'name=s'      => \$opt_name,           # new dataset name
@@ -97,7 +87,8 @@ if ($print_version) {
 
 ### Check for required values
 unless ($infile) {
-	die "No file name supplied!";
+	print STDERR " FATAL: No file name supplied!";
+	exit 1;
 }
 
 ### Load file
@@ -112,12 +103,7 @@ printf "    Loaded '$infile' with %s data rows and %s columns\n\n",
 my @opt_indices;
 if ( defined $opt_index ) {
 	@opt_indices = parse_list($opt_index)
-		or die " requested index '$opt_index' cannot be parsed!\n";
-}
-
-# set zero usage
-if ( $opt_exception =~ /^y/i ) {
-	$opt_zero = 1;
+		or die " requested index '$opt_index' cannot be parsed!";
 }
 
 # initialize modification count
@@ -216,7 +202,7 @@ MENU
 
 	# unlisted option: print this (m)enu
 	# unused letters: E F H jJ k
-	return;    # return 0, nothing done
+	return 0;    # return 0, nothing done
 }
 
 sub print_online_help {
@@ -230,7 +216,7 @@ sub print_online_help {
 			'-exitval'  => 'NOEXIT',
 		}
 	);
-	return;
+	return 0;
 }
 
 sub automatic_execution {
@@ -270,7 +256,8 @@ sub automatic_execution {
 		$modification += &{ $function_to_subroutine{$function} };
 	}
 	else {
-		die "unknown function '$function'!";
+		print STDERR " FATAL: unknown function '$function'!\n";
+		exit 1;
 	}
 }
 
@@ -280,9 +267,8 @@ sub interactive_execution {
 
 	# Ask for the function
 	print " Functions are chosen by symbol. Use [m] for menu or [h] for help\n";
-	print " Enter the symbol for the function you would like to perform   ";
-	my $request = <STDIN>;
-	chomp $request;
+	my $p       = ' Enter the symbol for the function you would like to perform:  ';
+	my $request = prompt($p);
 	while (1) {
 		if ( exists $letter_to_function{$request} ) {
 
@@ -293,16 +279,15 @@ sub interactive_execution {
 				&{ $function_to_subroutine{ $letter_to_function{$request} } };
 
 			# prepare for the next function
-			print " Which function is next? [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
-			$request = <STDIN>;
-			chomp $request;
+			$p = ' Which function is next? [m]enu, [h]elp, just [Q]uit, save & [q]uit:  ';
+			$request = prompt($p);
 		}
 
 		else {
 			# unrecognized command
-			print " unrecognized command. [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
-			$request = <STDIN>;
-			chomp $request;
+			my $p2 =
+				' unrecognized command. [m]enu, [h]elp, just [Q]uit, save & [q]uit:  ';
+			$request = prompt($p2);
 		}
 	}
 	return;
@@ -333,7 +318,7 @@ sub write_and_quit_function {
 			print " Wrote datafile $write_results\n";
 		}
 		else {
-			print " Failed to write datafile\n";
+			print " WARNING: Failed to write datafile\n";
 		}
 	}
 	else {
@@ -358,16 +343,16 @@ sub print_statistics_function {
 	my @indices = _request_indices(
 		" Enter one or more column index numbers to calculate statistics  ");
 	unless (@indices) {
-		warn " unknown index number(s).\n";
-		return;
+		print " WARNING: unknown index number(s).\n";
+		return 0;
 	}
 
 	# get statistics and print
 	foreach my $index (@indices) {
 		my %statdata = _get_statistics_hash($index);
 		unless (%statdata) {
-			warn " unable to get statistics for column index $index!\n";
-			return;
+			print " WARNING: unable to get statistics for column index $index!\n";
+			return 0;
 		}
 
 		# print the metadata and the calculated statistics
@@ -400,7 +385,7 @@ sub print_statistics_function {
 	}
 
 	# we're returning 0 because the data file has not been modified
-	return;
+	return 0;
 }
 
 sub reorder_function {
@@ -425,8 +410,8 @@ sub reorder_function {
 		@order = _request_indices($line);
 	}
 	unless (@order) {
-		warn " No order! Nothing done!\n";
-		return;
+		print " WARNING: No order! Nothing done!\n";
+		return 0;
 	}
 
 	# re-order the data columns
@@ -442,13 +427,6 @@ sub reorder_function {
 	else {
 		# explicit user request, print completion statement
 		print " re-ordered data as '" . join( ", ", @order ) . "\n";
-
-		# reset structure
-		$Data->gff(0);
-		$Data->bed(0);
-		$Data->vcf(0);
-		$Data->ucsc(0);
-		$Data->format('');
 		return 1;
 	}
 }
@@ -470,8 +448,8 @@ sub delete_function {
 			" Enter one or more column index numbers to be deleted.\n  ");
 	}
 	unless (@deletion_list) {
-		warn " No list for deletion! Nothing done!\n";
-		return;
+		print " WARNING: No list for deletion! Nothing done!\n";
+		return 0;
 	}
 
 	$Data->delete_column(@deletion_list);
@@ -479,12 +457,6 @@ sub delete_function {
 		. join( ", ", map { sprintf "'%s'", $Data->name($_) } @deletion_list )
 		. " deleted\n";
 
-	# reset structure
-	$Data->gff(0);
-	$Data->bed(0);
-	$Data->vcf(0);
-	$Data->ucsc(0);
-	$Data->format('');
 	return 1;
 }
 
@@ -525,8 +497,8 @@ sub rename_function {
 			@newnames = map {$opt_name} @indices;
 		}
 		else {
-			warn "unequal number of provided names and indices!? nothing done\n";
-			return;
+			print " WARNING: unequal number of provided names and indices!? nothing done\n";
+			return 0;
 		}
 	}
 
@@ -538,9 +510,8 @@ sub rename_function {
 		unless ($name) {
 
 			# request a new name from the user
-			print " ($oldname) Enter a new name: ";
-			$name = <STDIN>;
-			chomp $name;
+			my $p = " ($oldname) Enter a new name: ";
+			$name = prompt($p);
 		}
 
 		# assign new name
@@ -559,12 +530,12 @@ sub concatenate_function {
 	my @indices =
 		_request_indices(" Enter two or more column index numbers to concatenate  ");
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 	unless ( scalar @indices >= 2 ) {
-		warn " at least two columns are required to concatenate! nothing done\n";
-		return;
+		print " WARNING: at least two columns are required to concatenate! nothing done\n";
+		return 0;
 	}
 
 	# identify joining character
@@ -579,9 +550,9 @@ sub concatenate_function {
 		$glue = '_';
 	}
 	else {
-		print " Enter a character to join values, return for nothing    ";
-		$glue = <STDIN>;
-		chomp $glue;
+		my $p       = ' Enter a character to join values, return for nothing:  ';
+		my $default = q();
+		$glue = prompt( $p, $default );
 	}
 
 	# generate new column
@@ -623,8 +594,8 @@ sub split_function {
 	# Request dataset
 	my $index = _request_index(" Enter the index number of a column to split  ");
 	if ( $index == -1 ) {
-		warn " unknown index number. nothing done\n";
-		return;
+		print " WARNING: unknown index number. nothing done\n";
+		return 0;
 	}
 
 	# identify joining character
@@ -639,8 +610,9 @@ sub split_function {
 		$glue = '_';
 	}
 	else {
-		print " Enter the character to split the values, return for nothing    ";
-		$glue = <STDIN>;
+		my $p       = ' Enter the character to split the values, return for nothing:  ';
+		my $default = q();
+		$glue = prompt( $p, $default );
 		chomp $glue;
 	}
 
@@ -695,8 +667,8 @@ sub coordinate_function {
 	unless ( $Data->feature_type eq 'coordinate' ) {
 
 		# cannot add coordinate column, do without ?
-		warn " cannot generate coordinates, no chromosome or start column found\n";
-		return;
+		print " WARNING: cannot generate coordinates, no chromosome or start column found\n";
+		return 0;
 	}
 
 	# the new index position
@@ -731,8 +703,8 @@ sub median_scale_function {
 			_request_indices(" Enter one or more column index numbers to median scale  ");
 	}
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 
 	# Where to put new values?
@@ -747,8 +719,8 @@ sub median_scale_function {
 	}
 	else {
 		# request target from user
-		print " Enter the new median target  ";
-		$target = <STDIN>;
+		my $p = ' Enter the new median target:  ';
+		$target = prompt($p);
 		chomp $target;
 	}
 
@@ -759,14 +731,12 @@ INDEX_LOOP: foreach my $index (@indices) {
 		# Retrieve values and calculate median
 		my %statdata = _get_statistics_hash( $index, 'n' );
 		unless (%statdata) {
-			warn " unable to get statistics for dataset "
-				. $Data->name($index)
-				. ", index $index!\n";
+			printf " WARNING: unable to get statistics for dataset %s, index %d!\n",
+				$Data->name($index), $index;
 			next INDEX_LOOP;
 		}
-		print " The median value for dataset "
-			. $Data->name($index)
-			. " is $statdata{'median'}\n";
+		printf " The median value for dataset %s is %s\n",
+			$Data->name($index), $statdata{'median'};
 
 		# Calculate correction value
 		my $correction_value = $target / $statdata{median};
@@ -814,8 +784,8 @@ sub percentile_rank_function {
 		);
 	}
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 
 	# Where to put new values?
@@ -880,8 +850,8 @@ sub zscore_function {
 			" Enter one or more column index numbers to convert to z-scores  ");
 	}
 	unless (@indices) {
-		warn " Unknown columns. Nothing done.\n";
-		return;
+		print " WARNING: Unknown columns. Nothing done.\n";
+		return 0;
 	}
 
 	# Where to put new values?
@@ -894,7 +864,7 @@ sub zscore_function {
 		# generate statistics on the dataset
 		my %statdata = _get_statistics_hash( $index, 'y' );
 		unless (%statdata) {
-			warn " unable to generate statistics for index $index! skipping\n";
+			print " WARNING: unable to generate statistics for index $index! skipping\n";
 			next;
 		}
 
@@ -940,8 +910,8 @@ sub sort_function {
 			" Enter column index number (or column ranges for mean) to sort by  ");
 	}
 	unless ( scalar(@indices) ) {
-		warn " no index provided. nothing done\n";
-		return;
+		print " WARNING: no index provided. nothing done\n";
+		return 0;
 	}
 
 	# Ask the sort direction
@@ -953,12 +923,11 @@ sub sort_function {
 	}
 	else {
 		# otherwise ask the user for the direction
-		print " Sort by (i)ncreasing or (d)ecreasing order?  ";
-		$direction = <STDIN>;
-		chomp $direction;
-		unless ( $direction =~ /^i|d$/i ) {
-			warn " unknown order; nothing done\n";
-			return;
+		my $p = ' Sort by (i)ncreasing or (d)ecreasing order?:  ';
+		$direction = prompt($p);
+		unless ( $direction =~ /^[id]$/i ) {
+			print " WARNING: unknown order; nothing done\n";
+			return 0;
 		}
 	}
 
@@ -988,7 +957,7 @@ sub sort_function {
 
 	# annotate metadata, but only if there was one index
 	if ( scalar(@indices) == 1 ) {
-		if ( $direction =~ /i/i ) {
+		if ( lc $direction eq 'i' ) {
 			$Data->metadata( $indices[0], 'sorted', "increasing" )
 				unless $Data->metadata( $indices[0], 'AUTO' )
 				;    # internal flag to not accept metadata
@@ -1009,8 +978,8 @@ sub genomic_sort_function {
 
 	my $result = $Data->gsort_data;
 	unless ($result) {
-		print " Data table not sorted\n";
-		return;
+		print " WARNING: Data table not sorted\n";
+		return 0;
 	}
 
 	# remove any pre-existing sorted metadata since no longer valid
@@ -1038,8 +1007,8 @@ sub toss_nulls_function {
 	my @order = _request_indices(
 		" Enter one or more column index numbers to check for non-values\n   ");
 	unless (@order) {
-		warn " No valid columns! Nothing done!\n";
-		return;
+		print " WARNING: No valid columns! Nothing done!\n";
+		return 0;
 	}
 
 	# Collection exception rule from commandline
@@ -1067,18 +1036,20 @@ sub toss_nulls_function {
 					elsif ( not defined $zero and not defined $function ) {
 
 						# ask the user if we haven't already
-						print " Also toss values of 0? y or n  ";
-						my $answer = <STDIN>;
-						if ( $answer =~ /^y/i ) {
+						my $p      = ' Also toss values of 0? y/n, default n :  ';
+						my $answer = prompt( $p, 'n' );
+						if ( lc $answer eq 'y' ) {
 							$zero = 1;
 						}
+						elsif ( lc $answer eq 'n' ) {
+							$zero = 0;
+						}
 						else {
+							print " WARNING: unrecognized answer, defaulting to 'n'\n";
 							$zero = 0;
 						}
 					}
 					if ($zero) {
-
-						# Yes, toss the 0 values
 						$check++;
 					}
 				}
@@ -1113,8 +1084,8 @@ sub toss_duplicates_function {
 	my @order = _request_indices(
 		" Enter one or more column index numbers to check for duplicates\n   ");
 	unless (@order) {
-		warn " No valid columns! Nothing done!\n";
-		return;
+		print " WARNING: No valid columns! Nothing done!\n";
+		return 0;
 	}
 
 	# initialize variables
@@ -1181,8 +1152,8 @@ sub toss_threshold_function {
 	my @order = _request_indices(
 		" Enter one or more column index numbers to toss values $direction a value\n   ");
 	unless (@order) {
-		warn " No valid datasets! Nothing done!\n";
-		return;
+		print " WARNING: No valid datasets! Nothing done!\n";
+		return 0;
 	}
 
 	# identify the threshold
@@ -1194,14 +1165,14 @@ sub toss_threshold_function {
 	}
 	else {
 		# interactively ask the user
+		my $p;
 		if ( $direction eq 'above' ) {
-			print " Toss values that exceed this value:  ";
+			$p = ' Toss values that exceed this value:  ';
 		}
 		else {
-			print " Toss values that are below this value:  ";
+			$p = ' Toss values that are below this value:  ';
 		}
-		$threshold = <STDIN>;
-		chomp $threshold;
+		$threshold = prompt($p);
 	}
 
 	# Check values
@@ -1272,8 +1243,8 @@ sub do_specific_values_function {
 	my @list = _request_indices(
 		" Enter one or more column index numbers to check for specific values\n   ");
 	unless (@list) {
-		warn " No valid columns! Nothing done!\n";
-		return;
+		print " WARNING: No valid columns! Nothing done!\n";
+		return 0;
 	}
 
 	# determine values
@@ -1306,10 +1277,11 @@ sub do_specific_values_function {
 			$lookup{$i} = $_;
 			$i++;
 		}
-		printf " Enter the number(s) corresponding to the values to %s. Enter as a \n"
+		my $p =
+			sprintf
+			" Enter the number(s) corresponding to the values to %s. Enter as a \n"
 			. " comma-delimited list or range.    ", $toss ? 'toss' : 'keep';
-		my $response = <STDIN>;
-		chomp $response;
+		my $response = prompt($p);
 		foreach ( parse_list($response) ) {
 			if ( exists $lookup{$_} ) {
 				$wanted{ $lookup{$_} } = 0;
@@ -1317,8 +1289,8 @@ sub do_specific_values_function {
 		}
 	}
 	unless (%wanted) {
-		warn " No specific values provided! Nothing done!\n";
-		return;
+		print " WARNING: No specific values provided! Nothing done!\n";
+		return 0;
 	}
 
 	# Identify rows to delete
@@ -1408,8 +1380,8 @@ sub convert_nulls_function {
 			" Enter one or more dataset index numbers to convert null values  ");
 	}
 	unless (@indices) {
-		warn " no valid indices. Nothing done.\n";
-		return;
+		print " WARNING: no valid indices. Nothing done.\n";
+		return 0;
 	}
 
 	# request replacement value
@@ -1421,16 +1393,13 @@ sub convert_nulls_function {
 	}
 	else {
 		# interactively ask the user
-		print " Enter the new value to convert nulls to  ";
-		$new_value = <STDIN>;
-		chomp $new_value;
+		my $p = ' Enter the new value to convert nulls to:  ';
+		$new_value = prompt($p);
 	}
 
 	# check zero status
 	my $zero;
 	if ( defined $opt_zero ) {
-
-		# command line option
 		$zero = $opt_zero;
 	}
 
@@ -1468,9 +1437,18 @@ sub convert_nulls_function {
 
 						# wasn't defined on the command line, running interactively,
 						# so stop the program and ask the user
-						print " Include 0 values to convert? y or n  ";
-						my $answer = <STDIN>;
-						$zero = ( $answer =~ /^y/i ) ? 1 : 0;
+						my $p      = ' Include 0 values to convert? y/n, default n:  ';
+						my $answer = prompt( $p, 'n' );
+						if ( lc $answer eq 'y' ) {
+							$zero = 1;
+						}
+						elsif ( lc $answer eq 'n' ) {
+							$zero = 0;
+						}
+						else {
+							print " WARNING: unrecognized answer, defaulting to 'n'\n";
+							$zero = 0;
+						}
 
 						# remember for next time, chances are user may still want this
 						# value again in the future
@@ -1519,8 +1497,8 @@ sub convert_absolute_function {
 			" Enter one or more dataset index numbers to make absolute  ");
 	}
 	unless (@indices) {
-		warn " no valid indices. Nothing done.\n";
-		return;
+		print " WARNING: no valid indices. Nothing done.\n";
+		return 0;
 	}
 
 	# request placement
@@ -1588,8 +1566,8 @@ sub minimum_function {
 	my @indices = _request_indices(
 		" Enter one or more dataset index numbers to reset minimum values  ");
 	unless (@indices) {
-		warn " no valid indices. nothing done\n";
-		return;
+		print " WARNING: no valid indices. nothing done\n";
+		return 0;
 	}
 
 	# request value
@@ -1601,9 +1579,8 @@ sub minimum_function {
 	}
 	else {
 		# interactively ask the user
-		print " Enter the minimum value to accept  ";
-		$value = <STDIN>;
-		chomp $value;
+		my $p = ' Enter the minimum value to accept:  ';
+		$value = prompt($p);
 	}
 
 	# request placement
@@ -1618,8 +1595,9 @@ sub minimum_function {
 		my $count = 0;
 
 		# reset minimum values
-		$index = _prepare_new_destination( $index, '_minimum_reset' )
-			if $placement =~ /^n/i;
+		if ( $placement =~ /^n/i ) {
+			$index = _prepare_new_destination( $index, '_minimum_reset' );
+		}
 		$Data->iterate(
 			sub {
 				my $row = shift;
@@ -1657,8 +1635,8 @@ sub maximum_function {
 	my @indices = _request_indices(
 		" Enter one or more dataset index numbers to reset maximum values  ");
 	unless (@indices) {
-		warn " no valid indices. nothing done\n";
-		return;
+		print " WARNING: no valid indices. nothing done\n";
+		return 0;
 	}
 
 	# request value
@@ -1670,9 +1648,8 @@ sub maximum_function {
 	}
 	else {
 		# interactively ask the user
-		print " Enter the maximum value to accept  ";
-		$value = <STDIN>;
-		chomp $value;
+		my $p = ' Enter the maximum value to accept:  ';
+		$value = prompt($p);
 	}
 
 	# request placement
@@ -1687,8 +1664,9 @@ sub maximum_function {
 		my $count = 0;
 
 		# reset minimum values
-		$index = _prepare_new_destination( $index, '_maximum_reset' )
-			if $placement =~ /^n/i;
+		if ( $placement =~ /^n/i ) {
+			$index = _prepare_new_destination( $index, '_maximum_reset' );
+		}
 		$Data->iterate(
 			sub {
 				my $row = shift;
@@ -1735,25 +1713,22 @@ sub log_function {
 		@indices = _request_indices(
 			" Enter one or more dataset index numbers to convert to log  ");
 		if ( defined $opt_target ) {
-
-			# specified on the command line
 			$base = $opt_target;
 		}
 		else {
 			# interactively ask the user
-			print " What log base to use? [2 10]:  ";
-			$base = <STDIN>;
-			chomp $base;
+			my $p = ' What log base to use? [2 10]:  ';
+			$base = prompt($p);
 		}
 
 	}
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 	unless ( $base =~ /^\d+$/ ) {
-		warn " unrecognized base number. nothing done\n";
-		return;
+		print " WARNING: unrecognized base number. nothing done\n";
+		return 0;
 	}
 	my $factor = log($base);
 
@@ -1770,10 +1745,13 @@ sub log_function {
 		my $check =
 			$Data->metadata( $index, 'log' ) || $Data->metadata( $index, 'log2' ) || 0;
 		if ( $check != 0 ) {
-			warn " dataset $Data->name($index) metadata "
-				. "reports it is currently in log scale. Continue? y/n\n";
-			my $response = <STDIN>;
-			next if $response =~ /n/i;
+			printf " dataset %s metadata reports it is currently in log scale.",
+				$Data->name($index);
+			my $p        = ' Continue? y/n:  ';
+			my $response = prompt($p);
+			if ( lc $response eq 'n' ) {
+				next;
+			}
 		}
 
 		# Placement dictates method
@@ -1847,8 +1825,8 @@ sub delog_function {
 			" Enter one or more dataset index numbers to convert from log  ");
 	}
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 
 	# request placement
@@ -1872,13 +1850,12 @@ sub delog_function {
 				$base = $opt_target;
 			}
 			else {
-				print " What log base is the data in? [2 10]:  ";
-				$base = <STDIN>;
-				chomp $base;
+				my $p = ' What log base is the data in? [2 10]:  ';
+				$base = prompt($p);
 			}
 		}
 		unless ( $base =~ /^\d+$/ ) {
-			warn " Unrecognized base integer '$base'. Nothing done.\n";
+			print " WARNING: Unrecognized base integer '$base'. Nothing done.\n";
 			return scalar(@datasets_modified);
 		}
 
@@ -1947,8 +1924,8 @@ sub format_function {
 			_request_indices(" Enter one or more dataset index numbers to format  ");
 	}
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 
 	# ask for the number of decimal positions to format to
@@ -1960,13 +1937,12 @@ sub format_function {
 	}
 	else {
 		# interactively ask the user
-		print " Format the numbers to how many decimal positions?  ";
-		$positions = <STDIN>;
-		chomp $positions;
+		my $p = ' Format the numbers to how many decimal positions?  ';
+		$positions = prompt($p);
 	}
 	unless ( $positions =~ /^\d+$/ ) {
-		warn " Unknown number of positions; formatting NOT done\n";
-		return;
+		print " WARNING: Unknown number of positions; formatting NOT done\n";
+		return 0;
 	}
 	my $format_string = '%.' . $positions . 'f';
 
@@ -2017,12 +1993,12 @@ sub combine_function {
 			" Enter two or more dataset index numbers to mathematically combine  ");
 	}
 	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
-		return;
+		print " WARNING: unknown index number(s). nothing done\n";
+		return 0;
 	}
 	unless ( scalar @indices >= 2 ) {
-		warn " two or more indices are required to combine. nothing done.\n";
-		return;
+		print " WARNING: two or more indices are required to combine. nothing done.\n";
+		return 0;
 	}
 
 	# request value
@@ -2034,21 +2010,20 @@ sub combine_function {
 	}
 	else {
 		# interactively ask the user
-		print " Enter the method: [mean median min max stdev sum]  ";
-		$method = <STDIN>;
-		chomp $method;
+		my $p = ' Enter the method [mean median min max stdev sum], default mean: ';
+		$method = prompt( $p, 'mean' );
 	}
 	my $combine_method =
-		  $method eq 'mean'   ? \&mean
+		  $method eq 'mean'   ? sub { return sum0(@_) / ( scalar(@_) || 1 ); }
 		: $method eq 'median' ? \&median
 		: $method eq 'min'    ? \&min
 		: $method eq 'max'    ? \&max
 		: $method eq 'stdev'  ? \&stddevp
-		: $method eq 'sum'    ? \&sum
+		: $method eq 'sum'    ? \&sum0
 		:                       undef;
 	unless ($combine_method) {
-		warn " unknown method. nothing done\n";
-		return;
+		print " WARNING: unknown method. nothing done\n";
+		return 0;
 	}
 
 	# generate new column
@@ -2069,8 +2044,7 @@ sub combine_function {
 		sub {
 			my $row = shift;
 
-			# collect data, throwing out null values
-			# my @data = grep {!/^\.$/} map {$row->value($_)} @indices;
+			# collect data
 			my @data;
 			foreach (@indices) {
 				my $v = $row->value($_);
@@ -2115,8 +2089,8 @@ sub ratio_function {
 			$denominator = $opt_denominator;
 		}
 		else {
-			warn " unknown index number(s); nothing done\n";
-			return;
+			print " WARNING: unknown index number(s); nothing done\n";
+			return 0;
 		}
 	}
 	else {
@@ -2124,8 +2098,8 @@ sub ratio_function {
 			_request_indices( " Enter two dataset index numbers for the ratio as "
 				. "'numerator, denominator'\n  " );
 		unless ( defined $numerator and defined $denominator ) {
-			warn " unknown index number(s); nothing done\n";
-			return;
+			print " WARNING: unknown index number(s); nothing done\n";
+			return 0;
 		}
 	}
 
@@ -2152,17 +2126,17 @@ sub ratio_function {
 				$log = $numerator_log;
 			}
 			else {
-				warn " Columns appear to have different log status!\n"
+				print " WARNING: Columns appear to have different log status!\n"
 					. "  numerator is $numerator_log and denominator is "
 					. " $denominator_log\n  Nothing done.";
-				return;
+				return 0;
 			}
 		}
 		elsif ( $numerator_log or $denominator_log ) {
-			warn " Columns appear to have different log status!\n"
+			print " WARNING: Columns appear to have different log status!\n"
 				. "  numerator is $numerator_log and denominator is "
 				. " $denominator_log\n  Nothing done.";
-			return;
+			return 0;
 		}
 		else {
 			# looks like neither is log state
@@ -2198,7 +2172,7 @@ sub ratio_function {
 				$row->value( $new_position, '.' );
 				$failure_count++;
 			}
-			elsif ( $d == 0 and !$log ) {
+			elsif ( $d == 0 and not $log ) {
 
 				# denominator is 0, avoid div by 0 errors, assign null
 				$row->value( $new_position, '.' );
@@ -2253,8 +2227,8 @@ sub difference_function {
 			$control_index    = $opt_denominator;
 		}
 		else {
-			warn " unknown index number(s); nothing done\n";
-			return;
+			print " WARNING: unknown index number(s); nothing done\n";
+			return 0;
 		}
 	}
 	else {
@@ -2271,8 +2245,8 @@ sub difference_function {
 		}
 		( $experiment_index, $control_index ) = _request_indices($line);
 		unless ( defined $experiment_index and defined $control_index ) {
-			warn " unknown index number(s); nothing done\n";
-			return;
+			print " WARNING: unknown index number(s); nothing done\n";
+			return 0;
 		}
 	}
 
@@ -2343,7 +2317,7 @@ sub difference_function {
 
 	# Print conclusion
 	printf "%s difference between %s and %s\n generated as new column\n",
-		$normalization ? ' normalized' : '', $Data->name($experiment_index),
+		$normalization ? ' normalized' : q(), $Data->name($experiment_index),
 		$Data->name($control_index);
 	if ($failure_count) {
 		print " $failure_count rows could not generate ratios\n";
@@ -2362,8 +2336,8 @@ sub normalized_difference_function {
 		return 1;
 	}
 	else {
-		warn " unable to generate a normalized difference\n";
-		return;
+		print " WARNING: unable to generate a normalized difference\n";
+		return 0;
 	}
 }
 
@@ -2434,8 +2408,8 @@ sub math_function {
 		@indices = _request_indices($line);
 	}
 	unless (@indices) {
-		warn " no valid indices. nothing done\n";
-		return;
+		print " WARNING: no valid indices. nothing done\n";
+		return 0;
 	}
 
 	# request the value to perform the mathematical function
@@ -2447,9 +2421,8 @@ sub math_function {
 	}
 	else {
 		# interactively ask the user
-		print " Enter the numeric value, 'mean', 'median', or 'sum' to $math  ";
-		$request_value = <STDIN>;
-		chomp $request_value;
+		my $p = " Enter the numeric value, 'mean', 'median', or 'sum' to $math:  ";
+		$request_value = prompt($p);
 	}
 
 	# request placement
@@ -2457,10 +2430,10 @@ sub math_function {
 
 	# generate past tense verb
 	my $mathed = $math;
-	$mathed =~ s/^(multipl)y$/$1ied/;
-	$mathed =~ s/^(add)$/$1ed/;
-	$mathed =~ s/^(divide)$/$1d/;
-	$mathed =~ s/^(subtract)$/$1ed/;
+	$mathed =~ s/^(multipl) y $ / $1ied/x;
+	$mathed =~ s/^(add)$ / $1ed/x;
+	$mathed =~ s/^(divide)$ / $1d/x;
+	$mathed =~ s/^(subtract)$ / $1ed/x;
 
 	## Process the datasets and subtract their values
 	my $dataset_modification_count = 0;    # a count of how many processed
@@ -2468,13 +2441,13 @@ sub math_function {
 
 		# determine the actual value to divide by
 		my $value;                         # the actual number to divide by
-		if ( $request_value =~ /median|mean|sum/i ) {
+		if ( $request_value and $request_value =~ /median | mean | sum/xi ) {
 
 			# collect dataset statistics
 			my %stathash = _get_statistics_hash($index);
 			unless (%stathash) {
-				warn " unable to get statistics! nothing done\n";
-				return;
+				print " WARNING: unable to get statistics! nothing done\n";
+				return 0;
 			}
 
 			# assign the appropriate value
@@ -2491,20 +2464,24 @@ sub math_function {
 				printf "  sum value for %s is $value\n", $Data->name($index);
 			}
 		}
-		elsif ( $request_value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/ ) {
+		elsif (
+			$request_value
+			and $request_value =~ m/^ \-? \d+ (?:\.\d+)? (?:[eE] \-? \d+)? $/x
+		) {
 
 			# a numeric value, allowing for negatives, decimals, exponents
 			$value = $request_value;
 		}
 		else {
-			warn " unrecognized value '$request_value'; nothing done\n";
-			return;
+			print " WARNING: unrecognized value '$request_value'; nothing done\n";
+			return 0;
 		}
 
 		# generate subtraction product
 		my $failed_count = 0;    # failed count
-		$index = _prepare_new_destination( $index, "_$mathed\_$value" )
-			if $placement =~ /^n/i;
+		if ( $placement =~ /^n/i ) {
+			$index = _prepare_new_destination( $index, "_$mathed\_$value" );
+		}
 		$Data->iterate(
 			sub {
 				my $row = shift;
@@ -2512,7 +2489,8 @@ sub math_function {
 					$failed_count++;
 				}
 				else {
-					$row->value( $index, &$calculate( $row->value($index), $value ) );
+					$row->value( $index,
+						&{$calculate}( $row->value($index), $value ) );
 				}
 			}
 		);
@@ -2631,7 +2609,7 @@ sub write_summary_function {
 	}
 
 	# since no changes have been made to the data structure, return 0
-	return;
+	return 0;
 }
 
 sub export_function {
@@ -2658,18 +2636,8 @@ sub export_function {
 	}
 	else {
 		# ask for new filename
-		print " Provide an exported file name [$possible_name]  ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		if ( $answer eq '' ) {
-
-			# user wants to use the suggested name
-			$outfilename = $possible_name;
-		}
-		else {
-			# user requested own name
-			$outfilename = $answer;
-		}
+		my $p = " Provide an exported file name [$possible_name]  ";
+		$outfilename = prompt( $p, $possible_name );
 	}
 
 	# write the file
@@ -2688,7 +2656,7 @@ sub export_function {
 	}
 
 	# since no changes have been made to the data structure, return
-	return;
+	return 0;
 }
 
 sub export_treeview_function {
@@ -2701,11 +2669,9 @@ sub export_treeview_function {
 	# First check for previous modifications
 	if ( $modification and not $function ) {
 		print " There are existing unsaved changes to the data. Do you want to\n";
-		print " save these first before making required, irreversible changes? "
-			. "y/n  ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		if ( $answer =~ /^y/i ) {
+		my $p = ' save these first before making required, irreversible changes? y/n:  ';
+		my $answer = prompt($p);
+		if ( lc $answer eq 'y' ) {
 			rewrite_function();
 		}
 	}
@@ -2720,8 +2686,8 @@ sub export_treeview_function {
 	my @datasets = _request_indices(
 		" Enter one unique name column, followed by a range of data columns  ");
 	unless (@datasets) {
-		warn " Unknown datasets. Nothing done.\n";
-		return;
+		print " WARNING: Unknown datasets. Nothing done.\n";
+		return 0;
 	}
 
 	# Identify the manipulations requested
@@ -2743,11 +2709,10 @@ Available dataset manipulations
   pd - convert dataset to percentile rank
   L2 - convert dataset to log2
   L10 - convert dataset to log10
-  n0 - convert null values to 0
-Enter the manipulation(s) in order of desired execution  
+  n0 - convert null values to 0 
 LIST
-		my $answer = <STDIN>;
-		chomp $answer;
+		my $p      = 'Enter the manipulation(s) in order of desired execution: ';
+		my $answer = prompt($p);
 		@manipulations = split /[,\s]+/, $answer;
 	}
 
@@ -2837,7 +2802,7 @@ LIST
 			convert_nulls_function(@datasets);
 		}
 		else {
-			warn " unknown manipulation '$_'!\n";
+			print " WARNING: unknown manipulation '$_'!\n";
 		}
 	}
 
@@ -2861,7 +2826,7 @@ LIST
 	# exporting for treeview, any pre-existing changes should have been
 	# saved earlier
 	$modification = 0;
-	return;
+	return 0;
 }
 
 sub center_function {
@@ -2881,8 +2846,8 @@ sub center_function {
 			_request_indices(" Enter the range of dataset indices to be centered  ");
 	}
 	unless (@datasets) {
-		warn " Unknown datasets. Nothing done.\n";
-		return;
+		print " WARNING: Unknown datasets. Nothing done.\n";
+		return 0;
 	}
 
 	# Center the data
@@ -2927,27 +2892,20 @@ sub new_column_function {
 	# this will generate a new dataset
 
 	# request column name
-	my $name;
+	my $name = "$function\_Column";
 	if ( defined $opt_name ) {
-
-		# command line option
 		$name = $opt_name;
 	}
-	elsif ($function) {
-		$name = 'New_Column';
-	}
-	else {
+	elsif ( not $function ) {
+
 		# interactively ask the user
-		print " Enter the name for the new column   ";
-		$name = <STDIN>;
-		chomp $name;
+		my $p = " Enter the name for the new column [$name]: ";
+		$name = prompt( $p, $name );
 	}
 
 	# request value
 	my $value;
 	if ( defined $opt_target ) {
-
-		# command line option
 		$value = $opt_target;
 	}
 	elsif ($function) {
@@ -2955,9 +2913,8 @@ sub new_column_function {
 	}
 	else {
 		# interactively ask the user
-		print " Enter the common value to be assigned in the new column   ";
-		$value = <STDIN>;
-		chomp $value;
+		my $p = ' Enter the common value to be assigned in the new column:  ';
+		$value = prompt($p);
 	}
 
 	# generate the new dataset
@@ -2978,36 +2935,24 @@ sub addname_function {
 	# this will add a name column and uniquely name the rows
 
 	# request column name
-
-	# request value
-	my $prefix;
+	my $prefix = $Data->feature || 'feature';
 	if ( defined $opt_target ) {
-
-		# command line option
 		$prefix = $opt_target;
 	}
-	elsif ($function) {
-		$prefix = $Data->feature || 'feature';
-	}
-	else {
+	elsif ( not $function ) {
+
 		# interactively ask the user
-		print " Enter the name prefix for each feature  ";
-		$prefix = <STDIN>;
-		chomp $prefix;
+		my $p = " Enter the name prefix for each feature [$prefix]:  ";
+		$prefix = prompt( $p, $prefix );
 	}
 
 	# Identify column
 	my $idx = $Data->name_column;
-	if ( defined $idx ) {
+	if ( not defined $idx ) {
 
-		# we are updating an existing column
-	}
-	else {
 		# we are adding a new column
 		my $name;
 		if ( defined $opt_name ) {
-
-			# command line option
 			$name = $opt_name;
 		}
 		else {
@@ -3041,16 +2986,8 @@ sub rewrite_function {
 	}
 	else {
 		# ask the user for a new name
-		print " Enter a new file name [$infile]  ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		if ($answer) {
-			$rewrite_filename = $answer;
-		}
-		else {
-			# accept default of using the input file name
-			$rewrite_filename = $infile;
-		}
+		my $p = " Enter a new file name [$infile]  ";
+		$rewrite_filename = prompt( $p, $infile );
 	}
 
 	# write the file
@@ -3067,7 +3004,7 @@ sub rewrite_function {
 		print " Unable to re-write to file '$rewrite_filename'!\n";
 	}
 
-	return;
+	return 0;
 }
 
 sub view_function {
@@ -3080,15 +3017,14 @@ sub view_function {
 
 		# print the table contents
 		$stop_row = $Data->last_row if $stop_row > $Data->last_row;
-		for ( my $i = $start_row; $i <= $stop_row; $i++ ) {
-			my $text = join( "  ", $Data->row_values($i) );
-			print "$text\n";
+		for my $i ( $start_row .. $stop_row ) {
+			last if $i >= $Data->number_rows;
+			printf "%s\n", join( q(  ), $Data->row_values($i) );
 		}
 
 		# continue or return the next menu response
-		print "\nPress Return for next 10 lines, or enter a (m)enu command   ";
-		my $answer = <STDIN>;
-		chomp $answer;
+		my $p      = "\nPress Return for next 10 lines, or enter a (m)enu command   ";
+		my $answer = prompt( $p, q() );
 		if ($answer) {
 			if ( exists $letter_to_function{$answer} ) {
 				$modification +=
@@ -3097,7 +3033,7 @@ sub view_function {
 			else {
 				print "unkown response\n";
 			}
-			return;
+			return 0;
 		}
 		else {
 			# print next 10 lines
@@ -3105,7 +3041,7 @@ sub view_function {
 			$stop_row  += 10;
 		}
 	}
-	return;
+	return 0;
 }
 
 ################################################################################
@@ -3283,15 +3219,12 @@ sub _request_placement {
 
 	my $placement;
 	if ( defined $opt_placement ) {
-
-		# use the command line specified placement
 		$placement = $opt_placement;
 	}
 	else {
 		# request placement from user
-		print " (r)eplace dataset or generate (n)ew dataset?  ";
-		$placement = <STDIN>;
-		chomp $placement;
+		my $p = ' (r)eplace dataset or generate (n)ew dataset?: ';
+		$placement = prompt($p);
 	}
 
 	return $placement;
@@ -3328,7 +3261,7 @@ sub _validate_index_list {
 		# check that each number represents a metadata hash
 		# and presumably dataset
 		unless ( $num =~ /^\d+$/ and $num <= $Data->number_columns ) {
-			warn " requested index number '$num' is not valid!\n";
+			print " WARNING: requested index number '$num' is not valid!\n";
 			return;
 		}
 	}
@@ -3361,12 +3294,16 @@ sub _get_statistics_hash {
 			unless ( defined $zero ) {
 
 				# wasn't defined on the command line, so stop the program and ask the user
-				print " Include 0 values in the statistics? y or n  ";
-				my $answer = <STDIN>;
-				if ( $answer =~ /^y/i ) {
+				my $p      = ' Include zero values in the statistics? y/n (default y):  ';
+				my $answer = prompt( $p, 'y' );
+				if ( lc $answer eq 'y' ) {
 					$zero = 1;
 				}
+				elsif ( lc $answer eq 'n' ) {
+					$zero = 0;
+				}
 				else {
+					print " WARNING: unrecognized answer! defaulting to y\n";
 					$zero = 0;
 				}
 
@@ -3381,17 +3318,30 @@ sub _get_statistics_hash {
 
 	# check that we have values
 	unless (@goodvalues) {
-		warn " no valid values collected from dataset index '$index'!";
+		print " WARNING: no valid values collected from dataset index '$index'!";
 		return;
 	}
 
-	return statshash(@goodvalues);
+	# calculate the statistics hash
+	my $sum       = sum0(@goodvalues);
+	my %statshash = (
+		'count'   => scalar(@goodvalues),
+		'sum'     => $sum,
+		'mean'    => ( $sum / ( scalar(@goodvalues) || 1 ) ),
+		'min'     => min(@goodvalues),
+		'max'     => max(@goodvalues),
+		'mode'    => mode(@goodvalues),
+		'stddevp' => stddevp(@goodvalues),
+		'median'  => median(@goodvalues)
+	);
+
+	return %statshash;
 }
 
 sub _is_null {
 	my $v = shift;
 	return 1 if not defined $v;
-	return 1 if ( $v eq '.' or $v =~ /^(?:n\/?a|nan|\-?inf)$/i );
+	return 1 if ( $v eq '.' or $v =~ /^(?: n\/?a | nan | \-? inf )$/xi );
 	return 0;
 }
 
@@ -3497,7 +3447,7 @@ Refer to the FUNCTIONS section for details.
 
 =item --index E<lt>integersE<gt>
 
-Provide the 0-based index number of the column(s) on which to perform the 
+Provide the index number of the column(s) on which to perform the 
 function(s). Multiple indices may also be specified using a comma delimited 
 list without spaces. Ranges of contiguous indices may be specified using a 
 dash between the start and stop. For example, '1,2,5-7,9' would indicate 
@@ -3513,7 +3463,7 @@ datasets '1, 2, 5, 6, 7, and 9'.
 
 =item --num E<lt>integerE<gt>
 
-Specify the 0-based index number to be used for the experiment or numerator 
+Specify the index number to be used for the experiment or numerator 
 column with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
@@ -3521,7 +3471,7 @@ for the same thing.
 
 =item --den E<lt>integerE<gt>
 
-Specify the 0-based index number to be used for the control or denominator 
+Specify the index number to be used for the control or denominator 
 column with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
