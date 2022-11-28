@@ -2,6 +2,7 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
@@ -12,8 +13,9 @@ use Bio::ToolBox::GeneTools qw(
 	:filter
 	:transcript
 );
-use Bio::ToolBox::utility;
-my $VERSION = '1.68';
+use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
+
+our $VERSION = '1.70';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -35,10 +37,13 @@ my (
 	$input,               $database,       $id_list,        $get_subfeatures,
 	$include_coordinates, $start_adj,      $stop_adj,       $position,
 	$tsl,                 $gencode,        $tbiotype,       $collapse,
-	$chromosome_exclude,  $convert_to_bed, $convert_to_gff, $convert_to_gtf,
-	$convert_to_refflat,  $outfile,        $sort_data,      $gz,
+	$chromosome_exclude,  $outfile,        $sort_data,      $gz,
 	$bgz,                 $help,           $print_version,
 );
+my $convert_to_bed     = 0;
+my $convert_to_gff     = 0;
+my $convert_to_gtf     = 0;
+my $convert_to_refflat = 0;
 my @features;
 my @output_tags;
 my @exclude_tags;
@@ -119,12 +124,11 @@ filter_features();
 if ( $start_adj or $stop_adj ) {
 	printf " Adjusting start by %s bp and stop by %s bp relative to position %s\n",
 		$start_adj, $stop_adj,
-		$position eq '5'   ? 'start'
-		: $position eq '3' ? 'end'
-		: $position eq '4'
-		or $position eq 'm' ? 'middle'
-		: $position eq '53' ? 'both ends'
-		:                     'neither';
+		$position eq '5'                           ? 'start'
+		: $position eq '3'                         ? 'end'
+		: ( $position eq '4' or $position eq 'm' ) ? 'middle'
+		: $position eq '53'                        ? 'both ends'
+		:                                            'neither';
 }
 if ($convert_to_bed) {
 	print " Writing to bed file...\n";
@@ -153,10 +157,11 @@ sub check_requirements {
 
 	# check input
 	unless ( $database or $input ) {
-		die
-" Must provide an input file or database name! use --help for more information\n";
+		print STDERR
+" FATAL: Must provide an input file or database name! use --help for more information\n";
+		exit 1;
 	}
-	if ( $input =~ /\.(?:sqlite|db)$/i ) {
+	if ( $input =~ /\. (?: sqlite | db )$/xi ) {
 
 		# whoops! specifiying a database file as input
 		$database = $input;
@@ -164,28 +169,26 @@ sub check_requirements {
 	}
 	if ($id_list) {
 		unless ( -e $id_list and -r _ ) {
-			die "unable to read list file '$id_list'!\n";
+			print STDERR " FATAL: unable to read list file '$id_list'!\n";
+			exit 1;
 		}
 	}
 
 	# check if feature is a comma delimited list
 	if ( scalar @features == 1 and $features[0] =~ /,/ ) {
-		@features = split ',', shift @features;
+		@features = split /,/, shift @features;
 	}
 	if ( scalar(@features) > 1 and $input ) {
-		warn sprintf( " Only one feature allowed when parsing an input file! Using %s",
-			$features[0] );
-	}
-	if ( not @features and $input ) {
-		print " using default feature of 'gene'\n";
-		$features[0] = 'gene';
+		printf " WARNING: Only one top feature allowed when parsing an input file!\n Subfeatures do not need to be specified. Using '%s'\n\n",
+			$features[0];
 	}
 
 	# check conversions
 	my $conversions =
 		$convert_to_bed + $convert_to_gff + $convert_to_gtf + $convert_to_refflat;
 	if ( $conversions > 1 ) {
-		die " Too many bed/gff/gtf/refFlat conversions specified!\n";
+		print STDERR " FATAL: Too many bed/gff/gtf/refFlat conversions specified!\n";
+		exit 1;
 	}
 	if ( $convert_to_gff or $convert_to_gtf or $convert_to_refflat ) {
 		$get_subfeatures = 1 if ( $input and not defined $get_subfeatures );
@@ -194,14 +197,18 @@ sub check_requirements {
 	# check collapse
 	if ($collapse) {
 		unless ($get_subfeatures) {
-			die " Cannot collapse transcript unless subfeatures are turned on!\n";
+			print STDERR 
+" FATAL: Cannot collapse transcript unless subfeatures are turned on!\n";
+			exit 1;
 		}
 		unless ( $convert_to_gff
 			or $convert_to_gtf
 			or $convert_to_refflat
 			or $convert_to_bed )
 		{
-			die " Cannot collapse transcripts unless writing to BED12/GFF/GTF/refFlat!\n";
+			print STDERR
+" FATAL: Cannot collapse transcripts unless writing to BED12/GFF/GTF/refFlat!\n";
+			exit 1;
 		}
 	}
 
@@ -210,13 +217,16 @@ sub check_requirements {
 
 		# automatically include coordinates if we're adjusting them
 		if ($get_subfeatures) {
-			die " Cannot adjust coordinates when including subfeatures!\n";
+			print STDERR
+" FATAL: Cannot adjust coordinates when including subfeatures!\n";
+			exit 1;
 		}
 		$include_coordinates = 1;
 	}
 	if ($position) {
-		unless ( $position =~ /[543m]{1,2}/ ) {
-			die " unrecognized position value '$position'! see help\n";
+		if ( $position !~ /^ (?: 5 | 3 | 53 | m | 4 ) $/x ) {
+			print STDERR " FATAL: unrecognized position value '$position'! see help\n";
+			exit 1;
 		}
 	}
 	else {
@@ -231,10 +241,11 @@ sub check_requirements {
 
 	# exclude tags
 	if (@exclude_tags) {
-		foreach (@exclude_tags) {
-			my ( $k, $v ) = split /[,=]/, $_;
+		foreach my $et (@exclude_tags) {
+			my ( $k, $v ) = split /[,=]/, $et;
 			unless ( defined $k and defined $v ) {
-				die " exclude tags must be a \"key=value\" pair!\n";
+				print STDERR " FATAL: exclude tags must be a \"key=value\" pair!\n";
+				exit 1;
 			}
 			$exclude_tag2value{$k} = $v;
 		}
@@ -242,10 +253,11 @@ sub check_requirements {
 
 	# include tags
 	if (@include_tags) {
-		foreach (@include_tags) {
-			my ( $k, $v ) = split /[,=]/, $_;
+		foreach my $it (@include_tags) {
+			my ( $k, $v ) = split /[,=]/, $it;
 			unless ( defined $k and defined $v ) {
-				die " include tags must be a \"key=value\" pair!\n";
+				print STDERR " FATAL: include tags must be a \"key=value\" pair!\n";
+				exit 1;
 			}
 			$include_tag2value{$k} = $v;
 		}
@@ -253,7 +265,8 @@ sub check_requirements {
 
 	# check output
 	unless ($outfile) {
-		die " Must provide an output file!\n";
+		print STDERR " FATAL: Must provide an output file!\n";
+		exit 1;
 	}
 	if ($bgz) {
 		$gz        = 2;
@@ -283,7 +296,8 @@ sub load_from_database {
 			$input ? $input : $database;
 	}
 	else {
-		die " No features loaded!\n";
+		print STDERR " FATAL: No features loaded from database '$database'!\n";
+		exit 1;
 	}
 	return $D;
 }
@@ -294,9 +308,9 @@ sub load_from_infile {
 	my $D = Bio::ToolBox::Data->new(
 		file       => $input,
 		parse      => 1,
-		simplify   => 0,                                             # we want everything!
+		simplify   => 0,              # we want everything!
 		feature    => $features[0],
-		subfeature => $get_subfeatures ? 'exon,cds,utr,codon' : '',
+		subfeature => $get_subfeatures ? 'exon,cds,utr,codon' : undef,
 		chrskip    => $chromosome_exclude,
 	) or die " unable to load input file '$input'\n";
 
@@ -304,8 +318,10 @@ sub load_from_infile {
 		printf " Loaded %s features from $input.\n", format_with_commas( $D->last_row );
 	}
 	else {
-		die " No features loaded! Re-check your feature type. If you are attempting to \n"
-			. " parse subfeatures like exon or CDS, try the program get_gene_regions instead.\n";
+		print STDERR 
+" FATAL: No top features loaded from file '$input'!\n Check your feature type. If you are attempting to parse subfeatures\n"
+		. " like exon or CDS, try the program get_gene_regions instead.\n";
+		exit 1;
 	}
 	return $D;
 }
@@ -566,7 +582,7 @@ sub export_to_bed {
 	}
 
 	# write
-	unless ( $outfile =~ /\.bed(?:\.gz)?$/i ) {
+	unless ( $outfile =~ /\.bed (?:\.gz)? $/xi ) {
 		$outfile .= '.bed';
 	}
 	$outfile = $outData->write_file(
@@ -579,7 +595,7 @@ sub export_to_bed {
 sub export_to_gff {
 
 	# check output filename
-	unless ( $outfile =~ /\.gff3?(?:\.gz)?$/i ) {
+	unless ( $outfile =~ /\.gff 3? (?:\.gz)? $/xi ) {
 		$outfile .= '.gff3';
 	}
 
@@ -617,7 +633,7 @@ sub export_to_gff {
 		# we can simply write out gff directly
 		$outfile .= '.gz' if ( $gz and $outfile !~ /\.gz$/i );
 		my $fh = Bio::ToolBox::Data->open_to_write_fh( $outfile, $gz )
-			or die "unable to open '$outfile' for writing! $!\n";
+			or die "unable to open '$outfile' for writing!\n";
 		$fh->print("##gff-version 3\n");
 		$fh->printf( "# exported from %s\n", $database ? $database : $input );
 
@@ -639,7 +655,7 @@ sub export_to_gff {
 sub export_to_gtf {
 
 	# check output filename
-	unless ( $outfile =~ /\.gtf?(?:\.gz)?$/i ) {
+	unless ( $outfile =~ /\.gtf (?:\.gz)? $/xi ) {
 		$outfile .= '.gtf';
 	}
 
@@ -675,7 +691,7 @@ sub export_to_gtf {
 		# we can simply write out gff directly
 		$outfile .= '.gz' if ( $gz and $outfile !~ /\.gz$/i );
 		my $fh = Bio::ToolBox::Data->open_to_write_fh( $outfile, $gz )
-			or die "unable to open '$outfile' for writing! $!\n";
+			or die "unable to open '$outfile' for writing!\n";
 		$fh->print("##gff-version 2.5\n");
 		$fh->printf( "# exported from %s\n", $database ? $database : $input );
 
@@ -781,7 +797,7 @@ sub export_to_txt {
 sub export_to_ucsc {
 
 	# check output filename
-	unless ( $outfile =~ /\.(?:refflat|ucsc)(?:\.gz)?$/i ) {
+	unless ( $outfile =~ /\. (?: refflat | ucsc ) (?:\.gz)? $/xi ) {
 		$outfile .= '.refFlat';
 	}
 
@@ -817,7 +833,7 @@ sub export_to_ucsc {
 		# we can simply write out gff directly
 		$outfile .= '.gz' if ( $gz and $outfile !~ /\.gz$/i );
 		my $fh = Bio::ToolBox::Data->open_to_write_fh( $outfile, $gz )
-			or die "unable to open '$outfile' for writing! $!\n";
+			or die "unable to open '$outfile' for writing!\n";
 		$fh->printf( "# exported from %s\n", $database ? $database : $input );
 
 		# write to UCSC file
