@@ -2,7 +2,9 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use File::Spec;
@@ -13,13 +15,13 @@ use Bio::DB::SeqFeature::Store;
 use Bio::DB::SeqFeature::Store::GFF3Loader;
 
 # check for additional requirements
-my $sql;
+my $sql = 0;
 eval {
 	require DBD::SQLite;
 	$sql = 1;
 };
 
-my $VERSION = '1.60';
+our $VERSION = '1.70';
 
 print "\n This program will set up an annotation database\n\n";
 
@@ -85,7 +87,7 @@ unless ($ucscdb) {
 if ($path) {
 	$path = File::Spec->rel2abs($path);
 	unless ( -e $path ) {
-		mkdir $path or die "unable to make database path $path\n$!\n";
+		mkdir $path or die "unable to make database path $path $OS_ERROR\n";
 	}
 	unless ( -w _ ) {
 		die " $path is not writable!\n";
@@ -102,7 +104,7 @@ else {
 	else {
 		# make one for us
 		$path = File::Spec->catdir( $ENV{HOME}, 'lib' );
-		mkdir $path or die "unable to make database path $path\n$!\n";
+		mkdir $path or die "unable to make database path $path $OS_ERROR\n";
 	}
 }
 if (@tables) {
@@ -112,7 +114,7 @@ if (@tables) {
 	}
 }
 else {
-	@tables = qw(refgene ensgene knowngene);
+	@tables = qw(refgene knowngene);
 }
 my $start_time = time;
 
@@ -157,7 +159,8 @@ my $loader = Bio::DB::SeqFeature::Store::GFF3Loader->new(
 
 # on signals, give objects a chance to call their DESTROY methods
 # borrowed from bp_seqfeature_load.pl
-$SIG{TERM} = $SIG{INT} = sub { undef $loader; undef $store; die "Aborted..."; };
+local $SIG{TERM} = local $SIG{INT} =
+	sub { undef $loader; undef $store; die "Aborted..."; };
 $loader->load(@gff);
 
 ### Check database
@@ -210,7 +213,7 @@ db_setup.pl [--options...] <UCSC database>
   Options:
   -d --db <UCSC database>
   -p --path </path/to/store/database> 
-  -t --table [refGene|ensGene|knownGene|xenoRefGene|all]
+  -t --table [refGene|knownGene|all]
   -k --keep
   -V --verbose
   -v --version
@@ -235,11 +238,11 @@ sacCer3, etc.
 Specify the optional path to store the SQLite database file. The default 
 path is the C<~/lib>.
 
-=item --table [refGene|ensGene|knownGene|xenoRefGene|all]
+=item --table [refGene|knownGene|all]
 
 Provide one or more UCSC tables to load into the database. They may be 
 specified as comma-delimited list (no spaces) or as separate, repeated 
-arguments. The default is refGene, ensGene, and knownGene (if available).
+arguments. The default is refGene and knownGene (if available).
 
 =item --keep
 
@@ -271,7 +274,6 @@ scripts.
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
- Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah
  Salt Lake City, UT, 84112
