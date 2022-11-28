@@ -2,14 +2,17 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use List::MoreUtils qw(mesh);
+use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
+use Bio::ToolBox::utility qw( ask_user_for_index format_with_commas );
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION = '1.66';
+
+our $VERSION = '1.70';
 
 print "\n This program will write a BED file\n";
 
@@ -85,12 +88,18 @@ if ($print_version) {
 
 ### Check for requirements
 unless ($infile) {
-	$infile = shift @ARGV
-		or die " no input file! use --help for more information\n";
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		print STDERR " FATAL: no input file! use --help for more information\n";
+		exit 1;
+	}
 }
 if ($bed) {
 	unless ( $bed == 3 or $bed == 4 or $bed == 5 or $bed == 6 ) {
-		die " bed must be 3, 4, 5, or 6!\n";
+		print STDERR " FATAL: bed must be 3, 4, 5, or 6!\n";
+		exit 1;
 	}
 }
 if ($bigbed) {
@@ -106,8 +115,8 @@ if ($bgz) {
 }
 
 # define name base or index
-my $name_index;
-my $name_base;
+my $name_index = 0;
+my $name_base  = q();
 if ( defined $name ) {
 	if ( $name =~ /^(\d+)$/ ) {
 
@@ -134,7 +143,7 @@ if ($bigbed) {
 	unless ( $database or $chromo_file ) {
 		$database = $Input->database
 			or die
-			" No database name or chromosome file provided for generating bigbed file!\n";
+" FATAL: No database name or chromosome file provided for generating bigbed file!\n";
 	}
 }
 
@@ -147,145 +156,141 @@ if ($ask) {
 	print " Press Return to accept the suggested index\n";
 
 	# request chromosome index
-	unless ( defined $chr_index ) {
+	unless ( $chr_index ) {
 		my $suggestion = $Input->chromo_column;
 		$chr_index = ask_user_for_index( $Input,
 			" Enter the index for the chromosome column [$suggestion]  " );
-		$chr_index = defined $chr_index ? $chr_index : $suggestion;
+		$chr_index = $chr_index ? $chr_index : $suggestion;
 		unless ( defined $chr_index ) {
-			die " No identifiable chromosome column index!\n";
+			print STDERR " FATAL: No identifiable chromosome column index!\n";
+			exit 1;
 		}
 	}
 
 	# request start index
-	unless ( defined $start_index ) {
-		my $suggestion = $Input->start_column;
+	unless ( $start_index ) {
+		my $suggestion = $Input->start_column || q();
 		$start_index = ask_user_for_index( $Input,
 			" Enter the index for the start column [$suggestion]  " );
-		$start_index = defined $start_index ? $start_index : $suggestion;
+		$start_index = $start_index ? $start_index : $suggestion;
 		unless ( defined $start_index ) {
-			die " No identifiable start position column index!\n";
+			print STDERR " FATAL: No identifiable start position column index!\n";
+			exit 1;
 		}
 	}
 
 	# request stop index
-	unless ( defined $stop_index ) {
-		my $suggestion = $Input->stop_column;
+	unless ( $stop_index ) {
+		my $suggestion = $Input->stop_column || q();
 		$stop_index = ask_user_for_index( $Input,
 			" Enter the index for the stop or end column [$suggestion]  " );
-		$stop_index = defined $stop_index ? $stop_index : $suggestion;
+		$stop_index = $stop_index ? $stop_index : $suggestion;
 		unless ( defined $stop_index ) {
-			die " No identifiable stop position column index!\n";
+			print STDERR " FATAL: No identifiable stop position column index!\n";
+			exit 1;
 		}
 	}
 
 	# request name index or text
-	unless ( defined $name ) {
+	unless ( $name ) {
 
 		# this is a special input, can't use the ask_user_for_index sub
 		# accepts either index or text string
-		my $suggestion = $Input->name_column;
-		print " Enter the index for the feature name column or\n"
+		my $suggestion = $Input->name_column || q();
+		my $prompt     = " Enter the index for the feature name column or\n"
 			. "   the base text for auto-generated names [$suggestion]  ";
-		my $in = <STDIN>;
+		my $in = prompt( $prompt );
 		if ( $in =~ /^(\d+)$/ ) {
 			$name_index = $1;
 		}
-		elsif ( $in =~ /(\w+)/ ) {
-			$name_base = $1;
-		}
-		elsif ( defined $suggestion ) {
-			$name_index = $suggestion;
+		else {
+			$name_base = $in;
 		}
 	}
 
 	# request score index
-	unless ( defined $score_index ) {
-		my $suggestion = $Input->find_column('^score$');
+	unless ( $score_index ) {
+		my $suggestion = $Input->find_column('^score$') || q();
 		$score_index = ask_user_for_index( $Input,
 			" Enter the index for the feature score column [$suggestion]  " );
-		$score_index = defined $score_index ? $score_index : $suggestion;
+		$score_index = $score_index ? $score_index : $suggestion;
 	}
 
 	# request strand index
-	unless ( defined $strand_index ) {
-		my $suggestion = $Input->strand_column;
+	unless ( $strand_index ) {
+		my $suggestion = $Input->strand_column || q();
 		$strand_index = ask_user_for_index( $Input,
 			" Enter the index for the feature strand column [$suggestion]  " );
-		$strand_index = defined $strand_index ? $strand_index : $suggestion;
+		$strand_index = $strand_index ? $strand_index : $suggestion;
 	}
 }
 else {
 	# or else the indices need to be automatically identified
 	unless ( $Input->feature_type eq 'coordinate'
-		or ( defined $chr_index and defined $start_index and defined $stop_index )
+		or ( $chr_index and $start_index and $stop_index )
 		or ( $Input->feature_type eq 'named' and ( $database or $Input->database ) ) )
 	{
-		die "Not enough information has been provided to convert to bed file.\n"
+		print STDERR " FATAL: Not enough information has been provided to convert to bed file.\n"
 			. "Coordinate column names must be recognizable or specified. Use --help\n";
+		exit 1;
 	}
 }
 
 # print summary of columns
 printf " Converting using \n  - chromosome index %s\n  - start index %s\n"
 	. "  - stop index %s\n  - name index %s\n  - score index %s\n  - strand index %s\n",
-	defined $chr_index              ? $chr_index
-	: defined $Input->chromo_column ? $Input->chromo_column
-	: '-',
-	defined $start_index           ? $start_index
-	: defined $Input->start_column ? $Input->start_column
-	: '-',
-	defined $stop_index           ? $stop_index
-	: defined $Input->stop_column ? $Input->stop_column
-	: '-',
-	defined $name_index           ? $name_index
-	: defined $name_base          ? $name_base
-	: defined $Input->name_column ? $Input->name_column
-	: '-',
-	defined $score_index           ? $score_index
-	: defined $Input->score_column ? $Input->score_column
-	: '-',
-	defined $strand_index           ? $strand_index
-	: defined $Input->strand_column ? $Input->strand_column
+	$chr_index              ? $chr_index
+	: $Input->chromo_column ? $Input->chromo_column
+	: '-', $start_index ? $start_index
+	: $Input->start_column ? $Input->start_column
+	: '-', $stop_index ? $stop_index
+	: $Input->stop_column ? $Input->stop_column
+	: '-', $name_index ? $name_index
+	: $name_base          ? $name_base
+	: $Input->name_column ? $Input->name_column
+	: '-', $score_index ? $score_index
+	: $Input->score_column ? $Input->score_column
+	: '-', $strand_index ? $strand_index
+	: $Input->strand_column ? $Input->strand_column
 	:                                 '-';
 
 # generate arguments list
 my @arg_keys;
 my @arg_indices;
-if ( defined $chr_index ) {
+if ( $chr_index ) {
 	push @arg_keys,    'chromo';
 	push @arg_indices, $chr_index;
 }
-if ( defined $start_index ) {
+if ( $start_index ) {
 	push @arg_keys,    'start';
 	push @arg_indices, $start_index;
 }
-if ( defined $stop_index ) {
+if ( $stop_index ) {
 	push @arg_keys,    'stop';
 	push @arg_indices, $stop_index;
 }
-if ( defined $name_index ) {
+if ( $name_index ) {
 	push @arg_keys,    'name';
 	push @arg_indices, $name_index;
 }
-if ( defined $score_index ) {
+if ( $score_index ) {
 	push @arg_keys,    'score';
 	push @arg_indices, $score_index;
 }
-if ( defined $strand_index ) {
+if ( $strand_index ) {
 	push @arg_keys,    'strand';
 	push @arg_indices, $strand_index;
 }
 
 # determine minimum bed
 unless ($bed) {
-	if ( defined $strand_index or defined $Input->strand_column ) {
+	if ( $strand_index or $Input->strand_column ) {
 		$bed = 6;
 	}
-	elsif ( defined $score_index ) {
+	elsif ( $score_index ) {
 		$bed = 5;
 	}
-	elsif ( defined $name_index or defined $name_base or defined $Input->name_column ) {
+	elsif ( $name_index or $name_base or $Input->name_column ) {
 		$bed = 4;
 	}
 	else {
@@ -295,12 +300,9 @@ unless ($bed) {
 printf " Writing as bed%d\n", $bed;
 
 # check for zero start
-if ( defined $start_index and substr( $Input->name($start_index), -1 ) eq '0' ) {
+if ( $start_index and substr( $Input->name($start_index), -1 ) eq '0' ) {
 	$zero_based = 1;    # name suggests 0-based indexing
 }
-
-# check for named features
-my $do_feature = $Input->feature_type eq 'named' ? 1 : 0;    # get features from db?
 
 ### Convert the input stream
 # Open output data
@@ -310,9 +312,6 @@ my $Output = Bio::ToolBox::Data->new( bed => $bed, )
 my $count = 0;    # the number of lines processed
 while ( my $row = $Input->next_row ) {
 
-	# get the feature from the db if necessary
-	my $f = $row->feature if $do_feature;
-
 	# build the arguments
 	# retrieve information from row object if indices were provided
 	my @values = map { $row->value($_) } @arg_indices;
@@ -320,10 +319,10 @@ while ( my $row = $Input->next_row ) {
 	$args{bed} = $bed;
 
 	# extras
-	if ( defined $name_base ) {
+	if ( $name_base ) {
 		$args{name} = sprintf( "%s_%07d", $name_base, $count );
 	}
-	if ( $zero_based and defined $start_index ) {
+	if ( $zero_based and $start_index ) {
 		$args{start} += 1;
 	}
 
