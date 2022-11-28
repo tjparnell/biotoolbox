@@ -6,17 +6,18 @@ use strict;
 use Test::More;
 
 BEGIN {
-    plan tests => 19;
+	plan tests => 19;
 }
 
-use_ok('Bio::ToolBox::utility', qw(
-	parse_list
-	format_with_commas
-	ask_user_for_index
-	simplify_dataset_name
-	sane_chromo_sort
-) )
-  or BAIL_OUT "Cannot load Bio::ToolBox::utility";
+use_ok(
+	'Bio::ToolBox::utility', qw(
+		parse_list
+		format_with_commas
+		ask_user_for_index
+		simplify_dataset_name
+		sane_chromo_sort
+	)
+) or BAIL_OUT "Cannot load Bio::ToolBox::utility";
 
 ### parse list
 my $in     = '1-10';
@@ -109,17 +110,14 @@ my @expect_l = qw(chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 MT);
 my @got_l    = sane_chromo_sort(@list);
 is_deeply( \@got_l, \@expect_l, 'Sanely sort chromosome list 1' );
 
-@list =
-  qw(1 10 chr11 chr2 chr3 chr4 5 chr6 chr7 chr8 chr9 contig.124 contig.14 Y X mito);
+@list = qw(1 10 chr11 chr2 chr3 chr4 5 chr6 chr7 chr8 chr9 contig.124 contig.14 Y X mito);
 @expect_l =
-  qw(1 chr2 chr3 chr4 5 chr6 chr7 chr8 chr9 10 chr11 X Y mito contig.14 contig.124);
+	qw(1 chr2 chr3 chr4 5 chr6 chr7 chr8 chr9 10 chr11 X Y mito contig.14 contig.124);
 @got_l = sane_chromo_sort(@list);
 is_deeply( \@got_l, \@expect_l, 'Sanely sort chromosome list 2' );
 
-@list =
-  qw(2-micron scaffold-1 M scaffold-10 scaffold-3 I III IX VIII IV XII X Y );
-@expect_l =
-  qw(I III IV VIII IX X XII Y M scaffold-1 scaffold-3 scaffold-10 2-micron);
-@got_l = sane_chromo_sort(@list);
+@list     = qw(2-micron scaffold-1 M scaffold-10 scaffold-3 I III IX VIII IV XII X Y );
+@expect_l = qw(I III IV VIII IX X XII Y M scaffold-1 scaffold-3 scaffold-10 2-micron);
+@got_l    = sane_chromo_sort(@list);
 is_deeply( \@got_l, \@expect_l, 'Sanely sort chromosome list 3' );
 

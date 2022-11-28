@@ -9,17 +9,19 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-    if ( eval { require Bio::DB::Big; 1 } ) {
-        plan tests => 41;
-    }
-    else {
-        plan skip_all => 'Optional module Bio::DB::Big not available';
-    }
-    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	if ( eval { require Bio::DB::Big; 1 } ) {
+		plan tests => 41;
+	}
+	else {
+		plan skip_all => 'Optional module Bio::DB::Big not available';
+	}
+	## no critic
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## use critic
 }
 
 require_ok 'Bio::ToolBox::Data'
-  or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
 use_ok( 'Bio::ToolBox::db_helper', 'get_chromosome_list' );
 
 my $dataset = File::Spec->catfile( $Bin, "Data", "sample3" );
@@ -54,9 +56,9 @@ is( $row->name, 'YAL047C', 'row name' );
 
 # score count sum
 my $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => 'sample3',
-    'method'  => 'count',
+	'db'      => $dataset,
+	'dataset' => 'sample3',
+	'method'  => 'count',
 );
 
 # print "count sum for ", $row->name, " is $score\n";
@@ -67,9 +69,9 @@ is( $score, 434, 'row sum of count' );
 
 # score mean coverage
 $score = $row->get_score(
-    'db'      => $db,
-    'dataset' => 'sample3',
-    'method'  => 'mean',
+	'db'      => $db,
+	'dataset' => 'sample3',
+	'method'  => 'mean',
 );
 
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -88,17 +90,17 @@ is( $pos2scores2{1787},                    0,    'score at position 1787' );
 
 # min score
 $score = $row->get_score(
-    'db'      => $db,
-    'dataset' => 'sample3',
-    'method'  => 'min',
+	'db'      => $db,
+	'dataset' => 'sample3',
+	'method'  => 'min',
 );
 is( $score, 0, 'minimum score' );
 
 # max score
 $score = $row->get_score(
-    'db'      => $db,
-    'dataset' => 'sample3',
-    'method'  => 'max',
+	'db'      => $db,
+	'dataset' => 'sample3',
+	'method'  => 'max',
 );
 is( sprintf( "%.2f", $score ), 4.57, 'maximum score' );
 
@@ -108,46 +110,40 @@ is( $row->start,  57029, 'row start position' );
 is( $row->strand, -1,    'row strand' );
 
 $score = $row->get_score(
-    'dataset'  => 'sample3',
-    'method'   => 'median',
-    'stranded' => 'all',
+	'dataset'  => 'sample3',
+	'method'   => 'median',
+	'stranded' => 'all',
 );
 
 # print "both strands score median for ", $row->name, " is $score\n";
 is( sprintf( "%.2f", $score ), 1.69, 'row median score' )
-  or diag(
-    "if this test fails, try updating your UCSC kent source library and rebuild"
-  );
+	or diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 # try stranded data collection
 $score = $row->get_score(
-    'dataset'  => 'sample3',
-    'method'   => 'median',
-    'stranded' => 'sense',
+	'dataset'  => 'sample3',
+	'method'   => 'median',
+	'stranded' => 'sense',
 );
 
 # print "sense score median for ", $row->name, " is $score\n";
 is( sprintf( "%.2f", $score ), 2.74, 'row sense median score' )
-  or diag(
-    "if this test fails, try updating your UCSC kent source library and rebuild"
-  );
+	or diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 $score = $row->get_score(
-    'dataset'  => 'sample3',
-    'method'   => 'median',
-    'stranded' => 'antisense',
+	'dataset'  => 'sample3',
+	'method'   => 'median',
+	'stranded' => 'antisense',
 );
 
 # print "antisense score median for ", $row->name, " is $score\n";
 is( sprintf( "%.2f", $score ), 0.38, 'row antisense median score' )
-  or diag(
-    "if this test fails, try updating your UCSC kent source library and rebuild"
-  );
+	or diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 ### Try positioned score index
 my %pos2scores = $row->get_region_position_scores(
-    'dataset'  => 'sample3',
-    'stranded' => 'sense',
+	'dataset'  => 'sample3',
+	'stranded' => 'sense',
 );
 is( scalar keys %pos2scores, 44, 'number of positioned scores' );
 
@@ -160,10 +156,10 @@ is( sprintf( "%.2f", $pos2scores{255} ), 2.03, 'score at position 255' );
 
 ### Try relative positioned score index
 %pos2scores = $row->get_relative_point_position_scores(
-    'dataset'  => 'sample3',
-    'stranded' => 'sense',
-    'position' => 5,
-    'extend'   => 200,
+	'dataset'  => 'sample3',
+	'stranded' => 'sense',
+	'position' => 5,
+	'extend'   => 200,
 );
 is( scalar keys %pos2scores, 49, 'number of relative positioned scores' );
 
@@ -171,17 +167,16 @@ is( scalar keys %pos2scores, 49, 'number of relative positioned scores' );
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is( sprintf( "%.2f", $pos2scores{55} ), 4.16, 'score at relative position 55' );
-is( sprintf( "%.2f", $pos2scores{-25} ),
-    1.73, 'score at relative position -25' );
+is( sprintf( "%.2f", $pos2scores{55} ),  4.16, 'score at relative position 55' );
+is( sprintf( "%.2f", $pos2scores{-25} ), 1.73, 'score at relative position -25' );
 
 ### Generate new genomic window file
 undef $Data;
 undef $row;
 $Data = Bio::ToolBox::Data->new(
-    feature => 'genome',
-    db      => $dataset,
-    win     => 500
+	feature => 'genome',
+	db      => $dataset,
+	win     => 500
 );
 isa_ok( $Data, 'Bio::ToolBox::Data', 'new genome window file' );
 is( $Data->feature,        'genome',     'Data feature name' );

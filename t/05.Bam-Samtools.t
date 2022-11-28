@@ -15,7 +15,9 @@ BEGIN {
 	else {
 		plan skip_all => 'Optional module Bio::DB::Sam not available';
 	}
-	local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## no critic
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## use critic
 }
 
 require_ok 'Bio::ToolBox::Data'

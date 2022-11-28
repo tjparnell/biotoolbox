@@ -8,25 +8,24 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-    plan tests => 81;
+	plan tests => 81;
+	## no critic
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## use critic
+	use_ok('Bio::ToolBox::parser::ucsc');
+	use_ok( 'Bio::ToolBox::GeneTools', qw(:all) );
 }
 
-BEGIN {
-    use_ok('Bio::ToolBox::parser::ucsc');
-    use_ok( 'Bio::ToolBox::GeneTools', qw(:all) );
-}
-
-local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 my $ucscfile = File::Spec->catfile( $Bin, "Data", "ensGene.txt" );
 my $enssrc   = File::Spec->catfile( $Bin, "Data", "ensemblSource.txt" );
 
 my $ucsc = Bio::ToolBox::parser::ucsc->new(
-    file    => $ucscfile,
-    enssrc  => $enssrc,
-    do_gene => 1,
-    do_cds  => 1,
-    do_exon => 1,
-    do_utr  => 1,
+	file    => $ucscfile,
+	enssrc  => $enssrc,
+	do_gene => 1,
+	do_cds  => 1,
+	do_exon => 1,
+	do_utr  => 1,
 );
 
 # parse first feature line
@@ -47,8 +46,7 @@ is( scalar @transcripts, 13, 'get_transcripts method' );
 
 # filter transcript
 my $filt_gene1 = filter_transcript_biotype( $gene, 'processed_transcript' );
-isa_ok( $filt_gene1, 'Bio::ToolBox::SeqFeature',
-    'first filtered gene transcript' );
+isa_ok( $filt_gene1, 'Bio::ToolBox::SeqFeature', 'first filtered gene transcript' );
 my @filt_gene1_trx = get_transcripts($filt_gene1);
 is( scalar @filt_gene1_trx, 2, 'number filtered processed_transcripts' );
 
@@ -74,19 +72,17 @@ is( $alt_introns[0]->start, 388316, 'first alt gene intron start' );
 
 # collapsed transcript
 my $collapsedT = collapse_transcripts(@transcripts);
-isa_ok( $collapsedT, 'Bio::ToolBox::SeqFeature',
-    'collapsed transcript object' );
+isa_ok( $collapsedT, 'Bio::ToolBox::SeqFeature', 'collapsed transcript object' );
 is( get_transcript_length($collapsedT), 3839, 'collapsed transcript length' );
 my @collapsedT_exons = get_exons($collapsedT);
 is( scalar @collapsedT_exons, 14, 'collapsed transcript exon number' );
 my @collapsedT_cds = get_cds($collapsedT);
 is( scalar @collapsedT_cds, 0, 'collapsed transcript cds number' );
 my @collapsedT_introns = get_introns($collapsedT);
-is( scalar @collapsedT_introns, 13,    'collapsed transcript intron number' );
-is( get_cdsStart($collapsedT),  undef, 'collapsed transcript CDS start' );
-is( get_cdsEnd($collapsedT),    undef, 'collapsed transcript CDS stop' );
-is( get_transcript_cds_length($collapsedT),
-    0, 'collapsed transcript CDS length' );
+is( scalar @collapsedT_introns,             13,    'collapsed transcript intron number' );
+is( get_cdsStart($collapsedT),              undef, 'collapsed transcript CDS start' );
+is( get_cdsEnd($collapsedT),                undef, 'collapsed transcript CDS stop' );
+is( get_transcript_cds_length($collapsedT), 0,     'collapsed transcript CDS length' );
 
 # first transcript
 my $t1 = shift @transcripts;
@@ -94,7 +90,7 @@ isa_ok( $t1, 'Bio::ToolBox::SeqFeature', 'first transcript object' );
 is( is_coding($t1),             1,                 'transcript1 is_coding' );
 is( $t1->primary_tag,           'mRNA',            'transcript1 primary_tag' );
 is( $t1->primary_id,            'ENST00000411647', 'transcript1 primary_id' );
-is( get_transcript_length($t1), 593, 'transcript1 get_transcript_length' );
+is( get_transcript_length($t1), 593,               'transcript1 get_transcript_length' );
 my @t1_exons = get_exons($t1);
 is( scalar @t1_exons, 5, 'transcript1 exon number' );
 my @t1_cds = get_cds($t1);
@@ -123,9 +119,9 @@ is( get_transcript_utr_length($t1),    241, 'combined UTR length' );
 # second transcript
 my $t2 = shift @transcripts;
 isa_ok( $t2, 'Bio::ToolBox::SeqFeature', 'second transcript object' );
-is( is_coding($t2),   0,                      'transcript2 is_coding' );
-is( $t2->primary_tag, 'processed_transcript', 'transcript2 primary_tag' );
-is( $t2->primary_id,  'ENST00000465226',      'transcript2 primary_id' );
+is( is_coding($t2),             0,                      'transcript2 is_coding' );
+is( $t2->primary_tag,           'processed_transcript', 'transcript2 primary_tag' );
+is( $t2->primary_id,            'ENST00000465226',      'transcript2 primary_id' );
 is( get_transcript_length($t2), 372, 'transcript2 get_transcript_length' );
 my @t2_exons = get_exons($t2);
 is( scalar @t2_exons, 2, 'transcript2 exon number' );
@@ -144,7 +140,7 @@ my $t3 = shift @transcripts;
 is( is_coding($t3),             0,                 'transcript3 is_coding' );
 is( $t3->primary_tag,           'transcript',      'transcript3 primary_tag' );
 is( $t3->primary_id,            'ENST00000382214', 'transcript3 primary_id' );
-is( get_transcript_length($t3), 2752, 'transcript3 get_transcript_length' );
+is( get_transcript_length($t3), 2752,              'transcript3 get_transcript_length' );
 my @t3_exons = get_exons($t3);
 is( scalar @t3_exons,               12,     'transcript3 exon number' );
 is( get_cdsStart($t3),              389402, 'transcript3 CDS start' );

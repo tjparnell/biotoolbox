@@ -9,17 +9,19 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-    if ( eval { require Bio::DB::USeq; 1 } ) {
-        plan tests => 48;
-    }
-    else {
-        plan skip_all => 'Optional module Bio::DB::USeq not available';
-    }
-    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	if ( eval { require Bio::DB::USeq; 1 } ) {
+		plan tests => 48;
+	}
+	else {
+		plan skip_all => 'Optional module Bio::DB::USeq not available';
+	}
+	## no critic
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## use critic
 }
 
 require_ok 'Bio::ToolBox::Data'
-  or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
 use_ok( 'Bio::ToolBox::db_helper', 'get_chromosome_list' );
 
 my $dataset = File::Spec->catfile( $Bin, "Data", "sample3.useq" );
@@ -56,9 +58,9 @@ is( $segment->start, 54989, 'segment start' );
 
 # score count
 my $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => $dataset,
-    'method'  => 'count',
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'count',
 );
 
 # print "count sum for ", $row->name, " is $score\n";
@@ -66,9 +68,9 @@ is( $score, 437, 'row score count' );
 
 # score precise count
 $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => $dataset,
-    'method'  => 'pcount',
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'pcount',
 );
 
 # print "precise count for ", $row->name, " is $score\n";
@@ -76,9 +78,9 @@ is( $score, 431, 'row precise count' );
 
 # score name count
 $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => $dataset,
-    'method'  => 'ncount',
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'ncount',
 );
 
 # print "name count for ", $row->name, " is $score\n";
@@ -86,9 +88,9 @@ is( $score, 437, 'row name count' );
 
 # score mean coverage
 $score = $row->get_score(
-    'db'      => $db,
-    'dataset' => $dataset,
-    'method'  => 'mean',
+	'db'      => $db,
+	'dataset' => $dataset,
+	'method'  => 'mean',
 );
 
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -100,9 +102,9 @@ is( $row->start,  57029, 'row start position' );
 is( $row->strand, -1,    'row strand' );
 
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'median',
-    'stranded' => 'all',
+	'dataset'  => $dataset,
+	'method'   => 'median',
+	'stranded' => 'all',
 );
 
 # print "both strands score median for ", $row->name, " is $score\n";
@@ -110,18 +112,18 @@ is( sprintf( "%.2f", $score ), 1.67, 'row median score' );
 
 # try stranded data collection
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'median',
-    'stranded' => 'sense',
+	'dataset'  => $dataset,
+	'method'   => 'median',
+	'stranded' => 'sense',
 );
 
 # print "sense score median for ", $row->name, " is $score\n";
 is( sprintf( "%.2f", $score ), 2.71, 'row sense median score' );
 
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'median',
-    'stranded' => 'antisense',
+	'dataset'  => $dataset,
+	'method'   => 'median',
+	'stranded' => 'antisense',
 );
 
 # print "antisense score median for ", $row->name, " is $score\n";
@@ -129,8 +131,8 @@ is( sprintf( "%.2f", $score ), 0.38, 'row antisense median score' );
 
 ### Try positioned score index
 my %pos2scores = $row->get_region_position_scores(
-    'dataset'  => $dataset,
-    'stranded' => 'sense',
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
 );
 
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
@@ -143,9 +145,9 @@ is( sprintf( "%.2f", $pos2scores{255} ), 2.03, 'score at position 255' );
 
 # positioned count
 %pos2scores = $row->get_region_position_scores(
-    'dataset'  => $dataset,
-    'stranded' => 'sense',
-    'method'   => 'count',
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'method'   => 'count',
 );
 
 # print "found ", scalar keys %pos2scores, " positions with counts\n";
@@ -158,9 +160,9 @@ is( $pos2scores{167},        1,  'count at position 167' );
 
 # positioned pcount
 %pos2scores = $row->get_region_position_scores(
-    'dataset'  => $dataset,
-    'stranded' => 'sense',
-    'method'   => 'pcount',
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'method'   => 'pcount',
 );
 
 # print "found ", scalar keys %pos2scores, " positions with precise counts\n";
@@ -173,9 +175,9 @@ is( $pos2scores{127},        1,  'precise count at position 127' );
 
 # positioned ncount
 %pos2scores = $row->get_region_position_scores(
-    'dataset'  => $dataset,
-    'stranded' => 'sense',
-    'method'   => 'ncount',
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'method'   => 'ncount',
 );
 
 # print "found ", scalar keys %pos2scores, " positions with named counts\n";
@@ -188,10 +190,10 @@ is( $pos2scores{335},        1,  'named count at position 335' );
 
 ### Try relative positioned score index
 %pos2scores = $row->get_relative_point_position_scores(
-    'dataset'  => $dataset,
-    'stranded' => 'sense',
-    'position' => 5,
-    'extend'   => 200,
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'position' => 5,
+	'extend'   => 200,
 );
 is( scalar keys %pos2scores, 49, 'number of relative positioned scores' );
 
@@ -199,17 +201,16 @@ is( scalar keys %pos2scores, 49, 'number of relative positioned scores' );
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is( sprintf( "%.2f", $pos2scores{55} ), 4.16, 'score at relative position 55' );
-is( sprintf( "%.2f", $pos2scores{-25} ),
-    1.73, 'score at relative position -25' );
+is( sprintf( "%.2f", $pos2scores{55} ),  4.16, 'score at relative position 55' );
+is( sprintf( "%.2f", $pos2scores{-25} ), 1.73, 'score at relative position -25' );
 
 # Generate new genomic window file
 undef $Data;
 undef $row;
 $Data = Bio::ToolBox::Data->new(
-    feature => 'genome',
-    db      => $dataset,
-    win     => 500
+	feature => 'genome',
+	db      => $dataset,
+	win     => 500
 );
 isa_ok( $Data, 'Bio::ToolBox::Data', 'new genome window file' );
 is( $Data->feature,        'genome',     'Data feature name' );

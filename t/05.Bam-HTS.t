@@ -9,20 +9,22 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-    if ( eval { require Bio::DB::HTS; 1 } ) {
-        plan tests => 60;
-    }
-    else {
-        plan skip_all => 'Optional module Bio::DB::HTS not available';
-    }
-    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	if ( eval { require Bio::DB::HTS; 1 } ) {
+		plan tests => 60;
+	}
+	else {
+		plan skip_all => 'Optional module Bio::DB::HTS not available';
+	}
+	## no critic
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## use critic
 }
 
 require_ok 'Bio::ToolBox::Data'
-  or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
 use_ok(
-    'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support',
-    'get_chromosome_list',     'get_genomic_sequence'
+	'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support',
+	'get_chromosome_list',     'get_genomic_sequence'
 );
 
 my $dataset = File::Spec->catfile( $Bin, "Data", "sample1.bam" );
@@ -76,9 +78,9 @@ is( $segment->start, 54989, 'segment start' );
 
 # read count sum
 my $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => $dataset,
-    'method'  => 'count',
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'count',
 );
 
 # print "count sum for ", $row->name, " is $score\n";
@@ -86,9 +88,9 @@ is( $score, 453, 'row sum of read count score' );
 
 # mean coverage
 $score = $row->get_score(
-    'db'      => $db,
-    'dataset' => $dataset,
-    'method'  => 'mean',
+	'db'      => $db,
+	'dataset' => $dataset,
+	'method'  => 'mean',
 );
 
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -96,9 +98,9 @@ is( sprintf( "%.2f", $score ), 16.33, 'row mean coverage' );
 
 # read precise count sum
 $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => $dataset,
-    'method'  => 'pcount',
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'pcount',
 );
 
 # print "count sum for ", $row->name, " is $score\n";
@@ -106,9 +108,9 @@ is( $score, 414, 'row sum of read precise count score' );
 
 # read ncount sum
 $score = $row->get_score(
-    'db'      => $dataset,
-    'dataset' => $dataset,
-    'method'  => 'ncount',
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'ncount',
 );
 
 # print "ncount sum for ", $row->name, " is $score\n";
@@ -121,46 +123,46 @@ is( $row->strand, -1,    'row strand' );
 
 # try stranded data collection
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'count',
-    'stranded' => 'all',
+	'dataset'  => $dataset,
+	'method'   => 'count',
+	'stranded' => 'all',
 );
 
 # print "all read count sum for ", $row->name, " is $score\n";
 is( $score, 183, 'row sum of count score for all strands' );
 
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'count',
-    'stranded' => 'sense',
+	'dataset'  => $dataset,
+	'method'   => 'count',
+	'stranded' => 'sense',
 );
 
 # print "sense read count sum for ", $row->name, " is $score\n";
 is( $score, 86, 'row sum of count score for sense strand' );
 
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'count',
-    'stranded' => 'antisense',
+	'dataset'  => $dataset,
+	'method'   => 'count',
+	'stranded' => 'antisense',
 );
 
 # print "antisense read count sum for ", $row->name, " is $score\n";
 is( $score, 97, 'row sum of count score for antisense strand' );
 
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'method'   => 'mean',
-    'stranded' => 'sense',
+	'dataset'  => $dataset,
+	'method'   => 'mean',
+	'stranded' => 'sense',
 );
 
 # print "sense mean coverage for ", $row->name, " is $score\n";
 is( sprintf( "%.2f", $score ), 29.38, 'row mean coverage for sense strand' );
 
 $score = $row->get_score(
-    'dataset'  => $dataset,
-    'value'    => 'score',
-    'method'   => 'mean',
-    'stranded' => 'antisense',
+	'dataset'  => $dataset,
+	'value'    => 'score',
+	'method'   => 'mean',
+	'stranded' => 'antisense',
 );
 
 # print "antisense mean coverage for ", $row->name, " is $score\n";
@@ -172,8 +174,8 @@ $row = $stream->next_row;
 is( $row->name, 'YAL044W-A', 'row name' );
 
 my %pos2scores = $row->get_region_position_scores(
-    'dataset' => $dataset,
-    'method'  => 'count',
+	'dataset' => $dataset,
+	'method'  => 'count',
 );
 is( scalar keys %pos2scores, 150, 'number of positioned scores' );
 
@@ -185,8 +187,8 @@ is( $pos2scores{6},   1, 'positioned count at 6' );
 is( $pos2scores{-21}, 2, 'positioned count at -21' );
 
 %pos2scores = $row->get_region_position_scores(
-    'dataset' => $dataset,
-    'method'  => 'pcount',
+	'dataset' => $dataset,
+	'method'  => 'pcount',
 );
 
 # print "found ", scalar keys %pos2scores, " positions with precise reads\n";
@@ -198,8 +200,8 @@ is( $pos2scores{37},         1,  'precise positioned count at 37' );
 is( $pos2scores{72},         2,  'precise positioned count at 72' );
 
 %pos2scores = $row->get_region_position_scores(
-    'dataset' => $dataset,
-    'method'  => 'ncount',
+	'dataset' => $dataset,
+	'method'  => 'ncount',
 );
 
 # print "found ", scalar keys %pos2scores, " positions of named reads\n";
@@ -207,18 +209,14 @@ is( $pos2scores{72},         2,  'precise positioned count at 72' );
 # 	printf "  $_ => %s\n", join(',', @{$pos2scores{$_}});
 # }
 is( scalar keys %pos2scores, 150, 'number of named positioned scores' );
-is(
-    $pos2scores{6}->[0],
-    'HWI-EAS240_0001:7:64:6158:10466#0/1',
-    'positioned named at 6'
-);
+is( $pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1', 'positioned named at 6' );
 is( scalar @{ $pos2scores{56} }, 2, 'positioned name count at 56' );
 
 %pos2scores = $row->get_region_position_scores(
-    'dataset'  => $dataset,
-    'absolute' => 1,
-    'stranded' => 'antisense',
-    'method'   => 'count',
+	'dataset'  => $dataset,
+	'absolute' => 1,
+	'stranded' => 'antisense',
+	'method'   => 'count',
 );
 
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
@@ -232,13 +230,13 @@ is( $pos2scores{57613},      1,  'positioned score at 57613' );
 # Fetch alignments
 my $alignment_data = { mapq => [] };
 my $callback       = sub {
-    my ( $a, $data ) = @_;
-    push @{ $data->{mapq} }, $a->qual;
+	my ( $a, $data ) = @_;
+	push @{ $data->{mapq} }, $a->qual;
 };
 my $f = $row->fetch_alignments(
-    'db'       => $db,
-    'data'     => $alignment_data,
-    'callback' => $callback,
+	'db'       => $db,
+	'data'     => $alignment_data,
+	'callback' => $callback,
 );
 is( $f, 1, 'Raw alignment fetch' );
 
@@ -255,9 +253,9 @@ is( $alignment_data->{mapq}->[80],          95,  '80th alignment mapq' );
 undef $Data;
 undef $row;
 $Data = Bio::ToolBox::Data->new(
-    feature => 'genome',
-    db      => $dataset,
-    win     => 500
+	feature => 'genome',
+	db      => $dataset,
+	win     => 500
 );
 isa_ok( $Data, 'Bio::ToolBox::Data', 'new genome window file' );
 is( $Data->feature,        'genome',     'Data feature name' );

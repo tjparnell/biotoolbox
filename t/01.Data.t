@@ -9,14 +9,16 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-    plan tests => 228;
-    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	plan tests => 228;
+	## no critic
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	## use critic
 }
 
 require_ok 'Bio::ToolBox::Data'
-  or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
 require_ok 'Bio::ToolBox::Data::Stream'
-  or BAIL_OUT "Cannot load Bio::ToolBox::Data::Stream";
+	or BAIL_OUT "Cannot load Bio::ToolBox::Data::Stream";
 
 ### Open a test file
 my $infile = File::Spec->catfile( $Bin, "Data", "chrI.gff3" );
@@ -86,8 +88,8 @@ is( $Data->find_column('Group'), 9, 'find column Group' );
 
 # test column names
 my @column_names = $Data->list_columns;
-is( scalar @column_names, 9,       'number of column names' );
-is( $column_names[7],     'Phase', 'name of column 7' );
+is( scalar @column_names, 9,        'number of column names' );
+is( $column_names[7],     'Phase',  'name of column 7' );
 is( $Data->name(7),       'Strand', 'name of column 7 again' );
 
 # column metadata
@@ -102,7 +104,7 @@ is( $md->{'accuracy'}, 'bogus', 'set metadata value is correct' );
 my $cv = $Data->column_values(4);
 ok( $cv, 'column values' );
 is( scalar @{$cv}, 80, 'number of column values' );
-is( $cv->[1],    1,  'check specific column value' );
+is( $cv->[1],      1,  'check specific column value' );
 
 # test duplicate
 my $Dupe = $Data->duplicate;
@@ -148,9 +150,9 @@ is( $gff_att->{Name}, 'TEL01L-TR', 'row GFF attribute Name' );
 $gff_att->{Note} = 'I hereby claim this telomeric repeat to be mine';
 is( $row->rewrite_gff_attributes, 1, 'rewrite row GFF attributes' );
 is(
-    $row->value(9),
+	$row->value(9),
 'ID=TEL01L-TR; Name=TEL01L-TR; Note=I%20hereby%20claim%20this%20telomeric%20repeat%20to%20be%20mine',
-    'rewritten row GFF attribute'
+	'rewritten row GFF attribute'
 );
 
 # change end value
@@ -180,12 +182,12 @@ $Data->delete_column(9);
 # add array of names as a new column
 my @new_column = qw(Name);
 for my $i ( 1 .. $Data->last_row ) {
-    push @new_column, "Feature$i";
+	push @new_column, "Feature$i";
 }
 my $index = $Data->add_column( \@new_column );
 is( $index, 9, 'added column index' );
 is( $Data->value( 78, 9 ),
-    'Feature78', 'checked column value after adding new column values' );
+	'Feature78', 'checked column value after adding new column values' );
 
 # copy a column
 $index = $Data->copy_column(9);
@@ -209,32 +211,32 @@ is( $Data->value( 78, 9 ), 'Feature1', 'check last name after reverse sort' );
 is( $Data->value( 78, 4 ), 1,          'check last start after reverse sort' );
 
 # genomic sort rows
-$Data->gsort_data;   # Data still tagged as gff, which influences gsort method
-is( $Data->value( 1,  9 ), 'Feature2', 'check first name after genomic sort' );
-is( $Data->value( 1,  4 ), 1,          'check first start after genomic sort' );
+$Data->gsort_data;    # Data still tagged as gff, which influences gsort method
+is( $Data->value( 1,  9 ), 'Feature2',  'check first name after genomic sort' );
+is( $Data->value( 1,  4 ), 1,           'check first start after genomic sort' );
 is( $Data->value( 78, 9 ), 'Feature77', 'check last name after genomic sort' );
 is( $Data->value( 78, 4 ), 58695,       'check last start after genomic sort' );
 
 # test reorder_column
 $Data->reorder_column( 1, 4, 5, 9 );
-is( $Data->number_columns, 4, 'number of columns after reordering' );
+is( $Data->number_columns, 4,           'number of columns after reordering' );
 is( $Data->value( 78, 4 ), 'Feature77', 'value in data table after reordering' );
 
 # test iterate function
-my $offset  = 1;
+my $offset = 1;
 is( $Data->interbase, 0, 'interbase value of 0' );
 my $start_i = $Data->start_column;
 is( $start_i, 2, 'start column index' );
 my $iterate_success = $Data->iterate(
-    sub {
-        my $row2      = shift;
-        my $new_start = $row2->start - $offset;
-        $row2->value( $start_i, $new_start );
-    }
+	sub {
+		my $row2      = shift;
+		my $new_start = $row2->start - $offset;
+		$row2->value( $start_i, $new_start );
+	}
 );
 ok( $iterate_success, 'iterate success' );
 is( $Data->value( 1, $start_i ), 0, 'data table value after iteration' );
-is( $Data->interbase(1), 1, 'interbase value of 1');
+is( $Data->interbase(1),         1, 'interbase value of 1' );
 
 # test splice function
 $Data->splice_data( 2, 2 );    # second half of the data table
@@ -318,18 +320,22 @@ is( $row->name('bob'),     'bob',       'Change name via high level' );
 is( $row->name,            'bob',       'Feature changed name' );
 is( $Data->value( 25, 4 ), 'bob',       'Feature name actual value' );
 
-is( $row->value(5),        '.',   'Feature actual strand value (nonexistent)' );
-is( $row->strand,          0,     'Feature strand (implied)' );
-warning_is( sub { $row->strand(1) },
+is( $row->value(5), '.', 'Feature actual strand value (nonexistent)' );
+is( $row->strand,   0,   'Feature strand (implied)' );
+warning_is(
+	sub { $row->strand(1) },
 	'ERROR: No Strand column to update!',
-	'Attempt strand change via high level' );
+	'Attempt strand change via high level'
+);
 is( $row->strand,          0,     'Check attempted strand change' );
 is( $Data->value( 25, 5 ), undef, 'Feature actual changed strand value' );
 
-is( $row->type,         'region', 'Feature type (implied)' );
-warning_is( sub { $row->type('gene') },
+is( $row->type, 'region', 'Feature type (implied)' );
+warning_is(
+	sub { $row->type('gene') },
 	'ERROR: No Type column to update!',
-	'Attempt type change via high level' );
+	'Attempt type change via high level'
+);
 isnt( $row->type, 'gene', 'Check attempted type change' );
 is( $row->type, 'region', 'Check actual type value' );
 
@@ -338,12 +344,12 @@ is( $row->calculate_reference(5), 52901, '5\' reference position' );
 is( $row->calculate_reference(3), 54589, '3\' reference position' );
 is( $row->calculate_reference(4), 53745, 'midpoint reference position' );
 my $args = {
-    position        => 4,
-    practical_start => 1001,
-    practical_stop  => 2000
+	position        => 4,
+	practical_start => 1001,
+	practical_stop  => 2000
 };
 is( $row->calculate_reference($args),
-    1501, 'midpoint reference position of given positions' );
+	1501, 'midpoint reference position of given positions' );
 
 undef $row;
 undef $stream;
@@ -377,12 +383,12 @@ my $f = $Stream->next_row;
 isa_ok( $f, 'Bio::ToolBox::Data::Feature', 'next row Feature object' );
 
 # check feature
-is( $f->seq_id,     'chrI',      'feature seq_id' );
-is( $f->start,      35155,       'feature start position transformed' );
-is( $f->stop,       36303,       'feature stop position' );
-is( $f->midpoint,   35729,       'feature midpoint position' );
-is( $f->peak,       35729,       'feature peak position, default to midpoint' );
-is( $f->name,       'Feature41', 'feature name' );
+is( $f->seq_id,     'chrI',             'feature seq_id' );
+is( $f->start,      35155,              'feature start position transformed' );
+is( $f->stop,       36303,              'feature stop position' );
+is( $f->midpoint,   35729,              'feature midpoint position' );
+is( $f->peak,       35729,              'feature peak position, default to midpoint' );
+is( $f->name,       'Feature41',        'feature name' );
 is( $f->coordinate, 'chrI:35154-36303', 'feature coordinate string' );
 
 $Stream->close_fh;
@@ -390,8 +396,8 @@ undef $Stream;
 
 # open again differently
 $Stream = Bio::ToolBox::Data->new(
-    stream => 1,
-    in     => $file,
+	stream => 1,
+	in     => $file,
 );
 isa_ok( $Stream, 'Bio::ToolBox::Data::Stream', 'Stream object' );
 
@@ -406,9 +412,9 @@ is( $outStream->basename, 'chrI_2', 'out Stream basename' );
 # duplicate file
 while ( my $row2 = $Stream->next_row ) {
 
-    # just write the same thing, no need to modify
-    # write as Feature objects
-    $outStream->write_row($row2);
+	# just write the same thing, no need to modify
+	# write as Feature objects
+	$outStream->write_row($row2);
 }
 $Stream->close_fh;
 $outStream->close_fh;
@@ -422,9 +428,9 @@ $Stream    = Bio::ToolBox::Data::Stream->new( in  => $file );
 $outStream = Bio::ToolBox::Data::Stream->new( out => $file2, bed => 4 );
 while ( my $row2 = $Stream->next_row ) {
 
-    # write as arrays
-    my @a = $row2->row_values;
-    $outStream->write_row( \@a );
+	# write as arrays
+	my @a = $row2->row_values;
+	$outStream->write_row( \@a );
 }
 $Stream->close_fh;
 $outStream->close_fh;
@@ -463,8 +469,7 @@ is( $Data->stop_column,           3,             'stop column' );
 is( $Data->find_column('pValue'), 8,             'find column pValue' );
 is( $Data->find_column('peak'),   10,            'find column peak' );
 $row = $Data->get_row(1);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature',
-    'first peak interval Feature object' );
+isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'first peak interval Feature object' );
 is( $row->peak,     11908866, 'peak interval peak coordinate' );
 is( $row->midpoint, 11909060, 'peak interval midpoint' );
 
