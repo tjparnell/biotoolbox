@@ -2,19 +2,19 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
-my $VERSION = '1.67';
+use Bio::ToolBox::utility qw(ask_user_for_index);
+
+our $VERSION = '1.70';
 
 print "\n A script to pull out specific features from a data file\n";
 
 ### Quick help
-unless (@ARGV) {    # when no command line options are present
-					# when no command line options are present
-					# print SYNOPSIS
+unless (@ARGV) {
 	pod2usage(
 		{
 			'-verbose' => 0,
@@ -71,15 +71,18 @@ if ($print_version) {
 ### Check for required values
 
 unless ( defined $datafile ) {
-	die " no input data file specified!\n";
+	print STDERR " FATAL: no input data file specified!\n";
+	exit 1;
 }
 
 unless ( defined $listfile ) {
-	die " no list data specified!\n";
+	print STDERR " FATAL: no list data specified!\n";
+	exit 1;
 }
 
 unless ( defined $outfile ) {
-	die " no output data file name given!\n";
+	print " FATAL: no output data file name given!\n";
+	exit 1;
 }
 
 $sum = 1 if $sum_only;
@@ -93,7 +96,8 @@ if ($order) {
 		$list_order = 0;
 	}
 	else {
-		die " unrecognized order request '$order'! Enter list or data\n";
+		print STDERR " FATAL: unrecognized order request '$order'! Enter list or data\n";
+		exit 1;
 	}
 }
 else {
@@ -168,7 +172,7 @@ sub identify_indices {
 	}
 
 	# look for the corresponding list index if data was specified
-	if ( defined $data_index and !defined $list_index ) {
+	if ( defined $data_index and not defined $list_index ) {
 
 		# we have the data index but need the list index
 
@@ -190,7 +194,7 @@ sub identify_indices {
 	}
 
 	# look for the corresponding data index if list was specified
-	elsif ( !defined $data_index and defined $list_index ) {
+	elsif ( not defined $data_index and defined $list_index ) {
 
 		# we have the list index but need the data index
 
@@ -229,7 +233,7 @@ sub identify_indices {
 	}
 
 	# neither was specified
-	elsif ( !defined $data_index and !defined $list_index ) {
+	elsif ( not defined $data_index and not defined $list_index ) {
 
 		# just try the built-in name column index
 		# this uses a few common names
@@ -423,7 +427,7 @@ sub generate_output_data_structures {
 
 	# multiple data structures
 	else {
-		foreach my $group ( keys %$pulled ) {
+		foreach my $group ( keys %{$pulled} ) {
 
 			# generate new file name
 			my $newfile = $outfile;
@@ -444,7 +448,7 @@ sub write_files {
 
 	# Write the files
 
-	foreach my $group ( keys %$pulled ) {
+	foreach my $group ( keys %{$pulled} ) {
 
 		# de-reference the output data for ease
 		my $group_Data = $pulled->{$group}{'output_data'};
