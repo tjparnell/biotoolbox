@@ -2,15 +2,23 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Net::FTP;
 use Bio::ToolBox;
-use Bio::ToolBox::utility;
-use Bio::ToolBox::parser::ucsc;
+use Bio::ToolBox::Parser;
 use Bio::ToolBox::GeneTools qw(gtf_string);
-my $VERSION = '1.69';
+use Bio::ToolBox::utility qw(format_with_commas sane_chromo_sort);
+
+# check for additional requirements
+my $net = 0;
+eval {
+	require Net::FTP;
+	$net = 1;
+};
+
+our $VERSION = '1.70';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -30,7 +38,6 @@ unless (@ARGV) {
 ### Command line options
 my (
 	$ftp_file,      $database,   $host,         $do_chromo,
-	$refseqstatusf, $refseqsumf, $ensemblnamef, $ensemblsourcef,
 	$kgxreff,       $chromof,    $user_source,  $do_gene,
 	$do_cds,        $do_utr,     $do_codon,     $share,
 	$do_name,       $do_gtf,     $gz,           $help,
@@ -43,11 +50,7 @@ GetOptions(
 	'h|host=s'    => \$host,              # the ftp server to connect to
 	'chr!'        => \$do_chromo,         # include the chromosome file from ftp
 	't|table=s'   => \@genetables,        # the input gene table files
-	'a|status=s'  => \$refseqstatusf,     # the refseqstatus file
-	's|sum=s'     => \$refseqsumf,        # the refseqsummary file
 	'k|kgxref=s'  => \$kgxreff,           # the kgXref info file
-	'n|ensname=s' => \$ensemblnamef,      # the ensemblToGeneName file
-	'r|enssrc=s'  => \$ensemblsourcef,    # the ensemblSource file
 	'c|chromo=s'  => \$chromof,           # a chromosome file
 	'source=s'    => \$user_source,       # user provided source
 	'gene!'       => \$do_gene,           # include genes in output
@@ -83,41 +86,7 @@ if ($print_version) {
 }
 
 ### Check requirements and defaults
-unless ( @genetables or $ftp_file or $chromof ) {
-	die " Specify either an input table file, chromosome file, or a FTP table!\n";
-}
-if ($ftp_file) {
-	unless ( $ftp_file =~ m/^refgene|ensgene|xenorefgene|known|all$/i ) {
-		die " requested table '$ftp_file' by FTP not supported! see help\n";
-	}
-	unless ( defined $database ) {
-		die " a UCSC genome database must be provided! see help\n";
-	}
-	unless ( defined $do_chromo ) {
-		$do_chromo = 1;
-	}
-	unless ( defined $host ) {
-		$host = 'hgdownload.cse.ucsc.edu';
-	}
-}
-unless ( defined $do_gene ) {
-	$do_gene = 1;
-}
-unless ( defined $do_utr ) {
-	$do_utr = 0;
-}
-unless ( defined $do_cds ) {
-	$do_cds = 1;
-	unless ( defined $do_codon ) {
-		$do_codon = 0;
-	}
-}
-unless ( defined $share ) {
-	$share = 1;
-}
-unless ( defined $do_name ) {
-	$do_name = 0;
-}
+check_options();
 my $start_time = time;
 
 ### Fetch files if requested
@@ -128,20 +97,8 @@ if ($ftp_file) {
 
 	# push file names into appropriate variables
 	foreach my $file (@files) {
-		if ( $file =~ /refgene|ensgene|knowngene/i ) {
+		if ( $file =~ m/refgene | knowngene /xi ) {
 			push @genetables, $file;
-		}
-		elsif ( $file =~ /summary/i ) {
-			$refseqsumf = $file;
-		}
-		elsif ( $file =~ /status/i ) {
-			$refseqstatusf = $file;
-		}
-		elsif ( $file =~ /ensembltogene/i ) {
-			$ensemblnamef = $file;
-		}
-		elsif ( $file =~ /ensemblsource/i ) {
-			$ensemblsourcef = $file;
 		}
 		elsif ( $file =~ /kgxref/i ) {
 			$kgxreff = $file;
@@ -152,49 +109,30 @@ if ($ftp_file) {
 	}
 }
 
-### Initiate the parser
-my $ucsc = Bio::ToolBox::parser::ucsc->new(
-	do_gene  => $do_gene,
-	do_exon  => 1,           # always
-	do_cds   => $do_cds,
-	do_utr   => $do_utr,
-	do_codon => $do_codon,
-	do_name  => $do_name,
-	share    => $share,
-) or die "cannot initialize ucsc parser!";
-
-# add options
-if ($user_source) {
-	$ucsc->source($user_source);
-}
-if ($refseqsumf) {
-	my $c = $ucsc->load_extra_data( $refseqsumf, 'refseqsummary' );
-	printf " Loaded %s transcripts from supplemental data file '$refseqsumf'\n",
-		format_with_commas($c);
-}
-if ($refseqstatusf) {
-	my $c = $ucsc->load_extra_data( $refseqstatusf, 'refseqstatus' );
-	printf " Loaded %s transcripts from supplemental data file '$refseqstatusf'\n",
-		format_with_commas($c);
-}
-if ($ensemblnamef) {
-	my $c = $ucsc->load_extra_data( $ensemblnamef, 'ensembltogene' );
-	printf " Loaded %s transcripts from supplemental data file '$ensemblnamef'\n",
-		format_with_commas($c);
-}
-if ($ensemblsourcef) {
-	my $c = $ucsc->load_extra_data( $ensemblsourcef, 'ensemblsource' );
-	printf " Loaded %s transcripts from supplemental data file '$ensemblsourcef'\n",
-		format_with_commas($c);
-}
-if ($kgxreff) {
-	my $c = $ucsc->load_extra_data( $kgxreff, 'kgxref' );
-	printf " Loaded %s transcripts from supplemental data file '$kgxreff'\n",
-		format_with_commas($c);
-}
-
-# walk through the input tables
+### Walk through the input tables
 foreach my $file (@genetables) {
+
+	# Initiate the parser
+	my $ucsc = Bio::ToolBox::Parser->new(
+		file     => $file,
+		do_gene  => $do_gene,
+		do_exon  => 1,
+		do_cds   => $do_cds,
+		do_utr   => $do_utr,
+		do_codon => $do_codon,
+		do_name  => $do_name,
+		share    => $share,
+	) or die "cannot initialize Parser!";
+
+	# add options
+	if ($user_source) {
+		$ucsc->source($user_source);
+	}
+	if ($file =~ /knowngene/i and $kgxreff) {
+		my $c = $ucsc->load_extra_data( $kgxreff, 'kgxref' );
+		printf " Loaded %s transcripts from supplemental data file '$kgxreff'\n",
+			format_with_commas($c);
+	}
 
 	# open output file
 	my ( $outfile, $gff_fh ) = open_output_gff($file);
@@ -210,45 +148,90 @@ foreach my $file (@genetables) {
 	# convert the table
 	print " Converting gene table '$file' features....\n";
 	unless ( $ucsc->open_file($file) ) {
-		warn " Unable to open file!\n";
+		print " WARNING: Unable to open file!\n";
 		next;
 	}
-	my $tops = $ucsc->top_features;
-	print_current_gene_list( $gff_fh, $tops );
+	print_current_gene_list( $gff_fh, $ucsc );
 
 	# report outcomes
 	my $count = $ucsc->counts;
 	print "  converted ", format_with_commas( $count->{gene} ), " gene features\n"
-		if $count->{gene} > 0;
+		if ( exists $count->{gene} and $count->{gene}> 0 );
 	print "  converted ", format_with_commas( $count->{mrna} ), " mRNA transcripts\n"
-		if $count->{mrna} > 0;
+		if ( exists $count->{mrna} and $count->{mrna}> 0 );
 	print "  converted ", format_with_commas( $count->{pseudogene} ),
 		" pseudogene transcripts\n"
-		if $count->{pseudogene} > 0;
+		if ( exists $count->{pseudogene} and $count->{pseudogene}> 0 );
 	print "  converted ", format_with_commas( $count->{ncrna} ), " ncRNA transcripts\n"
-		if $count->{ncrna} > 0;
+		if ( exists $count->{ncrna} and $count->{ncrna}> 0 );
 	print "  converted ", format_with_commas( $count->{mirna} ), " miRNA transcripts\n"
-		if $count->{mirna} > 0;
+		if ( exists $count->{mirna} and $count->{mirna}> 0 );
 	print "  converted ", format_with_commas( $count->{snrna} ), " snRNA transcripts\n"
-		if $count->{snrna} > 0;
+		if ( exists $count->{snrna} and $count->{snrna}> 0 );
 	print "  converted ", format_with_commas( $count->{snorna} ), " snoRNA transcripts\n"
-		if $count->{snorna} > 0;
+		if ( exists $count->{snorna} and $count->{snorna}> 0 );
 	print "  converted ", format_with_commas( $count->{trna} ), " tRNA transcripts\n"
-		if $count->{trna} > 0;
+		if ( exists $count->{trna} and $count->{trna}> 0 );
 	print "  converted ", format_with_commas( $count->{rrna} ), " rRNA transcripts\n"
-		if $count->{rrna} > 0;
+		if ( exists $count->{rrna} and $count->{rrna}> 0 );
 	print "  converted ", format_with_commas( $count->{other} ), " other transcripts\n"
-		if $count->{other} > 0;
+		if ( exists $count->{other} and $count->{other}> 0 );
 
 	# Finished
 	printf "  wrote file '$outfile' in %.1f minutes\n", ( time - $start_time ) / 60;
-
 }
 
 ### Finish
 exit;
 
 #########################  Subroutines  #######################################
+
+sub check_options {
+	unless ( @genetables or $ftp_file or $chromof ) {
+		print STDERR
+" FATAL: Specify either an input table file, chromosome file, or a FTP table!\n";
+		exit 1;
+	}
+	if ($ftp_file) {
+		unless ($net) {
+			print STDERR " FATAL: please install Perl module Net::FTP to download files\n";
+			exit 1;
+		}
+		unless ( $ftp_file =~ m/^ refgene | known | all $/xi ) {
+			print STDERR
+" FATAL: requested table '$ftp_file' by FTP not supported! see help\n";
+			exit 1;
+		}
+		unless ( defined $database ) {
+			print STDERR " FATAL: a UCSC genome database must be provided! see help\n";
+			exit 1;
+		}
+		unless ( defined $do_chromo ) {
+			$do_chromo = 1;
+		}
+		unless ( defined $host ) {
+			$host = 'hgdownload.cse.ucsc.edu';
+		}
+	}
+	unless ( defined $do_gene ) {
+		$do_gene = 1;
+	}
+	unless ( defined $do_utr ) {
+		$do_utr = 0;
+	}
+	unless ( defined $do_cds ) {
+		$do_cds = 1;
+		unless ( defined $do_codon ) {
+			$do_codon = 0;
+		}
+	}
+	unless ( defined $share ) {
+		$share = 1;
+	}
+	unless ( defined $do_name ) {
+		$do_name = 0;
+	}
+}
 
 sub fetch_files_by_ftp {
 
@@ -257,8 +240,6 @@ sub fetch_files_by_ftp {
 	if ( $ftp_file eq 'all' ) {
 		@ftp_files = qw(
 			refgene
-			ensgene
-			xenorefgene
 			known
 		);
 	}
@@ -272,25 +253,9 @@ sub fetch_files_by_ftp {
 	# generate list of files
 	my @files;
 	foreach my $item (@ftp_files) {
-		if ( $item =~ m/^xeno/i ) {
-			push @files, qw(
-				xenoRefGene.txt.gz
-				refSeqStatus.txt.gz
-				refSeqSummary.txt.gz
-			);
-		}
-		elsif ( $item =~ m/refgene/i ) {
+		if ( $item =~ m/refgene/i ) {
 			push @files, qw(
 				refGene.txt.gz
-				refSeqStatus.txt.gz
-				refSeqSummary.txt.gz
-			);
-		}
-		elsif ( $item =~ m/ensgene/i ) {
-			push @files, qw(
-				ensGene.txt.gz
-				ensemblToGeneName.txt.gz
-				ensemblSource.txt.gz
 			);
 		}
 		elsif ( $item =~ m/known/i ) {
@@ -298,6 +263,10 @@ sub fetch_files_by_ftp {
 				knownGene.txt.gz
 				kgXref.txt.gz
 			);
+		}
+		else {
+			print " unknown ftp request '$item'! skipping\n";
+			next;
 		}
 	}
 
@@ -321,7 +290,7 @@ sub fetch_files_by_ftp {
 
 	# initiate connection
 	print " Connecting to $host....\n";
-	my $ftp = Net::FTP->new($host) or die "Cannot connect! $@";
+	my $ftp = Net::FTP->new($host) or die "Cannot connect!";
 	$ftp->login                    or die "Cannot login! " . $ftp->message;
 
 	# prepare for download
@@ -362,7 +331,7 @@ sub open_output_gff {
 	# prepare output file name
 	my $file    = shift;
 	my $outfile = $file;
-	$outfile =~ s/\.txt(?:\.gz)?$//i;    # remove the extension
+	$outfile =~ s/\.txt (?:\.gz)? $//xi;    # remove the extension
 	$outfile .= $do_gtf ? '.gtf' : '.gff3';
 	if ($gz) {
 		$outfile .= '.gz';
@@ -382,45 +351,27 @@ sub open_output_gff {
 }
 
 sub print_current_gene_list {
-	my ( $gff_fh, $top_features ) = @_;
+	my ( $gff_fh, $ucsc ) = @_;
 
 	# we need to sort the genes in genomic order before writing the GFF
+	# ucsc files are not always in a nice genomic order
+	# we will first put the features in a hash based on coordinates
+	my $top_features = $ucsc->top_features;
 	printf "  Sorting %s top features....\n",
-		format_with_commas( scalar(@$top_features) );
+		format_with_commas( scalar( @{$top_features} ) );
 	my %pos2seqf;
-	foreach my $gene (@$top_features) {
-
-		# get coordinates
-		my $start = $gene->start;
-		my $chr;
-		my $key;
-
-		# identify which key to put under
-		if ( $gene->seq_id =~ /^chr(\d+)$/i ) {
-			$chr = $1;
-			$key = 'numeric_chr';
-		}
-		elsif ( $gene->seq_id =~ /^chr(\w+)$/i ) {
-			$chr = $1;
-			$key = 'other_chr';
-		}
-		elsif ( $gene->seq_id =~ /(\d+)$/ ) {
-			$chr = $1;
-			$key = 'other_numeric';
-		}
-		else {
-			$chr = $gene->seq_id;
-			$key = 'other';
-		}
+	foreach my $gene ( @{$top_features} ) {
 
 		# make sure start positions are unique, just in case
 		# these modifications won't make it into seqfeature object
-		while ( exists $pos2seqf{$key}{$chr}{$start} ) {
+		my $start = $gene->start;
+		my $chr   = $gene->seq_id;
+		while ( exists $pos2seqf{$chr}{$start} ) {
 			$start++;
 		}
 
 		# store the seqfeature
-		$pos2seqf{$key}{$chr}{$start} = $gene;
+		$pos2seqf{$chr}{$start} = $gene;
 	}
 
 	# print in genomic order
@@ -428,51 +379,15 @@ sub print_current_gene_list {
 	# valid method. Passing 1 should force a recursive action to
 	# print both parent and children.
 	print "  Writing features to GFF....\n";
-	foreach my $chr ( sort { $a <=> $b } keys %{ $pos2seqf{'numeric_chr'} } ) {
-		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'numeric_chr'}{$chr} } )
+	foreach my $chr ( sane_chromo_sort( keys %pos2seqf ) ) {
+		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{$chr} } )
 		{
 			# print the seqfeature recursively
 			if ($do_gtf) {
-				$gff_fh->print( gtf_string( $pos2seqf{'numeric_chr'}{$chr}{$start} ) );
+				$gff_fh->print( gtf_string( $pos2seqf{$chr}{$start} ) );
 			}
 			else {
-				$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1) );
-				$gff_fh->print("###\n");
-			}
-		}
-	}
-	foreach my $chr ( sort { $a cmp $b } keys %{ $pos2seqf{'other_chr'} } ) {
-		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'other_chr'}{$chr} } ) {
-			if ($do_gtf) {
-				$gff_fh->print( gtf_string( $pos2seqf{'other_chr'}{$chr}{$start} ) );
-			}
-			else {
-				$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1) );
-				$gff_fh->print("###\n");
-			}
-		}
-	}
-	foreach my $chr ( sort { $a <=> $b } keys %{ $pos2seqf{'other_numeric'} } ) {
-		foreach
-			my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'other_numeric'}{$chr} } )
-		{
-			if ($do_gtf) {
-				$gff_fh->print( gtf_string( $pos2seqf{'other_numeric'}{$chr}{$start} ) );
-			}
-			else {
-				$gff_fh->print(
-					$pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1) );
-				$gff_fh->print("###\n");
-			}
-		}
-	}
-	foreach my $chr ( sort { $a cmp $b } keys %{ $pos2seqf{'other'} } ) {
-		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{'other'}{$chr} } ) {
-			if ($do_gtf) {
-				$gff_fh->print( gtf_string( $pos2seqf{'other'}{$chr}{$start} ) );
-			}
-			else {
-				$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1) );
+				$gff_fh->print( $pos2seqf{$chr}{$start}->gff3_string(1) );
 				$gff_fh->print("###\n");
 			}
 		}
@@ -523,17 +438,13 @@ A program to convert UCSC gene tables to GFF3 or GTF annotation.
    ucsc_table2gff3.pl [--options] --table <filename>
   
   UCSC database options:
-  -f --ftp [refgene|ensgene|            specify what tables to retrieve from UCSC
-            xenorefgene|known|all]
+  -f --ftp [refgene|known|all]          specify what tables to retrieve from UCSC
+            
   -d --db <text>                        UCSC database name: hg19,hg38,danRer7, etc
   -h --host <text>                      specify UCSC hostname
   
   Input file options:
   -t --table <filename>                 name of table, repeat or comma list
-  -a --status <filename>                refSeqStatus file
-  -s --sum <filename>                   refSeqSummary file
-  -n --ensname <filename>               ensemblToGeneName file
-  -r --enssrc <filename>                ensemblSource file
   -k --kgxref <filename>                kgXref file
   -c --chromo <filename>                chromosome file
   
@@ -561,13 +472,13 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --ftp [refgene|ensgene|xenorefgene|known|all]
+=item --ftp [refgene|known|all]
 
 Request that the current indicated tables and supporting files be 
 downloaded from UCSC via FTP. Four different tables may be downloaded, 
-including I<refGene>, I<ensGene>, I<xenoRefGene> mRNA gene prediction 
-tables, and the UCSC I<knownGene> table (if available). Specify all to 
-download all four tables. A comma delimited list may also be provided.
+including I<refGene>, and the UCSC I<knownGene> table (if available). 
+Specify all to download all tables. A comma delimited list may also 
+be provided.
 
 =item --db E<lt>textE<gt>
 
@@ -595,34 +506,6 @@ I<knownGene> tables. Both simple and extended gene prediction tables, as
 well as refFlat tables are supported. The file may be gzipped. When 
 converting multiple tables, use this option repeatedly for each table. 
 The C<--ftp> option is recommended over using this one.
-
-=item --status E<lt>filenameE<gt>
-
-Optionally provide the name of the I<refSeqStatus> table file. This file 
-provides additional information for the I<refSeq>-based gene prediction 
-tables, including I<refGene>, I<xenoRefGene>, and I<knownGene> tables. 
-The file may be gzipped. The C<--ftp> option is recommended over using this.
-
-=item --sum E<lt>filenameE<gt>
-
-Optionally provide the name of the I<refSeqSummary> file. This file 
-provides additional information for the I<refSeq>-based gene prediction 
-tables, including I<refGene>, I<xenoRefGene>, and I<knownGene> tables. The 
-file may be gzipped. The C<--ftp> option is recommended over using this.
-
-=item --ensname E<lt>filenameE<gt>
-
-Optionally provide the name of the I<ensemblToGeneName> file. This file 
-provides a key to translate the Ensembl unique gene identifier to the 
-common gene name. The file may be gzipped. The C<--ftp> option is 
-recommended over using this.
-
-=item --enssrc E<lt>filenameE<gt>
-
-Optionally provide the name of the I<ensemblSource> file. This file 
-provides a key to translate the Ensembl unique gene identifier to the 
-type of transcript, provided by Ensembl as the source. The file may be 
-gzipped. The C<--ftp> option is recommended over using this.
 
 =item --kgxref E<lt>filenameE<gt>
 
@@ -731,10 +614,9 @@ attempt to identify non-coding genesas to type using the gene name as inference.
 Various additional informational attributes may also be included with the gene 
 and transcriptfeatures, which are derived from supporting table files.
 
-Four table files are supported. Gene prediction tables, including I<refGene>, 
-I<xenoRefGene>, and I<ensGene>, are supported. The UCSC I<knownGene> gene 
-table, if available, is also supported. Supporting tables include I<refSeqStatus>, 
-I<refSeqSummary>, I<ensemblToGeneName>, I<ensemblSource>, and I<kgXref>. 
+Two table files are currently supported. Gene prediction tables, including 
+I<refGene> and UCSC I<knownGene> are supported. Supporting tables include 
+I<kgXref>. 
 
 Tables obtained from UCSC are typically in the extended GenePrediction 
 format, although simple genePrediction and refFlat formats are also 
@@ -745,10 +627,7 @@ The latest table files may be automatically downloaded using FTP from
 UCSC or other host. Since these files are periodically updated, this may 
 be the best option. Alternatively, individual files may be specified 
 through command line options. Files may be obtained manually through FTP, 
-HTTP, or the UCSC Table Browser. However, it is B<highly recommended> to 
-let the program obtain the necessary files using the C<--ftp> option, as 
-using the wrong file format or manipulating the tables may prevent the 
-program from working properly.
+HTTP, or the UCSC Table Browser. 
 
 If provided, chromosome and/or scaffold features will be written as GFF3-style 
 sequence-region pragmas (even for GTF files, just in case).
@@ -760,7 +639,6 @@ convenient automated database setup based on UCSC annotation.
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
- Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah
  Salt Lake City, UT, 84112
