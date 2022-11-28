@@ -17,7 +17,7 @@ BEGIN {
     else {
         plan skip_all => 'Bio::DB::SeqFeature::Store not available';
     }
-    $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 }
 
 require_ok 'Bio::ToolBox::Data'
@@ -431,7 +431,7 @@ unlink "$fasta.index";
 
 sub print_hash {
     my $hash = shift;
-    foreach ( sort { $a <=> $b } keys %$hash ) {
+    foreach ( sort { $a <=> $b } keys %{$hash} ) {
         print "    $_\t=> " . $hash->{$_} . "\n";
     }
 }

@@ -16,7 +16,7 @@ BEGIN {
     use_ok( 'Bio::ToolBox::GeneTools', qw(:all) );
 }
 
-$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 my $ucscfile = File::Spec->catfile( $Bin, "Data", "ensGene.txt" );
 my $enssrc   = File::Spec->catfile( $Bin, "Data", "ensemblSource.txt" );
 

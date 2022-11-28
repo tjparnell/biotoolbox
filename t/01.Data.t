@@ -9,7 +9,7 @@ use FindBin '$Bin';
 
 BEGIN {
     plan tests => 228;
-    $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 }
 
 require_ok 'Bio::ToolBox::Data'
@@ -100,7 +100,7 @@ is( $md->{'accuracy'}, 'bogus', 'set metadata value is correct' );
 # column values
 my $cv = $Data->column_values(4);
 ok( $cv, 'column values' );
-is( scalar @$cv, 80, 'number of column values' );
+is( scalar @{$cv}, 80, 'number of column values' );
 is( $cv->[1],    1,  'check specific column value' );
 
 # test duplicate
@@ -226,9 +226,9 @@ my $start_i = $Data->start_column;
 is( $start_i, 2, 'start column index' );
 my $iterate_success = $Data->iterate(
     sub {
-        my $row       = shift;
-        my $new_start = $row->start - $offset;
-        $row->value( $start_i, $new_start );
+        my $row2      = shift;
+        my $new_start = $row2->start - $offset;
+        $row2->value( $start_i, $new_start );
     }
 );
 ok( $iterate_success, 'iterate success' );
@@ -399,11 +399,11 @@ is( $Stream->basename,    'chrI',   'in Stream basename' );
 is( $outStream->basename, 'chrI_2', 'out Stream basename' );
 
 # duplicate file
-while ( my $row = $Stream->next_row ) {
+while ( my $row2 = $Stream->next_row ) {
 
     # just write the same thing, no need to modify
     # write as Feature objects
-    $outStream->write_row($row);
+    $outStream->write_row($row2);
 }
 $Stream->close_fh;
 $outStream->close_fh;
@@ -415,10 +415,10 @@ my $file2 = $file1;
 $file2 =~ s/_2\.bed/_3.bed/;
 $Stream    = Bio::ToolBox::Data::Stream->new( in  => $file );
 $outStream = Bio::ToolBox::Data::Stream->new( out => $file2, bed => 4 );
-while ( my $row = $Stream->next_row ) {
+while ( my $row2 = $Stream->next_row ) {
 
     # write as arrays
-    my @a = $row->row_values;
+    my @a = $row2->row_values;
     $outStream->write_row( \@a );
 }
 $Stream->close_fh;

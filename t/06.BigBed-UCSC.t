@@ -15,7 +15,7 @@ BEGIN {
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigBed not available';
 	}
-	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+	local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 }
 
 require_ok 'Bio::ToolBox::Data'

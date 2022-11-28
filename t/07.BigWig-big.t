@@ -15,7 +15,7 @@ BEGIN {
     else {
         plan skip_all => 'Optional module Bio::DB::Big not available';
     }
-    $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+    local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 }
 
 require_ok 'Bio::ToolBox::Data'
@@ -138,10 +138,10 @@ my $pos2scores = $row->get_relative_point_position_scores(
     'position' => 5,
     'extend'   => 200,
 );
-is( scalar keys %$pos2scores, 9, 'number of relative positioned scores' );
+is( scalar keys %{$pos2scores}, 9, 'number of relative positioned scores' );
 
-# print "found ", scalar keys %$pos2scores, " positions with reads\n";
-# foreach (sort {$a <=> $b} keys %$pos2scores) {
+# print "found ", scalar keys %{$pos2scores}, " positions with reads\n";
+# foreach (sort {$a <=> $b} keys %{$pos2scores}) {
 # 	print "  $_ => $pos2scores->{$_}\n";
 # }
 is( sprintf( "%.2f", $pos2scores->{-114} ),

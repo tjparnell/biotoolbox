@@ -15,7 +15,7 @@ if ( eval { require Bio::SeqFeature::Lite; 1 } ) {
 else {
     plan tests => 418;
 }
-$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
+local $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 
 require_ok 'Bio::ToolBox::parser::gff'
   or BAIL_OUT "Cannot load Bio::ToolBox::parser::gff";
@@ -141,7 +141,7 @@ sub test_gff {
     # export gff3
     $f->version(3);
     my $string      = $f->gff_string(1);
-    my @stringlines = split "\n", $string;
+    my @stringlines = split /\n/, $string;
     is( scalar @stringlines, 2, 'feature3 gff3 string' );
 
     # due to random ID numbers and complications in testing the gff3
@@ -363,7 +363,7 @@ sub test_ucsc {
     # print gene
     $f->version(3);
     my $string      = $f->gff_string(1);
-    my @stringlines = split "\n", $string;
+    my @stringlines = split /\n/, $string;
     is( scalar @stringlines, 47, 'feature gff3 string' );
 
     # due to random ID numbers and complications in testing the gff3
@@ -425,7 +425,7 @@ sub test_bed6 {
     is( $f->display_name, 'YAL047C',          'feature display_name' );
     is( $f->primary_id,   'chrI:54988-56857', 'feature primary_id' );
     is( $f->strand,       -1,                 'feature strand' );
-    is( $f->source,       '',                 'feature source' );
+    is( $f->source,       q(),                'feature source' );
     my @transcripts = $f->get_SeqFeatures;
     is( scalar(@transcripts), 0, 'number of subfeatures' );
 
@@ -482,7 +482,7 @@ sub test_bed12 {
     is( $f->display_name, 'ENST00000411647',     'transcript display_name' );
     is( $f->primary_id,   'chr20:388141-398466', 'transcript primary_id' );
     is( $f->strand,       1,                     'transcript strand' );
-    is( $f->source,       '',                    'transcript source' );
+    is( $f->source,       q(),                   'transcript source' );
 
     # first transcript exons
     my @exons =
@@ -554,7 +554,7 @@ sub test_narrowPeak {
     is( $f->display_name, 'narrowPeak207',          'feature display_name' );
     is( $f->primary_id,   'chr1:11908310-11909810', 'feature primary_id' );
     is( $f->strand,       0,                        'feature strand' );
-    is( $f->source,       '',                       'feature source' );
+    is( $f->source,       q(),                      'feature source' );
     is( $f->score,        1016,                     'feature score' );
     is( $f->get_tag_values('qValue'), '0.00000',    'feature qvalue' );
     is( $f->get_tag_values('peak'),   555,          'feature peak' );
@@ -603,7 +603,7 @@ sub test_gappedPeak {
     is( $f->display_name, 'peak_1',                   'feature display_name' );
     is( $f->primary_id,   'chr1:5055-5366',           'feature primary_id' );
     is( $f->strand,       0,                          'feature strand' );
-    is( $f->source,       '',                         'feature source' );
+    is( $f->source,       q(),                        'feature source' );
     is( $f->score,        53,                         'feature score' );
     is( $f->get_tag_values('signalValue'), 4.21044,   'feature signalValue' );
     is( $f->get_tag_values('qValue'),      '5.32258', 'feature qvalue' );
