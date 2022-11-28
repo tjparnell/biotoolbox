@@ -2,6 +2,14 @@
 
 # documentation at end of file
 
+use warnings;
+no warnings qw(uninitialized); 
+# This script results in a ton of uninitialized warnings when packing chromosomal 
+# coverage arrays into binary strings due to vast stretches of chromosomes without 
+# alignments (think megabases of Ns in the human genome). 
+# Taking time to convert into proper zeroes unnecessarily slows down run time.
+# Since we pack frequently throughout the app, it's easiest to simply turn off
+# uninitialized warnings globally.
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
@@ -9,6 +17,7 @@ use File::Spec;
 use File::Temp;
 use List::Util qw(sum0);
 use List::MoreUtils qw(any natatime);
+use English qw(-no_match_vars);
 use Bio::ToolBox;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -28,7 +37,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.69';
+our $VERSION = '1.70';
 
 print "\n This program will convert bam alignments to wig data\n";
 
@@ -47,21 +56,31 @@ unless (@ARGV) {
 
 ### Get command line options and initialize values
 my (
-	$outfile,      $use_start,       $use_mid,         $use_span,
-	$use_cspan,    $use_extend,      $use_smartpe,     $use_ends,
-	$position,     $use_coverage,    $splice,          $paired,
-	$fastpaired,   $shift,           $shift_value,     $extend_value,
+	$outfile,      $position,        $splice,          $paired,
+	$fastpaired,   $shift,
 	$chr_number,   $correlation_min, $zmin,            $zmax,
 	$model,        $do_strand,       $flip,            $min_mapq,
 	$nosecondary,  $noduplicate,     $nosupplementary, $max_isize,
-	$min_isize,    $first,           $second,          $multi_hit_scale,
+	$min_isize,    $first_read,      $second_read,     $multi_hit_scale,
 	$splice_scale, $rpm,             $do_mean,         $chrnorm,
 	$chrapply,     $chr_exclude,     $black_list,      $bin_size,
-	$dec_precison, $bigwig,          $do_fixstep,      $do_varstep,
-	$do_bedgraph,  $no_zero,         $bwapp,           $gz,
+	$dec_precison, $bigwig,          $no_zero,         $bwapp,
 	$cpu,          $max_intron,      $window,          $verbose,
-	$tempdir,      $help,            $print_version,
+	$gz,           $tempdir,         $help,            $print_version,
 );
+my $use_start    = 0;  # these need to be explicitly set to zero because I sum them 
+my $use_mid      = 0;  # to verify user input
+my $use_span     = 0;
+my $use_cspan    = 0;
+my $use_extend   = 0;
+my $use_smartpe  = 0;
+my $use_ends     = 0;
+my $use_coverage = 0;
+my $do_fixstep   = 0;
+my $do_varstep   = 0;
+my $do_bedgraph  = 0;
+my $extend_value = 0;
+my $shift_value  = 0;
 my @bamfiles;
 my @scale_values;
 
@@ -97,8 +116,8 @@ GetOptions(
 	'U|nosupplementary' => \$nosupplementary,    # skip supplementary alignments
 	'maxsize=i'         => \$max_isize,          # maximum paired insert size to accept
 	'minsize=i'         => \$min_isize,          # minimum paired insert size to accept
-	'first!'            => \$first,              # only take first read
-	'second!'           => \$second,             # only take second read
+	'first!'            => \$first_read,         # only take first read
+	'second!'           => \$second_read,        # only take second read
 	'fraction!'         => \$multi_hit_scale,    # scale by number of hits
 	'splfrac!'          => \$splice_scale,   # divide counts by number of spliced segments
 	'r|rpm!'            => \$rpm,            # calculate reads per million
@@ -181,7 +200,7 @@ my @seq_list;
 my %seq_name2length;
 for my $tid ( 0 .. $sams[0]->n_targets - 1 ) {
 	my $chr = $sams[0]->target_name($tid);
-	if ( $chr_exclude and $chr =~ /$chr_exclude/i ) {
+	if ( $chr_exclude and $chr =~ /$chr_exclude/xi ) {
 		print "  skipping sequence $chr\n" if $verbose;
 		next;
 	}
@@ -283,8 +302,13 @@ sub check_defaults {
 
 	# check input file
 	unless (@bamfiles) {
-		die " no input files! use --help for more information\n" unless @ARGV;
-		@bamfiles = @ARGV;
+		if (@ARGV) {
+			@bamfiles = @ARGV;
+		}
+		else {
+			print STDERR " FATAL: no input files! use --help for more information\n";
+			exit 1;
+		}
 	}
 	if ( $bamfiles[0] =~ /,/ ) {
 		@bamfiles = split /,/, shift @bamfiles;
@@ -300,10 +324,14 @@ sub check_defaults {
 
 				# only one, that's ok, use it for all
 				my $v = shift @scale_values;
-				push @scale_values, $v foreach (@bamfiles);
+				foreach (@bamfiles) {
+					push @scale_values, $v;
+				}
 			}
 			else {
-				die " number of scale values does not equal number of bam files!\n";
+				print STDERR
+" FATAL: number of scale values does not equal number of bam files!\n";
+				exit 1;
 			}
 		}
 	}
@@ -316,15 +344,15 @@ sub check_defaults {
 	}
 	else {
 		# disable cores
-		print " disabling parallel CPU execution, no support present\n" if $cpu;
+		print " WARNING: disabling parallel CPU execution, no support present\n" if $cpu;
 		$cpu = 0;
 	}
 
 	# set missing options if the value was set
-	if ( $shift_value and !$shift ) {
+	if ( $shift_value and not $shift ) {
 		$shift = 1;
 	}
-	if ( $extend_value and !$use_extend ) {
+	if ( $extend_value and not $use_extend ) {
 		$use_extend = 1 unless ( $use_cspan or $position );
 	}
 
@@ -362,7 +390,8 @@ sub check_defaults {
 			$paired   = 1;
 		}
 		else {
-			die " unrecognized position value '$position'! see help\n";
+			print STDERR " FATAL: unrecognized position value '$position'! see help\n";
+			exit 1;
 		}
 	}
 	my $position_check =
@@ -375,16 +404,18 @@ sub check_defaults {
 		$use_smartpe +
 		$use_ends;
 	if ( $position_check > 1 ) {
-		die " Modes are mutually exclusive! Please select only one of\n"
+		print STDERR " FATAL: Modes are mutually exclusive! Please select only one of\n"
 			. " --start, --mid, --span, --cpsan, --extend, --smartcov, --ends, or --coverage\n";
+		exit 1;
 	}
 	elsif ( not $position_check ) {
 
 		# we allow no position if user has selected shift so that we can calculate
 		# the shift value without running through entire wig conversion
 		unless ($shift) {
-			die " Please select one of the following modes:\n"
+			print STDERR " FATAL: Please select one of the following modes:\n"
 				. " --start, --mid, --span, --cspan, --extend, --smartcov, --ends, or --coverage\n";
+			exit 1;
 		}
 	}
 
@@ -404,14 +435,16 @@ sub check_defaults {
 			# perfect
 		}
 		else {
-			die " incompatible mode with paired and splices enabled! Try --smartcov\n";
+			print STDERR
+" FATAL: incompatible mode with paired and splices enabled! Try --smartcov\n";
+			exit 1;
 		}
 	}
 	$max_intron ||= 0;
 
 	# check paired-end requirements
 	$paired = 1 if $fastpaired;    # for purposes here, fastpair is paired
-	if ( ( $paired or $use_smartpe ) and ( $first or $second ) ) {
+	if ( ( $paired or $use_smartpe ) and ( $first_read or $second_read ) ) {
 		$paired      = 0;          # not necessary
 		$use_smartpe = 0;
 	}
@@ -421,20 +454,26 @@ sub check_defaults {
 
 		# warnings
 		if ($fastpaired) {
-			warn " disabling fast-paired mode with smart-paired coverage\n";
+			print " WARNING: disabling fast-paired mode with smart-paired coverage\n";
 			$fastpaired = 0;
 		}
 		if ($splice_scale) {
-			warn " disabling splice scaling with smart-paired coverage\n";
+			print " WARNING: disabling splice scaling with smart-paired coverage\n";
 			$splice_scale = 0;
 		}
 
 		# required modules
+		my $fast = 0;
 		eval {
 			# required for conveniently assembling overlapping and spliced coverage
 			require Set::IntSpan::Fast;
+			$fast = 1;
 		};
-		die " Module Set::IntSpan::Fast is required for smart-paired coverage\n" if $@;
+		unless ($fast) {
+			print STDERR
+" FATAL: Module Set::IntSpan::Fast is required for smart-paired coverage\n";
+			exit 1;
+		}
 	}
 	if ($use_ends) {
 		$paired = 1;
@@ -442,22 +481,23 @@ sub check_defaults {
 
 	# incompatible options
 	if ( $splice and ( $use_extend or $extend_value ) ) {
-		warn " disabling splices when extend is defined\n";
+		print " WARNING: disabling splices when extend is defined\n";
 		$splice = 0;
 	}
 	if ( $shift and $splice ) {
-		die " enabling both shift and splices is currently not allowed. Pick one.\n";
+		print " WARNING: enabling both shift and splices is currently not allowed. Pick one.\n";
+		exit 1;
 	}
 	if ( $shift and $paired ) {
-		warn " disabling shift with paired reads\n";
+		print " WARNING: disabling shift with paired reads\n";
 		undef $shift;
 	}
 	if ( $use_ends and $shift ) {
-		warn " disabling shift when recording paired endpoints\n";
+		print " WARNING: disabling shift when recording paired endpoints\n";
 		undef $shift;
 	}
 	if ( $use_ends and $splice ) {
-		warn " disabling splices when recording paired endpoints\n";
+		print " WARNING: disabling splices when recording paired endpoints\n";
 		undef $splice;
 	}
 
@@ -468,20 +508,25 @@ sub check_defaults {
 		unless ( $shift_value or $extend_value ) {
 
 			# not provided by user, empirical calculation required
+			my $stat = 0;
 			eval {
 				# required for calculating shift
 				require Statistics::Descriptive;
+				$stat = 1;
 			};
-			die
-" Provide a shift value or install the Perl module Statistics::Descriptive\n"
-				. " to empirically determine the shift value.\n"
-				if $@;
+			if ($stat) {
+				print STDERR
+" FATAL: Provide a shift value or install the Perl module Statistics::Descriptive\n"
+					. " to empirically determine the shift value.\n";
+				exit 1;
+			}
 		}
 
 		if ( defined $correlation_min ) {
 			if ( $correlation_min <= 0 or $correlation_min >= 1 ) {
-				die " cannot use minimum correlation value of $correlation_min!\n"
-					. " use --help for more information\n";
+				print STDERR
+" FATAL: cannot use minimum correlation value of $correlation_min!\n use --help for more information\n";
+				exit 1;
 			}
 		}
 		else {
@@ -493,14 +538,16 @@ sub check_defaults {
 	}
 
 	# center span should have extend value
-	if ( $use_cspan and !$extend_value ) {
-		die
-" please use the --extval option to define an extend value when using center span\n";
+	if ( $use_cspan and not $extend_value ) {
+		print STDERR
+" FATAL: please use the --extval option to define an extend value when using center span\n";
+		exit 1;
 	}
 
 	# check mapping quality
 	if ( defined $min_mapq ) {
-		die " quality score must be 0-255!\n" if $min_mapq > 255;
+		print STDERR " FATAL: quality score must be 0-255!\n" if $min_mapq > 255;
+		exit 1;
 	}
 	else {
 		$min_mapq = 0;
@@ -529,10 +576,16 @@ sub check_defaults {
 	if ( $chrnorm or $chrapply ) {
 
 		# must have both of these parameters
-		die "missing --chrnorm value a for specific-chromosome normalization!\n"
-			unless $chrnorm;
-		die "missing --chrapply regex for specific-chromosome normalization!\n"
-			unless $chrapply;
+		unless ($chrnorm) {
+			print STDERR
+" FATAL: missing --chrnorm value a for specific-chromosome normalization!\n";
+			exit 1;
+		}
+		unless ($chrapply) {
+			print STDERR
+"FATAL: missing --chrapply regex for specific-chromosome normalization!\n";
+			exit 1;
+		}
 	}
 
 	# check flag parameters
@@ -545,7 +598,10 @@ sub check_defaults {
 
 	# set bin size
 	if ($bin_size) {
-		die "bin size cannot be negative!\n" if $bin_size < 0;
+		if ( $bin_size < 0 ) {
+			print STDERR " FATAL: bin size cannot be negative!\n" ;
+			exit 1;
+		}
 	}
 	else {
 		# set default to 10 bp for any span or coverage, or 1 bp for point data
@@ -591,18 +647,18 @@ sub check_defaults {
 			$coverage_sub  = sub {
 				my ( $coverage, $chrom_data ) = @_;
 				my @binned_scores;
-				my $iterator = natatime $bin_size, @$coverage;
+				my $iterator = natatime $bin_size, @{$coverage};
 				while ( my @values = $iterator->() ) {
 					push @binned_scores, mean(@values);
 				}
-				$$chrom_data .= pack( "$binpack*", @binned_scores );
+				${$chrom_data} .= pack( "$binpack*", @binned_scores );
 			};
 		}
 		else {
 			$coverage_dump = 1000;
 			$coverage_sub  = sub {
 				my ( $coverage, $chrom_data ) = @_;
-				$$chrom_data .= pack( "$binpack*", @$coverage );
+				${$chrom_data} .= pack( "$binpack*", @{$coverage} );
 			};
 		}
 	}
@@ -623,23 +679,24 @@ sub check_defaults {
 	unless ($outfile) {
 		if ( scalar @bamfiles == 1 ) {
 			$outfile = $bamfiles[0];
-			$outfile =~ s/\.(?:b|cr)am$//;
+			$outfile =~ s/\.(?:b|cr)am$//xi;
 		}
 		else {
-			die " Please define an output filename when providing multiple bam files!\n";
+			print STDERR
+" FATAL: Define an output filename when providing multiple bam files!\n";
+			exit 1;
 		}
 	}
 	( undef, my $outdir, $outbase ) = File::Spec->splitpath($outfile);
-	$outbase =~
-		s/\.(?:wig|bdg|bedgraph|bw|bigwig)(?:\.gz)?$//i;    # strip extension if present
-	$outfile =~
-		s/\.(?:wig|bdg|bedgraph|bw|bigwig)(?:\.gz)?$//i;    # strip extension if present
+	$outbase =~ s/\.(?: wig | bdg | bedgraph | bw | bigwig ) (?:\.gz)? $//xi;
+	$outfile =~ s/\.(?: wig | bdg | bedgraph | bw | bigwig ) (?:\.gz)? $//xi;
 
 	# set output temporary directory
 	if ($tempdir) {
 		unless ( -x $tempdir and -d _ and -w _ ) {
-			die
-" Specified temp directory '$tempdir' either does not exist or is not writeable!\n";
+			print STDERR
+" FATAL: Specified temp directory '$tempdir' either does not exist or is not writeable!\n";
+			exit 1;
 		}
 		$tempdir =
 			File::Temp->newdir( "bam2wigTEMP_XXXX", DIR => $tempdir, CLEANUP => 1 );
@@ -677,11 +734,12 @@ sub check_defaults {
 		}
 	}
 	if ( ( $do_bedgraph + $do_varstep + $do_fixstep ) > 1 ) {
-		die " Please select only one of --bedgraph, --fixstep, or --varstep\n";
+		print STDERR " FATAL: Select only one of --bedgraph, --fixstep, or --varstep\n";
+		exit 1;
 	}
 	if ( $do_varstep and $bin_size > 1 ) {
-		warn
-" Writing variableStep wig files with bin size of $bin_size bp is not supported!"
+		print
+" WARNING: Writing variableStep wig files with bin size of $bin_size bp is not supported!"
 			. "\n Writing fixedStep wig file instead\n";
 		$do_varstep = 0;
 		$do_fixstep = 1;
@@ -881,7 +939,7 @@ sub process_black_list {
 		my $i = 0;
 		eval { require Set::IntervalTree; $i = 1; };
 		unless ($i) {
-			warn " PROBLEM! Please install Set::IntervalTree to use black lists\n";
+			print " WARNING! Please install Set::IntervalTree to use black lists\n";
 			undef $black_list;
 			return;
 		}
@@ -1061,7 +1119,7 @@ sub calculate_strand_correlation {
 	my @regions;
 
 	# determine the optimal shift for each of the test regions
-	foreach my $pos (@$collected) {
+	foreach my $pos ( @{$collected} ) {
 
 		# generate region string
 		my $region = sprintf "%s:%d..%d", $sam->target_name($tid), $pos * 10,
@@ -1156,7 +1214,7 @@ sub scan_high_coverage {
 	my %pos2depth;
 	for ( my $start = 0; $start < int( $chr_length / 10 ); $start += 50 ) {
 		my $readsum = sum0( map { $data{f}->[$_] || 0 } ( $start .. $start + 49 ) );
-		my $readsum += sum0( map { $data{r}->[$_] || 0 } ( $start .. $start + 49 ) );
+		$readsum += sum0( map { $data{r}->[$_] || 0 } ( $start .. $start + 49 ) );
 		next if $readsum == 0;
 		$pos2depth{$start} = $readsum;
 	}
@@ -1263,7 +1321,7 @@ sub write_model_file {
 	$profile->add_comment("Final shift value calculated as $value bp");
 	$profile->metadata( 2, 'minimum_r',                     $correlation_min );
 	$profile->metadata( 2, 'number_of_chromosomes_sampled', $chr_number );
-	$profile->metadata( 2, 'regions_sampled',               scalar(@$f_profile) );
+	$profile->metadata( 2, 'regions_sampled',               scalar( @{$f_profile} ) );
 
 	# Load data table
 	# first we will put the mean value for all the regions
@@ -1293,7 +1351,7 @@ sub write_model_file {
 	$Data->add_comment("Final shift value calculated as $value bp");
 	$Data->metadata( 1, 'minimum_r',                     $correlation_min );
 	$Data->metadata( 1, 'number_of_chromosomes_sampled', $chr_number );
-	$Data->metadata( 1, 'regions_sampled',               scalar(@$f_profile) );
+	$Data->metadata( 1, 'regions_sampled',               scalar( @{$f_profile} ) );
 
 	# load data table
 	# first we will put the mean value for all the r squared values
@@ -1362,7 +1420,7 @@ sub open_wig_file {
 	}
 
 	# otherwise we open a text wig file
-	unless ( $name =~ /\.(?:bdg|wig)(?:\.gz)?$/i ) {
+	unless ( $name =~ /\. (?: bdg |wig ) (?:\.gz)? $/xi ) {
 		$name .= $do_bedgraph ? '.bdg' : '.wig';
 	}
 	my $do_gz = ( $gz and $do_bw ) ? 1 : 0;
@@ -1406,7 +1464,7 @@ sub process_bam_coverage {
 		foreach my $file (@filelist) {
 
 			# each file name is basename.samid.seqid.count.strand.bin.gz
-			if ( $file =~ /$outbase\.(\d+)\.(.+)\.0\.f\.temp\.bin\Z/ ) {
+			if ( $file =~ /$outbase \.(\d+) \.(.+) \.0 \.f \.temp \.bin \Z/x ) {
 				my $samid = $1;
 				my $seqid = $2;
 				$files{$seqid}{$samid} = $file;
@@ -1452,7 +1510,7 @@ sub parallel_process_bam_coverage {
 	my $pm = Parallel::ForkManager->new($cpu);
 	foreach my $stuff (@pool) {
 		$pm->start and next;
-		my ( $samid, $sam, $seq_id ) = @$stuff;
+		my ( $samid, $sam, $seq_id ) = @{$stuff};
 
 		# clone the sam object for safe forking
 		$sam->clone;
@@ -1478,7 +1536,7 @@ sub parallel_process_bam_coverage {
 		foreach my $file (@filelist) {
 
 			# each file name is basename.samid.seqid.count.strand.bin.gz
-			if ( $file =~ /$outbase\.(\d+)\.(.+)\.0\.f\.temp\.bin\Z/ ) {
+			if ( $file =~ /$outbase \.(\d+) \.(.+) \.0 \.f \.temp \.bin \Z/x ) {
 				my $samid = $1;
 				my $seqid = $2;
 				$files{$seqid}{$samid} = $file;
@@ -1528,7 +1586,7 @@ sub process_bam_coverage_on_chromosome {
 		my $coverage = low_level_bam_coverage( $sam, $tid, $start, $end );
 
 		# record the coverage
-		&$coverage_sub( $coverage, \$chrom_data );
+		&{$coverage_sub}( $coverage, \$chrom_data );
 	}
 
 	# write out chromosome binary file, set count to arbitrary 0
@@ -1537,8 +1595,10 @@ sub process_bam_coverage_on_chromosome {
 			join( '.', $outbase, $samid, $seq_id, 0, 'f', 'temp.bin' ) );
 	}
 	else {
-		&$wig_writer( \$chrom_data, $binpack, $seq_id, $seq_length,
-			join( '.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig' ) );
+		&{$wig_writer}(
+			\$chrom_data, $binpack, $seq_id, $seq_length,
+			join( '.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig' )
+		);
 	}
 
 	# verbose status line
@@ -1584,7 +1644,7 @@ sub process_alignments {
 		foreach my $file (@filelist) {
 
 			# each file name is basename.samid.seqid.count.strand.bin.gz
-			if ( $file =~ /$outbase\.(\d+)\.(.+)\.(\d+)\.([fr])\.temp\.bin\Z/ ) {
+			if ( $file =~ /$outbase \.(\d+) \.(.+) \.(\d+) \.([fr]) \.temp \.bin \Z/x ) {
 				my $samid  = $1;
 				my $seq_id = $2;
 				my $count  = $3;
@@ -1649,7 +1709,7 @@ sub process_alignments {
 					@norms = @scale_values;
 				}
 			}
-			printf "  Normalization factors: %s\n", join( ' ', @norms ) if $verbose;
+			printf "  Normalization factors: %s\n", join( q( ), @norms ) if $verbose;
 
 			# merge the samples
 			foreach my $seq_id (@seq_list) {
@@ -1665,7 +1725,7 @@ sub process_alignments {
 
 			if ($verbose) {
 				printf " Finished merging%s in %.3f minutes\n",
-					defined $norms[0] ? " and normalizing" : "",
+					defined $norms[0] ? ' and normalizing' : q(),
 					( time - $start_time ) / 60;
 			}
 		}
@@ -1721,7 +1781,7 @@ sub parallel_process_alignments {
 		or die "unable to initialize ForkManager object!\n";
 	foreach my $stuff (@pool) {
 		$pm->start and next;
-		my ( $samid, $sam, $seq_id ) = @$stuff;
+		my ( $samid, $sam, $seq_id ) = @{$stuff};
 
 		# clone the sam object for safe forking
 		$sam->clone;
@@ -1753,7 +1813,7 @@ sub parallel_process_alignments {
 		foreach my $file (@filelist) {
 
 			# each file name is basename.samid.seqid.count.strand.bin.gz
-			if ( $file =~ /$outbase\.(\d+)\.(.+)\.(\d+)\.([fr])\.temp\.bin\Z/ ) {
+			if ( $file =~ /$outbase \.(\d+) \.(.+) \.(\d+) \.([fr]) \.temp \.bin \Z/x ) {
 				my $samid  = $1;
 				my $seq_id = $2;
 				my $count  = $3;
@@ -1821,7 +1881,7 @@ sub parallel_process_alignments {
 					@norms = @scale_values;
 				}
 			}
-			printf "  Normalization factors: %s\n", join( ' ', @norms ) if $verbose;
+			printf "  Normalization factors: %s\n", join( q( ), @norms ) if $verbose;
 
 			# merge the samples
 			foreach my $seq_id (@seq_list) {
@@ -1840,7 +1900,7 @@ sub parallel_process_alignments {
 
 			if ($verbose) {
 				printf " Finished merging%s in %.3f minutes\n",
-					defined $norms[0] ? " and normalizing" : "",
+					defined $norms[0] ? ' and normalizing' : q(),
 					( time - $start_time ) / 60;
 			}
 		}
@@ -1892,8 +1952,8 @@ sub process_alignments_on_chromosome {
 	my $data = {
 		f          => [],
 		r          => [],
-		fpack      => undef,
-		rpack      => undef,
+		fpack      => q(),
+		rpack      => q(),
 		f_offset   => 0,
 		r_offset   => 0,
 		pair       => {},
@@ -1953,10 +2013,12 @@ sub process_alignments_on_chromosome {
 	}
 	else {
 		# write a chromosome specific wig file
-		&$wig_writer( \$data->{fpack}, $binpack, $seq_id, $seq_length,
+		&{$wig_writer}(
+			\$data->{fpack}, $binpack, $seq_id, $seq_length,
 			join( '.', $outbase, $samid, $seq_id, $data->{f_count}, 'f', 'temp.wig' )
 		);
-		&$wig_writer( \$data->{rpack}, $binpack, $seq_id, $seq_length,
+		&{$wig_writer}(
+			\$data->{rpack}, $binpack, $seq_id, $seq_length,
 			join( '.', $outbase, $samid, $seq_id, $data->{r_count}, 'r', 'temp.wig' )
 		) if $do_strand;
 	}
@@ -1983,7 +2045,7 @@ sub write_bin_file {
 	my $fh = Bio::ToolBox->write_file($filename)
 		or die " unable to write temporary file '$filename'!\n";
 	$fh->binmode;
-	$fh->print($$data);
+	$fh->print( ${$data} );
 	$fh->close;
 }
 
@@ -1995,7 +2057,7 @@ sub merge_bin_files {
 
 	# open filehandles to each binary file
 	my %fhs;
-	foreach my $samid ( keys %$files ) {
+	foreach my $samid ( keys %{$files} ) {
 		my $fh = Bio::ToolBox->read_file( $files->{$samid} )
 			or die sprintf " unable to read temporary file %s!\n", $files->{$samid};
 		$fh->binmode;
@@ -2064,7 +2126,7 @@ sub merge_bin_files {
 	);
 	if ($verbose) {
 		printf "  Merged%s $seq_id temp files in %d seconds\n",
-			defined $norm_factors->[0] ? " and normalized" : "",
+			defined $norm_factors->[0] ? ' and normalized' : q(),
 			time - $merge_start_time;
 	}
 }
@@ -2104,7 +2166,7 @@ sub normalize_bin_file {
 
 	# now write the wig file
 	$file =~ s/\.bin$/.wig/;
-	&$wig_writer( \$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, $file );
+	&{$wig_writer}( \$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, $file );
 	if ($verbose) {
 		printf "  Scaled $seq_id temp file in %d seconds\n", time - $norm_start_time;
 	}
@@ -2128,7 +2190,7 @@ sub write_final_wig_file {
 	foreach my $file (@filelist) {
 
 		# each file name is basename.samid.seqid.count.strand.temp.wig
-		if ( $file =~ /$outbase\.\d+\.(.+)\.(\d+)\.([fr])\.temp\.wig\Z/ ) {
+		if ( $file =~ /$outbase \.\d+ \.(.+) \.(\d+) \.([fr]) \.temp \.wig \Z/x ) {
 			my $seq_id = $1;
 			my $total  = $2;
 			my $strand = $3;
@@ -2154,7 +2216,7 @@ sub write_final_wig_file {
 	}
 
 	# write wig files with the appropriate wig writer
-	if ( $do_strand and !$flip ) {
+	if ( $do_strand and not $flip ) {
 
 		if ( $cpu > 1 ) {
 
@@ -2212,7 +2274,6 @@ sub write_bedgraph {
 
 	# work though chromosome
 	my $seq_bin_length = int( $seq_length / $bin_size );
-	my $buflength      = length( pack( $packer, 1 ) );
 	my $out_string;
 	my $cpos = 0;    # current position
 	my $lpos = 0;    # last position
@@ -2225,7 +2286,8 @@ sub write_bedgraph {
 
 		# unpack current window from the passed binary string
 		my @win_data =
-			unpack( "$packer*", substr( $$data, $pos * $buflength, $len * $buflength ) );
+			unpack( "$packer*",
+				substr( ${$data}, $pos * $buflength, $len * $buflength ) );
 
 		# work through current window
 		foreach my $value (@win_data) {
@@ -2259,7 +2321,8 @@ sub write_bedgraph {
 	}
 
 	# write wig file
-	my ( $filename, $outfh ) = open_wig_file( $filename, 0 );
+	my $outfh;
+	( $filename, $outfh ) = open_wig_file( $filename, 0 );
 	$outfh->print($out_string);
 	$outfh->close;
 }
@@ -2277,7 +2340,6 @@ sub write_fixstep {
 
 	# work though chromosome
 	my $seq_bin_length = int( $seq_length / $bin_size );
-	my $buflength      = length( pack( $packer, 1 ) );
 	for ( my $pos = 0; $pos < $seq_bin_length; $pos += $window ) {
 
 		# check length
@@ -2286,7 +2348,8 @@ sub write_fixstep {
 
 		# unpack current window from the passed binary string
 		my @win_data =
-			unpack( "$packer*", substr( $$data, $pos * $buflength, $len * $buflength ) );
+			unpack( "$packer*",
+				substr( ${$data}, $pos * $buflength, $len * $buflength ) );
 
 		# work through current window
 		foreach my $value (@win_data) {
@@ -2295,7 +2358,8 @@ sub write_fixstep {
 	}
 
 	# write wig file
-	my ( $filename, $outfh ) = open_wig_file( $filename, 0 );
+	my $outfh;
+	( $filename, $outfh ) = open_wig_file( $filename, 0 );
 	$outfh->print($out_string);
 	$outfh->close;
 }
@@ -2313,7 +2377,6 @@ sub write_varstep {
 	my $out_string = "variableStep chrom=$seq_id\n";
 
 	# work though chromosome
-	my $buflength = length( pack( $packer, 1 ) );
 	for ( my $pos = 0; $pos < $seq_length; $pos += $window ) {
 
 		# check length
@@ -2321,7 +2384,8 @@ sub write_varstep {
 
 		# unpack current window from the passed binary string
 		my @win_data =
-			unpack( "$packer*", substr( $$data, $pos * $buflength, $len * $buflength ) );
+			unpack( "$packer*",
+				substr( ${$data}, $pos * $buflength, $len * $buflength ) );
 
 		# work through current window
 		for ( my $i = 0; $i <= $#win_data; $i++ ) {
@@ -2331,7 +2395,8 @@ sub write_varstep {
 	}
 
 	# write wig file
-	my ( $filename, $outfh ) = open_wig_file( $filename, 0 );
+	my $outfh;
+	( $filename, $outfh ) = open_wig_file( $filename, 0 );
 	$outfh->print($out_string);
 	$outfh->close;
 }
@@ -2346,11 +2411,13 @@ sub merge_wig_files {
 		unless ($in) {
 			warn
 "one or more sub-process forks failed! Check your parameters and input file.\nAttempting to clean up\n";
-			foreach (@files) { unlink $_; }
+			foreach (@files) { unlink; }
 			unlink $chromo_file if $chromo_file;
 			exit 1;
 		}
-		while (<$in>) { $fh->print($_) }
+		while ( my $l = $in->getline ) {
+			$fh->print($l);
+		}
 		$in->close;
 		unlink $file;
 	}
@@ -2368,13 +2435,13 @@ sub se_callback {
 	return if ( $noduplicate and $flag & 0x400 );           # marked duplicate
 	return if ( $flag & 0x200 );    # QC failed but still aligned? is this necessary?
 	return if ( $nosupplementary and $flag & 0x800 );       # supplementary hit
-	return if ( $first           and not $flag & 0x40 );    # first read in pair
-	return if ( $second          and not $flag & 0x80 );    # second read in pair
+	return if ( $first_read      and not $flag & 0x40 );    # first read in pair
+	return if ( $second_read     and not $flag & 0x80 );    # second read in pair
 
 	# filter black listed regions
 	if ( defined $data->{black_list} ) {
 		my $results = $data->{black_list}->fetch( $a->pos, $a->calend );
-		return if @$results;
+		return if scalar @{$results};
 	}
 
 	# scale by number of hits
@@ -2401,7 +2468,7 @@ sub se_callback {
 		se_spliced_callback( $a, $data, $score );
 	}
 	else {
-		&$callback( $a, $data, $score );
+		&{$callback}( $a, $data, $score );
 	}
 
 	# check data size
@@ -2439,7 +2506,7 @@ sub fast_pe_callback {
 	# filter black listed regions
 	if ( $data->{black_list} ) {
 		my $results = $data->{black_list}->fetch( $a->pos, $a->pos + $isize );
-		return if @$results;
+		return if scalar @{$results};
 	}
 
 	# scale by number of hits
@@ -2464,7 +2531,7 @@ sub fast_pe_callback {
 	}
 
 	# record based on the forward read
-	&$callback( $a, $data, $score );
+	&{$callback}( $a, $data, $score );
 
 	# check data size
 	if ( scalar( @{ $data->{f} } ) > 1_000_000 ) {
@@ -2512,7 +2579,7 @@ sub pe_callback {
 		else {
 			$results = $data->{black_list}->fetch( $a->pos, $a->pos + $isize );
 		}
-		return if @$results;
+		return if scalar @{$results};
 	}
 
 	# look for pair
@@ -2551,7 +2618,7 @@ sub pe_callback {
 
 		# record based primarily on the forward read, but pass reverse read at end
 		# for use in smart pairing
-		&$callback( $f, $data, $score, $a );
+		&{$callback}( $f, $data, $score, $a );
 	}
 	else {
 		# store until we find it's mate
@@ -2577,7 +2644,7 @@ sub se_spliced_callback {
 	if ($max_intron) {
 		my $size   = 1;
 		my $cigars = $aw->cigar_array;
-		foreach my $c (@$cigars) {
+		foreach my $c ( @{$cigars} ) {
 
 			# each element is [operation, size]
 			$size = $c->[1] if ( $c->[0] eq 'N' and $c->[1] > $size );
@@ -2960,8 +3027,9 @@ sub pe_start {
 		$data->{f}->[ $pos - $data->{f_offset} ] += $score;
 	}
 	else {
-		die
-" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+		die sprintf(
+" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
+			$a->query->name);
 	}
 }
 
@@ -2983,8 +3051,9 @@ sub pe_strand_start {
 		$data->{r}->[ $pos - $data->{r_offset} ] += $score;
 	}
 	else {
-		die
-" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+		die sprintf(
+" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
+			$a->query->name);
 	}
 }
 
@@ -3012,8 +3081,9 @@ sub pe_strand_mid {
 		$data->{r}->[ $mid - $data->{r_offset} ] += $score;
 	}
 	else {
-		die
-" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+		die sprintf(
+" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
+			$a->query->name);
 	}
 }
 
@@ -3049,17 +3119,18 @@ sub pe_strand_span {
 		}
 	}
 	else {
-		die
-" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+		die sprintf(
+" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
+			$a->query->name);
 	}
 }
 
 sub pe_center_span {
 	my ( $a, $data, $score ) = @_;
-	my $position = $a->pos + int( $a->isize / 2 );
-	my $start    = int( ( $position - $half_extend ) / $bin_size );
+	my $center = $a->pos + int( $a->isize / 2 );
+	my $start  = int( ( $center - $half_extend ) / $bin_size );
 	$start = 0 if $start < 0;
-	my $end = int( ( $position + $half_extend ) / $bin_size );
+	my $end = int( ( $center + $half_extend ) / $bin_size );
 	foreach ( $start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 		$data->{f}->[$_] += $score;
 	}
@@ -3067,10 +3138,10 @@ sub pe_center_span {
 
 sub pe_strand_center_span {
 	my ( $a, $data, $score ) = @_;
-	my $position = $a->pos + int( $a->isize / 2 );
-	my $start    = int( ( $position - $half_extend ) / $bin_size );
+	my $center = $a->pos + int( $a->isize / 2 );
+	my $start  = int( ( $center - $half_extend ) / $bin_size );
 	$start = 0 if $start < 0;
-	my $end  = int( ( $position + $half_extend ) / $bin_size );
+	my $end  = int( ( $center + $half_extend ) / $bin_size );
 	my $flag = $a->flag;
 
 	# we always receive the forward read, never reverse, from pe_callback
@@ -3090,8 +3161,9 @@ sub pe_strand_center_span {
 		}
 	}
 	else {
-		die
-" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+		die sprintf(
+" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
+			$a->query->name);
 	}
 }
 
@@ -3108,7 +3180,7 @@ sub smart_pe {
 			if ($max_intron) {
 				my $size   = 1;
 				my $cigars = $aw->cigar_array;
-				foreach my $c (@$cigars) {
+				foreach my $c ( @{$cigars} ) {
 
 					# each element is [operation, size]
 					$size = $c->[1] if ( $c->[0] eq 'N' and $c->[1] > $size );
@@ -3165,7 +3237,7 @@ sub smart_stranded_pe {
 			if ($max_intron) {
 				my $size   = 1;
 				my $cigars = $aw->cigar_array;
-				foreach my $c (@$cigars) {
+				foreach my $c ( @{$cigars} ) {
 
 					# each element is [operation, size]
 					$size = $c->[1] if ( $c->[0] eq 'N' and $c->[1] > $size );
@@ -3235,8 +3307,9 @@ sub pe_strand_ends {
 		$data->{f}->[ $pos - $data->{f_offset} ] += $score;
 	}
 	else {
-		die
-" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+		die sprintf(
+" Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
+			$a->query->name);
 	}
 }
 
