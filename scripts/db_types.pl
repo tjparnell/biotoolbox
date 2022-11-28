@@ -5,12 +5,14 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
+use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
 use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.19';
+
+our $VERSION = '1.70';
 
 print "\n A script to print all available feature types in a database\n\n";
 
@@ -121,7 +123,7 @@ sub request_db_from_user {
 	my %num2db;
 	my $n = 1;
 	foreach my $key ( $BTB_CONFIG->param() ) {
-		if ( $key =~ /^(.+)\.dsn$/ ) {
+		if ( $key =~ /^ (.+) \.dsn $/x ) {
 			next if $1 =~ /example/;
 			$num2db{$n} = $1;
 			$n++;
@@ -133,9 +135,8 @@ sub request_db_from_user {
 	foreach ( sort { $a <=> $b } keys %num2db ) {
 		print "   $_\t$num2db{$_}\n";
 	}
-	print " Enter the number of the database to examine   ";
-	my $number = <STDIN>;
-	chomp $number;
+	my $p = " Enter the number of the database to examine   ";
+	my $number = prompt($p);
 	return unless exists $num2db{$number};
 	return $num2db{$number};
 }
