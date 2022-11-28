@@ -2,6 +2,7 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
@@ -13,7 +14,7 @@ eval {
 	$bio = 1;
 };
 
-my $VERSION = '1.63';
+our $VERSION = '1.70';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -94,8 +95,13 @@ END
 	exit;
 }
 unless ($infile) {
-	$infile = shift @ARGV
-		or die " no input file! use --help for more information\n";
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		print STDERR " FATAL: no input file! use --help for more information\n";
+		exit 1;
+	}
 }
 unless ( defined $gz ) {
 	$gz = 0;
@@ -113,18 +119,17 @@ unless ($database) {
 }
 
 ### Identify columns ####
-unless ( defined $id_i ) {
+unless ( $id_i ) {
 	$id_i = $Data->name_column;
 }
-unless ( defined $seq_i ) {
+unless ( $seq_i ) {
 	$seq_i = $Data->find_column('sequence');
 }
-unless ( defined $desc_i ) {
+unless ( $desc_i ) {
 	$desc_i = $Data->find_column('description|note');
 }
-my $coords;
-my $do_feature;
-if ( defined $chr_i and defined $start_i and defined $stop_i ) {
+my $coords = 0;
+if ( $chr_i and $start_i and $stop_i ) {
 
 	# user defined coordinates
 	$coords = 1;
@@ -137,12 +142,11 @@ elsif ( $Data->feature_type eq 'coordinate' ) {
 elsif ( $Data->feature_type eq 'named' ) {
 
 	# Input has named features that presumably have coordinates in a database
-	$coords     = 1;
-	$do_feature = 1;
+	$coords = 1;
 }
 
 ### Determine mode ###
-if ( defined $id_i and defined $seq_i and $concatenate ) {
+if ( $id_i and $seq_i and $concatenate ) {
 
 	# sequence is already in the source file
 	printf " Found Sequence column %s\n",    defined $seq_i  ? $seq_i  : '-';
@@ -150,7 +154,7 @@ if ( defined $id_i and defined $seq_i and $concatenate ) {
 	print " writing a single concatenated fasta with the provided sequence\n";
 	write_direct_single_fasta();
 }
-elsif ( defined $id_i and defined $seq_i ) {
+elsif ( $id_i and $seq_i ) {
 
 	# sequence is already in the source file
 	printf " Found Sequence column %s\n",    defined $seq_i  ? $seq_i  : '-';
@@ -171,7 +175,8 @@ elsif ($coords) {
 	fetch_seq_and_write_multi_fasta();
 }
 else {
-	die " unable to identify appropriate columns! see help\n";
+	print STDERR " FATAL: unable to identify appropriate columns! see help\n";
+	exit 1;
 }
 
 ### Finished
@@ -182,7 +187,7 @@ print " wrote file '$outfile'\n";
 sub write_direct_single_fasta {
 
 	# concatenate each of the provided sequences
-	my $concat_seq;
+	my $concat_seq = q();
 
 	$Data->iterate(
 		sub {
@@ -243,18 +248,16 @@ sub fetch_seq_and_write_single_fasta {
 		# hope it works....
 	}
 	else {
-		die " A sequence or fasta database must be provided to collect sequence!\n";
+		print STDERR 
+" FATAL: A sequence or fasta database must be provided to collect sequence!\n";
+		exit 1;
 	}
 
 	# collect concatenated sequences and write
-	my $concat_seq;
+	my $concat_seq = q();
 	$Data->iterate(
 		sub {
 			my $row = shift;
-
-			# make sure we parse and/or fetch the seqfeature if need be
-			# this isn't necessarily automatic....
-			my $f = $row->seqfeature if $do_feature;
 
 			# collect provided arguments for generating sequence
 			my @args;
@@ -309,7 +312,9 @@ sub fetch_seq_and_write_multi_fasta {
 		# hope it works....
 	}
 	else {
-		die " A sequence or fasta database must be provided to collect sequence!\n";
+		print STDERR
+" FATAL: A sequence or fasta database must be provided to collect sequence!\n";
+		exit 1;
 	}
 
 	# open output file
@@ -320,18 +325,14 @@ sub fetch_seq_and_write_multi_fasta {
 		sub {
 			my $row = shift;
 
-			# make sure we parse and/or fetch the seqfeature if need be
-			# this isn't necessarily automatic....
-			my $f = $row->seqfeature if $do_feature;
-
 			# collect provided arguments for generating sequence
 			my @args;
 			push @args, ( 'subfeature', $subfeature )            if $subfeature;
 			push @args, ( 'db',         $db )                    if $db;
-			push @args, ( 'start',      $row->value($start_i) )  if defined $start_i;
-			push @args, ( 'stop',       $row->value($stop_i) )   if defined $stop_i;
-			push @args, ( 'seq_id',     $row->value($chr_i) )    if defined $chr_i;
-			push @args, ( 'strand',     $row->value($strand_i) ) if defined $strand_i;
+			push @args, ( 'start',      $row->value($start_i) )  if $start_i;
+			push @args, ( 'stop',       $row->value($stop_i) )   if $stop_i;
+			push @args, ( 'seq_id',     $row->value($chr_i) )    if $chr_i;
+			push @args, ( 'strand',     $row->value($strand_i) ) if $strand_i;
 			push @args, ( 'extend',     $extend )                if $extend;
 
 			# collect sequence based on values obtained above
@@ -347,7 +348,7 @@ sub fetch_seq_and_write_multi_fasta {
 				-id  => $row->name || $row->coordinate,
 				-seq => $sequence,
 			);
-			if ( defined $desc_i ) {
+			if ( $desc_i ) {
 				$seq->desc( $row->value($desc_i) );
 			}
 
@@ -363,7 +364,7 @@ sub open_output_fasta {
 	unless ($outfile) {
 		$outfile = $Data->path . $Data->basename . '.fa';
 	}
-	unless ( $outfile =~ /\.fa(?:sta)?(?:\.gz)?/i ) {
+	unless ( $outfile =~ /\.fa (?:sta)? (?:\.gz)? $/xi ) {
 		$outfile .= '.fasta';
 	}
 	if ( $gz and $outfile !~ /\.gz$/i ) {
