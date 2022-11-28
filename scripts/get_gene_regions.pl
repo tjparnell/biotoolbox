@@ -2,19 +2,22 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
+use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
+use Bio::ToolBox::Parser;
 use Bio::ToolBox::GeneTools qw(:all);
-use Bio::ToolBox::parser::gff;
-use Bio::ToolBox::parser::ucsc;
-use Bio::ToolBox::utility;
-my $VERSION = '1.65';
+use Bio::ToolBox::utility qw(parse_list format_with_commas);
+
+our $VERSION = '1.70';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -34,14 +37,14 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 my ( $infile, $outfile, $database, $request, $transcript_type, $tsl, $gencode, $tbiotype,
 	$start_adj, $stop_adj, $unique, $slop, $bed, $gz, $help, $print_version, );
-my @features;
+my @feature_types;
 
 # Command line options
 GetOptions(
 	'i|in=s'          => \$infile,             # the input data file
 	'o|out=s'         => \$outfile,            # name of output file
 	'd|db=s'          => \$database,           # source annotation database
-	'f|feature=s'     => \@features,           # the gene feature from the database
+	'f|feature=s'     => \@feature_types,      # the features requested from database
 	'r|region=s'      => \$request,            # the region requested
 	't|transcript=s'  => \$transcript_type,    # which transcripts to take
 	'tsl=s'           => \$tsl,                # filter on transcript support level
@@ -72,15 +75,24 @@ if ($help) {
 # Print version
 if ($print_version) {
 	print " Biotoolbox script get_gene_regions.pl, version $VERSION\n\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 
 ### Check for requirements and set defaults
 unless ( $infile or $database ) {
-	die
-" must define a database or input gene table file! use --help for more information\n";
+	print STDERR
+" FATAL: must define a database or input gene table file! use --help for more information\n";
+	exit 1;
 }
-if ( $database =~ /\.(?:gtf|gff3?|txt|refflat|genepred|ucsc)(?:\.gz)?$/i ) {
+if (    $database
+	and $database =~
+	/\. (?: gtf | gff3? | txt | refflat | genepred | ucsc ) (?:\.gz)? $/xi )
+{
 
 	# looks like a gene table file was specified as the database
 	# intercept and assign to input file name
@@ -88,8 +100,10 @@ if ( $database =~ /\.(?:gtf|gff3?|txt|refflat|genepred|ucsc)(?:\.gz)?$/i ) {
 	$database = undef;
 }
 
-unless ($outfile) {
-	die " must define an output file name! use --help for more information\n";
+unless ( defined $outfile ) {
+	print STDERR
+" FATAL: must define an output file name! use --help for more information\n";
+	exit 1;
 }
 
 unless ( defined $slop ) {
@@ -102,8 +116,8 @@ unless ( defined $gz ) {
 
 # one or more feature types may have been provided
 # check if it is a comma delimited list
-if ( scalar @features == 1 and $features[0] =~ /,/ ) {
-	@features = split /,/, shift @features;
+if ( scalar @feature_types == 1 and $feature_types[0] =~ /,/ ) {
+	@feature_types = split /,/, shift @feature_types;
 }
 
 # boolean values for different transcript types to take
@@ -113,20 +127,22 @@ my (
 );
 
 ### Determine methods and transcript types
-# Determine request_method
-my $method = determine_method();
+# Determine request_method and put into global variable
+my $method;
+determine_method();
 
 ### Collect feature regions
-# collection
-printf " Collecting %s$request regions...\n", $unique ? "unique " : "";
-
+# collect the regions based on provided database or input file
+# using the method determined above
+printf " Collecting %s$request regions...\n", $unique ? 'unique ' : q();
 my $outdata;
 if ($database) {
-	$outdata = collect_from_database($method);
+	$outdata = collect_from_database();
 }
 elsif ($infile) {
-	$outdata = collect_from_file($method);
+	$outdata = collect_from_file();
 }
+
 printf " Collected %s regions\n", format_with_commas( $outdata->last_row );
 print " Sorting...\n";
 $outdata->gsort_data;
@@ -170,97 +186,98 @@ sub determine_method {
 	unless ($request) {
 		$request = collect_method_from_user();
 	}
-
+	$request = lc $request;
+	
 	# determine the method
 	# also change the name of the request from short to long form
-	my $method;
-	if ( $request =~ /tss/i ) {
+	if ( $request eq 'tss' ) {
 		$request = 'transcription start site';
 		$method  = \&collect_tss;
 	}
 	elsif ( $request eq 'transcription start site' ) {
 		$method = \&collect_tss;
 	}
-	elsif ( $request =~ /tts/i ) {
+	elsif ( $request eq 'tts' ) {
 		$request = 'transcription stop site';
 		$method  = \&collect_tts;
 	}
 	elsif ( $request eq 'transcription stop site' ) {
 		$method = \&collect_tts;
 	}
-	elsif ( $request =~ /^splices?/i ) {
+	elsif ( $request =~ /^splices?$/x ) {
 		$request = 'splice sites';
 		$method  = \&collect_splice_sites;
 	}
-	elsif ( $request =~ /^exons?/i ) {
+	elsif ( $request =~ /^exons?$/x ) {
 		$request = 'exon';
 		$method  = \&collect_exons;
 	}
-	elsif ( $request =~ /^collapsed ?exons?/i ) {
+	elsif ( $request =~ /^collapsed .? exon s?$/x ) {
 		$request = 'collapsed exon';
 		$method  = \&collect_collapsed_exons;
 	}
-	elsif ( $request =~ /^first ?exon$/i ) {
+	elsif ( $request =~ /^first.?exon$/x ) {
 		$request = 'first exon';
 		$method  = \&collect_first_exon;
 	}
-	elsif ( $request =~ /^last ?exon$/i ) {
+	elsif ( $request =~ /^last.?exon$/x ) {
 		$request = 'last exon';
 		$method  = \&collect_last_exon;
 	}
-	elsif ( $request =~ /^alt.*exons?/i ) {
+	elsif ( $request =~ /^alt .* exons?$/x ) {
 		$request = 'alternate exon';
 		$method  = \&collect_alt_exons;
 	}
-	elsif ( $request =~ /^common ?exons?/i ) {
+	elsif ( $request =~ /^common .? exons?$/x ) {
 		$request = 'common exon';
 		$method  = \&collect_common_exons;
 	}
-	elsif ( $request =~ /^uncommon ?exons?/i ) {
+	elsif ( $request =~ /^uncommon .? exons?$/x ) {
 		$request = 'uncommon exon';
 		$method  = \&collect_uncommon_exons;
 	}
-	elsif ( $request =~ /^introns?$/i ) {
+	elsif ( $request =~ /^introns?$/ ) {
 		$method = \&collect_introns;
 	}
-	elsif ( $request =~ /^collapsed ?introns?/i ) {
+	elsif ( $request =~ /^collapsed .? introns?$/x ) {
 		$request = 'collapsed intron';
 		$method  = \&collect_collapsed_introns;
 	}
-	elsif ( $request =~ /^first ?intron/i ) {
+	elsif ( $request =~ /^first .? intron$/x ) {
 		$request = 'first intron';
 		$method  = \&collect_first_intron;
 	}
-	elsif ( $request =~ /^last ?intron/i ) {
+	elsif ( $request =~ /^last .? intron$/x ) {
 		$request = 'last intron';
 		$method  = \&collect_last_intron;
 	}
-	elsif ( $request =~ /^alt.*introns?/i ) {
+	elsif ( $request =~ /^alt .* introns?$/x ) {
 		$request = 'alternate intron';
 		$method  = \&collect_alt_introns;
 	}
-	elsif ( $request =~ /^common ?introns?/i ) {
+	elsif ( $request =~ /^common .? intron s?$/x ) {
 		$request = 'common intron';
 		$method  = \&collect_common_introns;
 	}
-	elsif ( $request =~ /^uncommon ?introns?/i ) {
+	elsif ( $request =~ /^uncommon .? intron s?$/x ) {
 		$request = 'uncommon intron';
 		$method  = \&collect_uncommon_introns;
 	}
-	elsif ( $request =~ /utr/i ) {
+	elsif ( $request eq 'utr' ) {
 		$request = 'UTRs';
 		$method  = \&collect_utrs;
 	}
-	elsif ( $request =~ /cds ?start/i ) {
+	elsif ( $request =~ /^cds .? start$/x ) {
 		$request = 'CDS start';
 		$method  = \&collect_cds_start;
 	}
-	elsif ( $request =~ /cds ?stop/i ) {
+	elsif ( $request =~ /^cds .? stop$/x ) {
 		$request = 'CDS stop';
 		$method  = \&collect_cds_stop;
 	}
 	else {
-		die " unknown region request!\n";
+		print STDERR " FATAL: unknown region request!\n";
+		exit 1;
 	}
 
 	return $method;
@@ -296,16 +313,16 @@ sub collect_method_from_user {
 	foreach my $i ( sort { $a <=> $b } keys %list ) {
 		print "   $i\t$list{$i}\n";
 	}
-	print " Enter the type of region to collect   ";
-	my $answer = <STDIN>;
-	chomp $answer;
+	my $p      = " Enter the type of region to collect:  ";
+	my $answer = prompt($p);
 
 	# verify and return answer
 	if ( exists $list{$answer} ) {
 		return $list{$answer};
 	}
 	else {
-		die " unknown request!\n";
+		print STDERR " unknown request!\n";
+		exit 1;
 	}
 }
 
@@ -331,14 +348,14 @@ sub determine_transcript_types {
 
 		# user selected types from a database
 		foreach (@features) {
-			my ( $p, $s ) = split /:/, $_;    # take only the primary tag if both present
-			push @types, $p if $p =~ /rna|transcript/i;
+			my ( $p, $s ) = split /:/;    # take only the primary tag if both present
+			push @types, $p if $p =~ /rna | transcript/xi;
 		}
 	}
 
+	# request from the user if not otherwise provided
 	unless (@types) {
 
-		# request from the user
 		print " Genes may generate different types of RNA transcripts.\n";
 		my $i = 1;
 		my %i2tag;
@@ -347,9 +364,8 @@ sub determine_transcript_types {
 			$i2tag{$i} = $_;
 			$i++;
 		}
-		print " Select one or more RNA types to include   ";
-		my $response = <STDIN>;
-		chomp $response;
+		my $p        = ' Select one or more RNA types to include:  ';
+		my $response = prompt($p);
 		@types = map { $i2tag{$_} || undef } parse_list($response);
 	}
 
@@ -404,9 +420,6 @@ sub determine_transcript_types {
 
 sub collect_from_database {
 
-	# collection method
-	my $method = shift;
-
 	# open database connection
 	my $db = open_db_connection($database)
 		or die " unable to open database connection!\n";
@@ -415,9 +428,9 @@ sub collect_from_database {
 	my $prompt = <<PROMPT;
  Select one or more database features (typically genes) from which to collect regions. 
 PROMPT
-	@features = verify_or_request_feature_types(
+	my @features = verify_or_request_feature_types(
 		'db'      => $db,
-		'feature' => \@features,
+		'feature' => \@feature_types,
 		'prompt'  => $prompt,
 		'single'  => 0,
 		'limit'   => 'gene|rna',
@@ -443,26 +456,25 @@ PROMPT
 		if ( $seqfeat->primary_tag eq 'gene' ) {
 
 			# gene
-			my @regions = process_gene( $seqfeat, $method );
+			my @regions = process_gene($seqfeat);
 			foreach (@regions) {
 
 				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
-		elsif ( $seqfeat->primary_tag =~ /rna|transcript/i ) {
+		elsif ( $seqfeat->primary_tag =~ /rna | transcript/xi ) {
 
 			# transcript
-			my @regions = process_transcript( $seqfeat, $method );
+			my @regions = process_transcript($seqfeat);
 
 			# remove duplicates if requested
 			if ($unique) {
 				remove_duplicates( \@regions );
 			}
 
+			# add regions to collection
 			foreach (@regions) {
-
-				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
@@ -473,9 +485,6 @@ PROMPT
 }
 
 sub collect_from_file {
-
-	# collection method
-	my $method = shift;
 
 	# get transcript_type
 	unless ( defined $transcript_type ) {
@@ -496,94 +505,67 @@ sub collect_from_file {
 	$Data->add_comment("Source data file $infile");
 
 	# open appropriate parser object
-	my $flavor = $Data->taste_file($infile);
-	print " $infile determined to be a $flavor format\n";
-	my $parser;
-	my $type_string;
-	if ( $flavor eq 'gff' ) {
-		$parser = Bio::ToolBox::parser::gff->new( file => $infile )
-			or die " unable to open input file '$infile'!\n";
+	my $Parser = Bio::ToolBox::Parser->new( file => $infile, );
+	unless ($Parser) {
+		die " unable to open and parse '$infile'!\n";
+	}
 
-		# we never know what's going to be present in a GFF file, so let's check first
-		$type_string = $parser->typelist;
-	}
-	elsif ( $flavor eq 'ucsc' ) {
-
-		# some sort of ucsc format
-		$parser = Bio::ToolBox::parser::ucsc->new( file => $infile )
-			or die " unable to open input file '$infile'!\n";
-
-		# we typically know what's going to be in a UCSC formatted file
-		$type_string = 'gene,RNA,exon,cds,utr,codon';
-	}
-	else {
-		die " $infile is an unrecognized gene table format!\n";
-	}
-	$parser->do_gene(1);    # assume we always want genes?
-	if ( $request =~ /exon|splice|intron/i ) {
-		$parser->do_exon(1);
-	}
-	elsif ( $request =~ /utr/i ) {
+	# set parser attributes - most of these are probably redundant or not necessary
+	my $type_string = $Parser->typelist;
+	$Parser->do_gene(1);    # assume we always want genes?
+	$Parser->do_exon(1);
+	$Parser->do_cds(1);
+	if ( $request =~ /utr/i ) {
 		if ( $type_string =~ /utr/i ) {
-			$parser->do_utr(1);
-		}
-		else {
-			$parser->do_exon(1);
-			$parser->do_cds(1);
+			$Parser->do_utr(1);
 		}
 	}
 	elsif ( $request =~ /cds st/i ) {
 		if ( $type_string =~ /codon/ ) {
-			$parser->do_codon(1);
-		}
-		else {
-			$parser->do_cds(1);
+			$Parser->do_codon(1);
 		}
 	}
 	if ( $tsl or $type_string !~ /rna/i ) {
 
 		# we need the extra attributes for transcript_support_level and biotype
-		$parser->simplify(0);
+		$Parser->simplify(0);
 	}
 	else {
-		$parser->simplify(1);
+		$Parser->simplify(1);
 	}
-	$parser->parse_table or die "unable to parse file '$infile'!\n";
-
+	
 	# process the features
 	my @bad_features;
-	while ( my $seqfeat = $parser->next_top_feature ) {
+	while ( my $seqfeat = $Parser->next_top_feature ) {
 
 		# collect the regions based on the primary tag
-		if ( $seqfeat->primary_tag =~ /gene$/i ) {
+		my $type = $seqfeat->primary_tag;
+		if ( $type =~ /gene$/i ) {
 
-			# gene, including things like gene, miRNA_gene, etc
-			my @regions = process_gene( $seqfeat, $method );
+			# gene, including things like gene, miRNA_gene, pseudogene, etc
+			my @regions = process_gene( $seqfeat );
 			foreach (@regions) {
-
-				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
-		elsif ( $seqfeat->primary_tag =~ /rna|transcript/i ) {
+		elsif ( $type =~ /rna | transcript/xi ) {
 
-			# transcript
-			my @regions = process_transcript( $seqfeat, $method );
+			# any sort of RNA transcript
+			my @regions = process_transcript( $seqfeat );
 
 			# remove duplicates if requested
 			if ($unique) {
 				remove_duplicates( \@regions );
 			}
-
 			foreach (@regions) {
-
-				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
+		elsif ( $type =~ /chromosome | contig | scaffold | sequence/xi ) {
+			next;    # safely ignore these
+		}
 		else {
-			push @bad_features, $seqfeat
-				unless $seqfeat->primary_tag =~ /chromosome|contig|scaffold|sequence/i;
+			push @bad_features, $seqfeat;
 		}
 	}
 
@@ -593,7 +575,8 @@ sub collect_from_file {
 		foreach (@bad_features) {
 			$bad_types{ $_->primary_tag } += 1;
 		}
-		printf " skipped %s unrecognized top feature types:\n%s\n", scalar(@bad_features),
+		printf " skipped %d unrecognized top feature types:\n%s\n",
+			scalar(@bad_features),
 			join( "\n", map {"  $bad_types{$_} $_"} sort { $a cmp $b } keys %bad_types );
 	}
 	return $Data;
@@ -604,7 +587,7 @@ sub generate_output_structure {
 		feature => "region",
 		columns => [qw(Gene Transcript Name Chromosome Start Stop Strand)],
 	);
-	$Data->program("$0, v $VERSION");
+	$Data->program("$PROGRAM_NAME, v $VERSION");
 	my $r = $request;
 	$r =~ s/\s/_/g;    # remove spaces
 	$Data->metadata( 1, 'type', $transcript_type );
@@ -625,8 +608,8 @@ sub generate_output_structure {
 
 sub process_gene {
 
-	# passed objects
-	my ( $gene, $method ) = @_;
+	# passed gene object
+	my $gene = shift;
 	my @regions;
 
 	# need to pull out the appropriate transcript types from the gene
@@ -640,41 +623,41 @@ sub process_gene {
 	# filter for gencode transcripts if requested
 	if ($gencode) {
 		my $new_transcripts = filter_transcript_gencode_basic( \@transcripts );
-		return unless scalar @$new_transcripts;
-		@transcripts = @$new_transcripts;
+		return unless scalar @{$new_transcripts};
+		@transcripts = @{$new_transcripts};
 	}
 
 	# filter for transcript support level if requested
 	if ($tsl) {
 		my $new_transcripts = filter_transcript_support_level( \@transcripts, $tsl );
-		return unless scalar @$new_transcripts;
-		@transcripts = @$new_transcripts;
+		return unless scalar @{$new_transcripts};
+		@transcripts = @{$new_transcripts};
 	}
 
 	# filter for biotype if requested
 	if ($tbiotype) {
 		my $new_transcripts = filter_transcript_biotype( \@transcripts, $tbiotype );
-		return unless scalar @$new_transcripts;
-		@transcripts = @$new_transcripts;
+		return unless scalar @{$new_transcripts};
+		@transcripts = @{$new_transcripts};
 	}
 
 	# alternate or common exons require working with multiple transcripts
-	if ( $request =~ /alternate|common|collapsed/i ) {
+	if ( $request =~ /alternate | common | collapsed/xi ) {
 
 		# pass all the transcripts together
-		@regions = &$method(@transcripts);
+		@regions = &{$method}(@transcripts);
 	}
 	else {
 		# do each transcript one at a time
 		foreach my $t (@transcripts) {
-			push @regions, &$method($t);
+			push @regions, &{$method}($t);
 		}
 	}
 	return unless @regions;
 
 	# add gene name
 	foreach my $region (@regions) {
-		unshift @$region, $gene->display_name;
+		unshift @{$region}, $gene->display_name;
 	}
 
 	# remove duplicates if requested
@@ -689,7 +672,7 @@ sub process_gene {
 sub process_transcript {
 
 	# passed objects
-	my ( $transcript, $method ) = @_;
+	my $transcript = shift;
 
 	# filter transcripts
 	return unless acceptable_transcript($transcript);
@@ -697,27 +680,27 @@ sub process_transcript {
 	# filter for gencode transcripts if requested
 	if ($gencode) {
 		$transcript = filter_transcript_gencode_basic($transcript);
-		return unless $transcript;
+		return unless scalar @{$transcript};
 	}
 
 	# filter for transcript support level if requested
 	if ($tsl) {
 		$transcript = filter_transcript_support_level( $transcript, $tsl );
-		return unless $transcript;
+		return unless scalar @{$transcript};
 	}
 
 	# filter for biotype if requested
 	if ($tbiotype) {
 		$transcript = filter_transcript_biotype( $transcript, $tbiotype );
-		return unless $transcript;
+		return unless scalar @{$transcript};
 	}
 
 	# call appropriate method
-	my @regions = &$method($transcript);
+	my @regions = &{$method}($transcript);
 
 	# add non-existent gene name
 	foreach my $region (@regions) {
-		unshift @$region, '.';
+		unshift @{$region}, '.';
 	}
 	return @regions;
 }
@@ -867,7 +850,7 @@ sub collect_alt_exons {
 
 	# we need the transcript name, so can't use the simpler get_alt_exons()
 	my @exons;
-	foreach my $transcript ( keys %$ac_exons ) {
+	foreach my $transcript ( keys %{$ac_exons} ) {
 		next if $transcript eq 'common';
 		next if $transcript eq 'uncommon';
 		foreach my $e ( @{ $ac_exons->{$transcript} } ) {
@@ -925,10 +908,10 @@ sub collect_splice_sites {
 	# find the exons and/or CDSs
 	my $list = get_exons($transcript);
 	return unless $list;
-	return if ( scalar(@$list) == 1 );
+	return if ( scalar @{$list} == 1 );
 
 	# identify the last exon index position
-	my $last = scalar(@$list) - 1;
+	my $last = scalar @{$list} - 1;
 
 	# collect the splice sites
 	my @splices;
@@ -1125,7 +1108,7 @@ sub collect_last_intron {
 sub collect_alt_introns {
 	my $ac_introns = get_alt_common_introns(@_);
 	my @introns;
-	foreach my $transcript ( keys %$ac_introns ) {
+	foreach my $transcript ( keys %{$ac_introns} ) {
 		next if $transcript eq 'common';
 		next if $transcript eq 'uncommon';
 		foreach my $i ( @{ $ac_introns->{$transcript} } ) {
@@ -1231,21 +1214,23 @@ sub collect_cds_stop {
 }
 
 sub acceptable_transcript {
-	my $t = shift;
+	my $transcript = shift;
+	my $t = $transcript->primary_tag;
 	return 1
-		if (    $t->primary_tag =~ /rna|transcript|retained_intron|antisense|nonsense/i
+		if ( $t =~ m/rna | transcript | retained_intron | antisense | nonsense/xi
 			and $do_all_rna );
-	return 1 if ( is_coding($t) and $do_mrna );
-	return 1 if ( $t->primary_tag =~ /mirna/i  and $do_mirna );
-	return 1 if ( $t->primary_tag =~ /ncrna/i  and $do_ncrna );
-	return 1 if ( $t->primary_tag =~ /snrna/i  and $do_snrna );
-	return 1 if ( $t->primary_tag =~ /snorna/i and $do_snorna );
-	return 1 if ( $t->primary_tag =~ /trna/i   and $do_rrna );
-	return 1 if ( $t->primary_tag =~ /rrna/i   and $do_rrna );
+	return 1 if ( is_coding($transcript) and $do_mrna );
+	return 1 if ( $t =~ /mirna/i  and $do_mirna );
+	return 1 if ( $t =~ /ncrna/i  and $do_ncrna );
+	return 1 if ( $t =~ /snrna/i  and $do_snrna );
+	return 1 if ( $t =~ /snorna/i and $do_snorna );
+	return 1 if ( $t =~ /trna/i   and $do_rrna );
+	return 1 if ( $t =~ /rrna/i   and $do_rrna );
 	return 1
-		if ( $t->primary_tag =~ /misc_rna|transcript|retained_intron|antisense|nonsense/i
+		if ( $t =~
+			m/misc_rna | transcript | retained_intron | antisense | nonsense/xi
 			and $do_miscrna );
-	return 1 if ( $t->primary_tag =~ /lincrna/i and $do_lincrna );
+	return 1 if ( $t =~ /lincrna/i and $do_lincrna );
 	return 0;
 }
 
