@@ -2,12 +2,14 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Pod::Usage;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility;
-my $VERSION = '1.60';
+use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
+
+our $VERSION = '1.70';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -64,8 +66,13 @@ if ($print_version) {
 
 ### Check for required values
 unless ($infile) {
-	$infile = shift @ARGV
-		or die "  No input file specified! \n use $0 --help\n";
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		print STDERR " FATAL: no input file! use --help for more information\n";
+		exit 1;
+	}
 }
 unless ( defined $gz ) {
 	if ( $infile =~ /\.gz$/ ) {
@@ -87,17 +94,22 @@ unless ( defined $index or defined $tag ) {
 	$index = ask_user_for_index( $Input,
 		"  Enter the column index number containing the values to split by   " );
 	unless ( defined $index ) {
-		die " Must provide a valid index!\n";
+		print STDERR " FATAL: Must provide a valid index!\n";
+		exit 1;
 	}
 }
 if ($tag) {
 	unless ( $Input->gff or $Input->vcf ) {
-		die " Input file must be in GFF or VCF format to use attribute tags!";
+		print STDERR
+" FATAL: Input file must be in GFF or VCF format to use attribute tags!";
+		exit 1;
 	}
 	if ( $Input->vcf and not defined $index ) {
-		die " Please provide a column index for accessing VCF attributes.\n"
+		print STDERR
+" FATAL: Please provide a column index for accessing VCF attributes.\n"
 			. " The INFO column is 0-based index 7, and sample columns begin\n"
 			. " at index 9.\n";
+		exit 1;
 	}
 	elsif ( $Input->gff ) {
 		$index = 8;
@@ -107,7 +119,7 @@ if ($tag) {
 ### Split the file
 printf " Splitting file by elements in column %s%s...\n",
 	$Input->name($index),
-	$tag ? ", attribute tag $tag" : "";
+	$tag ? ', attribute tag $tag' : q();
 my %out_files;    # a hash of the file names written
                   # we can't assume that all the data elements we're splitting on are
                   # contiguous in the file
@@ -159,7 +171,7 @@ print " Split '$infile' into $split_count files\n";
 foreach my $value ( sort { $a cmp $b } keys %out_files ) {
 	printf "  wrote %s lines in %d file%s for '$value'\n",
 		format_with_commas( $out_files{$value}{total} ), $out_files{$value}{parts},
-		$out_files{$value}{parts} > 1 ? 's' : '';
+		$out_files{$value}{parts} > 1 ? 's' : q();
 }
 
 sub request_new_file_name {
@@ -167,7 +179,7 @@ sub request_new_file_name {
 	# calculate a new file name based on the current check value and part number
 	my $value          = shift;
 	my $filename_value = $value;
-	$filename_value =~ s/[\:\|\\\/\+\*\?\#\(\)\[\]\{\} ]+/_/g;
+	$filename_value =~ s/[\: \| \\ \/ \+ \* \? \# \( \) \[ \] \{ \} \  ]+/_/xg;
 
 	# replace unsafe characters
 
@@ -283,7 +295,7 @@ from the user in an interactive mode.
 Provide the attribute tag name that contains the values to split the 
 file. Attributes are supported by GFF and VCF files. If splitting a 
 VCF file, please also provide the column index. The INFO column is 
-index 7, and sample columns begin at index 9.
+index 8, and sample columns begin at index 10.
 
 =item --max E<lt>integerE<gt>
 
