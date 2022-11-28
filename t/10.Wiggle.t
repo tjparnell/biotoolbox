@@ -6,6 +6,7 @@
 use strict;
 use Test::More;
 use File::Spec;
+use IO::File;
 use FindBin '$Bin';
 
 BEGIN {
@@ -25,14 +26,14 @@ require_ok 'Bio::ToolBox::Data'
 my $database = File::Spec->catfile( $Bin, "Data", "sample2_wib.gff3" );
 my $wigfile  = File::Spec->catfile( $Bin, "Data", "sample2.wib" );
 unless ( -e $database ) {
-    open( my $fh, ">", $database );
-    print $fh <<GFF
+    my $fh = IO::File->new( $database, "w" )
+    	or die "unable to write temporary GFF file!";
+     $fh->print <<GFF;
 ##gff-version 3
 chrI	SGD	chromosome	1	230218	.	.	.	ID=chrI;dbxref=NCBI:NC_001133;Name=chrI
 chrI	tim	sample2	1	230218	.	.	.	Name=sample2;wigfile=$wigfile
 GFF
-      ;
-    close $fh;
+     $fh->close;
 }
 
 ### Open a test file
