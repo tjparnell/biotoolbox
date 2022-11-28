@@ -2,7 +2,9 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
@@ -14,7 +16,7 @@ use Bio::ToolBox::db_helper qw(
 	$BAM_ADAPTER
 	$BIG_ADAPTER
 );
-use Bio::ToolBox::utility;
+use Bio::ToolBox::utility qw(format_with_commas simplify_dataset_name);
 
 my $parallel;
 eval {
@@ -23,7 +25,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.69';
+our $VERSION = '1.70';
 
 print "\n A program to collect data for a list of features\n\n";
 
@@ -50,8 +52,7 @@ my (
 	$limit,         $position,      $fpkm_method,     $tpm,
 	$format,        $win,           $step,            $exclusion_file,
 	$chrskip,       $prefix_text,   $set_strand,      $discard,
-	$gz,            $cpu,           $help,            $verbose,
-	$print_version,
+	$gz,            $cpu,           $help,            $print_version,
 );
 my @datasets;    # an array of names of dataset values to be retrieved
 
@@ -140,7 +141,8 @@ if ($infile) {
 			format_with_commas( $Data->last_row );
 	}
 	else {
-		die " No features loaded!\n";
+		print STDERR " FATAL: No features loaded from file '$infile'!\n";
+		exit 1;
 	}
 
 	# update main database as necessary
@@ -191,7 +193,7 @@ elsif ($new) {
 }
 
 # update program name
-$Data->program("$0, v $VERSION");
+$Data->program("$PROGRAM_NAME, v $VERSION");
 
 # Check output file name
 unless ($outfile) {
@@ -206,8 +208,6 @@ unless ($outfile) {
 # Open data database
 my $ddb;
 if ( defined $data_database ) {
-
-	# specifically defined a data database
 	$ddb = open_db_connection($data_database)
 		or die "unable to establish data database connection to $data_database!\n";
 }
@@ -222,12 +222,14 @@ unless ( $datasets[0] eq 'none' ) {
 	);
 }
 unless (@datasets) {
-	die " No verifiable datasets provided. Check your file path, database, or dataset.\n";
+	print STDERR 
+" FATAL: No verifiable datasets provided. Check your file path, database, or dataset.\n";
+	exit 1;
 }
 
 # Working with RPKM value datasets
 my %dataset2sum;    # for genomic totals of reads for rpkm determination
-if ( $fpkm_method eq 'genome' ) {
+if ( $fpkm_method and $fpkm_method eq 'genome' ) {
 	foreach my $d (@datasets) {
 		print " Summing total reads for dataset '$d'...\n";
 		my $sum = check_dataset_for_rpm_support( $d, $cpu );
@@ -300,18 +302,20 @@ calculate_fpkm_values() if ( $fpkm_method or $tpm );
 # write the output file
 # we will rewrite the file after each collection
 # appropriate extensions and compression should be taken care of
-my $success = $Data->save(
-	'filename' => $outfile,
-	'gz'       => $gz,
-);
-if ($success) {
-	printf " wrote file $success\n";
+{
+	my $success = $Data->save(
+		'filename' => $outfile,
+		'gz'       => $gz,
+	);
+	if ($success) {
+		printf " wrote file $success\n";
+	}
+	else {
+		# failure! the subroutine will have printed error messages
+		print " unable to write file!\n";
+	}
+	printf " Finished in %.1f minutes\n", ( time - $start_time ) / 60;
 }
-else {
-	# failure! the subroutine will have printed error messages
-	print " unable to write file!\n";
-}
-printf " Finished in %.1f minutes\n", ( time - $start_time ) / 60;
 
 ############# Subroutines ######################################################
 
@@ -339,7 +343,8 @@ sub set_defaults {
 	$parse = 1 if ( $infile and not defined $parse );
 	if ($new) {
 		unless ($outfile) {
-			die " You must define an output filename!";
+			print STDERR " FATAL: You must define an output filename!\n";
+			exit 1;
 		}
 
 		# database for new files checked below
@@ -371,7 +376,7 @@ sub set_defaults {
 	if ( not @datasets and @ARGV ) {
 		@datasets = @ARGV;
 	}
-	if ( $datasets[0] =~ /,/ ) {
+	if ( @datasets and $datasets[0] =~ /,/ ) {
 
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;
@@ -386,9 +391,11 @@ sub set_defaults {
 
 		# check the method that was defined on the command line
 		unless ( $method =~
-			m/^(?:median|mean|stddev|min|max|range|sum|count|pcount|ncount)$/ )
+m/^ (?: median | mean | stddev | min | max | range | sum | count | pcount | ncount )$/x
+			)
 		{
-			die " unknown method '$method'!";
+			print " FATAL: unknown method '$method'!\n";
+			exit 1;
 		}
 	}
 	else {
@@ -399,10 +406,13 @@ sub set_defaults {
 	# check fpkm method
 	if ($fpkm_method) {
 		unless ( $fpkm_method eq 'region' or $fpkm_method eq 'genome' ) {
-			die " fpkm option must be one of 'region' or 'genome'! see help\n";
+			print STDERR
+" FATAL: fpkm option must be one of 'region' or 'genome'! see help\n";
+			exit 1;
 		}
 		unless ( $method =~ /count|sum/ ) {
-			die " method must be a count if you use the fpkm option!\n";
+			print STDERR " FATAL: method must be a count if you use the fpkm option!\n";
+			exit 1;
 		}
 	}
 
@@ -410,8 +420,9 @@ sub set_defaults {
 	if ( defined $stranded ) {
 
 		# check the strand request that was defined on the command line
-		unless ( $stranded =~ m/^(?:all|antisense|sense)$/i ) {
-			die " unknown strand '$stranded'!";
+		unless ( $stranded =~ m/^ (?: all | antisense | sense )$/xi ) {
+			print STDERR " FATAL: unknown strand '$stranded'!";
+			exit 1;
 		}
 	}
 	else {
@@ -423,13 +434,14 @@ sub set_defaults {
 	if ( defined $position ) {
 
 		# check the position value
-		unless ( $position =~ m/^(?:5|4|53|3|m|p)$/ ) {
-			die " Unknown relative position '$position'!\n";
+		unless ( $position =~ m/^ (?: 5 | 4 | 53 | 3 | m | p )$/x ) {
+			print STDERR " FATAL: Unknown relative position '$position'!\n";
+			exit 1;
 		}
 
 		# change to match internal usage as necessary
-		$position = 4 if $position eq 'm';
-		$position = 9 if $position eq 'p';
+		$position = 4  if $position eq 'm';
+		$position = 10 if $position eq 'p';
 	}
 	else {
 		# default position to use the 5' end
@@ -445,8 +457,10 @@ sub set_defaults {
 			# set a minimum size limit on sub fractionating a feature
 			$limit = 10;
 		}
-		if ( $position == 4 or $position == 9 ) {
-			die " set position to 5 or 3 only when using fractional start and stop\n";
+		if ( $position == 4 or $position == 10 ) {
+			print STDERR
+" FATAL: set position to 5 or 3 only when using fractional start and stop\n";
+			exit 1;
 		}
 	}
 
@@ -473,7 +487,9 @@ sub set_defaults {
 			# hope for the best here....
 		}
 		else {
-			die " You must define a database or an appropriate dataset file! see help\n";
+			print STDERR
+" FATAL: You must define a database or an appropriate dataset file! see help\n";
+			exit 1;
 		}
 	}
 
@@ -484,11 +500,16 @@ sub set_defaults {
 		$subfeature = 'exon';
 	}
 	if ( $subfeature and ( defined $fstart or defined $start_adj ) ) {
-		die " Cannot modify coordinates when subfeatures are requested!\n";
+		print STDERR
+" FATAL: Cannot modify coordinates when subfeatures are requested!\n";
+		exit 1;
 	}
-	if ( $subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr|intron)$/ ) {
-		die
-" unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr 3p_utr, or intron\n";
+	if (    $subfeature
+		and $subfeature !~ /^ (?: exon | cds | 5p_utr | 3p_utr | intron )$/x )
+	{
+		print STDERR
+" FATAL: unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr 3p_utr, or intron\n";
+		exit 1;
 	}
 
 	# generate formatter
@@ -506,7 +527,7 @@ sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
 
 	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$";
+	my $child_base_name = $outfile . ".$PID";
 
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i ( 1 .. $cpu ) {
@@ -525,7 +546,11 @@ sub parallel_execution {
 		}
 
 		# collapse transcripts if needed
-		if ( $feature =~ /^gene/i and $subfeature =~ /exon|intron/ ) {
+		if (
+			$feature
+			and $feature =~ /^gene/i
+			and $subfeature =~ m/exon | intron/xi
+		) {
 			my $c = $Data->collapse_gene_transcripts;
 			if ( $c != $Data->last_row ) {
 				printf " Not all row SeqFeatures could be collapsed, %d failed\n",
@@ -535,9 +560,8 @@ sub parallel_execution {
 
 		# collect the dataset
 		foreach my $dataset (@datasets) {
-			unless ( $dataset eq 'none' ) {
-				collect_dataset($dataset);
-			}
+			next if $dataset eq 'none';
+			collect_dataset($dataset);
 		}
 
 		# write out result
@@ -569,7 +593,11 @@ sub parallel_execution {
 sub single_execution {
 
 	# collapse transcripts if needed
-	if ( $feature =~ /^gene/i and $subfeature =~ /exon|intron/ ) {
+	if (
+		$feature
+		and $feature =~ /^gene/i
+		and $subfeature =~ m/exon | intron/xi
+	) {
 		my $c = $Data->collapse_gene_transcripts;
 		if ( $c != $Data->last_row ) {
 			printf " Not all row SeqFeatures could be collapsed, %d failed\n",
@@ -579,11 +607,9 @@ sub single_execution {
 
 	# collect the datasets
 	foreach my $dataset (@datasets) {
-		unless ( $dataset eq 'none' ) {
-			print " Collecting $method scores from dataset '$dataset'...\n";
-			collect_dataset($dataset);
-		}
-		last if $dataset eq 'none';
+		next if $dataset eq 'none';
+		print " Collecting $method scores from dataset '$dataset'...\n";
+		collect_dataset($dataset);
 	}
 }
 
@@ -597,7 +623,9 @@ sub collect_dataset {
 	# check that we have strand data if necessary
 	if ($set_strand) {
 		unless ( defined $Data->strand_column ) {
-			die " requested to set strand but a strand column was not found!\n";
+			print STDERR
+" FATAL: requested to set strand but a strand column was not found!\n";
+			exit 1;
 		}
 	}
 
@@ -703,7 +731,7 @@ sub get_adjusted_dataset {
 					$stop  = $row->end - $stop_adj;
 				}
 			}
-			elsif ( $position == 9 ) {
+			elsif ( $position == 10 ) {
 
 				# peak summit position
 				my $middle = $row->peak;
@@ -741,11 +769,8 @@ sub get_fractionated_dataset {
 		sub {
 			my $row = shift;
 
-			# make sure we work with the represented seqfeature if present
-			my $feature = $row->seqfeature || $row;
-
 			# calculate length
-			my $length = $feature->length;
+			my $length = $row->length;
 
 			# calculate new fractional start and stop positions
 			# the fraction depends on the length
@@ -759,29 +784,29 @@ sub get_fractionated_dataset {
 				# length exceeds our minimum limit
 				# we can take a fractional length
 
-				if ( $position == 5 and $feature->strand >= 0 ) {
+				if ( $position == 5 and $row->strand >= 0 ) {
 
 					# 5' end of forward strand
-					$start = $feature->start + $relative_start;
-					$stop  = $feature->start + $relative_stop;
+					$start = $row->start + $relative_start;
+					$stop  = $row->start + $relative_stop;
 				}
-				elsif ( $position == 5 and $feature->strand < 0 ) {
+				elsif ( $position == 5 and $row->strand < 0 ) {
 
 					# 5' end of reverse strand
-					$start = $feature->end - $relative_stop;
-					$stop  = $feature->end - $relative_start;
+					$start = $row->end - $relative_stop;
+					$stop  = $row->end - $relative_start;
 				}
-				elsif ( $position == 3 and $feature->strand >= 0 ) {
+				elsif ( $position == 3 and $row->strand >= 0 ) {
 
 					# 3' end of forward strand
-					$start = $feature->end + $relative_start;
-					$stop  = $feature->end + $relative_stop;
+					$start = $row->end + $relative_start;
+					$stop  = $row->end + $relative_stop;
 				}
-				elsif ( $position == 3 and $feature->strand < 0 ) {
+				elsif ( $position == 3 and $row->strand < 0 ) {
 
 					# 3' end of reverse strand
-					$start = $feature->start - $relative_stop;
-					$stop  = $feature->start - $relative_start;
+					$start = $row->start - $relative_stop;
+					$stop  = $row->start - $relative_start;
 				}
 
 				# midpoint is not accepted
@@ -789,8 +814,8 @@ sub get_fractionated_dataset {
 			else {
 				# length doesn't meet minimum limit
 				# simply take the whole fragment
-				$start = $feature->start;
-				$stop  = $feature->end;
+				$start = $row->start;
+				$stop  = $row->end;
 			}
 
 			# now collect score
@@ -967,11 +992,9 @@ sub calculate_fpkm_values {
 						$length = $row->value($length_i);
 					}
 					else {
-						my $feature =
-							$row->seqfeature;    # force feature to be retrieved
 						$length = $row->length;
 					}
-					$length ||= 1;               # why would the length be zero?
+					$length ||= 1;    # why would the length be zero?
 					if ($fractional_length) {
 						if ( defined $limit ) {
 							$length = int( $length * $fractional_length )
@@ -1012,11 +1035,9 @@ sub calculate_fpkm_values {
 						$length = $row->value($length_i);
 					}
 					else {
-						my $feature =
-							$row->seqfeature;    # force feature to be retrieved
 						$length = $row->length;
 					}
-					$length ||= 1;               # why would the length be zero?
+					$length ||= 1;    # why would the length be zero?
 					if ($fractional_length) {
 						if ( defined $limit ) {
 							$length = int( $length * $fractional_length )
