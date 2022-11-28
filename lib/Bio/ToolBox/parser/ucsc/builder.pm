@@ -2,7 +2,6 @@ package Bio::ToolBox::parser::ucsc::builder;
 
 use warnings;
 use strict;
-use Carp qw(carp cluck croak);
 
 our $VERSION = '1.70';
 
@@ -318,7 +317,8 @@ sub new {
 	}
 	else {
 		# unrecognized line format
-		carp sprintf "unrecognized format, line has %d elements", scalar @{ $linedata };
+		printf STDERR "ERROR: unrecognized format, line has %d elements\n",
+			scalar @{ $linedata };
 		return;
 	}
 
@@ -334,7 +334,8 @@ sub new {
 	push @errors, 'exonEnds'   unless $self{exonEnds}   =~ /^[\d,]+$/;
 
 	if (@errors) {
-		warn "line format for $format has the following errors: @errors";
+		printf STDERR "ERROR: line format for %s has the following errors: %s\n", 
+			$format, join(", ", @errors);
 		return;
 	}
 
@@ -890,11 +891,10 @@ UTR_LOOP:
 
 		# Something else?
 		else {
-			my $warning = sprintf
-"Warning: A malformed UTR that doesn't match known criteria: cdsStart %d, cdsEnd %d, exonStart %d, exonEnd %d",
+			printf STDERR
+"Warning: A malformed UTR that doesn't match known criteria: cdsStart %d, cdsEnd %d, exonStart %d, exonEnd %d\n",
 				$self->cdsStart, $self->cdsEnd, $self->exonStarts->[$i],
 				$self->exonEnds->[$i];
-			warn $warning;
 			next UTR_LOOP;
 		}
 
@@ -1052,11 +1052,10 @@ CDS_LOOP:
 
 		# Something else?
 		else {
-			my $warning = sprintf
-"Warning: A malformed CDS that doesn't match known criteria: cdsStart %d, cdsEnd %d, exonStart %d, exonEnd %d",
+			printf STDERR
+"Warning: A malformed CDS that doesn't match known criteria: cdsStart %d, cdsEnd %d, exonStart %d, exonEnd %d\n",
 				$self->cdsStart, $self->cdsEnd, $self->exonStarts->[$j], 
 				$self->exonEnds->[$j];
-			warn $warning;
 			next CDS_LOOP;
 		}
 

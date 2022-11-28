@@ -24,7 +24,7 @@ sub open_file {
 	# This is historical precedent from earlier versions, unfortunately.
 	# This may unnecessarily complicate and/or inflate memory....
 	unless ($filename) {
-		cluck 'no file name passed!';
+		carp 'ERROR: no file name passed!';
 		return;
 	}
 
@@ -33,7 +33,7 @@ sub open_file {
 	unless ($filetype) {
 		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
 		unless ( $flavor eq 'ucsc' ) {
-			confess 'File is not a UCSC-format file!!! How did we get here?';
+			confess 'FATAL: File is not a UCSC-format file!!! How did we get here?';
 		}
 		$self->{filetype} = $filetype;
 	}
@@ -50,7 +50,7 @@ sub open_file {
 
 	# Open filehandle object
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename)
-		or croak " cannot open file '$filename'!\n";
+		or croak "FATAL: cannot open file '$filename'!";
 
 	# reset source as necessary
 	if ( $filename =~ /ensgene/i and $self->source eq 'UCSC' ) {
@@ -96,7 +96,7 @@ sub open_file {
 sub load_extra_data {
 	my ( $self, $file, $type ) = @_;
 	unless ($file) {
-		cluck 'no file name passed!';
+		carp 'ERROR: no file name passed!';
 		return;
 	}
 
@@ -117,13 +117,13 @@ sub load_extra_data {
 		$type = 'kgxref';
 	}
 	else {
-		carp "unknown type '$type' to load extra data";
+		carp "ERROR: unknown type '$type' to load extra data";
 		return;
 	}
 
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($file);
 	unless ($fh) {
-		carp "unable to open file '$file'!";
+		carp "ERROR: unable to open file '$file'!";
 		return;
 	}
 
@@ -140,7 +140,7 @@ sub load_extra_data {
 			next if ( $line =~ /^#/ );
 			my @line_data = split /\t/, $line;
 			if ( scalar @line_data != 2 ) {
-				carp sprintf " file $file doesn't seem right!? Line has %d elements!",
+				carp sprintf "ERROR: file $file doesn't seem right!? Line has %d elements!",
 					scalar @line_data;
 				return;
 			}
@@ -193,7 +193,7 @@ sub load_extra_data {
 
 			# check for duplicate lines
 			if ( exists $self->{$type}{$id} ) {
-				warn "  $type line for identifier $id exists twice!\n";
+				printf STDERR "  %s line for identifier %s exists twice!\n", $type, $id;
 				next;
 			}
 
@@ -234,7 +234,7 @@ sub next_feature {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		croak('no UCSC file loaded to parse!');
+		croak 'FATAL: no UCSC file loaded to parse!';
 	}
 	return if $self->{'eof'};
 
@@ -255,7 +255,7 @@ sub next_feature {
 		unless ($builder) {
 
 			# builder will print its own error message if fails
-			warn sprintf " unable to parse line number %d\n", $self->{line_count};
+			printf STDERR " unable to parse line number %d\n", $self->{line_count};
 			next;
 		}
 
@@ -282,8 +282,7 @@ sub parse_table {
 		$self->open_file(shift) or return;
 	}
 	unless ( $self->fh ) {
-		carp 'must open a file first!';
-		return;
+		confess 'FATAL: must open a file first!';
 	}
 	return if ( $self->{'eof'} );
 

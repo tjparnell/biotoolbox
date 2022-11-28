@@ -55,7 +55,7 @@ sub collect_wig_position_scores {
 	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
 
 		my $feature = $param->[$d];
-		confess 'dataset is not a seqfeature object!'
+		confess 'FATAL: dataset is not a seqfeature object!'
 			unless ref($feature) =~ /seqfeature/i;
 
 		# Check which data to take based on strand
@@ -80,7 +80,7 @@ sub collect_wig_position_scores {
 				# get wigfile name
 				my @wigfiles = $feature->get_tag_values('wigfile');
 				my $wigfile  = shift @wigfiles;    # there should only be one wigfile
-				confess ' no wigfile passed!' unless $wigfile;
+				confess 'FATAL: no wigfile passed!' unless $wigfile;
 
 				# check for opened wigfile
 				my $wig;
@@ -92,11 +92,11 @@ sub collect_wig_position_scores {
 				else {
 					# this file has not been opened yet, open it
 					unless ( -e $wigfile ) {
-						confess " Binary wiggle file '$wigfile' does not exist!\n";
+						confess "FATAL: Binary wiggle file '$wigfile' does not exist!";
 					}
 					$wig = Bio::Graphics::Wiggle->new( $wigfile, 0 );
 					unless ($wig) {
-						confess " unable to open data wigfile '$wigfile'";
+						confess "FATAL: unable to open data wigfile '$wigfile'";
 					}
 
 					# store the opened object for later use

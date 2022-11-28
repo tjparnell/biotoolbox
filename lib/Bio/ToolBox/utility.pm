@@ -35,7 +35,7 @@ sub parse_list {
 	my $string = shift;
 	return unless defined $string;
 	if ( $string =~ /[^\d,\-\s\&]/x ) {
-		carp ' the string contains characters that cannot be parsed';
+		carp 'ERROR: the string contains characters that cannot be parsed';
 		return;
 	}
 	my @list;
@@ -77,7 +77,7 @@ sub format_with_commas {
 		$integers = $2;
 	}
 	else {
-		carp ' the string contains characters that cannot be parsed';
+		carp 'ERROR: the string contains characters that cannot be parsed';
 		return $number;
 	}
 
@@ -109,7 +109,7 @@ sub ask_user_for_index {
 	my $Data = shift;
 	my $line = shift || ' Enter the desired column index   ';
 	unless ( ref($Data) =~ /Bio::ToolBox::Data/x ) {
-		carp 'Must pass a Bio::ToolBox::Data object!';
+		carp 'ERROR: Must pass a Bio::ToolBox::Data object!';
 		return;
 	}
 

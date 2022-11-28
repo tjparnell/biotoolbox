@@ -156,8 +156,7 @@ sub open_db_connection {
 	my $database = shift;
 	my $no_cache = shift || 0;
 	unless ($database) {
-
-		# 		cluck 'no database name passed!';
+		cluck 'ERROR: no database name passed!';
 		return;
 	}
 
@@ -562,7 +561,7 @@ sub get_dataset_list {
 	# Open a db connection
 	my $db = open_db_connection($database);
 	unless ($db) {
-		carp 'no database connected!';
+		carp 'ERROR: no database connected!';
 		return;
 	}
 	my $db_ref = ref $db;
@@ -618,7 +617,7 @@ sub get_dataset_list {
 
 	# some other database
 	else {
-		carp " no dataset lists for database type $db_ref!\n";
+		carp "ERROR: no dataset lists for database type $db_ref!";
 	}
 
 	# finish
@@ -744,12 +743,14 @@ sub verify_or_request_feature_types {
 						# verify
 						unless (%db_features) {
 							carp
-' provided database has no feature types to verify dataset(s) against!';
+'ERROR: provided database has no feature types to verify dataset(s) against!';
+							return;
 						}
 					}
 					else {
 						# we need a database
-						carp ' unable to verify dataset without database';
+						carp 'ERROR: unable to verify dataset without database';
+						return;
 					}
 				}
 
@@ -804,13 +805,13 @@ sub verify_or_request_feature_types {
 
 			# verify
 			unless (%db_features) {
-				carp ' provided database has no feature types to collect!';
+				carp 'ERROR: provided database has no feature types to collect!';
 				return;
 			}
 		}
 		else {
 			# we need a database
-			carp ' no database provided from which to collect features!';
+			carp 'ERROR: no database provided from which to collect features!';
 			return;
 		}
 
@@ -933,7 +934,7 @@ sub check_dataset_for_rpm_support {
 		}
 		else {
 			carp
-' Bam support is not available! Is Bio::DB::Sam or Bio::DB::HTS installed?';
+'ERROR: Bam support is not available! Is Bio::DB::Sam or Bio::DB::HTS installed?';
 			return;
 		}
 	}
@@ -951,7 +952,7 @@ sub check_dataset_for_rpm_support {
 			$rpm_read_sum = sum_total_bigbed_features($dataset);
 		}
 		else {
-			carp ' BigBed support is not available! Is Bio::DB::BigBed installed?';
+			carp 'ERROR: BigBed support is not available! Is Bio::DB::BigBed installed?';
 			return;
 		}
 	}
@@ -975,11 +976,11 @@ sub get_new_feature_list {
 	# check data object
 	my $data = $args{data} || undef;
 	unless ($data) {
-		confess q(must pass a 'data' key and Bio::ToolBox::Data object!);
+		confess q(FATAL: must pass a 'data' key and Bio::ToolBox::Data object!);
 		return;
 	}
 	unless ( ref($data) eq 'Bio::ToolBox::Data' ) {
-		confess 'must pass a Bio::ToolBox::Data object!';
+		confess 'FATAL: must pass a Bio::ToolBox::Data object!';
 		return;
 	}
 
@@ -987,21 +988,21 @@ sub get_new_feature_list {
 	$args{'db'} ||= undef;
 	my $db = open_db_connection( $args{'db'} );
 	unless ($db) {
-		carp 'no database connected!';
+		carp 'ERROR: no database connected!';
 		return;
 	}
 
 	# Verify a SeqFeature::Store database
 	my $db_ref = ref $db;
 	unless ( $db_ref =~ m/^Bio::DB::SeqFeature::Store/x ) {
-		carp "Database type $db_ref doesn't support generating feature lists!\n";
+		carp "ERROR: Database type $db_ref doesn't support generating feature lists!";
 		return;
 	}
 
 	# Features to search for
 	my $searchFeature = $args{'feature'} || $args{'features'} || undef;
 	unless ($searchFeature) {
-		carp 'no search feature types passed!';
+		carp 'ERROR: no search feature types passed!';
 		return;
 	}
 	my @classes = split /,/, $searchFeature;    # it may or may not be a list
@@ -1021,7 +1022,7 @@ sub get_new_feature_list {
 	unless ($iterator) {
 
 		# there should be some features found in the database
-		carp 'could not get feature iterator for database';
+		carp 'ERROR: could not get feature iterator for database';
 		return;
 	}
 
@@ -1057,17 +1058,17 @@ sub get_new_genome_list {
 	# check data object
 	my $data = $args{data} || undef;
 	unless ($data) {
-		confess q(must pass a 'data' key and Bio::ToolBox::Data object!);
+		confess q(FATAL: must pass a 'data' key and Bio::ToolBox::Data object!);
 	}
 	unless ( ref($data) eq 'Bio::ToolBox::Data' ) {
-		confess 'must pass a Bio::ToolBox::Data object!';
+		confess 'FATAL: must pass a Bio::ToolBox::Data object!';
 	}
 
 	# Open a db connection
 	$args{'db'} ||= undef;
 	my $db = open_db_connection( $args{'db'} );
 	unless ($db) {
-		carp 'no database connected!';
+		carp 'ERROR: no database connected!';
 		return;
 	}
 
@@ -1086,7 +1087,7 @@ sub get_new_genome_list {
 	my $chr_exclude = $args{'skip'} || $args{'chrskip'} || undef;
 	my @chromosomes = get_chromosome_list( $db, $chr_exclude );
 	unless (@chromosomes) {
-		carp ' no sequence IDs were found in the database!';
+		carp 'ERROR: no sequence IDs were found in the database!';
 		return;
 	}
 
@@ -1113,11 +1114,11 @@ sub get_new_genome_list {
 				);
 			}
 			else {
-				carp ' Set::IntervalTree must be installed to use exclusion intervals!';
+				carp 'ERROR: Set::IntervalTree must be installed to use exclusion intervals!';
 			}
 		}
 		else {
-			confess ' Exclusion data must be a Bio::ToolBox::Data object!';
+			carp 'ERROR: Exclusion data must be a Bio::ToolBox::Data object!';
 		}
 	}
 
@@ -1155,7 +1156,7 @@ sub get_db_feature {
 	# Open a db connection
 	$args{db} ||= undef;
 	unless ( $args{db} ) {
-		croak 'no database provided for getting a feature!';
+		croak 'FATAL: no database provided for getting a feature!';
 	}
 	my $db     = open_db_connection( $args{db} );
 	my $db_ref = ref $db;
@@ -1289,7 +1290,7 @@ sub get_segment_score {
 	# we will be passing this array on as a reference to the appropriate
 	# imported helper subroutine
 	# chromosome, start, stop, strand, strandedness, method, return type, db, dataset
-	confess 'incorrect number of parameters passed!' unless scalar @_ == 9;
+	confess 'FATAL: incorrect number of parameters passed!' unless scalar @_ == 9;
 
 	# check the database
 	$_[DB] = open_db_connection( $_[DB] ) if ( $_[DB] and not ref( $_[DB] ) );
@@ -1341,7 +1342,7 @@ sub calculate_score {
 		return &{ $SCORE_CALCULATOR_SUB{$method} }($scores);
 	}
 	else {
-		confess " unrecognized method '$method'!";
+		confess "FATAL: unrecognized method '$method'!";
 	}
 }
 
@@ -1354,7 +1355,7 @@ sub get_chromosome_list {
 	# Open a db connection
 	my $db = open_db_connection($database);
 	unless ($db) {
-		carp 'no database connected!';
+		carp 'ERROR: no database connected!';
 		return;
 	}
 
@@ -1500,7 +1501,7 @@ sub get_chromosome_list {
 
 			# check segment
 			unless ($segment) {
-				carp " No genome segment for seq_id $chr!!?? skipping\n";
+				print STDERR "ERROR: No genome segment for seq_id $chr!!?? skipping\n";
 				next;
 			}
 
@@ -1514,20 +1515,20 @@ sub get_chromosome_list {
 
 	else {
 		carp
-" Unable to identify chromosomes in database type '$type'. Try using a different database file or adapter\n";
+"ERROR: Unable to identify chromosomes in database type '$type'. Try using a different database file or adapter";
 		return;
 	}
 
 	# Return
 	unless (@chrom_lengths) {
-		carp ' no chromosome sequences identified in database!';
+		carp 'ERROR: no chromosome sequences identified in database!';
 		return;
 	}
 	return @chrom_lengths;
 }
 
 sub low_level_bam_fetch {
-	confess 'incorrect number of parameters passed!' unless scalar @_ == 6;
+	confess 'FATAL: incorrect number of parameters passed!' unless scalar @_ == 6;
 	my ( $sam, $tid, $start, $stop, $callback, $data ) = @_;
 
 	# run the the low level bam fetch based on which adapter is being used
@@ -1549,12 +1550,12 @@ sub low_level_bam_fetch {
 		return $index->fetch( $sam->bam, $tid, $start, $stop, $callback, $data );
 	}
 	else {
-		confess 'no bam adapter loaded!';
+		confess 'FATAL: no bam adapter loaded!';
 	}
 }
 
 sub low_level_bam_coverage {
-	confess 'incorrect number of parameters passed!' unless scalar @_ == 4;
+	confess 'FATAL: incorrect number of parameters passed!' unless scalar @_ == 4;
 	my ( $sam, $tid, $start, $stop ) = @_;
 
 	# run the the low level bam coverage based on which adapter is being used
@@ -1576,12 +1577,12 @@ sub low_level_bam_coverage {
 		return $index->coverage( $sam->bam, $tid, $start, $stop );
 	}
 	else {
-		confess 'no bam adapter loaded!';
+		confess 'FATAL: no bam adapter loaded!';
 	}
 }
 
 sub get_genomic_sequence {
-	confess 'incorrect number of parameters passed!' unless scalar @_ == 4;
+	confess 'FATAL: incorrect number of parameters passed!' unless scalar @_ == 4;
 	my ( $db, $chrom, $start, $stop ) = @_;
 
 	# check database
@@ -1601,7 +1602,7 @@ sub get_genomic_sequence {
 		return $db->seq( $chrom, $start, $stop );
 	}
 	else {
-		confess "unsupported database $type for collecting genomic sequence!\n";
+		confess "FATAL: unsupported database $type for collecting genomic sequence!";
 	}
 }
 
@@ -1657,7 +1658,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak
-' BigWig support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?';
+'FATAL: BigWig support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?';
 			}
 		}
 
@@ -1680,7 +1681,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak
-' BigBed support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?';
+'FATAL: BigBed support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?';
 			}
 		}
 
@@ -1698,7 +1699,7 @@ sub _lookup_db_method {
 			}
 			else {
 				croak
-' Bam support is not enabled! Is Bio::DB::HTS or Bio::DB::Sam installed?';
+'FATAL: Bam support is not enabled! Is Bio::DB::HTS or Bio::DB::Sam installed?';
 			}
 		}
 
@@ -1721,13 +1722,13 @@ sub _lookup_db_method {
 				}
 			}
 			else {
-				croak ' USeq support is not enabled! Is Bio::DB::USeq installed?';
+				croak 'FATAL: USeq support is not enabled! Is Bio::DB::USeq installed?';
 			}
 		}
 
 		# Unsupported Data file
 		else {
-			confess sprintf " Unsupported or unrecognized file type for file '%s'!\n",
+			confess sprintf "FATAL Unsupported or unrecognized file type for file '%s'!",
 				$param->[DATA];
 		}
 	}
@@ -1742,7 +1743,7 @@ sub _lookup_db_method {
 		# duh! we should, we probably opened the stupid database!
 		$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
 		croak
-' BigWigSet support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?'
+'FATAL: BigWigSet support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?'
 			unless $BIGWIG_OK;
 
 		# the data collection depends on the method
@@ -1784,22 +1785,22 @@ sub _lookup_db_method {
 			# check that we support methods
 			unless ( $param->[DB]->can('get_seq_stream') ) {
 				confess sprintf
-"unsupported database! cannot use %s as it does not support get_seq_stream method or equivalent",
+"FATAL: unsupported database! cannot use %s as it does not support get_seq_stream method or equivalent",
 					ref( $param->[DB] );
 			}
 			$score_method = \&collect_store_scores;
 		}
 		else {
 			croak
-' SeqFeature Store support is not enabled! Is BioPerl and Bio::DB::SeqFeature::Store properly installed?';
+'FATAL: SeqFeature Store support is not enabled! Is BioPerl and Bio::DB::SeqFeature::Store properly installed?';
 		}
 	}
 
 	### Some other database?
 	else {
-		confess 'no recognizeable dataset provided!' unless $param->[DATA];
-		confess 'no database passed!'                unless $param->[DB];
-		confess sprintf "something went wrong! parameters: %s", join ', ', @{$param};
+		confess 'FATAL: no recognizeable dataset provided!' unless $param->[DATA];
+		confess 'FATAL: no database passed!'                unless $param->[DB];
+		confess sprintf "FATAL: something went wrong! parameters: %s", join ', ', @{$param};
 	}
 
 	### Cache and return the results
@@ -1833,7 +1834,7 @@ sub _load_bam_helper_module {
 			return 0;                # basically for testing purposes, don't use a module
 		}
 		if ( not $BAM_OK and $EVAL_ERROR ) {
-			carp $EVAL_ERROR;
+			carp "ERROR: $EVAL_ERROR";
 		}
 	}
 	else {
@@ -1849,7 +1850,7 @@ sub _load_bam_helper_module {
 				$BAM_ADAPTER = 'sam';
 			}
 			else {
-				carp "Neither Bio::DB::HTS or Bio::DB::Sam are installed";
+				carp "ERROR: Neither Bio::DB::HTS or Bio::DB::Sam are installed";
 			}
 		}
 	}
@@ -1871,7 +1872,7 @@ sub _load_bigwig_helper_module {
 			return 0;                # basically for testing purposes, don't use a module
 		}
 		if ( not $BIGWIG_OK and $EVAL_ERROR ) {
-			carp $EVAL_ERROR;
+			carp "ERROR: $EVAL_ERROR";
 		}
 	}
 	else {
@@ -1889,7 +1890,7 @@ sub _load_bigwig_helper_module {
 			}
 			else {
 				carp
-"Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
+"ERROR: Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
 			}
 		}
 	}
@@ -1911,7 +1912,7 @@ sub _load_bigbed_helper_module {
 			return 0;                # basically for testing purposes, don't use a module
 		}
 		if ( not $BIGBED_OK and $EVAL_ERROR ) {
-			carp $EVAL_ERROR;
+			carp "ERROR: $EVAL_ERROR";
 		}
 	}
 	else {
@@ -1929,7 +1930,7 @@ sub _load_bigbed_helper_module {
 			}
 			else {
 				carp
-"Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
+"ERROR: Neither Bio::DB::Big, Bio::DB::BigWig, or Bio::DB::BigBed are installed";
 			}
 		}
 	}

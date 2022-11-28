@@ -20,11 +20,11 @@ sub open_file {
 
 	# check file
 	if ( $filename and $self->file and $filename ne $self->file ) {
-		confess 'Must open new files with new Parser object!';
+		confess 'FATAL: Must open new files with new Parser object!';
 	}
 	$filename ||= $self->file;
 	unless ($filename) {
-		cluck "No file name passed!\n";
+		cluck "ERROR: No file name passed!\n";
 		return;
 	}
 	if ( defined $self->{fh} ) {
@@ -36,7 +36,7 @@ sub open_file {
 	unless ($filetype) {
 		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
 		unless ( $flavor eq 'bed' ) {
-			confess 'File is not a BED file!!! How did we get here?';
+			confess 'FATAL: File is not a BED file!!! How did we get here?';
 		}
 		$self->{filetype} = $filetype;
 	}
@@ -89,7 +89,7 @@ sub open_file {
 
 	# Open file
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename)
-		or croak(" Unable to open file '$filename'!");
+		or croak "FATAL: Unable to open file '$filename'!";
 
 	# finish
 	$self->{fh} = $fh;
@@ -121,7 +121,7 @@ sub next_feature {
 
 	# check that we have an open filehandle and not finished
 	unless ( $self->fh ) {
-		croak 'no Bed file loaded to parse!';
+		croak 'FATAL: no Bed file loaded to parse!';
 	}
 	return if $self->{'eof'};
 
@@ -158,7 +158,8 @@ sub parse_file {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		confess 'no file loaded to parse!';
+		carp 'ERROR: no file loaded to parse!';
+		return;
 	}
 	return 1 if $self->{'eof'};
 
@@ -200,7 +201,7 @@ sub _parse_narrowPeak {
 	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
 	unless ( scalar(@data) == 10 ) {
-		croak sprintf( "narrowPeak line %d '%s' doesn't have 10 elements!",
+		croak sprintf( "FATAL: narrowPeak line %d '%s' doesn't have 10 elements!",
 			$self->{line_count}, $line );
 	}
 
@@ -229,7 +230,7 @@ sub _parse_broadPeak {
 	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
 	unless ( scalar(@data) == 9 ) {
-		croak sprintf( "broadPeak line %d '%s' doesn't have 9 elements!",
+		croak sprintf( "FATAL: broadPeak line %d '%s' doesn't have 9 elements!",
 			$self->{line_count}, $line );
 	}
 
@@ -257,7 +258,7 @@ sub _parse_bedGraph {
 	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
 	unless ( scalar(@data) == 4 ) {
-		croak sprintf( "bedGraph line %d '%s' doesn't have 4 elements!",
+		croak sprintf( "FATAL: bedGraph line %d '%s' doesn't have 4 elements!",
 			$self->{line_count}, $line );
 	}
 
@@ -275,7 +276,7 @@ sub _parse_bed {
 	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
 	unless ( scalar(@data) == $self->{bed} ) {
-		croak sprintf( "Bed line %d '%s' doesn't have %d elements!",
+		croak sprintf( "FATAL: Bed line %d '%s' doesn't have %d elements!",
 			$self->{line_count}, $line, $self->{bed} );
 	}
 
@@ -295,7 +296,7 @@ sub _parse_bed12 {
 	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
 	unless ( scalar(@data) == $self->{bed} ) {
-		croak sprintf( "Bed line %d '%s' doesn't have %d elements!",
+		croak sprintf( "FATAL: Bed line %d '%s' doesn't have %d elements!",
 			$self->{line_count}, $line, $self->{bed} );
 	}
 
@@ -354,7 +355,7 @@ sub _parse_gappedPeak {
 	my ( $self, $line ) = @_;
 	my @data = split /\t/, $line;
 	unless ( scalar(@data) == 15 ) {
-		croak sprintf( "GappedPeak line %d '%s' doesn't have 15 elements!",
+		croak sprintf( "FATAL: GappedPeak line %d '%s' doesn't have 15 elements!",
 			$self->{line_count}, $line );
 	}
 

@@ -43,8 +43,9 @@ sub open_fasta_db {
 		$db = Bio::DB::Fasta->new($database);
 	};
 	unless ($db) {
-		warn "unable to open fasta file as database! Make sure the file's directory\n"
+		carp "ERROR: unable to open fasta file as database! Make sure the file's directory\n"
 			. "writable, and if a *.index file exists, try deleting it so it can be rebuilt\n";
+		return;
 	}
 	return $db;
 }
@@ -202,19 +203,15 @@ sub collect_store_scores {
 			if ($WIGGLE_OK) {
 
 				# get the dataset scores using Bio::ToolBox::db_helper::wiggle
-
 				if ( $param->[RETT] == 2 ) {
-
-					# warn " using collect_wig_position_scores() from tag\n";
 					return collect_wig_position_scores($param);
 				}
 				else {
-					# warn " using collect_wig_scores() from tag\n";
 					return collect_wig_scores($param);
 				}
 			}
 			else {
-				croak " Wiggle support is not enabled! $EVAL_ERROR\n";
+				croak "FATAL: Wiggle support is not enabled! $EVAL_ERROR";
 			}
 		}
 
@@ -223,11 +220,11 @@ sub collect_store_scores {
 
 			# data is in bigwig format
 			# we are abandoning this support
-			die ' Supporting bigWig files via seqfeature attribute is no longer '
+			croak 'FATAL: Supporting bigWig files via seqfeature attribute is no longer '
 				. "supported.\n Please use bigWig files directly\n";
 		}
 		else {
-			croak " Unrecognized wigfile attribute '$wigfile'!"
+			croak "FATAL: Unrecognized wigfile attribute '$wigfile'!"
 				. " Unable to continue!\n";
 		}
 	}

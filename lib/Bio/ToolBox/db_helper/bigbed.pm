@@ -284,7 +284,7 @@ sub sum_total_bigbed_features {
 	# Passed arguments;
 	my $bb_file = shift;
 	unless ($bb_file) {
-		carp " no BigBed file or BigBed db object passed!\n";
+		carp "ERROR: no BigBed file or BigBed db object passed!";
 		return;
 	}
 
@@ -320,7 +320,7 @@ sub _get_bb {
 
 	# open and cache the bigWig object
 	my $bb = open_bigbed_db($bbfile)
-		or croak " Unable to open bigBed file '$bbfile'!";
+		or croak "FATAL: Unable to open bigBed file '$bbfile'!";
 	$OPENED_BB{$bbfile} = $bb;
 
 	# record the chromosomes and possible variants

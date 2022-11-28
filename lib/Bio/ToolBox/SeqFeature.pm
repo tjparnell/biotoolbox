@@ -108,7 +108,7 @@ sub new {
 		$self->[SUBF] = [];
 		foreach my $s ( @{ $args{-segments} } ) {
 			unless ( ref($s) eq $class ) {
-				croak "segments should be passed as $class objects!";
+				croak "FATAL: segments should be passed as $class objects!";
 			}
 			push @{ $self->[SUBF] }, $s;
 		}
@@ -236,7 +236,7 @@ sub phase {
 	if (@_) {
 		my $p = $_[0];
 		unless ( $p =~ /^[012\.]$/ ) {
-			cluck 'phase must be 0, 1, 2 or .!';
+			carp 'ERROR: phase must be 0, 1, 2 or .!';
 		}
 		$self->[PHASE] = $p;
 	}
@@ -272,7 +272,7 @@ sub add_SeqFeature {
 			$count++;
 		}
 		else {
-			cluck 'please use SeqFeature objects when adding sub features!';
+			carp 'ERROR: use SeqFeature objects when adding sub features!';
 		}
 	}
 	return $count;

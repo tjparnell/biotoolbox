@@ -287,7 +287,7 @@ sub assign_callback {
 	# I goofed
 	else {
 		confess sprintf
-			"Programmer error: stranded %s, strand %s, method %s, do_index %d",
+			"FATAL Programmer error: stranded %s, strand %s, method %s, do_index %d",
 			$param->[STND], $param->[STR], $param->[METH], $param->[RETT];
 	}
 

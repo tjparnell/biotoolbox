@@ -318,10 +318,10 @@ sub next_top_feature {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		croak 'no annotation file loaded to parse!';
+		croak 'FATAL: no annotation file loaded to parse!';
 	}
 	unless ( $self->{'eof'} ) {
-		$self->parse_file or croak 'unable to parse file!';
+		$self->parse_file or croak 'FATAL: unable to parse file!';
 	}
 
 	# set up index
@@ -352,7 +352,7 @@ sub fetch {
 }
 
 sub find_gene {
-	confess 'The find_gene() method is deprecated. Please use fetch().';
+	confess 'FATAL: The find_gene() method is deprecated. Please use fetch().';
 }
 
 1;

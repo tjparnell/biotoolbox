@@ -95,7 +95,7 @@ sub new {
 				}
 				else {
 					carp
-" Cannot not load exclusion coordinate list file $args{blacklist}!";
+"ERROR: Cannot not load exclusion coordinate list file $args{blacklist}!";
 					return;
 				}
 			}
@@ -105,7 +105,7 @@ sub new {
 			$result = get_new_feature_list(%args);
 		}
 		unless ($result) {
-			carp " Cannot generate new $args{features} list!";
+			carp "ERROR: Cannot generate new $args{features} list!";
 			return;
 		}
 	}
@@ -138,7 +138,7 @@ sub new {
 
 			# use standard names for the number of columns indicated
 			unless ( $args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3 ) {
-				carp 'bed parameter must be an integer 3-12!';
+				carp 'ERROR: bed parameter must be an integer 3-12!';
 				return;
 			}
 			$self->add_bed_metadata( $args{bed} );
@@ -151,7 +151,7 @@ sub new {
 			# a ucsc format such as refFlat, genePred, or genePredExt
 			my $u = $self->add_ucsc_metadata( $args{ucsc} );
 			unless ($u) {
-				carp 'unrecognized number of columns for ucsc format!';
+				carp 'ERROR: unrecognized number of columns for ucsc format!';
 				return;
 			}
 			unless ( $self->extension =~ m/ucsc | ref+lat | genepred/xi ) {
@@ -202,7 +202,7 @@ sub parse_table {
 		$args = {};      # empty hash for below
 	}
 	unless ($file) {
-		carp 'no annotation file provided to parse!';
+		carp 'ERROR: no annotation file provided to parse!';
 		return;
 	}
 
@@ -292,7 +292,7 @@ sub parse_table {
 			}
 		);
 		unless ( $count == $self->last_row ) {
-			die <<PARSEFAIL;
+			croak <<PARSEFAIL;
 Not all features in the input file could be matched to a corresponding SeqFeature 
 object in the annotation file $file.
 Double check your input and annotation files. You can create a new table by just 
@@ -389,7 +389,7 @@ sub add_column {
 			}
 			else {
 				# different number of elements
-				cluck 'array has different number of elements than Data table!\n';
+				cluck 'ERROR: array has different number of elements than Data table!';
 				return;
 			}
 		}
@@ -429,7 +429,7 @@ sub add_column {
 	}
 	else {
 		cluck
-			"unrecognized reference '$name_ref'! pass a scalar value or array reference";
+"ERROR: unrecognized reference '$name_ref'! pass a scalar value or array reference";
 		return;
 	}
 
@@ -468,7 +468,8 @@ sub add_row {
 		@row_data = map {'.'} ( 1 .. $self->{number_columns} );
 	}
 	if ( scalar(@row_data) > $self->{number_columns} ) {
-		cluck 'row added has more elements than table columns! truncating row elements';
+		carp
+'ERROR: row added has more elements than table columns! truncating row elements';
 		splice @row_data, 0, $self->{number_columns};
 	}
 	elsif ( scalar(@row_data) < $self->{number_columns} ) {
@@ -535,7 +536,8 @@ sub iterate {
 	my $self = shift;
 	my $code = shift;
 	unless ( ref($code) eq 'CODE' ) {
-		confess 'iterate_function() method requires a code reference!';
+		carp 'ERROR: iterate_function() method requires a code reference!';
+		return;
 	}
 	my $stream = $self->row_stream;
 	while ( my $row = $stream->next_row ) {
@@ -549,9 +551,9 @@ sub iterate {
 sub store_seqfeature {
 	my ( $self, $row_i, $seqfeature ) = @_;
 	unless ( defined $row_i and ref($seqfeature) ) {
-		confess 'must provide a row index and SeqFeature object!';
+		carp 'ERROR: must provide a row index and SeqFeature object!';
 	}
-	confess 'invalid row index' unless ( $row_i <= $self->last_row );
+	carp 'ERROR: invalid row index' unless ( $row_i <= $self->last_row );
 	$self->{SeqFeatureObjects} ||= [];
 	$self->{SeqFeatureObjects}->[$row_i] = $seqfeature;
 	return 1;
@@ -559,7 +561,7 @@ sub store_seqfeature {
 
 sub delete_seqfeature {
 	my ( $self, $row_i ) = @_;
-	confess 'invalid row index' unless ( $row_i <= $self->last_row );
+	carp 'ERROR: invalid row index' unless ( $row_i <= $self->last_row );
 	return                      unless $self->{SeqFeatureObjects};
 	undef $self->{SeqFeatureObjects}->[$row_i];
 }
@@ -567,7 +569,7 @@ sub delete_seqfeature {
 sub collapse_gene_transcripts {
 	my $self = shift;
 	unless ( $self->feature_type eq 'named' ) {
-		carp 'Table does not contain named features!';
+		carp 'ERROR: Table does not contain named features!';
 		return;
 	}
 
@@ -588,8 +590,11 @@ sub collapse_gene_transcripts {
 	else {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
-		my $db = $self->open_meta_database(1) or    # force open a new db connection
-			confess 'No SeqFeature objects stored and no database connection!';
+		my $db = $self->open_meta_database(1);   # force open a new db connection
+		unless ($db) {
+			 carp 'ERROR: No SeqFeature objects stored and no database connection!';
+			 return;
+		}
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
 		my $type_i = $self->type_column;
@@ -611,10 +616,6 @@ sub collapse_gene_transcripts {
 sub add_transcript_length {
 	my $self       = shift;
 	my $subfeature = shift || 'exon';
-	unless ( exists $self->{SeqFeatureObjects} ) {
-		carp 'no SeqFeature objects stored for collapsing!';
-		return;
-	}
 
 	# load module
 	load Bio::ToolBox::GeneTools, qw(get_transcript_length get_transcript_cds_length
@@ -640,7 +641,7 @@ sub add_transcript_length {
 		$length_name       = 'Transcript_3p_UTR_Length';
 	}
 	else {
-		carp "unrecognized subfeature type '$subfeature'! No length calculated";
+		carp "ERROR: unrecognized subfeature type '$subfeature'! No length calculated";
 		return;
 	}
 
@@ -658,8 +659,11 @@ sub add_transcript_length {
 	else {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
-		my $db = $self->open_meta_database(1) or    # force open a new db connection
-			confess 'No SeqFeature objects stored and no database connection!';
+		my $db = $self->open_meta_database(1);    # force open a new db connection
+		unless ($db) {
+			carp 'ERROR: No SeqFeature objects stored and no database connection!';
+			return;
+		}
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
 		my $type_i = $self->type_column;
@@ -692,7 +696,7 @@ sub sort_data {
 	# confirm options
 	return unless exists $self->{$index}{name};
 	unless ( $direction =~ /^[id]/i ) {
-		carp "unrecognized sort order '$direction'! Must be i or d";
+		carp "ERROR: unrecognized sort order '$direction'! Must be i or d";
 		return;
 	}
 
@@ -852,7 +856,7 @@ sub gsort_data {
 
 	# identify indices
 	unless ( $self->feature_type eq 'coordinate' ) {
-		carp 'no chromosome and start/position columns to sort!';
+		carp 'ERROR: no chromosome and start/position columns to sort!';
 		return;
 	}
 	my $chromo_i = $self->chromo_column;
@@ -902,7 +906,7 @@ sub splice_data {
 	my ( $self, $part, $total_parts ) = @_;
 
 	unless ( $part and $total_parts ) {
-		confess 'ordinal part and total number of parts not passed';
+		confess 'FATAL: ordinal part and total number of parts not passed';
 	}
 	my $part_length = int( $self->last_row / $total_parts );
 
@@ -977,7 +981,7 @@ sub reload_children {
 	my $first  = shift @files;
 	my $Stream = $class->new( in => $first );
 	unless ($Stream) {
-		carp "unable to load first child file $first";
+		carp "ERROR: unable to load first child file $first";
 		return;
 	}
 
@@ -1010,7 +1014,7 @@ sub reload_children {
 	foreach my $file (@files) {
 		my $Stream1 = $class->new( in => $file );
 		if ( $Stream1->number_columns != $self->number_columns ) {
-			confess "fatal error: child file $file has a different number of columns!";
+			confess "FATAL: child file $file has a different number of columns!";
 		}
 		while ( my $row = $Stream1->next_row ) {
 			my $a = $row->row_values;
@@ -1068,7 +1072,7 @@ sub summary_file {
 			$outfile = $self->path . $self->basename;
 		}
 		else {
-			cluck 'no filename passed to write_summary_data!';
+			carp 'ERROR: no filename passed to write_summary_data!';
 			return;
 		}
 	}
@@ -1204,9 +1208,8 @@ sub summary_file {
 				# we're summarizing multiple datasets, we already have name midpoint
 				# first do sanity check
 				if ( $summed_data->value( $row, 1 ) != $midpoint ) {
-					carp(
-'unable to summarize multiple datasets with nonequal columns of data!'
-					);
+					carp
+'ERROR: unable to summarize multiple datasets with nonequal columns of data!';
 					return;
 				}
 				$summed_data->value( $row, $i, $window_mean );

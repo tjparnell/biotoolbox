@@ -44,19 +44,19 @@ sub column_name {
 
 sub feature_type {
 	my $self = shift;
-	carp 'feature_type is a read only method' if @_;
+	carp 'ERROR: feature_type is a read only method' if @_;
 	return $self->{data}->feature_type;
 }
 
 sub row_index {
 	my $self = shift;
-	carp 'row_index is a read only method' if @_;
+	carp 'ERROR: row_index is a read only method' if @_;
 	return $self->{'index'};
 }
 
 sub line_number {
 	my $self = shift;
-	carp 'line_number is a read only method' if @_;
+	carp 'ERROR: line_number is a read only method' if @_;
 	if ( exists $self->{data}->{line_count} ) {
 		return $self->{data}->{line_count};
 	}
@@ -70,7 +70,7 @@ sub line_number {
 
 sub row_values {
 	my $self = shift;
-	carp 'row_values is a read only method' if @_;
+	carp 'ERROR: row_values is a read only method' if @_;
 	my $row  = $self->{'index'};
 	my @data = @{ $self->{data}->{data_table}->[$row] }
 		[ 1 .. $#{ $self->{data}->{data_table}->[$row] } ];
@@ -102,10 +102,10 @@ sub seq_id {
 			$self->{seqid} = $_[0];
 		}
 		elsif ( exists $self->{feature} ) {
-			carp 'Unable to update seq_id for parsed SeqFeature objects';
+			carp 'ERROR: Unable to update seq_id for parsed SeqFeature objects';
 		}
 		else {
-			carp 'No Chromosome column to update!';
+			carp 'ERROR: No Chromosome column to update!';
 		}
 	}
 
@@ -156,13 +156,13 @@ sub start {
 			}
 		}
 		elsif ( not $d ) {
-			carp 'Start coordinate value is not an integer';
+			carp 'ERROR: Start coordinate value is not an integer';
 		}
 		elsif ( exists $self->{feature} ) {
-			carp 'Unable to update Start coordinate for parsed SeqFeature objects';
+			carp 'ERROR: Unable to update Start coordinate for parsed SeqFeature objects';
 		}
 		else {
-			carp 'No Start coordinate column to update!';
+			carp 'ERROR: No Start coordinate column to update!';
 		}
 	}
 
@@ -213,13 +213,13 @@ sub end {
 			$self->{end} = $_[0];
 		}
 		elsif ( not $d ) {
-			carp 'End coordinate value is not an integer';
+			carp 'ERROR: End coordinate value is not an integer';
 		}
 		elsif ( exists $self->{feature} ) {
-			carp 'Unable to update End coordinate for parsed SeqFeature objects';
+			carp 'ERROR: Unable to update End coordinate for parsed SeqFeature objects';
 		}
 		else {
-			carp 'No End coordinate column to update!';
+			carp 'ERROR: No End coordinate column to update!';
 		}
 	}
 
@@ -261,10 +261,10 @@ sub strand {
 			$self->{strand} = $self->_strand( $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
-			carp 'Unable to update Strand for parsed SeqFeature objects';
+			carp 'ERROR: Unable to update Strand for parsed SeqFeature objects';
 		}
 		else {
-			carp 'No Strand column to update!';
+			carp 'ERROR: No Strand column to update!';
 		}
 	}
 
@@ -378,10 +378,10 @@ sub display_name {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
-			carp 'Unable to update display_name for parsed SeqFeature objects';
+			carp 'ERROR: Unable to update display_name for parsed SeqFeature objects';
 		}
 		else {
-			carp 'No Name column to update!';
+			carp 'ERROR: No Name column to update!';
 		}
 	}
 
@@ -407,7 +407,7 @@ sub display_name {
 
 sub coordinate {
 	my $self = shift;
-	carp 'name is a read only method' if @_;
+	carp 'ERROR: name is a read only method' if @_;
 
 	# to avoid auto-converting start0 coordinates, which might confuse people or programs,
 	# we will take the start value as is when it's available, otherwise calculate start
@@ -432,10 +432,10 @@ sub type {
 			return $self->value( $i, $_[0] );
 		}
 		elsif ( exists $self->{feature} ) {
-			carp 'Unable to update primary_tag for parsed SeqFeature objects';
+			carp 'ERROR: Unable to update primary_tag for parsed SeqFeature objects';
 		}
 		else {
-			carp 'No Type column to update!';
+			carp 'ERROR: No Type column to update!';
 		}
 	}
 
@@ -462,7 +462,7 @@ sub type {
 
 sub primary_id {
 	my $self = shift;
-	carp 'id is a read only method' if @_;
+	carp 'ERROR: id is a read only method' if @_;
 	my $i = $self->{data}->id_column;
 	if ($i) {
 		my $v = $self->value($i);
@@ -479,7 +479,7 @@ sub primary_id {
 
 sub length {
 	my $self = shift;
-	carp 'length is a read only method' if @_;
+	carp 'ERROR: length is a read only method' if @_;
 	if ( $self->{data}->vcf ) {
 
 		# special case for vcf files, measure the length of the ALT allele
@@ -649,7 +649,7 @@ sub rewrite_vcf_attributes {
 sub seqfeature {
 	my $self  = shift;
 	my $force = shift || 0;
-	carp 'feature is a read only method' if @_;
+	carp 'ERROR: feature is a read only method' if @_;
 	return $self->{feature}              if exists $self->{feature};
 
 	# normally this is only for named features in a data table
@@ -678,7 +678,7 @@ sub seqfeature {
 
 sub segment {
 	my $self = shift;
-	carp 'segment is a read only method' if @_;
+	carp 'ERROR: segment is a read only method' if @_;
 	return unless $self->{data}->database;
 	if ( $self->feature_type eq 'coordinate' ) {
 		my $chromo = $self->seq_id;
@@ -700,7 +700,7 @@ sub get_features {
 	my $self = shift;
 	my %args = @_;
 	my $db   = $args{db} || $self->{data}->open_meta_database || undef;
-	carp 'no database defined to get features!' unless defined $db;
+	carp 'ERROR: no database defined to get features!' unless defined $db;
 	return                                      unless $db->can('features');
 
 	# convert the argument style for most bioperl db APIs
@@ -760,7 +760,7 @@ sub _get_subfeature_sequence {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless ( @{$subfeatures} ) {
-		carp 'no subfeatures available! Returning parent sequence!';
+		carp 'ERROR: no subfeatures available! Returning parent sequence!';
 
 		# just return the parent
 		undef $args->{subfeature};
@@ -800,7 +800,7 @@ sub _get_subfeatures {
 				get_introns)
 		);
 		if ($EVAL_ERROR) {
-			croak "missing required modules! $EVAL_ERROR";
+			croak "FATAL: missing required modules! $EVAL_ERROR";
 		}
 		else {
 			$GENETOOL_LOADED = 1;
@@ -829,7 +829,7 @@ sub _get_subfeatures {
 		@subfeatures = get_introns($feature);
 	}
 	else {
-		croak "unrecognized subfeature parameter '$subf'!";
+		croak "ERROR: unrecognized subfeature parameter '$subf'!";
 	}
 
 	return \@subfeatures;
@@ -844,7 +844,7 @@ sub get_score {
 	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $db );
 	unless ( $args{dataset} ) {
 		croak
-'provided dataset was unrecognized format or otherwise could not be verified!';
+'FATAL: provided dataset was unrecognized format or otherwise could not be verified!';
 	}
 
 	# get positioned scores over subfeatures only
@@ -885,7 +885,7 @@ sub get_score {
 	}
 	else {
 		croak
-'data table does not have identifiable coordinate or feature identification columns for score collection';
+'FATAL: data table does not have identifiable coordinate or feature identification columns for score collection';
 	}
 
 	# adjust coordinates as necessary
@@ -926,7 +926,7 @@ sub _get_subfeature_scores {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless ( @{$subfeatures} ) {
-		carp 'no subfeatures available! Returning parent score data!';
+		carp 'ERROR: no subfeatures available! Returning parent score data!';
 
 		# just return the parent
 		undef $args->{subfeature};
@@ -965,7 +965,7 @@ sub get_relative_point_position_scores {
 	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $ddb );
 	unless ( $args{dataset} ) {
 		croak
-'provided dataset was unrecognized format or otherwise could not be verified!';
+'FATAL: provided dataset was unrecognized format or otherwise could not be verified!';
 	}
 
 	# assign some defaults
@@ -975,7 +975,7 @@ sub get_relative_point_position_scores {
 	$args{avoid}        ||= undef;
 	$args{'method'}     ||= 'mean';    # in most cases this doesn't do anything
 	unless ( $args{extend} ) {
-		croak 'must provide an extend value!';
+		croak 'FATAL: must provide an extend value!';
 	}
 	$args{avoid} = undef unless ( $args{db} or $self->{data}->open_meta_database );
 
@@ -1028,7 +1028,7 @@ sub get_region_position_scores {
 	$args{dataset} = $self->{data}->verify_dataset( $args{dataset}, $ddb );
 	unless ( $args{dataset} ) {
 		croak
-'provided dataset was unrecognized format or otherwise could not be verified!\n';
+'FATAL: provided dataset was unrecognized format or otherwise could not be verified!';
 	}
 
 	# assign some defaults here, in case we get passed on to subfeature method
@@ -1094,7 +1094,7 @@ sub _get_subfeature_position_scores {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless ( @{$subfeatures} ) {
-		carp 'no subfeatures available! Returning parent score data!';
+		carp 'ERROR: no subfeatures available! Returning parent score data!';
 
 		# just return the parent
 		undef $args->{subfeature};
@@ -1253,7 +1253,7 @@ sub calculate_reference {
 		$coordinate = $self->peak;
 	}
 	else {
-		confess 'position must be one of 5, 3, 4, or 10';
+		confess 'FATAL: position must be one of 5, 3, 4, or 10';
 	}
 	return $coordinate;
 }
@@ -1384,13 +1384,13 @@ sub fetch_alignments {
 
 	# verify - trusting that these are valid, else they will fail lower down in the code
 	unless ( $args{db} ) {
-		croak 'must provide a Bam object database to fetch alignments!';
+		croak 'FATAL: must provide a Bam object database to fetch alignments!';
 	}
 	unless ( $args{data} and ref( $args{data} ) eq 'HASH' ) {
-		croak 'must provide a data HASH for the fetch callback!';
+		croak 'FATAL: must provide a data HASH for the fetch callback!';
 	}
 	unless ( $args{callback} ) {
-		croak 'must provide a callback code reference!';
+		croak 'FATAL: must provide a callback code reference!';
 	}
 
 	# array of features to iterate, probably just one or subfeatures
@@ -1448,8 +1448,8 @@ sub bed_string {
 	my $self = shift;
 	my %args = @_;
 	$args{bed} ||= 6;    # number of bed columns
-	croak 'bed count must be an integer!' unless $args{bed} =~ /^\d+$/;
-	croak 'bed count must be at least 3!' unless $args{bed} >= 3;
+	croak 'FATAL: bed count must be an integer!' unless $args{bed} =~ /^\d+$/;
+	croak 'FATAL: bed count must be at least 3!' unless $args{bed} >= 3;
 
 	# coordinate information
 	$self->seqfeature;    # retrieve the seqfeature object first
@@ -1466,7 +1466,8 @@ sub bed_string {
 		or $start eq '.'
 		or not CORE::length($start) )
 	{
-		carp sprintf( "no valid seq_id or start for data line %d", $self->line_number );
+		carp sprintf( "ERROR: no valid seq_id or start for data line %d",
+			$self->line_number );
 		return;
 	}
 	if ( $start > $stop ) {
@@ -1527,7 +1528,8 @@ sub gff_string {
 		or $start eq '.'
 		or not CORE::length($start) )
 	{
-		carp sprintf( "no valid seq_id or start for data line %d", $self->line_number );
+		carp sprintf( "ERROR: no valid seq_id or start for data line %d",
+			$self->line_number );
 		return;
 	}
 	if ( $start > $stop ) {

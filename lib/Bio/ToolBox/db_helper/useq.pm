@@ -299,7 +299,7 @@ sub _get_useq {
 
 	# open and cache the USeq object
 	my $useq = open_useq_db($useqfile)
-		or croak " Unable to open USeq file '$useqfile'! $OS_ERROR\n";
+		or croak "FATAL: Unable to open USeq file '$useqfile'! $OS_ERROR";
 	$OPENED_USEQ{$useqfile} = $useq;
 
 	# record the chromosomes and possible variants

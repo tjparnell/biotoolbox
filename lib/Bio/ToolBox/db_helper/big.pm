@@ -79,9 +79,9 @@ my %BIGWIGSET_WIGS;
 sub open_bigwig_db {
 	my $path = shift;
 	my $bw   = _open_big($path)
-		or croak " Unable to open bigWig file '$path'!";
+		or croak "FATAL: Unable to open bigWig file '$path'!";
 	unless ( $bw->is_big_wig ) {
-		croak " $path is not a bigWig file!\n";
+		croak "FATAL: $path is not a bigWig file!";
 	}
 	return $bw;    # we do not cache here
 }
@@ -133,8 +133,7 @@ sub collect_bigwig_score {
 			return max(@scores);
 		}
 		else {
-			confess sprintf
-				" how did we get here? unable to calculate %s from multiple bigwigs!\n",
+			confess sprintf "FATAL: unable to calculate %s from multiple bigwigs!",
 				$param->[METH];
 		}
 	}
@@ -258,9 +257,9 @@ sub collect_bigwig_position_scores {
 sub open_bigbed_db {
 	my $path = shift;
 	my $bb   = _open_big($path)
-		or croak " Unable to open bigBed file '$path'!";
+		or croak "FATAL: Unable to open bigBed file '$path'!";
 	unless ( $bb->is_big_bed ) {
-		croak " $path is not a bigBed file!\n";
+		croak "FATAL: $path is not a bigBed file!";
 	}
 	return $bb;
 }
@@ -500,7 +499,7 @@ sub collect_bigwigset_score {
 	my $ids = _lookup_bigwigset_wigs($param);
 	return unless scalar(@{ $ids }) > 0;
 	croak(
-'multiple selected bigWig files from a BigWigSet is not supported with single score method'
+'FATAL: multiple selected bigWig files from a BigWigSet is not supported with single score method'
 	) if scalar(@{ $ids }) > 1;
 	push @{ $param }, @{ $ids };
 
@@ -564,9 +563,9 @@ sub _get_bigwig {
 
 	# open and cache the bigFile object
 	my $bw = _open_big($file)
-		or croak " Unable to open big file '$file'! $OS_ERROR\n";
+		or croak "FATAL: Unable to open big file '$file'!";
 	unless ( $bw->is_big_wig ) {
-		croak " $file is not a bigWig file!\n";
+		croak "FATAL: $file is not a bigWig file!";
 	}
 	$OPENED_BIG{$file} = $bw;
 	_record_seqids( $file, $bw );
@@ -579,9 +578,9 @@ sub _get_bigbed {
 
 	# open and cache the bigFile object
 	my $bb = _open_big($file)
-		or croak " Unable to open big file '$file'! $OS_ERROR\n";
+		or croak "FATAL: Unable to open big file '$file'!";
 	unless ( $bb->is_big_bed ) {
-		croak " $file is not a bigBed file!\n";
+		croak "FATAL: $file is not a bigBed file!";
 	}
 	$OPENED_BIG{$file} = $bb;
 	_record_seqids( $file, $bb );
@@ -663,7 +662,7 @@ sub _lookup_bigwigset_wigs {
 				:                       0;
 		}
 		else {
-			confess sprintf "bad strandedness value: %s", $param->[STND];
+			confess sprintf "FATAL: bad strandedness value: %s", $param->[STND];
 		}
 		@ids = $param->[DB]->filter_bigwigs_by_strand( $strand_to_keep, @ids );
 	}
@@ -692,8 +691,8 @@ use File::Spec;
 
 sub new {
 	my ( $class, $dir ) = @_;
-	croak 'must call method new with a directory path!' unless $dir;
-	croak "BigWigSet '$dir' is not a directory path!"   unless -d $dir;
+	croak 'FATAL: must call method new with a directory path!' unless $dir;
+	croak "FATAL: BigWigSet '$dir' is not a directory path!"   unless -d $dir;
 	my $self = {
 		dir      => $dir,
 		bwfiles  => {},
@@ -701,7 +700,7 @@ sub new {
 	};
 
 	# read directory
-	my $D = IO::Dir->new($dir) or croak "unable to open $dir! $OS_ERROR";
+	my $D = IO::Dir->new($dir) or croak "FATAL: unable to open $dir! $OS_ERROR";
 	while ( my $f = $D->read ) {
 		my $f_path = File::Spec->catfile( $dir, $f );
 		next unless -f $f_path;
@@ -715,7 +714,7 @@ sub new {
 			# a genuine metadata file - excellent!
 			# let's open it and parse the contents
 			my $fh = IO::File->new($f_path)
-				or croak "unable to read metadata file '$f_path'! $OS_ERROR";
+				or croak "FATAL: unable to read metadata file '$f_path'! $OS_ERROR";
 			my $current_bw;    # the current bigwig file we're describing
 			while ( my $line = $fh->getline ) {
 				next if $line =~ /^#/;
@@ -731,7 +730,7 @@ sub new {
 
 					# a metadata line
 					croak
-'malformed metadata file! no bw file stanza header before metadata line!'
+'FATAL: malformed metadata file! no bw file stanza header before metadata line!'
 						unless defined $current_bw;
 					$self->{metadata}{$current_bw}{$1} = $2;
 				}
@@ -800,7 +799,7 @@ sub get_bigwig {
 		return Bio::ToolBox::db_helper::big::open_bigwig_db($path);
 	}
 	else {
-		carp "unrecognized bigWig file name '$bwfile'!\n";
+		carp "ERROR: unrecognized bigWig file name '$bwfile'!";
 		return;
 	}
 }
@@ -923,12 +922,12 @@ sub new {
 	# check the bigBed object
 	my $bb = shift;
 	unless ( ref($bb) eq 'Bio::DB::Big::File' and $bb->is_big_bed ) {
-		confess 'passed big object is not a bigBed file!';
+		confess 'FATAL: passed big object is not a bigBed file!';
 	}
 
 	# get coordinates
 	my ( $seqid, $start, $end ) = @_;
-	confess 'no coordinates!'
+	confess 'FATAL: no coordinates provided!'
 		unless ( defined $seqid and defined $start and defined $end );
 	$start -= 1;    # compensate for 0-based coordinates
 

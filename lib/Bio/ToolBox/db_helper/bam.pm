@@ -71,8 +71,7 @@ sub open_bam_db {
 		return $sam;
 	}
 	elsif ($EVAL_ERROR or $OS_ERROR) {
-		carp $EVAL_ERROR;
-		carp $OS_ERROR;
+		carp "ERROR: Unable to open Bam file: $EVAL_ERROR $OS_ERROR";
 		return;
 	}
 	else {
@@ -84,14 +83,21 @@ sub open_bam_db {
 sub open_indexed_fasta {
 	my $fasta = shift;
 	if ( $fasta =~ /\.gz$/ ) {
-		die
-" Bio::DB::Sam::Fai doesn't support compressed fasta files! Please decompress\n";
+		carp
+"ERROR:  Bio::DB::Sam::Fai doesn't support compressed fasta files! Please decompress";
+		return;
 	}
 	my $fai;
 	eval { $fai = Bio::DB::Sam::Fai->load($fasta) };
 
 	# this should automatically build the fai index if possible
-	return $fai if defined $fai;
+	if ($fai) {
+		return $fai;
+	}
+	else {
+		carp "ERROR: unable to open Fasta file!";
+		return;
+	}
 }
 
 ### Check for a bam index
@@ -147,7 +153,7 @@ sub write_new_bam_file {
 		return $bam;
 	}
 	else {
-		carp "unable to open bam file $file! $OS_ERROR";
+		carp "ERROR: unable to open bam file $file! $OS_ERROR";
 		return;
 	}
 }
@@ -175,7 +181,7 @@ sub collect_bam_scores {
 
 			# open and cache the bam file
 			$bam = open_bam_db($bamfile)
-				or croak " Unable to open bam file '$bamfile'!";
+				or croak "FATAL: Unable to open bam file '$bamfile'!";
 			$OPENED_BAM{$bamfile} = $bam;
 
 			# record the chromosomes and possible variants
@@ -268,7 +274,7 @@ sub sum_total_bam_alignments {
 	my $cpu      = shift || 2;    # number of forks to execute in parallel
 	$cpu = 1 unless ($parallel);
 	unless ($sam_file) {
-		carp " no Bam file or bam db object passed!\n";
+		carp "ERROR: no Bam file or bam db object passed!";
 		return;
 	}
 

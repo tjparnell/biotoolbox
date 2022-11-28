@@ -956,18 +956,18 @@ sub delete_column {
 	# check for Stream
 	if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
 		unless ( $self->mode ) {
-			cluck 'We have a read-only Stream object, cannot add columns';
+			cluck 'ERROR: We have a read-only Stream object, cannot add columns';
 			return;
 		}
 		if ( defined $self->{fh} ) {
 
 			# Stream file handle is opened
-			cluck 'Cannot modify columns when a Stream file handle is opened!';
+			cluck 'ERROR: Cannot modify columns when a Stream file handle is opened!';
 			return;
 		}
 	}
 	unless (@_) {
-		cluck 'must provide a list';
+		carp 'ERROR: must provide a list';
 		return;
 	}
 
@@ -994,20 +994,20 @@ sub reorder_column {
 	# check for Stream
 	if ( ref($self) eq 'Bio::ToolBox::Data::Stream' ) {
 		unless ( $self->mode ) {
-			cluck 'We have a read-only Stream object, cannot add columns';
+			cluck 'ERROR: We have a read-only Stream object, cannot add columns';
 			return;
 		}
 		if ( defined $self->{fh} ) {
 
 			# Stream file handle is opened
-			cluck 'Cannot modify columns when a Stream file handle is opened!';
+			cluck 'ERROR: Cannot modify columns when a Stream file handle is opened!';
 			return;
 		}
 	}
 
 	# reorder data table
 	unless (@_) {
-		carp 'must provide a list';
+		carp 'ERROR: must provide a list';
 		return;
 	}
 	my @order = @_;
@@ -1060,7 +1060,7 @@ sub feature {
 
 sub feature_type {
 	my $self = shift;
-	carp 'feature_type is a read only method' if @_;
+	carp 'ERROR: feature_type is a read only method' if @_;
 	if ( defined $self->{feature_type} ) {
 		return $self->{feature_type};
 	}
@@ -1152,49 +1152,49 @@ sub vcf {
 
 sub number_columns {
 	my $self = shift;
-	carp 'number_columns is a read only method' if @_;
+	carp 'ERROR: number_columns is a read only method' if @_;
 	return $self->{'number_columns'};
 }
 
 sub number_rows {
 	my $self = shift;
-	carp 'number_rows is a read only method' if @_;
+	carp 'ERROR: number_rows is a read only method' if @_;
 	return $self->{last_row};
 }
 
 sub last_column {
 	my $self = shift;
-	carp 'last_column is a read only method' if @_;
+	carp 'ERROR: last_column is a read only method' if @_;
 	return $self->{'number_columns'};
 }
 
 sub last_row {
 	my $self = shift;
-	carp 'last_row is a read only method' if @_;
+	carp 'ERROR: last_row is a read only method' if @_;
 	return $self->{last_row};
 }
 
 sub filename {
 	my $self = shift;
-	carp 'filename is a read only method. Use add_file_metadata().' if @_;
+	carp 'ERROR: filename is a read only method. Use add_file_metadata().' if @_;
 	return $self->{filename};
 }
 
 sub basename {
 	my $self = shift;
-	carp 'basename is a read only method. Use add_file_metadata().' if @_;
+	carp 'ERROR: basename is a read only method. Use add_file_metadata().' if @_;
 	return $self->{basename};
 }
 
 sub path {
 	my $self = shift;
-	carp 'path is a read only method. Use add_file_metadata().' if @_;
+	carp 'ERROR: path is a read only method. Use add_file_metadata().' if @_;
 	return $self->{path};
 }
 
 sub extension {
 	my $self = shift;
-	carp 'extension() is a read only method. Use add_file_metadata().' if @_;
+	carp 'ERROR: extension() is a read only method. Use add_file_metadata().' if @_;
 	return $self->{extension};
 }
 
@@ -1303,7 +1303,7 @@ sub rewrite_vcf_headers {
 
 sub list_columns {
 	my $self = shift;
-	carp 'list_columns is a read only method' if @_;
+	carp 'ERROR: list_columns is a read only method' if @_;
 	my @list = map { $self->name($_) } ( 1 .. $self->{'number_columns'} );
 	return wantarray ? @list : \@list;
 }
@@ -1499,7 +1499,7 @@ sub start_column {
 			$self->{column_indices}{start} = $_[0];
 		}
 		else {
-			carp sprintf( "start_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: start_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{start};
@@ -1513,7 +1513,7 @@ sub stop_column {
 			$self->{column_indices}{stop} = $_[0];
 		}
 		else {
-			carp sprintf( "stop_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: stop_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{stop};
@@ -1530,7 +1530,7 @@ sub coord_column {
 			$self->{column_indices}{coord} = $_[0];
 		}
 		else {
-			carp sprintf( "coord_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: coord_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{coord};
@@ -1544,7 +1544,7 @@ sub strand_column {
 			$self->{column_indices}{strand} = $_[0];
 		}
 		else {
-			carp sprintf( "strand_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: strand_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{strand};
@@ -1558,7 +1558,7 @@ sub name_column {
 			$self->{column_indices}{name} = $_[0];
 		}
 		else {
-			carp sprintf( "name_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: name_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{name};
@@ -1572,7 +1572,7 @@ sub type_column {
 			$self->{column_indices}{type} = $_[0];
 		}
 		else {
-			carp sprintf( "type_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: type_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{type};
@@ -1586,7 +1586,7 @@ sub id_column {
 			$self->{column_indices}{id} = $_[0];
 		}
 		else {
-			carp sprintf( "id_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: id_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{id};
@@ -1600,7 +1600,7 @@ sub score_column {
 			$self->{column_indices}{score} = $_[0];
 		}
 		else {
-			carp sprintf( "score_column %s is not a valid index!", $_[0] );
+			carp sprintf( "ERROR: score_column %s is not a valid index!", $_[0] );
 		}
 	}
 	return $self->{column_indices}{score};
@@ -1623,7 +1623,7 @@ sub interbase {
 			$self->name( $i, 'Start' );
 		}
 		else {
-			carp 'use 1 (true) or 0 (false) to set interbase mode';
+			carp 'ERROR: use 1 (true) or 0 (false) to set interbase mode';
 		}
 	}
 	return $self->{zerostart};

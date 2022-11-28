@@ -108,7 +108,7 @@ our %MULTI_SUMMARY_METHOD = (
 		return $count;
 	},
 	'stddev' => sub {
-		croak 'cannot calculate stddev value from multiple bigWig Summary objects!';
+		croak 'FATAL: cannot calculate stddev value from multiple bigWig Summary objects!';
 	},
 );
 
@@ -412,7 +412,7 @@ sub _get_bw {
 
 	# open and cache the bigWig object
 	my $bw = open_bigwig_db($bwfile)
-		or croak " Unable to open bigWig file '$bwfile'!";
+		or croak "FATAL: Unable to open bigWig file '$bwfile'!";
 	$OPENED_BW{$bwfile} = $bw;
 	_record_seqids( $bwfile, $bw );
 	return $bw;
@@ -534,7 +534,7 @@ sub _lookup_bigwigset_wigs {
 				:                       qw(minus plus none);
 		}
 		else {
-			confess sprintf "bad strandedness value: %s", $param->[STND];
+			confess sprintf "FATAL: bad strandedness value: %s", $param->[STND];
 		}
 
 		# then filter based on attribute

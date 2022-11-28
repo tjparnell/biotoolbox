@@ -71,8 +71,7 @@ sub open_bam_db {
 		return $sam;
 	}
 	elsif ($EVAL_ERROR or $OS_ERROR) {
-		carp $EVAL_ERROR;
-		carp $OS_ERROR;
+		carp "ERROR: Unable to open Bam file: $EVAL_ERROR $OS_ERROR";
 		return;
 	}
 	else {
@@ -113,7 +112,7 @@ sub write_new_bam_file {
 	my $file = shift;
 	$file .= '.bam' unless $file =~ /\.bam$/i;
 	my $bam = Bio::DB::HTSfile->open( $file, 'wb' );
-	carp "unable to open bam file $file!\n" unless $bam;
+	carp "ERROR: unable to open bam file $file!" unless $bam;
 	return $bam;
 }
 
@@ -140,7 +139,7 @@ sub collect_bam_scores {
 
 			# open and cache the bam file
 			$bam = open_bam_db($bamfile)
-				or croak " Unable to open bam file '$bamfile'!";
+				or croak "FATAL: Unable to open bam file '$bamfile'!";
 			$OPENED_BAM{$bamfile} = $bam;
 
 			# record the chromosomes and possible variants
@@ -234,7 +233,7 @@ sub sum_total_bam_alignments {
 	my $cpu      = shift || 2;    # number of forks to execute in parallel
 	$cpu = 1 unless ($parallel);
 	unless ($sam_file) {
-		carp ' no Bam file or bam db object passed!';
+		carp 'ERROR: no Bam file or bam db object passed!';
 		return;
 	}
 

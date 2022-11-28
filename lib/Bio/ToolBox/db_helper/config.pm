@@ -78,13 +78,18 @@ sub add_database {
 	my %args = @_;
 
 	# check
-	croak 'no name provided for new database configuration' unless ( $args{name} );
-	croak 'no dsn provided for new database configuration'
-		unless ( $args{dsn} || $args{dsn_prefix} );
+	unless ( $args{name} ) {
+		carp 'ERROR: no name provided for new database configuration';
+		return;
+	}
+	unless ( $args{dsn} or $args{dsn_prefix} ) {
+		carp 'ERROR: no dsn provided for new database configuration';
+		return;
+	}
 
 	# check that we have config file to update
 	unless ($config_path) {
-		_write_new_config();
+		_write_new_config() or return;
 	}
 
 	# set name
@@ -99,7 +104,7 @@ sub add_database {
 sub add_program {
 	my $path = shift;
 	unless ( -e $path and -x _ ) {
-		carp "$path either does not exist or is not executable\n";
+		carp "ERROR: $path either does not exist or is not executable";
 		return;
 	}
 
@@ -115,12 +120,17 @@ sub add_program {
 }
 
 sub _write_new_config {
-	my $fh = IO::File->new( '>', $default_path )
-		or croak "Cannot write biotoolbox configuration file $default_path! $OS_ERROR\n";
+	my $fh = IO::File->new( '>', $default_path );
+	unless ($fh) {
+		carp
+"ERROR: Cannot write biotoolbox configuration file $default_path! $OS_ERROR";
+		return;
+	}
 	$fh->print($default);
 	$fh->close;
 	$config_path = $default_path;
 	$BTB_CONFIG->read($default_path);
+	return 1;
 }
 
 sub _rewrite_config {
@@ -138,7 +148,7 @@ sub _rewrite_config {
 			return 1;
 		}
 		else {
-			carp sprintf "unable to write updated configuration to %s!\n%s\n",
+			carp sprintf "ERROR: unable to write updated configuration to %s!\n%s",
 				$file, $BTB_CONFIG->error;
 			return;
 		}

@@ -21,11 +21,11 @@ sub open_file {
 
 	# check file
 	if ( $filename and $self->file and $filename ne $self->file ) {
-		confess 'Must open new files with new Parser object!';
+		confess 'FATAL: Must open new files with new Parser object!';
 	}
 	$filename ||= $self->file;
 	unless ($filename) {
-		cluck 'No file name passed!';
+		carp 'ERROR: No file name passed!';
 		return;
 	}
 	if ( defined $self->{fh} ) {
@@ -37,7 +37,7 @@ sub open_file {
 	unless ($filetype) {
 		( my $flavor, $filetype ) = Bio::ToolBox::Data->taste_file($filename);
 		unless ( $flavor eq 'gff' ) {
-			confess 'File is not a GFF file!!! How did we get here?';
+			confess 'FATAL: File is not a GFF file!!! How did we get here?';
 		}
 		$self->{filetype} = $filetype;
 		if ( $filetype eq 'gtf' ) {
@@ -83,7 +83,7 @@ sub open_file {
 
 	# Open filehandle object
 	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename)
-		or croak " cannot open file '$filename'!\n";
+		or croak "FATAL: cannot open file '$filename'!";
 	$self->{fh} = $fh;
 	return 1;
 }
@@ -97,7 +97,7 @@ sub next_feature {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		croak('no GFF file loaded to parse!');
+		croak 'FATAL: no GFF file loaded to parse!';
 	}
 	return if $self->{'eof'};
 
@@ -126,7 +126,7 @@ sub next_feature {
 					$self->{seq_ids}{$seq_id} = $stop;
 				}
 				else {
-					warn "malformed sequence-region pragma! $line\n";
+					print STDERR "malformed sequence-region pragma! $line\n";
 				}
 				next;
 			}
@@ -222,7 +222,7 @@ sub parse_file {
 
 	# check that we have an open filehandle
 	unless ( $self->fh ) {
-		confess 'no file loaded to parse!';
+		confess 'FATAL: no file loaded to parse!';
 	}
 	return 1 if $self->{'eof'};
 

@@ -27,14 +27,13 @@ sub load_file {
 
 	# check that we have an empty table
 	if ( $self->last_row != 0 or $self->number_columns != 0 or $self->filename ) {
-		carp 'Cannot load file onto an existing data table!';
-		return;
+		confess 'FATAL: Cannot load file onto an existing data table!';
 	}
 
 	# open the file and load metadata
 	my $filename = $self->check_file($file);
 	unless ($filename) {
-		print " file '$file' does not exist!\n";
+		carp "ERROR: file '$file' does not exist!";
 		return;
 	}
 	$self->add_file_metadata($filename);
@@ -204,7 +203,11 @@ sub taste_file {
 sub sample_gff_type_list {
 	my ( $self, $file ) = @_;
 	return unless $file =~ m/\.g[tf]f\d? (?:\.gz)? $/xi;    # assume extension is accurate
-	my $fh = $self->open_to_read_fh($file) or die "can't open $file!\n";
+	my $fh = $self->open_to_read_fh($file);
+	unless ($fh) {
+		carp "ERROR: can't open $file!";
+		return;
+	}
 	my %types;
 	my $count = 0;
 	while ( $count < 1000 ) {
@@ -233,13 +236,12 @@ sub parse_headers {
 	}
 	else {
 		confess
-			' file metadata and/or open filehandle must be set before parsing headers!';
+'FATAL: file metadata and/or open filehandle must be set before parsing headers!';
 	}
 
 	# check that we have an empty table
 	if ( $self->last_row != 0 or $self->number_columns != 0 ) {
-		cluck 'Cannot parse file headers onto an existing data table!';
-		return;
+		confess 'FATAL: Cannot parse file headers onto an existing data table!';
 	}
 
 	# read and parse the file
@@ -255,8 +257,9 @@ sub parse_headers {
 		chomp($line2);
 		if ( $line2 =~ /[\r\n]+/ ) {
 			my $filename = $self->filename;
-			die "File '$filename' does not have expected line endings!\n"
+			print STDERR "FATAL: File '$filename' does not have expected line endings!\n"
 				. " Try converting to native line endings and try again\n";
+			exit 1;
 		}
 	}
 
@@ -539,8 +542,9 @@ sub add_data_line {
 
 	# check for extra remaining tabs
 	if ( index( $linedata[-1], "\t" ) != -1 ) {
-		die
+		print STDERR
 "FILE INCONSISTENCY ERRORS! line has additional tabs (columns) than headers!\n $line\n";
+		exit 1;
 	}
 
 	# add the line of data
@@ -553,7 +557,10 @@ sub add_data_line {
 ### Parse the filename using the list suffix list
 sub add_file_metadata {
 	my ( $self, $filename ) = @_;
-	confess 'no valid filename!' unless defined $filename;
+	unless ($filename) {
+		carp 'ERROR: no valid filename!';
+		return;
+	}
 	my ( $basename, $path, $extension ) = fileparse( $filename, $SUFFIX );
 	unless ($extension) {
 
@@ -600,12 +607,12 @@ sub write_file {
 				$args{'filename'} = $name;
 			}
 			else {
-				cluck 'no passed filename or original filename metadata!';
+				carp 'ERROR: no passed filename or original filename metadata!';
 				return;
 			}
 		}
 		else {
-			cluck 'bad data structure!';
+			carp 'ERROR: no provided filename AND bad data structure!!';
 			return;
 		}
 	}
@@ -1012,7 +1019,7 @@ sub open_to_read_fh {
 		$file = $self->filename || undef;
 	}
 	unless ($file) {
-		carp ' no filename provided or associated with object!';
+		carp 'ERROR: no filename provided or associated with object!';
 		return;
 	}
 
@@ -1022,18 +1029,18 @@ sub open_to_read_fh {
 
 		# the file is compressed with gzip
 		$fh = IO::File->new("gzip -dc $file |")
-			or carp "unable to read '$file': $OS_ERROR\n";
+			or carp "ERROR: unable to read '$file': $OS_ERROR";
 	}
 	elsif ( $file =~ /\.bz2$/i ) {
 
 		# the file is compressed with bzip2
 		$fh = IO::File->new("bzip2 -dc $file |")
-			or carp "unable to read '$file': $OS_ERROR\n";
+			or carp "ERROR: unable to read '$file': $OS_ERROR";
 	}
 	else {
 		# the file is uncompressed and space hogging
 		$fh = IO::File->new( $file, 'r' )
-			or carp "unable to read '$file': $OS_ERROR\n";
+			or carp "ERROR: unable to read '$file': $OS_ERROR";
 	}
 
 	if ($obj) {
@@ -1048,7 +1055,7 @@ sub open_to_write_fh {
 
 	# check filename
 	unless ($filename) {
-		carp ' no filename to write!';
+		carp 'ERROR: no filename to write!';
 		return;
 	}
 
@@ -1056,7 +1063,7 @@ sub open_to_write_fh {
 	# assuming a maximum of 256, at least on Mac with HFS+, don't know about Linux
 	my $name = fileparse($filename);
 	if ( length $name > 255 ) {
-		carp ' filename is too long! please shorten';
+		carp 'ERROR: filename is too long! please shorten';
 		return;
 	}
 
@@ -1091,7 +1098,9 @@ sub open_to_write_fh {
 			$gzip_app = which('gzip');
 		}
 		unless ($gzip_app) {
-			croak 'no gzip application in PATH to open compressed file handle output!';
+			carp 'ERROR: No gzip application in PATH to open compressed file handle output!';
+			$gz = 0;
+			$filename =~ s/\.gz$//;
 		}
 	}
 	elsif ( $gz == 2 and not $bgzip_app ) {
@@ -1106,7 +1115,9 @@ sub open_to_write_fh {
 			$bgzip_app .= ' -@ 3 -c';
 		}
 		unless ($bgzip_app) {
-			croak 'no bgzip application in PATH to open compressed file handle output!';
+			carp 'ERROR: No bgzip application in PATH to open compressed file handle output!';
+			$gz = 0;
+			$filename =~ s/\.gz$//;
 		}
 	}
 	my $gzipper = $gz == 1 ? $gzip_app : $gz == 2 ? $bgzip_app : undef;
@@ -1122,19 +1133,19 @@ sub open_to_write_fh {
 	my $fh;
 	if ( not $gzipper and not $append ) {
 		$fh = IO::File->new( $filename, 'w' )
-			or carp "cannot write to file '$filename': $OS_ERROR\n";
+			or carp "ERROR: cannot write to file '$filename': $OS_ERROR";
 	}
 	elsif ( $gzipper and not $append ) {
 		$fh = IO::File->new("| $gzipper >$filename")
-			or carp "cannot write to compressed file '$filename': $OS_ERROR\n";
+			or carp "ERROR: cannot write to compressed file '$filename': $OS_ERROR";
 	}
 	elsif ( not $gzipper and $append ) {
 		$fh = IO::File->new(">> $filename")
-			or carp "cannot append to file '$filename': $OS_ERROR\n";
+			or carp "ERROR: cannot append to file '$filename': $OS_ERROR";
 	}
 	elsif ( $gzipper and $append ) {
 		$fh = IO::File->new("| $gzipper >>$filename")
-			or carp "cannot append to compressed file '$filename': $OS_ERROR\n";
+			or carp "ERROR: cannot append to compressed file '$filename': $OS_ERROR";
 	}
 	return $fh if defined $fh;
 }
@@ -1480,7 +1491,7 @@ sub add_standard_metadata {
 			# set the name to match the actual column name
 			if ( $namelist->[$i] ne $self->{$j}->{'name'} ) {
 				unless ($force) {
-					print "WARN: metadata and header names for column $j do not match!\n";
+					print " WARNING: metadata and header names for column $j do not match!\n";
 				}
 				$self->{$j}->{'name'} = $namelist->[$i];
 			}
@@ -1564,7 +1575,8 @@ sub standard_column_names {
 		return $column_names{$type};
 	}
 	else {
-		confess "unrecognized standard column name format '$type'!";
+		cluck "ERROR: unrecognized standard column name format '$type'!";
+		return;
 	}
 }
 
