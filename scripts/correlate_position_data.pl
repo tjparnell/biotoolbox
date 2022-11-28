@@ -2,17 +2,20 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
+use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Statistics::Lite qw(sum min max mean median stddevp);
+use List::Util qw(sum0 min max);
+use Statistics::Lite qw(median stddevp);
 use Statistics::Descriptive;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
-use Bio::ToolBox::utility;
+use Bio::ToolBox::utility qw(format_with_commas);
 
 my $parallel;
 eval {
@@ -33,7 +36,8 @@ my $PARAMETRIC   = 1;
 my $ORDINAL      = 0;
 
 use constant LOG10 => log(10);
-my $VERSION = '1.63';
+
+our $VERSION = '1.70';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -104,7 +108,7 @@ check_defaults();
 my $Data = Bio::ToolBox::Data->new( file => $infile )
 	or die " unable to open input file '$infile'!\n";
 printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
-$Data->program("$0, v $VERSION");
+$Data->program("$PROGRAM_NAME, v $VERSION");
 
 ### Open database connection
 if ($database) {
@@ -158,15 +162,17 @@ else {
 }
 
 ### Write output file
-my $success = $Data->write_file(
-	'filename' => $outfile,
-	'gz'       => $gz,
-);
-if ($success) {
-	print " wrote output file $success\n";
-}
-else {
-	print " unable to write output file!\n";
+{
+	my $success = $Data->write_file(
+		'filename' => $outfile,
+		'gz'       => $gz,
+	);
+	if ($success) {
+		print " wrote output file $success\n";
+	}
+	else {
+		print " unable to write output file!\n";
+	}
 }
 printf " Finished in %.2f minutes\n", ( time - $start_time ) / 60;
 
@@ -175,8 +181,13 @@ printf " Finished in %.2f minutes\n", ( time - $start_time ) / 60;
 sub check_defaults {
 
 	unless ($infile) {
-		$infile = shift @ARGV
-			or die " no input file! use --help for more information\n";
+		if (@ARGV) {
+			$infile = shift @ARGV;
+		}
+		else {
+			print STDERR " FATAL: no input file! use --help for more information\n";
+			exit 1;
+		}
 	}
 	unless ( defined $gz ) {
 		$gz = 0;
@@ -190,7 +201,8 @@ sub check_defaults {
 			or $position == 3
 			or $position == 4 )
 		{
-			die " Unknown relative position '$position'!\n";
+			print STDERR " FATAL: Unknown relative position '$position'!\n";
+			exit 1;
 		}
 		if ( $position eq 'm' ) { $position = 4 }    # change to match internal usage
 	}
@@ -201,19 +213,24 @@ sub check_defaults {
 
 	if ($norm_method) {
 		unless ( $norm_method =~ /^rank|sum$/i ) {
-			die " Unrecognized normalization method! see help\n";
+			print STDERR " FATAL: Unrecognized normalization method! see help\n";
+			exit 1;
 		}
 	}
 
 	if ($find_pvalue) {
 		unless ($anova) {
-			die " Cannot calculate requested P-value! Pleast install Statistics::ANOVA\n";
+			print STDERR
+" FATAL: Cannot calculate requested P-value! Pleast install Statistics::ANOVA\n";
+			exit 1;
 		}
 	}
 
 	if ($find_shift) {
 		unless ($radius) {
-			die " Must define a radius and reference point to calculate optimum shift\n";
+			print STDERR
+" FATAL: Must define a radius and reference point to calculate optimum shift\n";
+			exit 1;
 		}
 	}
 
@@ -222,7 +239,7 @@ sub check_defaults {
 	}
 	else {
 		# disable cores
-		print " disabling parallel CPU execution, no support present\n" if $cpu;
+		print " WARNING: disabling parallel CPU execution, no support present\n" if $cpu;
 		$cpu = 0;
 	}
 
@@ -268,7 +285,7 @@ sub parallel_execution {
 	my ( $r_i, $p_i, $shift_i, $shiftr_i ) = add_new_columns();
 
 	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$";
+	my $child_base_name = $outfile . ".$PID";
 
 	# variables for reporting the summary of results
 	my @correlations;
@@ -336,8 +353,8 @@ sub parallel_execution {
 	unless ( scalar @files == $cpu ) {
 		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
 	}
-	my $count = $Data->reload_children(@files);
-	printf " reloaded %s features from children\n", format_with_commas($count);
+	my $new_count = $Data->reload_children(@files);
+	printf " reloaded %s features from children\n", format_with_commas($new_count);
 
 	# summarize the results
 	summarize_results( \@correlations, \@optimal_shifts, \@optimal_correlations,
@@ -418,8 +435,8 @@ sub collect_correlations {
 		}
 
 		# Verify minimum data count
-		if (   sum( map { abs $_ } values %ref_pos2data ) == 0
-			or sum( map { abs $_ } values %test_pos2data ) == 0 )
+		if (   sum0( map {abs} values %ref_pos2data ) == 0
+			or sum0( map {abs} values %test_pos2data ) == 0 )
 		{
 			# not enough data points to work with
 			$row->value( $r_i, '.' );
@@ -440,14 +457,14 @@ sub collect_correlations {
 
 		# Normalize the data
 		# there are couple ways to do this
-		if ( $norm_method =~ /rank/i ) {
+		if ( $norm_method and $norm_method =~ /rank/i ) {
 
 			# convert to rank values
 			# essentially a Spearman's rank correlation
 			normalize_values_by_rank( \%ref_pos2data );
 			normalize_values_by_rank( \%test_pos2data );
 		}
-		elsif ( $norm_method =~ /sum/i ) {
+		elsif ( $norm_method and $norm_method =~ /sum/i ) {
 
 			# normalize the sums of both
 			# good for read counts
@@ -644,10 +661,10 @@ sub calculate_optimum_shift {
 			next;
 		}
 
-		# calculate Pearson correlation
-		my $pearson = calculate_pearson( $ref_data, \@test_data );
-		if ( defined $pearson and $pearson > 0.5 ) {
-			$shift2pearson{ $shift * -1 } = $pearson;
+		# calculate Pearson correlation for reverse shift
+		my $pearson1 = calculate_pearson( $ref_data, \@test_data );
+		if ( defined $pearson1 and $pearson1 > 0.5 ) {
+			$shift2pearson{ $shift * -1 } = $pearson1;
 		}
 	}
 
@@ -725,7 +742,7 @@ sub normalize_values_by_sum {
 	# Scale the data sums to 100
 
 	my $data             = shift;
-	my $ref_scale_factor = 100 / sum( map { abs $_ } values %{$data} );
+	my $ref_scale_factor = 100 / sum0( map {abs} values %{$data} );
 	map { $data->{$_} = $ref_scale_factor * $data->{$_} } keys %{$data};
 }
 
@@ -734,7 +751,7 @@ sub normalize_values_by_median {
 	# Scale the data median to 100
 
 	my $data             = shift;
-	my $ref_scale_factor = 100 / median( map { abs $_ } values %{$data} );
+	my $ref_scale_factor = 100 / median( map {abs} values %{$data} );
 	map { $data->{$_} = $ref_scale_factor * $data->{$_} } keys %{$data};
 }
 
@@ -800,14 +817,14 @@ sub summarize_results {
 	# Summary analyses
 	printf " Correlated %s features\n", format_with_commas($count);
 	printf " Mean Pearson correlation was %.3f  +/- %.3f\n",
-		mean(@$correlations), stddevp(@$correlations);
+		mean( @{$correlations} ), stddevp( @{$correlations} );
 
 	if ($find_shift) {
 		printf " Mean absolute optimal shift was %.0f +/- %.0f bp\n",
-			mean( map { abs $_ } @$optimal_shifts ),
-			stddevp( map { abs $_ } @$optimal_shifts );
+			mean( map {abs} @{$optimal_shifts} ),
+			stddevp( map {abs} @{$optimal_shifts} );
 		printf " Mean optimal Pearson correlation was %.3f  +/- %.3f\n",
-			mean(@$optimal_correlations), stddevp(@$optimal_correlations);
+			mean( @{$optimal_correlations} ), stddevp( @{$optimal_correlations} );
 	}
 	if ($not_enough_data) {
 		printf " %s features did not have enough data points\n",
@@ -817,6 +834,10 @@ sub summarize_results {
 		printf " %s features had no variance in the reference data points\n",
 			format_with_commas($no_variance);
 	}
+}
+
+sub mean {
+	return sum0(@_) / ( scalar @_ || 1 );
 }
 
 __END__
