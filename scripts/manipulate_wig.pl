@@ -2,6 +2,7 @@
 
 # documentation at end of file
 
+use warnings;
 use strict;
 use Pod::Usage;
 use Getopt::Long qw(:config no_ignore_case bundling);
@@ -12,7 +13,8 @@ use Bio::ToolBox::big_helper qw(
 	open_bigwig_to_wig_fh
 	generate_chromosome_file
 );
-my $VERSION = 1.69;
+
+our $VERSION = 1.70;
 
 ### Quick help
 unless (@ARGV) {    # when no command line options are present
@@ -61,16 +63,16 @@ GetOptions(
 	'a|add=f'      => \$addValue,
 	'l|log=i'      => \$logValue,
 	'p|place=i'    => \$places,
-	'n|minimum=f'  => \$minValue,         #
-	'x|maximum=f'  => \$maxValue,         #
+	'n|minimum=f'  => \$minValue,
+	'x|maximum=f'  => \$maxValue,
 	'z|zero'       => \$noZeroes,
 	't|stats!'     => \$doStats,
 	'bw2w=s'       => \$bw2wig_app,
 	'w2bw=s'       => \$wig2bw_app,
 	'chromo=s'     => \$chromofile,
 	'db=s'         => \$database,
-	'h|help'       => \$help,             # request help
-	'v|version'    => \$print_version,    # print the version
+	'h|help'       => \$help,
+	'v|version'    => \$print_version,
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 ### Print help if requested
@@ -93,7 +95,15 @@ if ($print_version) {
 }
 
 ### Checks
-die "no input file provided!\n" unless $infile;
+unless ($infile) {
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		print STDERR " FATAL: no input file! use --help for more information\n";
+		exit 1;
+	}
+}
 my $doMin = defined $minValue ? 1 : 0;
 my $doMax = defined $maxValue ? 1 : 0;
 if ($logValue) {
@@ -120,7 +130,7 @@ if ( $infile =~ /^stdin$/i ) {
 	$infh = IO::Handle->new;
 	$infh->fdopen( fileno(STDIN), 'r' );
 }
-elsif ( $infile =~ /(?:bw|bigwig)$/i and -e $infile ) {
+elsif ( $infile =~ m/(?: bw | bigwig )$/xi and -e $infile ) {
 	$infh = open_bigwig_to_wig_fh(
 		bw        => $infile,
 		bwapppath => $bw2wig_app,
@@ -128,49 +138,51 @@ elsif ( $infile =~ /(?:bw|bigwig)$/i and -e $infile ) {
 }
 elsif ( -e $infile ) {
 	$infh = Bio::ToolBox->read_file($infile)
-		or die "can't open $infile! $!";
+		or die "can't open $infile!";
 }
 else {
 	die "unrecognized $infile!";
 }
 
 # Output
-if ( $outfile =~ /^stdout$/i ) {
-	$outfh = IO::Handle->new;
-	$outfh->fdopen( fileno(STDOUT), 'w' );
-}
-elsif ( $outfile =~ /(?:bw|bigwig)$/i ) {
-
-	# check for chromosome file
-	if ( $chromofile and -e $chromofile ) {
-
-		# user provided a chromosome file
-		$outfh = open_wig_to_bigwig_fh(
-			bw        => $outfile,
-			chromo    => $chromofile,
-			bwapppath => $wig2bw_app,
-		) or die "unable to open output bigWig file '$outfile'!\n";
+if ( $outfile ) {
+	if ( $outfile =~ /^stdout$/i ) {
+		$outfh = IO::Handle->new;
+		$outfh->fdopen( fileno(STDOUT), 'w' );
 	}
-	elsif ( $infile =~ /(?:bw|bigwig)$/i or $database ) {
+	elsif ( $outfile =~ m/(?: bw | bigwig )$/xi ) {
 
-		# we can use the input bigWig as a database source if one isn't provided
-		$database ||= $infile;
-		$chromofile = generate_chromosome_file( $database, $skip )
-			or die "unable to generate chromosome file from '$database'!\n";
-		$outfh = open_wig_to_bigwig_fh(
-			bw        => $outfile,
-			chromo    => $chromofile,
-			bwapppath => $wig2bw_app,
-		) or die "unable to open output bigWig file '$outfile'!\n";
+		# check for chromosome file
+		if ( $chromofile and -e $chromofile ) {
+
+			# user provided a chromosome file
+			$outfh = open_wig_to_bigwig_fh(
+				bw        => $outfile,
+				chromo    => $chromofile,
+				bwapppath => $wig2bw_app,
+			) or die "unable to open output bigWig file '$outfile'!\n";
+		}
+		elsif ( $infile =~ m/(?: bw | bigwig )$/xi or $database ) {
+
+			# we can use the input bigWig as a database source if one isn't provided
+			$database ||= $infile;
+			$chromofile = generate_chromosome_file( $database, $skip )
+				or die "unable to generate chromosome file from '$database'!\n";
+			$outfh = open_wig_to_bigwig_fh(
+				bw        => $outfile,
+				chromo    => $chromofile,
+				bwapppath => $wig2bw_app,
+			) or die "unable to open output bigWig file '$outfile'!\n";
+		}
+		else {
+			die "unable to open output bigWig file handle without chromosome information!\n";
+		}
+
 	}
 	else {
-		die "unable to open output bigWig file handle without chromosome information!\n";
+		$outfh = Bio::ToolBox->write_file($outfile)
+			or die "can't open $outfile!";
 	}
-
-}
-elsif ($outfile) {
-	$outfh = Bio::ToolBox->write_file($outfile)
-		or die "can't open $outfile! $!";
 }
 
 ### stats hash
@@ -207,7 +219,7 @@ while ( my $line = $infh->getline ) {
 	elsif ( $prefix eq 'varia' or $prefix eq 'fixed' ) {
 
 		# a step definition line
-		if ( $line =~ /chrom=([\w\-\.]+)/ ) {
+		if ( $line =~ m/chrom=( [\w\-\.]+ )/x ) {
 
 			# check the chromosome
 			my $chrom = $1;
@@ -264,7 +276,7 @@ while ( my $line = $infh->getline ) {
 			$statement       = " processing fixedStep...\n";
 			$wig_process_sub = \&process_fixedStep;
 		}
-		if ( $outfile =~ /stdout/i ) {
+		if ( $outfile and $outfile =~ /stdout/i ) {
 			print STDERR $statement;
 		}
 		else {
@@ -274,7 +286,7 @@ while ( my $line = $infh->getline ) {
 
 	# process
 	chomp $line;
-	&$wig_process_sub($line);
+	&{$wig_process_sub}($line);
 }
 
 ### close filehandles
@@ -282,10 +294,14 @@ $infh->close;
 $outfh->close if $outfh;
 
 # remove chromosome file if we generated it
-unlink $chromofile
-	if (    $outfile =~ /(?:bw|bigwig)$/i
-		and $database
-		and $chromofile =~ /^chr_sizes_\w{5}$/ );
+if (
+	$outfile
+	and $outfile =~ m/(?: bw | bigwig )$/xi
+	and $database
+	and $chromofile =~ m/^chr_sizes_\w{5}$/x
+) {
+	unlink $chromofile;
+}
 
 ### Print final messages
 my $statMessage;
@@ -305,7 +321,7 @@ std: $stddev
 STATS
 }
 
-if ( $outfile =~ /stdout/i ) {
+if ( $outfile and $outfile =~ /stdout/i ) {
 	print STDERR " converted $count lines, wrote file $outfile\n" if $outfile;
 	print STDERR $statMessage                                     if $statMessage;
 }
@@ -317,7 +333,7 @@ else {
 #### Subroutines
 
 sub process_bedGraph {
-	my @data = split "\t", shift;
+	my @data = split /\t/, shift;
 	return if ( $skip and $data[0] =~ $skip_regex );
 	if ( $apply and $data[0] !~ $apply_regex ) {
 		$outfh->printf( "%s\t%d\t%d\t%s\n", $data[0], $data[1], $data[2], $data[3] )
@@ -359,11 +375,11 @@ sub process_fixedStep {
 
 sub process_score {
 	my $v = shift;    # score
-	if ( $doNull and $v =~ /^(?:n.?[na])|(?:\-?inf)/i ) { $v = 0 }
-	if ($deLogValue)                                    { $v = $deLogValue**$v }
-	if ($doAbsolute)                                    { $v = abs($v) }
-	if ($multiplyValue)                                 { $v *= $multiplyValue }
-	if ($addValue)                                      { $v += $addValue }
+	if ( $doNull and $v =~ m/^(?:n.?[na]) | (?:\-?inf) $/xi ) { $v = 0 }
+	if ($deLogValue)                                          { $v = $deLogValue**$v }
+	if ($doAbsolute)                                          { $v = abs($v) }
+	if ($multiplyValue)                                       { $v *= $multiplyValue }
+	if ($addValue)                                            { $v += $addValue }
 	if ($logValue)                   { $v = $v == 0 ? 0 : log($v) / $logValue }
 	if ( $doMin and $v < $minValue ) { $v = $minValue }
 	if ( $doMax and $v > $maxValue ) { $v = $maxValue }
