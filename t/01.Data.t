@@ -4,6 +4,7 @@
 
 use strict;
 use Test::More;
+use Test::Warn;
 use File::Spec;
 use FindBin '$Bin';
 
@@ -319,12 +320,16 @@ is( $Data->value( 25, 4 ), 'bob',       'Feature name actual value' );
 
 is( $row->value(5),        '.',   'Feature actual strand value (nonexistent)' );
 is( $row->strand,          0,     'Feature strand (implied)' );
-is( $row->strand(1),       0,     'Attempt strand change via high level' );
+warning_is( sub { $row->strand(1) },
+	'ERROR: No Strand column to update!',
+	'Attempt strand change via high level' );
 is( $row->strand,          0,     'Check attempted strand change' );
 is( $Data->value( 25, 5 ), undef, 'Feature actual changed strand value' );
 
 is( $row->type,         'region', 'Feature type (implied)' );
-is( $row->type('gene'), 'region', 'Attempt type change via high level' );
+warning_is( sub { $row->type('gene') },
+	'ERROR: No Type column to update!',
+	'Attempt type change via high level' );
 isnt( $row->type, 'gene', 'Check attempted type change' );
 is( $row->type, 'region', 'Check actual type value' );
 

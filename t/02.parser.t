@@ -4,6 +4,7 @@
 
 use strict;
 use Test::More;
+use Test::Warn;
 use File::Spec;
 use FindBin '$Bin';
 
@@ -679,7 +680,9 @@ sub test_parsed_gff_table {
     is( $row->type,   'gene',    'Feature type' );
     is( $row->start,  7235,      'Feature start coordinate' );
     is( $row->strand, -1,        'Feature strand' );
-    isnt( $row->start(8000), 8000, 'Attempted change to Feature start' );
+    warning_is( sub { $row->start(8000) },
+    	'ERROR: Unable to update Start coordinate for parsed SeqFeature objects',
+    	'Attempted change to Feature start' );
     is( $row->start, 7235, 'Check start coordinate start after change' );
 
     # reparse with subfeatures
@@ -763,7 +766,9 @@ sub test_parsed_ucsc_table {
     is( $row->start, 1509702,
         'Seqfeature start coordinate through row Feature' );
     is( $row->strand, -1, 'Seqfeature strand through row Feature' );
-    isnt( $row->start(2500000), 2500000, 'Attempted change to Feature start' );
+    warning_is ( sub { $row->start(2500000) },
+    	'ERROR: Unable to update Start coordinate for parsed SeqFeature objects',
+    	'Attempted change to Feature start' );
     is( $row->start, 1509702, 'Check start coordinate start after change' );
 
     # reparse with mRNA feature
@@ -830,7 +835,9 @@ sub test_parsed_bed6_table {
     is( $row->type,  'feature', 'Seqfeature type through row Feature' );
     is( $row->start, 58695, 'Seqfeature start coordinate through row Feature' );
     is( $row->strand, -1,   'Seqfeature strand through row Feature' );
-    isnt( $row->start(100000), 100000, 'Attempted change to Feature start' );
+    warning_is( sub { $row->start(100000) },
+    	'ERROR: Unable to update Start coordinate for parsed SeqFeature objects',
+    	'Attempted change to Feature start' );
     is( $row->start, 58695, 'Check start coordinate start after change' );
 
     # attempt to reload the file
@@ -886,7 +893,9 @@ sub test_parsed_bed12_table {
     is( $row->start, 1509702,
         'Seqfeature start coordinate through row Feature' );
     is( $row->strand, -1, 'Seqfeature strand through row Feature' );
-    isnt( $row->start(2500000), 2500000, 'Attempted change to Feature start' );
+    warning_is( sub { $row->start(2500000) },
+    	'ERROR: Unable to update Start coordinate for parsed SeqFeature objects',
+    	'Attempted change to Feature start' );
     is( $row->start, 1509702, 'Check start coordinate start after change' );
 
     # attempt to reload the file
