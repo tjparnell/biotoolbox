@@ -6,6 +6,7 @@ lib/Bio/ToolBox/Data.pm
 lib/Bio/ToolBox/Data/core.pm
 lib/Bio/ToolBox/Data/file.pm
 lib/Bio/ToolBox/Data/Feature.pm
+lib/Bio/ToolBox/Data/Iterator.pm
 lib/Bio/ToolBox/Data/Stream.pm
 lib/Bio/ToolBox/GeneTools.pm
 lib/Bio/ToolBox/db_helper.pm
@@ -20,9 +21,11 @@ lib/Bio/ToolBox/db_helper/hts.pm
 lib/Bio/ToolBox/db_helper/seqfasta.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
+lib/Bio/ToolBox/Parser.pm
 lib/Bio/ToolBox/parser/bed.pm
 lib/Bio/ToolBox/parser/gff.pm
 lib/Bio/ToolBox/parser/ucsc.pm
+lib/Bio/ToolBox/parser/ucsc/builder.pm
 lib/Bio/ToolBox/SeqFeature.pm
 lib/Bio/ToolBox/utility.pm
 LICENSE
