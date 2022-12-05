@@ -453,10 +453,9 @@ sub delete_function {
 		return 0;
 	}
 
+	my $names = join ", ", map { sprintf "'%s'", $Data->name($_) } @deletion_list;
 	$Data->delete_column(@deletion_list);
-	print " datasets "
-		. join( ", ", map { sprintf "'%s'", $Data->name($_) } @deletion_list )
-		. " deleted\n";
+	print " datasets $names deleted\n";
 
 	return 1;
 }
