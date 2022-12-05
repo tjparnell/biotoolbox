@@ -628,7 +628,7 @@ sub write_file {
 		if ( $name =~ /^(.+)(\.\w+)(\.gz)?$/xi ) {
 
 			# nonstandard extension
-			$extension = $2 . $3 || q();
+			$extension = $3 ? $2 . $3 : $2;
 			$name      = $1;
 		}
 		elsif ( $self->gff ) {
