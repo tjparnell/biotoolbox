@@ -886,7 +886,7 @@ sub discard_features {
 	print " Discarding features with sum below $discard....\n";
 
 	# calculate which indices;
-	my @indices = ( $Data->number_columns - scalar @datasets ) .. $Data->last_column;
+	my @indices = ( $Data->number_columns - scalar(@datasets) + 1 ) .. $Data->last_column;
 
 	# identify features to delete
 	my @to_delete;
