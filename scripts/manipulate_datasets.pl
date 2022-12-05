@@ -7,6 +7,7 @@ use strict;
 use Pod::Usage;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use IO::Prompt::Tiny qw(prompt);
+use Scalar::Util qw(looks_like_number);
 use List::Util qw(min max sum0);
 use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
@@ -746,8 +747,9 @@ INDEX_LOOP: foreach my $index (@indices) {
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				next if _is_null( $row->value($index) );
-				my $v = $correction_value * $row->value($index);
+				my $v = $row->value($index);
+				next unless looks_like_number($v);
+				$v *= $correction_value;
 				$row->value( $index, $v );
 			}
 		);
@@ -797,7 +799,7 @@ INDEX_LOOP: foreach my $index (@indices) {
 
 		# Calculate percent rank of values
 		# remove null values
-		my @values = grep { !/^\.$/ } $Data->column_values($index);
+		my @values = grep { looks_like_number($_) } $Data->column_values($index);
 		my $total  = scalar @values;
 		my %percentrank;
 		my $n = 1;
@@ -814,8 +816,9 @@ INDEX_LOOP: foreach my $index (@indices) {
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				next if _is_null( $row->value($index) );
-				$row->value( $index, $percentrank{ $row->value($index) } );
+				my $v = $row->value($index);
+				next unless looks_like_number($v);
+				$row->value( $index, $percentrank{$v} );
 			}
 		);
 
@@ -1184,7 +1187,7 @@ sub toss_threshold_function {
 				my $check = 0;
 				foreach my $i (@order) {
 					my $v = $row->value($i);
-					next     if _is_null($v);
+					next unless looks_like_number($v);
 					$check++ if $v > $threshold;
 				}
 
@@ -1200,7 +1203,7 @@ sub toss_threshold_function {
 				my $check = 0;
 				foreach my $i (@order) {
 					my $v = $row->value($i);
-					next     if _is_null($v);
+					next unless looks_like_number($v);
 					$check++ if $v < $threshold;
 				}
 
@@ -1520,16 +1523,12 @@ sub convert_absolute_function {
 			sub {
 				my $row = shift;
 				my $v   = $row->value($index);
-				next if _is_null($v);
-				my $new_value;
-				eval { $new_value = abs($v) };
-				if ( defined $new_value ) {
-					$row->value( $index, $new_value );
-					$count++;
-				}
-				else {
+				unless ( looks_like_number($v) ) {
 					$failed++;
+					next;
 				}
+				$row->value( $index, abs($v) );
+				$count++;
 			}
 		);
 
@@ -1602,7 +1601,7 @@ sub minimum_function {
 			sub {
 				my $row = shift;
 				my $v   = $row->value($index);
-				next if _is_null($v);
+				next unless looks_like_number($v);
 				if ( $v < $value ) {
 					$row->value( $index, $value );
 					$count++;
@@ -1671,7 +1670,7 @@ sub maximum_function {
 			sub {
 				my $row = shift;
 				my $v   = $row->value($index);
-				next if _is_null($v);
+				next unless looks_like_number($v);
 				if ( $v > $value ) {
 					$row->value( $index, $value );
 					$count++;
@@ -1766,9 +1765,9 @@ sub log_function {
 				my $v   = $row->value($index);
 
 				# check the value contents and process appropriately
-				if ( _is_null($v) ) {
+				if ( not looks_like_number($v) ) {
 
-					# a null value, do nothing
+					# not a number, do nothing
 					$failed++;
 				}
 				elsif ( $v == 0 ) {
@@ -1869,15 +1868,12 @@ sub delog_function {
 				my $v   = $row->value($index);
 
 				# check the value contents and process appropriately
-				if ( _is_null($v) ) {
-
-					# a null value, do nothing
-					$failed++;
+				if ( looks_like_number($v) ) {
+					$row->value( $index, $base**$v );
+					$count++;
 				}
 				else {
-					my $new_value = $base**$v;
-					$row->value( $index, $new_value );
-					$count++;
+					$failed++;
 				}
 			}
 		);
@@ -1957,7 +1953,7 @@ sub format_function {
 			sub {
 				my $row = shift;
 				my $v   = $row->value($index);
-				if ( not _is_null($v) ) {
+				if ( looks_like_number($v) ) {
 					$row->value( $index, sprintf( $format_string, $v ) );
 				}
 			}
@@ -2048,7 +2044,7 @@ sub combine_function {
 			my @data;
 			foreach (@indices) {
 				my $v = $row->value($_);
-				next if _is_null($v);
+				next unless looks_like_number($v);
 				push @data, $v;
 			}
 
@@ -2275,23 +2271,16 @@ sub difference_function {
 	$Data->iterate(
 		sub {
 			my $row = shift;
+			my $e   = $row->value($experiment_index);
+			my $c   = $row->value($control_index);
 
 			# calculate difference
-			if (   _is_null( $row->value($experiment_index) )
-				or _is_null( $row->value($control_index) ) )
-			{
-				# can't do anything with nulls, new value will be null
-				$row->value( $new_position, '.' );
-				$failure_count++;
-			}
-			else {
-				my $diff =
-					$row->value($experiment_index) - $row->value($control_index);
+			if ( looks_like_number($e) and looks_like_number($c) ) {
+				my $diff = $e - $c;
 				if ($normalization) {
 
 					# determine a normalized difference value
-					my $sum =
-						$row->value($experiment_index) + $row->value($control_index);
+					my $sum = $e + $c;
 					if ( $sum == 0 ) {
 
 						# avoid pesky divide-by-0 errors, the difference is also 0
@@ -2305,6 +2294,11 @@ sub difference_function {
 					# determine a straight difference value
 					$row->value( $new_position, $diff );
 				}
+			}
+			else {
+				# can't do anything with non-numbers, new value will be null
+				$row->value( $new_position, '.' );
+				$failure_count++;
 			}
 		}
 	);
@@ -2464,10 +2458,7 @@ sub math_function {
 				printf "  sum value for %s is $value\n", $Data->name($index);
 			}
 		}
-		elsif (
-			$request_value
-			and $request_value =~ m/^ \-? \d+ (?:\.\d+)? (?:[eE] \-? \d+)? $/x
-		) {
+		elsif ( $request_value and looks_like_number($request_value) ) {
 
 			# a numeric value, allowing for negatives, decimals, exponents
 			$value = $request_value;
@@ -2485,12 +2476,13 @@ sub math_function {
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				if ( _is_null( $row->value($index) ) ) {
-					$failed_count++;
+				my $v   = $row->value($index);
+				if ( looks_like_number($v) ) {
+					$row->value( $index,
+						&{$calculate}( $v, $value ) );
 				}
 				else {
-					$row->value( $index,
-						&{$calculate}( $row->value($index), $value ) );
+					$failed_count++;
 				}
 			}
 		);
@@ -2862,7 +2854,10 @@ sub center_function {
 			# collect the datapoint values in each dataset for the feature
 			my @values;
 			foreach my $d (@datasets) {
-				push @values, $row->value($d) if not _is_null( $row->value($d) );
+				my $v = $row->value($d);
+				if ( looks_like_number($v) ) {
+					push @values, $v;
+				}
 			}
 			next unless (@values);
 
@@ -2871,8 +2866,9 @@ sub center_function {
 
 			# adjust the datapoints
 			foreach my $d (@datasets) {
-				next if _is_null( $row->value($d) );
-				$row->value( $d, ( $row->value($d) - $median_value ) );
+				my $v = $row->value($d);
+				next unless  looks_like_number($v);
+				$row->value( $d, ( $v - $median_value ) );
 			}
 		}
 	);
@@ -3287,7 +3283,7 @@ sub _get_statistics_hash {
 	shift @invalues;    # remove header
 	my @goodvalues;
 	foreach my $v (@invalues) {
-		next if _is_null($v);
+		next unless looks_like_number($v);
 		if ( $v == 0 ) {
 
 			# we need to determine whether we can accept 0 values
