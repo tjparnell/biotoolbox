@@ -798,11 +798,17 @@ sub percentile_rank_function {
 
 	# Process each index request
 	my @datasets_modified;    # a list of which datasets were modified
-INDEX_LOOP: foreach my $index (@indices) {
+	foreach my $index (@indices) {
 
 		# Calculate percent rank of values
-		# remove null values
-		my @values = grep { looks_like_number($_) } $Data->column_values($index);
+		my @cv = $Data->column_values($index);
+		shift @cv; # skip header
+		my @values = grep { looks_like_number($_) } @cv;
+		unless (@values) {
+			printf " WARNING: no numeric values in dataset %d, %s! Skipping\n", 
+				$index, $Data->name($index);
+			next;
+		}
 		my $total  = scalar @values;
 		my %percentrank;
 		my $n = 1;
@@ -2372,31 +2378,7 @@ sub math_function {
 
 	# General function to perform simple math on each datapoint value
 	# in a dataset by a specific value
-
-	# determine the mathematical function
-	# function is one of add, subtract, multiply, divide
 	my $math = shift;
-	my $calculate;    # a reference to the appropriate function
-	if ( $math eq 'add' ) {
-		$calculate = sub {
-			return $_[0] + $_[1];
-		};
-	}
-	elsif ( $math eq 'subtract' ) {
-		$calculate = sub {
-			return $_[0] - $_[1];
-		};
-	}
-	elsif ( $math eq 'multiply' ) {
-		$calculate = sub {
-			return $_[0] * $_[1];
-		};
-	}
-	elsif ( $math eq 'divide' ) {
-		$calculate = sub {
-			return $_[0] / $_[1];
-		};
-	}
 
 	# request dataset indices
 	my $line = " Enter one or more dataset index numbers to $math  ";
@@ -2430,6 +2412,30 @@ sub math_function {
 
 	# request placement
 	my $placement = _request_placement();
+
+	# determine the mathematical function
+	# function is one of add, subtract, multiply, divide
+	my $calculate;    # a reference to the appropriate function
+	if ( $math eq 'add' ) {
+		$calculate = sub {
+			return $_[0] + $_[1];
+		};
+	}
+	elsif ( $math eq 'subtract' ) {
+		$calculate = sub {
+			return $_[0] - $_[1];
+		};
+	}
+	elsif ( $math eq 'multiply' ) {
+		$calculate = sub {
+			return $_[0] * $_[1];
+		};
+	}
+	elsif ( $math eq 'divide' ) {
+		$calculate = sub {
+			return $_[0] / $_[1];
+		};
+	}
 
 	# generate past tense verb
 	my $mathed = $math;
