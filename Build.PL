@@ -54,6 +54,7 @@ sub get_base_options {
 			'List::Util'              => 1.45,
 			'List::MoreUtils'         => 0.400,
 			'Module::Load'            => 0.32,
+			'Scalar::Util'            => 1.45,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
 		},
