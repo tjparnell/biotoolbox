@@ -730,17 +730,20 @@ sub median_scale_function {
 INDEX_LOOP: foreach my $index (@indices) {
 
 		# Retrieve values and calculate median
-		my %statdata = _get_statistics_hash( $index, 'n' );
-		unless (%statdata) {
-			printf " WARNING: unable to get statistics for dataset %s, index %d!\n",
+		my @cv = $Data->column_values($index);
+		shift @cv; # skip header
+		my @values = grep { looks_like_number($_) and $_ != 0 } @cv;
+			# I had historically always skipped zero values before, so continue to do so?
+		unless (@values) {
+			printf " WARNING: no numeric values dataset %s, index %d!\n",
 				$Data->name($index), $index;
 			next INDEX_LOOP;
 		}
-		printf " The median value for dataset %s is %s\n",
-			$Data->name($index), $statdata{'median'};
+		my $median = median(@values);
+		printf " The median value for dataset %s is %s\n", $Data->name($index), $median;
 
 		# Calculate correction value
-		my $correction_value = $target / $statdata{median};
+		my $correction_value = $target / $median;
 
 		# Replace values
 		$index = _prepare_new_destination( $index, '_scaled' ) if $placement =~ /^n/i;
@@ -865,20 +868,26 @@ sub zscore_function {
 	foreach my $index (@indices) {
 
 		# generate statistics on the dataset
-		my %statdata = _get_statistics_hash( $index, 'y' );
-		unless (%statdata) {
-			print " WARNING: unable to generate statistics for index $index! skipping\n";
+		my @cv = $Data->column_values($index);
+		shift @cv; # skip header
+		my @values = grep { looks_like_number($_) } @cv;
+		unless (@values) {
+			printf " WARNING: no numeric values for index %d, %s! skipping\n",
+				$index, $Data->name($index);
 			next;
 		}
+		my $mean = sum0(@values) / scalar(@values);
+		my $std  = stddevp(@values);
+		printf "   Column %d is %.6f ± %.6f\n", $index, $mean, $std;
 
 		# Replace the current values
 		$index = _prepare_new_destination( $index, '_Zscore' ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				next if _is_null( $row->value($index) );
-				my $v =
-					( $row->value($index) - $statdata{'mean'} ) / $statdata{'stddevp'};
+				my $v = $row->value($index);
+				next unless looks_like_number($v);
+				$v = ( $v - $mean ) / $std;
 				$row->value( $index, $v );
 			}
 		);
@@ -2438,23 +2447,26 @@ sub math_function {
 		if ( $request_value and $request_value =~ /median | mean | sum/xi ) {
 
 			# collect dataset statistics
-			my %stathash = _get_statistics_hash($index);
-			unless (%stathash) {
-				print " WARNING: unable to get statistics! nothing done\n";
-				return 0;
+			my @cv = $Data->column_values($index);
+			shift @cv; # skip header
+			my @values = grep { looks_like_number($_) } @cv;
+			unless (@values) {
+				printf " WARNING: no numeric values for index $index, %s\n",
+					$Data->name($index);
+				next;
 			}
 
 			# assign the appropriate value
 			if ( $request_value eq 'median' ) {
-				$value = $stathash{'median'};
+				$value = median(@values);
 				printf "  median value for %s is $value\n", $Data->name($index);
 			}
 			elsif ( $request_value eq 'mean' ) {
-				$value = $stathash{'mean'};
+				$value = sum0(@values) / scalar(@values);
 				printf "  mean value for %s is $value\n", $Data->name($index);
 			}
 			elsif ( $request_value eq 'sum' ) {
-				$value = $stathash{'sum'};
+				$value = sum0(@values);
 				printf "  sum value for %s is $value\n", $Data->name($index);
 			}
 		}
