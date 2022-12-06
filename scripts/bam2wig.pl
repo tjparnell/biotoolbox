@@ -1572,6 +1572,12 @@ sub process_bam_coverage_on_chromosome {
 
 	# identify chromosome target id
 	my ( $tid, undef, undef ) = $sam->header->parse_region($seq_id);
+	unless (defined $tid) {
+		printf " WARNING: unable to parse target id for '%s' from bam file %s!\n",
+			$seq_id, $bamfiles[$samid];
+		# we continue but this will silently fail the low level fetch below
+		# but at least an empty temp file will be written allowing program to finish
+	}
 	my $seq_length = $seq_name2length{$seq_id};
 
 	# walk through the chromosome in 1 kb increments
@@ -1946,6 +1952,12 @@ sub process_alignments_on_chromosome {
 
 	# identify chromosome target id
 	my ( $tid, undef, undef ) = $sam->header->parse_region($seq_id);
+	unless (defined $tid) {
+		printf " WARNING: unable to parse target id for '%s' from bam file %s!\n",
+			$seq_id, $bamfiles[$samid];
+		# we continue but this will silently fail the low level fetch below
+		# but at least an empty temp file will be written allowing program to finish
+	}
 	my $seq_length = $seq_name2length{$seq_id};
 
 	# generate data structure for callback

@@ -1531,6 +1531,15 @@ sub low_level_bam_fetch {
 	confess 'FATAL: incorrect number of parameters passed!' unless scalar @_ == 6;
 	my ( $sam, $tid, $start, $stop, $callback, $data ) = @_;
 
+	# the low level fetch returns an undocumented code that is essentially useless
+	# all real data is in the $data reference 
+	# so we silently fail here too if something doesn't look right, and $data is unaltered
+	return unless defined $sam;
+	return unless defined $tid;
+	return unless defined $start;
+	return unless defined $stop;
+	return unless ref($callback) eq 'CODE';
+
 	# run the the low level bam fetch based on which adapter is being used
 	unless ($BAM_ADAPTER) {
 		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
@@ -1557,6 +1566,12 @@ sub low_level_bam_fetch {
 sub low_level_bam_coverage {
 	confess 'FATAL: incorrect number of parameters passed!' unless scalar @_ == 4;
 	my ( $sam, $tid, $start, $stop ) = @_;
+
+	# silently fail here too if something doesn't look right
+	return unless defined $sam;
+	return unless defined $tid;
+	return unless defined $start;
+	return unless defined $stop;
 
 	# run the the low level bam coverage based on which adapter is being used
 	unless ($BAM_ADAPTER) {
