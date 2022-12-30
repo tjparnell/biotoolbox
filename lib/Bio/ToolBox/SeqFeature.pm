@@ -69,9 +69,11 @@ sub new {
 		|| undef;
 	$self->[START] = int $args{-start} || undef;
 	$self->[STOP]  = int $args{-end}   || $args{-stop} || undef;
-	$self->strand( $args{-strand} ) if exists $args{-strand};
 	$self->[NAME] = $args{-display_name} || $args{-name} || undef;
 	$self->[ID]   = $args{-primary_id}   || $args{-id}   || undef;
+	if ( exists $args{-strand} and defined $args{-strand} ) {
+		$self->strand( $args{-strand} );
+	}
 
 	# check orientation
 	if (    defined $self->[START]
@@ -92,19 +94,23 @@ sub new {
 	if ( defined $args{-source} ) {
 		$self->[SRC] = $args{-source};
 	}
-	if ( exists $args{-score} ) {
+	if ( exists $args{-score} and defined $args{-score} ) {
 		$self->[SCORE] = $args{-score};
 	}
-	if ( exists $args{-phase} ) {
+	if ( exists $args{-phase} and defined $args{-phase} ) {
 		$self->phase( $args{-phase} );
 	}
 	if ( exists $args{-attributes} or exists $args{-tags} ) {
 		$args{-attributes} ||= $args{-tags};
-		if ( ref( $args{-attributes} ) eq 'HASH' ) {
+		if ( $args{-attributes} and ref( $args{-attributes} ) eq 'HASH' ) {
 			$self->[ATTRB] = $args{-attributes};
 		}
 	}
-	if ( exists $args{-segments} ) {
+	if (
+		exists $args{-segments}
+		and    $args{-segments}
+		and ref( $args{-segments} ) eq 'ARRAY'
+	) {
 		$self->[SUBF] = [];
 		foreach my $s ( @{ $args{-segments} } ) {
 			unless ( ref($s) eq $class ) {
@@ -119,7 +125,7 @@ sub new {
 
 sub seq_id {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[SEQID] = $_[0];
 	}
 	return defined $self->[SEQID] ? $self->[SEQID] : undef;
@@ -127,7 +133,7 @@ sub seq_id {
 
 sub start {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[START] = int $_[0];
 	}
 	return defined $self->[START] ? $self->[START] : undef;
@@ -135,7 +141,7 @@ sub start {
 
 sub end {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[STOP] = int $_[0];
 	}
 	return defined $self->[STOP] ? $self->[STOP] : undef;
@@ -143,7 +149,7 @@ sub end {
 
 sub strand {
 	my $self = shift;
-	if (@_) {
+	if (defined $_[0]) {
 		my $str = $_[0];
 		if ( $str eq '+' ) {
 			$self->[STRND] = 1;
@@ -166,7 +172,7 @@ sub strand {
 
 sub display_name {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[NAME] = $_[0];
 	}
 	return defined $self->[NAME] ? $self->[NAME] : $self->primary_id;
@@ -174,7 +180,7 @@ sub display_name {
 
 sub primary_id {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[ID] = $_[0];
 	}
 	elsif ( not defined $self->[ID] ) {
@@ -188,7 +194,7 @@ sub primary_id {
 
 sub primary_tag {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[TYPE] = $_[0];
 	}
 	return defined $self->[TYPE] ? $self->[TYPE] : 'feature';
@@ -196,7 +202,7 @@ sub primary_tag {
 
 sub source_tag {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[SRC] = $_[0];
 	}
 	return defined $self->[SRC] ? $self->[SRC] : q();
@@ -204,7 +210,7 @@ sub source_tag {
 
 sub type {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		my $type = $_[0];
 		if ( $type =~ /:/ ) {
 			my ( $t, $s ) = split /:/, $type;
@@ -225,7 +231,7 @@ sub type {
 
 sub score {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		$self->[SCORE] = $_[0];
 	}
 	return defined $self->[SCORE] ? $self->[SCORE] : undef;
@@ -233,7 +239,7 @@ sub score {
 
 sub phase {
 	my $self = shift;
-	if (@_) {
+	if ( defined $_[0] ) {
 		my $p = $_[0];
 		unless ( $p =~ /^[012\.]$/ ) {
 			carp 'ERROR: phase must be 0, 1, 2 or .!';
@@ -261,6 +267,7 @@ sub duplicate {
 
 sub add_SeqFeature {
 	my $self = shift;
+	return unless (@_);
 	$self->[SUBF] ||= [];
 	my $count = 0;
 	foreach my $s (@_) {
@@ -290,8 +297,9 @@ sub get_SeqFeatures {
 
 sub delete_SeqFeature {
 	my $self = shift;
+	my $id   = shift;
+	return unless $id;
 	return unless $self->[SUBF];
-	my $id = shift;
 	my $d;
 	my $i = 0;
 	foreach ( @{ $self->[SUBF] } ) {
@@ -328,12 +336,14 @@ sub add_tag_value {
 
 sub has_tag {
 	my ( $self, $key ) = @_;
+	return unless $key;
 	return unless $self->[ATTRB];
 	return exists $self->[ATTRB]->{$key};
 }
 
 sub get_tag_values {
 	my ( $self, $key ) = @_;
+	return unless $key;
 	return unless $self->[ATTRB];
 	if ( exists $self->[ATTRB]->{$key} ) {
 		if ( ref( $self->[ATTRB]->{$key} ) eq 'ARRAY' ) {
@@ -363,6 +373,7 @@ sub all_tags {
 
 sub remove_tag {
 	my ( $self, $key ) = @_;
+	return unless $key;
 	return unless $self->[ATTRB];
 	if ( exists $self->[ATTRB]->{$key} ) {
 		delete $self->[ATTRB]->{$key};
@@ -379,7 +390,7 @@ sub length {
 
 sub overlaps {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref($other) );
+	return unless ( $other and ref($other) =~ /seqfeature|range/xi );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return not( $self->start > $other->end
 		or $self->end < $other->start );
@@ -387,21 +398,21 @@ sub overlaps {
 
 sub contains {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref($other) );
+	return unless ( $other and ref($other) =~ /seqfeature|range/xi );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return ( $other->start >= $self->start and $other->end <= $self->end );
 }
 
 sub equals {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref($other) );
+	return unless ( $other and ref($other) =~ /seqfeature|range/xi );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return ( $other->start == $self->start and $other->end == $self->end );
 }
 
 sub intersection {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref($other) );
+	return unless ( $other and ref($other) =~ /seqfeature|range/xi );
 	return unless ( $self->seq_id eq $other->seq_id );
 	my ( $start, $stop );
 	if ( $self->start >= $other->start ) {
@@ -426,7 +437,7 @@ sub intersection {
 
 sub union {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref($other) );
+	return unless ( $other and ref($other) =~ /seqfeature|range/xi );
 	return unless ( $self->seq_id eq $other->seq_id );
 	my ( $start, $stop );
 	if ( $self->start <= $other->start ) {
@@ -451,7 +462,7 @@ sub union {
 
 sub subtract {
 	my ( $self, $other ) = @_;
-	return unless ( $other and ref($other) );
+	return unless ( $other and ref($other) =~ /seqfeature|range/xi );
 	return unless ( $self->seq_id eq $other->seq_id );
 	return if $self->equals($other);
 	my @pieces;
