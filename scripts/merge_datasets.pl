@@ -362,7 +362,10 @@ sub merge_two_datasets_by_lookup {
 	}
 
 	# add coordinate column to output if necessary
-	if ( $lookup_name eq 'MergeDatasetCoordinate' and not $automatic ) {
+	if (
+		$lookup_name
+		and ($lookup_name eq 'MergeDatasetCoordinate' and not $automatic)
+	) {
 
 		# check if we taking from file 1 or 2
 		if ( $order[0] =~ /[a-z]+/i ) {
