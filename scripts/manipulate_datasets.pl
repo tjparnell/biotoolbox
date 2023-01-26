@@ -2911,13 +2911,17 @@ sub new_column_function {
 	# this will generate a new dataset
 
 	# request column name
-	my $name = "$function\_Column";
+	my $name;
 	if ( defined $opt_name ) {
 		$name = $opt_name;
 	}
-	elsif ( not $function ) {
+	elsif ( $function ) {
+		$name = "$function\_Column";
+	}
+	else {
 
 		# interactively ask the user
+		$name = $function ? "$function\_Column" : 'New';
 		my $p = " Enter the name for the new column [$name]: ";
 		$name = prompt( $p, $name );
 	}
