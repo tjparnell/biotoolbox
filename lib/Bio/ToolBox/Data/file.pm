@@ -33,7 +33,7 @@ sub load_file {
 	# open the file and load metadata
 	my $filename = $self->check_file($file);
 	unless ($filename) {
-		carp "ERROR: file '$file' does not exist!";
+		carp "ERROR: file '$file' cannot be read or is empty!";
 		return;
 	}
 	$self->add_file_metadata($filename);
@@ -1155,7 +1155,7 @@ sub check_file {
 	my ( $self, $filename ) = @_;
 
 	# check for file existance
-	if ( -e $filename ) {
+	if ( -e $filename and -f _ and -r _ and -s _ ) {
 
 		# confirmed full filename and path
 		return $filename;
@@ -1163,14 +1163,12 @@ sub check_file {
 	else {
 		# file name is either incomplete or non-existent
 		# try adding some common file extensions in case those are missing
-		my $new_filename;
 		foreach my $ext (qw(.gz .txt .txt.gz .bed .bed.gz)) {
-			if ( -e "$filename\.$ext" ) {
-				$new_filename = $filename . $ext;
-				last;
+			my $new_filename = sprintf "%s.%s", $filename, $ext;
+			if ( -e $new_filename and -f _ and -r _ and -s _ ) {
+				return $new_filename;
 			}
 		}
-		return $new_filename;
 	}
 }
 
