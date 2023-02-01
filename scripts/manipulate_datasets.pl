@@ -3310,6 +3310,7 @@ sub _get_statistics_hash {
 	shift @invalues;    # remove header
 	my @goodvalues;
 	foreach my $v (@invalues) {
+		$v =~s/[, ]+//g;
 		next unless looks_like_number($v);
 		if ( $v == 0 ) {
 
