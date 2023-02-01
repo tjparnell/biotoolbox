@@ -420,6 +420,7 @@ sub _gff3_to_seqf {
 	my $feature = $self->_gff_to_seqf($fields);
 
 	# process the group tags
+	$fields->[8] =~ s/;$//;     # remove any trailing semi-colon
 	my %att = map { split /=/ } split /;\s?/, $fields->[8];
 
 	# add essential attributes
@@ -485,6 +486,7 @@ sub _gtf_to_seqf {
 	my $feature = $self->_gff_to_seqf($fields);
 
 	# process the group tags
+	$fields->[8] =~ s/;$//;     # remove any trailing semi-colon
 	my %att;
 	foreach ( split /;\s+/, $fields->[8] ) {
 		my ( $k, $v ) = split / /, $_, 2;
