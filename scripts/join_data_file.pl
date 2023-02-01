@@ -140,7 +140,9 @@ foreach my $file (@ARGV) {
 
 	# check for equal number of columns
 	unless ( $Output->number_columns == $Data->number_columns ) {
-		print STDERR "\n FATAL: Number of columns don't match! Unable to proceed!\n";
+		printf STDERR 
+"\n FATAL: Column number mismatch!\n %s has %d columns instead of %d!\n Unable to proceed!\n",
+			$file, $Data->number_columns, $Output->number_columns;
 		exit 1;
 	}
 
