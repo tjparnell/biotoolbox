@@ -1371,9 +1371,8 @@ sub do_specific_values_function {
 	if ($toss) {
 		printf " %s rows with specific values of %s were deleted in columns %s.\n",
 			format_with_commas( scalar(@todelete) ), join( ', ', keys %wanted ),
-			join( ', ', map { $Data->name($_) } @list ),
-			printf " %s data lines are remaining\n",
-			format_with_commas( $Data->last_row );
+			join( ', ', map { $Data->name($_) } @list );
+		printf " %s data lines are remaining\n", format_with_commas( $Data->last_row );
 	}
 	else {
 		printf " %s rows were deleted in columns %s\n",
