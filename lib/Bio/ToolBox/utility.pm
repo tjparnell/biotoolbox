@@ -138,12 +138,13 @@ sub ask_user_for_index {
 
 	# verify
 	my @good;
-	foreach (@indices) {
-		if ( $Data->name($_) ) {
-			push @good, $_;
+	my $n = $Data->number_columns;
+	foreach my $i (@indices) {
+		if ( $i =~ /^\d+$/ and $i > 0 and $i <= $n ) {
+			push @good, $i;
 		}
 		else {
-			print "  $_ is not a valid index!\n";
+			print "  $i is not a valid index!\n";
 		}
 	}
 	return wantarray ? @good : $good[0];
