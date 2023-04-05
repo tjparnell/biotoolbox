@@ -1,0 +1,332 @@
+# My Perl Critic configuration
+only      = 1
+force     = 0
+severity  = 2
+top       = 50
+
+# coloration
+color-severity-highest = bold red underline
+color-severity-high    = bold magenta
+color-severity-medium  = blue
+color-severity-low     =
+color-severity-lowest  =
+
+
+######## Explicit modules to include
+
+# should be almost everything in 
+#   BuiltinFunctions
+#   CodeLayout
+#   InputOutput
+#   Modules
+#   Variables
+# and in themes
+#   pbp
+#   core
+# exceptions are commented out with reasons
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitBooleanGrep]
+# themes: certrec core pbp performance
+severity  = 2
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitComplexMappings]
+# themes: complexity core maintenance pbp
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitLvalueSubstr]
+# themes: core maintenance pbp
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitReverseSortBlock]
+# themes: core cosmetic pbp
+severity  = 1
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitShiftRef]
+# themes: bugs core tests
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitSleepViaSelect]
+# themes: bugs core pbp
+severity  = 5
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitStringyEval]
+# themes: bugs certrule core pbp
+severity  = 5
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitStringySplit]
+# themes: certrule core cosmetic pbp
+severity  = 2
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitUniversalCan]
+# themes: certrule core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitUniversalIsa]
+# themes: certrule core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitUselessTopic]
+# themes: core
+severity  = 2
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitVoidGrep]
+# themes: core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::ProhibitVoidMap]
+# themes: core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::BuiltinFunctions::RequireBlockGrep]
+# themes: bugs core pbp
+severity  = 4
+
+[Perl::Critic::Policy::BuiltinFunctions::RequireBlockMap]
+# themes: bugs core pbp
+severity  = 4
+
+[Perl::Critic::Policy::BuiltinFunctions::RequireGlobFunction]
+# themes: bugs core pbp
+severity  = 5
+
+[Perl::Critic::Policy::BuiltinFunctions::RequireSimpleSortBlock]
+# themes: complexity core maintenance pbp
+severity  = 3
+
+[Perl::Critic::Policy::ClassHierarchies::ProhibitAutoloading]
+# themes: core maintenance pbp
+severity  = 5
+
+[Perl::Critic::Policy::CodeLayout::ProhibitHardTabs]
+# themes: core cosmetic pbp
+severity  = 1
+allow_leading_tabs = 1
+
+[Perl::Critic::Policy::CodeLayout::ProhibitParensWithBuiltins]
+# themes: core cosmetic pbp
+severity  = 1
+
+[Perl::Critic::Policy::CodeLayout::ProhibitQuotedWordLists]
+# themes: core cosmetic
+severity  = 2
+
+[Perl::Critic::Policy::CodeLayout::ProhibitTrailingWhitespace]
+# themes: core maintenance
+severity  = 1
+
+[Perl::Critic::Policy::CodeLayout::RequireConsistentNewlines]
+# themes: bugs core
+severity  = 4
+
+[Perl::Critic::Policy::CodeLayout::RequireTidyCode]
+# themes: core cosmetic pbp
+severity  = 1
+
+[Perl::Critic::Policy::CodeLayout::RequireTrailingCommas]
+# themes: core cosmetic pbp
+severity  = 1
+
+[Perl::Critic::Policy::ControlStructures::ProhibitPostfixControls]
+# themes: core cosmetic pbp
+allow     = unless if
+severity  = 2
+
+[Perl::Critic::Policy::InputOutput::ProhibitBacktickOperators]
+# themes: core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::InputOutput::ProhibitBarewordFileHandles]
+# themes: bugs certrec core pbp
+severity  = 5
+
+[Perl::Critic::Policy::InputOutput::ProhibitExplicitStdin]
+# themes: core maintenance pbp
+severity  = 4
+
+[Perl::Critic::Policy::InputOutput::ProhibitInteractiveTest]
+# themes: bugs certrule core pbp
+severity  = 5
+
+[Perl::Critic::Policy::InputOutput::ProhibitJoinedReadline]
+# themes: core pbp performance
+severity  = 3
+
+[Perl::Critic::Policy::InputOutput::ProhibitOneArgSelect]
+# themes: bugs certrule core pbp
+severity  = 4
+
+[Perl::Critic::Policy::InputOutput::ProhibitReadlineInForLoop]
+# themes: bugs core pbp
+severity  = 4
+
+[Perl::Critic::Policy::InputOutput::ProhibitTwoArgOpen]
+# themes: bugs certrule core pbp security
+severity  = 5
+
+[Perl::Critic::Policy::InputOutput::RequireBracedFileHandleWithPrint]
+# themes: core cosmetic pbp
+severity  = 1
+
+[Perl::Critic::Policy::InputOutput::RequireBriefOpen]
+# themes: core maintenance pbp
+severity  = 4
+
+[Perl::Critic::Policy::InputOutput::RequireCheckedClose]
+# themes: certrule core maintenance
+severity  = 2
+
+[Perl::Critic::Policy::InputOutput::RequireCheckedOpen]
+# themes: certrule core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::InputOutput::RequireCheckedSyscalls]
+# themes: certrule core maintenance
+severity  = 1
+
+[Perl::Critic::Policy::InputOutput::RequireEncodingWithUTF8Layer]
+# themes: bugs core security
+severity  = 5
+
+[Perl::Critic::Policy::Miscellanea::ProhibitTies]
+# themes: core maintenance pbp
+severity  = 2
+
+[Perl::Critic::Policy::Modules::ProhibitAutomaticExportation]
+# themes: bugs core
+severity  = 4
+
+[Perl::Critic::Policy::Modules::ProhibitConditionalUseStatements]
+# themes: bugs core
+severity  = 3
+
+[Perl::Critic::Policy::Modules::ProhibitEvilModules]
+# themes: bugs certrule core
+severity  = 5
+
+# [Perl::Critic::Policy::Modules::ProhibitExcessMainComplexity]
+# some of the scripts are old and definitely complex
+# but I don't have time to rewrite them at the moment
+# themes: complexity core maintenance
+# severity  = 3
+
+# [Perl::Critic::Policy::Modules::ProhibitMultiplePackages]
+# I have a few packages that are NEVER used outside of its 
+# parent, so moving into separate module doesn't really make sense
+# themes: bugs core
+# severity  = 4
+
+[Perl::Critic::Policy::Modules::RequireBarewordIncludes]
+# themes: core portability
+severity  = 5
+
+[Perl::Critic::Policy::Modules::RequireEndWithOne]
+# themes: bugs certrule core pbp
+severity  = 4
+
+[Perl::Critic::Policy::Modules::RequireExplicitPackage]
+# themes: bugs core
+severity  = 4
+
+[Perl::Critic::Policy::Modules::RequireFilenameMatchesPackage]
+# themes: bugs core
+severity  = 5
+
+[Perl::Critic::Policy::Modules::RequireNoMatchVarsWithUseEnglish]
+# themes: core performance
+severity  = 2
+
+[Perl::Critic::Policy::Modules::RequireVersionVar]
+# themes: core pbp readability
+severity  = 2
+
+# [Perl::Critic::Policy::NamingConventions::ProhibitAmbiguousNames]
+# themes: core maintenance pbp
+# default = last set left right no abstract contract record second close
+forbid = no abstract contract record close
+severity  = 3
+
+[Perl::Critic::Policy::References::ProhibitDoubleSigils]
+# themes: core cosmetic pbp
+severity  = 2
+
+[Perl::Critic::Policy::RegularExpressions::ProhibitUnusedCapture]
+# themes: core maintenance pbp
+severity  = 3
+
+[Perl::Critic::Policy::RegularExpressions::RequireExtendedFormatting]
+# themes: core maintenance pbp
+severity  = 3
+minimum_regex_length_to_complain_about = 10
+
+[Perl::Critic::Policy::ValuesAndExpressions::ProhibitEmptyQuotes]
+# themes: core cosmetic pbp
+severity  = 2
+
+[Perl::Critic::Policy::ValuesAndExpressions::ProhibitLeadingZeros]
+# themes: bugs certrec core pbp
+severity  = 5
+
+[Perl::Critic::Policy::ValuesAndExpressions::ProhibitMismatchedOperators]
+# themes: bugs certrule core
+severity  = 3
+
+[Perl::Critic::Policy::ValuesAndExpressions::ProhibitMixedBooleanOperators]
+# themes: bugs certrec core pbp
+severity  = 4
+
+[Perl::Critic::Policy::Variables::ProhibitAugmentedAssignmentInDeclaration]
+# themes: bugs core
+severity  = 4
+
+[Perl::Critic::Policy::Variables::ProhibitConditionalDeclarations]
+# themes: bugs core
+severity  = 5
+
+[Perl::Critic::Policy::Variables::ProhibitLocalVars]
+# themes: core maintenance pbp
+severity  = 2
+
+[Perl::Critic::Policy::Variables::ProhibitMatchVars]
+# themes: core pbp performance
+severity  = 4
+
+[Perl::Critic::Policy::Variables::ProhibitPackageVars]
+# themes: core maintenance pbp
+severity  = 3
+
+[Perl::Critic::Policy::Variables::ProhibitPerl4PackageNames]
+# themes: certrec core maintenance
+severity  = 2
+
+[Perl::Critic::Policy::Variables::ProhibitPunctuationVars]
+# themes: core cosmetic pbp
+severity  = 2
+
+[Perl::Critic::Policy::Variables::ProhibitReusedNames]
+# themes: bugs core
+severity  = 3
+
+[Perl::Critic::Policy::Variables::ProhibitUnusedVariables]
+# themes: certrec core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::Variables::ProtectPrivateVars]
+# themes: certrule core maintenance
+severity  = 3
+
+[Perl::Critic::Policy::Variables::RequireInitializationForLocalVars]
+# themes: bugs certrec core pbp
+severity  = 3
+
+[Perl::Critic::Policy::Variables::RequireLexicalLoopIterators]
+# themes: bugs certrec core pbp
+severity  = 5
+
+[Perl::Critic::Policy::Variables::RequireLocalizedPunctuationVars]
+# themes: bugs certrec core pbp
+severity  = 4
+
+[Perl::Critic::Policy::Variables::RequireNegativeIndices]
+# themes: core maintenance pbp
+severity  = 4
+
