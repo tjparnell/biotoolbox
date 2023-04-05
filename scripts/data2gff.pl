@@ -387,7 +387,7 @@ if ($sort_data) {
 	$Output->gsort_data;
 }
 unless ($outfile) {
-	$outfile = $Input->path . $Input->basename;
+	$outfile = sprintf "%s%s.gff", $Input->path, $Input->basename;
 }
 $outfile = $Output->write_file(
 	filename => $outfile,
