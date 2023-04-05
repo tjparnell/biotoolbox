@@ -154,10 +154,8 @@ unless ( $automatic or $user_list ) {
 
 # clean up metadata we added but shouldn't keep
 # this was put in here for remembering original file names for renaming purposes
-for ( my $c = 0; $c < $output_data->number_columns; $c++ ) {
-	if ( $output_data->metadata( $c, 'AUTO' ) ) {
-		$output_data->delete_metadata('original_file');
-	}
+for my $i ( 1 .. $output_data->number_columns ) {
+	$output_data->delete_metadata($i, 'original_file');
 }
 
 ### Print the output
@@ -577,7 +575,6 @@ sub add_datasets {
 
 			# add new empty column
 			$column = $output_data->add_column( $data->name($request) );
-# 			$output_data->add_metadata($column, 'original_file', $data->filename)
 
 			# copy the dataset via lookup process
 			$output_data->iterate(
