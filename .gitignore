@@ -19,5 +19,6 @@ pm_to_blib
 *.bs
 /_eumm/
 *.tar.gz
-
+*.bak
+.pls_cache/
 .DS_Store
