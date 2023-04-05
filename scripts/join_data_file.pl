@@ -164,11 +164,13 @@ foreach my $file (@ARGV) {
 	# and writing directly to the output
 	# write to the raw output filehandle if we can get it
 	# going through Data::Feature objects is considerably slower and not necessary
+	my $count  = 0;
 	my $in_fh  = $Data->fh;
 	my $out_fh = $Output->fh;    # only get a filehandle if we've started writing the file
 	if ($out_fh) {
 		while ( my $line = $in_fh->getline ) {
 			$out_fh->print($line);
+			$count++;
 			$line_count++;
 		}
 	}
@@ -176,15 +178,18 @@ foreach my $file (@ARGV) {
 		# not as fast but fast enough
 		while ( my $line = $in_fh->getline ) {
 			$Output->write_row($line);
+			$count++;
 			$line_count++;
 		}
 	}
-	printf " merged %s lines from %s\n", format_with_commas($line_count), $Data->filename;
+	printf " merged %s lines from %s\n", format_with_commas($count), $Data->filename;
+	$Data->close_fh;
 }
 
 ### Finish
 $Output->close_fh;
-print " Wrote combined file '$outfile'\n";
+printf " Wrote %s lines to combined file '%s'\n", format_with_commas($line_count),
+	$Output->filename;
 
 __END__
 
