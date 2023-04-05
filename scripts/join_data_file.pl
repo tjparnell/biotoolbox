@@ -149,9 +149,7 @@ foreach my $file (@ARGV) {
 	# check first and last column names
 	my @output_names = $Output->list_columns;
 	my @data_names   = $Data->list_columns;
-	unless ($output_names[0] eq $data_names[0]
-		and $output_names[-1] eq $data_names[-1] )
-	{
+	if ( join(q( ), @output_names) ne join(q( ), @data_names) ) {
 		print "\n  WARNING! Column header names don't match!!\n";
 		for my $i ( 0 .. $#output_names ) {
 			if ( $output_names[$i] ne $data_names[$i] ) {
