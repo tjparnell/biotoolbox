@@ -347,7 +347,7 @@ sub parse_headers {
 		}
 
 		# VCF version header
-		elsif ( $line =~ m/^\#\#\ fileformat=VCFv ( [\d\.]+ )$/x ) {
+		elsif ( $line =~ m/^\#\# fileformat=VCFv ( [\d\.]+ )$/x ) {
 
 			# store the VCF version in the hash
 			# this may or may not be present in the vcf file, but want to keep

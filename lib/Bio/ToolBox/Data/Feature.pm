@@ -541,7 +541,7 @@ sub vcf_attributes {
 
 			# some tags are simple and have no value, eg SOMATIC
 			map { [ split(/=/) ] }
-			split( /;/, $self->value(7) );
+			split( /;/, $self->value(8) );
 	}
 	$self->{attributes}->{INFO} = \%info;
 	$self->{attributes}->{8}    = \%info;
