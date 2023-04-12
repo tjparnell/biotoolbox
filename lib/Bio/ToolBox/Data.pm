@@ -1207,7 +1207,7 @@ sub summary_file {
 			else {
 				# we're summarizing multiple datasets, we already have name midpoint
 				# first do sanity check
-				if ( $summed_data->value( $row, 1 ) != $midpoint ) {
+				if ( $summed_data->value( $row, 2 ) != $midpoint ) {
 					carp
 'ERROR: unable to summarize multiple datasets with nonequal columns of data!';
 					return;
