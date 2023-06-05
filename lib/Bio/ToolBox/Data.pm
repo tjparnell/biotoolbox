@@ -50,8 +50,10 @@ sub new {
 		unless ( $self->parse_table( \%args ) ) {
 			my $l = $self->load_file( $args{file} );
 			return unless $l;
-			if ( $self->database =~ /^Parsed:(.+)$/x and $self->feature_type eq 'named' )
-			{
+			if ( 
+				$self->database and $self->database =~ /^Parsed:(.+)$/x and
+				$self->feature_type eq 'named'
+			) {
 
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
