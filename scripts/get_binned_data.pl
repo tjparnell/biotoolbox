@@ -294,7 +294,7 @@ sub check_defaults {
 	if ( not @datasets and @ARGV ) {
 		@datasets = @ARGV;
 	}
-	if ( $datasets[0] =~ /,/ ) {
+	if ( @datasets and $datasets[0] =~ /,/ ) {
 
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;
@@ -412,7 +412,10 @@ sub parallel_execution {
 		}
 
 		# collapse transcripts if needed
-		if ( $feature eq 'gene' and $subfeature eq 'exon' ) {
+		if (
+			$feature and $feature =~ /gene/i
+			and $subfeature and $subfeature =~ m/exon | intron/xi
+		) {
 			$Data->collapse_gene_transcripts;
 		}
 
@@ -482,9 +485,8 @@ sub single_execution {
 
 	# collapse transcripts if needed
 	if (
-		$feature
-		and $feature eq 'gene'
-		and $subfeature eq 'exon'
+		$feature and $feature =~ /gene/i
+		and $subfeature and $subfeature =~ m/exon | intron/xi
 	) {
 		$Data->collapse_gene_transcripts;
 	}

@@ -347,7 +347,7 @@ sub check_defaults {
 	if ( not @datasets and @ARGV ) {
 		@datasets = @ARGV;
 	}
-	if ( $datasets[0] =~ /,/ ) {
+	if ( @datasets and $datasets[0] =~ /,/ ) {
 
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;

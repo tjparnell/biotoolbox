@@ -547,9 +547,8 @@ sub parallel_execution {
 
 		# collapse transcripts if needed
 		if (
-			$feature
-			and $feature =~ /^gene/i
-			and $subfeature =~ m/exon | intron/xi
+			$feature and $feature =~ /gene/i
+			and $subfeature and $subfeature =~ m/exon | intron/xi
 		) {
 			my $c = $Data->collapse_gene_transcripts;
 			if ( $c != $Data->last_row ) {
@@ -594,9 +593,8 @@ sub single_execution {
 
 	# collapse transcripts if needed
 	if (
-		$feature
-		and $feature =~ /^gene/i
-		and $subfeature =~ m/exon | intron/xi
+		$feature and $feature =~ /gene/i
+		and $subfeature and $subfeature =~ m/exon | intron/xi
 	) {
 		my $c = $Data->collapse_gene_transcripts;
 		if ( $c != $Data->last_row ) {
