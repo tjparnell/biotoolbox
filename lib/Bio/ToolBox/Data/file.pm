@@ -1310,7 +1310,7 @@ sub add_bed_metadata {
 	if ( $self->format =~ /bedgraph/i or $self->extension =~ m/(?: bg | bdg | graph )/xi )
 	{
 		$self->format('bedGraph');
-		$column_names = $self->standard_column_names('bedgraph');
+		$column_names = $self->standard_column_names('bdg');
 	}
 	else {
 		$self->format( sprintf "bed%d", $column_count );
