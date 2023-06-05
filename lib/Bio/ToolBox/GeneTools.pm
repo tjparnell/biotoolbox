@@ -951,18 +951,18 @@ sub gtf_string {
 	# mandatory identifiers
 	my ( $gene_id, $gene_name, $gene_biotype );
 	if ($gene) {
-		$gene_id   = $gene->primary_id || $gene->display_name;
-		$gene_name = $gene->display_name;
+		$gene_id   = $gene->primary_id || $gene->display_name || q();
+		$gene_name = $gene->display_name || q();
 		($gene_biotype) =
 			   $gene->get_tag_values('gene_biotype')
 			|| $gene->get_tag_values('biotype')
-			|| undef;
+			|| q();
 	}
 	else {
 		# these attributes might still be present for transcripts
-		($gene_id)      = $feature->get_tag_values('gene_id')      || undef;
-		($gene_name)    = $feature->get_tag_values('gene_name')    || undef;
-		($gene_biotype) = $feature->get_tag_values('gene_biotype') || undef;
+		($gene_id)      = $feature->get_tag_values('gene_id')      || q();
+		($gene_name)    = $feature->get_tag_values('gene_name')    || q();
+		($gene_biotype) = $feature->get_tag_values('gene_biotype') || q();
 	}
 	my $trx_id   = $feature->primary_id || $feature->display_name;
 	my $trx_name = $feature->display_name;
