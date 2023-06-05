@@ -410,6 +410,8 @@ sub generate_output_data_structures {
 	# only one output data structure
 	if ( scalar keys %{$pulled} == 1 ) {
 
+		my $group = (keys %{$pulled})[0];  # use the actual group name
+
 		# generate new file name data
 		my $newfile = $outfile;
 		my $ext     = $Data->extension;
@@ -422,7 +424,7 @@ sub generate_output_data_structures {
 		# duplicate and store away
 		my $New = $Data->duplicate;
 		$New->add_file_metadata($newfile);
-		$pulled->{0}{'output_data'} = $New;
+		$pulled->{$group}{'output_data'} = $New;
 	}
 
 	# multiple data structures
