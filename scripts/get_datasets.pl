@@ -916,7 +916,7 @@ sub calculate_fpkm_values {
 	print " Calculating TPM values....\n"  if $tpm;
 
 	# calculate which indices;
-	my @indices = ( $Data->number_columns - scalar @datasets ) .. $Data->last_column;
+	my @indices = ( $Data->number_columns - scalar(@datasets) + 1 ) .. $Data->last_column;
 
 	# identify the length column as necessary
 	my $length_i;
