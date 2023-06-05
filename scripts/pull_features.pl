@@ -125,7 +125,7 @@ my ( $requests, $pulled ) = collect_request_list();
 # the second is for storing all the found pulled data
 
 ### Pull out the desired features
-print " Pulling features...\n";
+print " Pulling features from file '$datafile'...\n";
 my ( $found_count, $notfound_count ) = pull_requested_features();
 print "  $found_count features were found and pulled\n";
 if ( $notfound_count > 0 ) {
@@ -280,11 +280,10 @@ sub identify_indices {
 			" Enter the unique identifier lookup column index from the data file    "
 		);
 	}
-	printf
-" We are using list lookup index $list_index, %s, and data lookup index $data_index, %s\n",
-		$List->name($list_index), $Data->name($data_index);
+	printf " We are using\n  list lookup index %d, '%s'\n  data lookup index %d, '%s'\n",
+		$list_index, $List->name($list_index), $data_index, $Data->name($data_index);
 	if ( defined $group_index ) {
-		printf "  and group index %s\n", $List->name($group_index);
+		printf "  group index %d, '%s'\n", $group_index, $List->name($group_index);
 	}
 }
 
