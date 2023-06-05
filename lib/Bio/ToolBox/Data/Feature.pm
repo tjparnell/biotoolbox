@@ -926,12 +926,9 @@ sub _get_subfeature_scores {
 	# get the subfeatures
 	my $subfeatures = $self->_get_subfeatures( $args->{subfeature} );
 	unless ( @{$subfeatures} ) {
-		carp 'ERROR: no subfeatures available! Returning parent score data!';
 
-		# just return the parent
-		undef $args->{subfeature};
-		delete $args->{exon} if exists $args->{exon};
-		return $self->get_score( @{$args} );
+		# no subfeatures, nothing to collect
+		return;
 	}
 
 	# collect over each subfeature
