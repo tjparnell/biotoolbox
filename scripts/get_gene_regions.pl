@@ -36,7 +36,8 @@ unless (@ARGV) {
 
 ### Get command line options and initialize values
 my ( $infile, $outfile, $database, $request, $transcript_type, $tsl, $gencode, $tbiotype,
-	$start_adj, $stop_adj, $unique, $slop, $bed, $gz, $help, $print_version, );
+	$start_adj, $stop_adj, $unique, $slop, $chromosome_exclude, $bed, $gz, $help, 
+	$print_version, );
 my @feature_types;
 
 # Command line options
@@ -54,6 +55,7 @@ GetOptions(
 	'e|end|stop=i'    => \$stop_adj,           # stop coordinate adjustment
 	'u|unique!'       => \$unique,             # boolean to ensure uniqueness
 	'l|slop=i'        => \$slop,               # slop factor in bp to identify uniqueness
+	'K|chrskip=s'     => \$chromosome_exclude, # skip chromosomes
 	'bed!'            => \$bed,                # convert the output to bed format
 	'z|gz!'           => \$gz,                 # compress output
 	'h|help'          => \$help,               # request help
@@ -452,6 +454,11 @@ PROMPT
 	# process the features
 	while ( my $seqfeat = $iterator->next_seq ) {
 
+		# skip unwanted chromosomes
+		if ( $chromosome_exclude and $seqfeat->seq_id =~ $chromosome_exclude ) {
+			next;
+		}
+
 		# collect the regions based on the primary tag and the method re
 		if ( $seqfeat->primary_tag eq 'gene' ) {
 
@@ -537,6 +544,11 @@ sub collect_from_file {
 	# process the features
 	my @bad_features;
 	while ( my $seqfeat = $Parser->next_top_feature ) {
+
+		# skip unwanted chromosomes
+		if ( $chromosome_exclude and $seqfeat->seq_id =~ $chromosome_exclude ) {
+			next;
+		}
 
 		# collect the regions based on the primary tag
 		my $type = $seqfeat->primary_tag;
@@ -1370,6 +1382,7 @@ get_gene_regions.pl [--options...] --db <text> --out E<lt>filenameE<gt>
        best4|best5|1|2|3|4|5|NA]
   -u --unique                   select only unique regions
   -l --slop <integer>           duplicate region if within X bp
+  -K --chrskip <regex>          skip features from certain chromosomes
   
   Adjustments:
   -b --begin --start integer     specify adjustment to start coordinate
@@ -1514,6 +1527,16 @@ example, when start sites of transcription are not precisely mapped,
 but not useful with defined introns and exons. This does not take 
 into consideration transcripts from other genes, only the current 
 gene. The default is 0 (no sloppiness).
+
+=item --chrskip E<lt>regexE<gt>
+
+Exclude features from the output whose sequence ID or chromosome matches 
+the provided regex-compatible string. Expressions should be quoted or 
+properly escaped on the command line. Examples might be 
+    
+    'chrM'
+    'scaffold.+'
+    'chr.+alt|chrUn.+|chr.+_random'
 
 =back
 
