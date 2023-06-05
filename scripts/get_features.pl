@@ -224,7 +224,7 @@ sub check_requirements {
 		$include_coordinates = 1;
 	}
 	if ($position) {
-		if ( $position !~ /^ (?: 5 | 3 | 53 | m | 4 ) $/x ) {
+		if ( $position !~ /^ (?: 5 | 3 | 53 | m | 4 | p) $/x ) {
 			print STDERR " FATAL: unrecognized position value '$position'! see help\n";
 			exit 1;
 		}
@@ -1005,6 +1005,43 @@ sub adjust_coordinates {
 		}
 	}
 
+	# adjust from narrowPeak file peak or summit position, defaults to midpoint
+	elsif ( $position eq 'p' ) {
+
+		my $peak = $feature->peak;
+		if ( $feature->strand >= 0 ) {
+
+			# forward strand
+			if ($start_adj) {
+				$start = $peak + $start_adj;
+			}
+			else {
+				$start = $peak;
+			}
+			if ($stop_adj) {
+				$end = $peak + $stop_adj;
+			}
+			else {
+				$end = $peak;
+			}
+		}
+		else {
+			# reverse strand
+			if ($start_adj) {
+				$end = $peak - $start_adj;
+			}
+			else {
+				$end = $peak;
+			}
+			if ($stop_adj) {
+				$start = $peak - $stop_adj;
+			}
+			else {
+				$start = $peak;
+			}
+		}
+	}
+
 	# flip coordinates to make start and stop consistent with strand
 	# sometimes when only one coordinate is changed, it flips the orientation
 	# start must always be less than the stop coordinate
@@ -1059,7 +1096,7 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   Adjustments:
   -b --start=<integer>          modify start positions
   -e --stop=<integer>           modify stop positions
-  -p --pos [ 5 | m | 3 | 53 ]   relative position from which to modify
+  -p --pos [5|m|3|53|p]         relative position from which to modify
   --collapse                    collapse subfeatures from alt transcripts
   
   Report format options:
@@ -1217,14 +1254,16 @@ to the indicated position (--pos option, below) based on the feature
 strand. Adjustments are only allowed when writing standard BED6 or 
 standard text files.
 
-=item --pos [ 5 | m | 3 | 53 ]
+=item --pos [ 5 | m | 3 | 53 | p ]
 
 Indicate the relative position from which both coordinate adjustments 
 are made. Both start and stop adjustments may be made from the respective 
 5 prime, 3 prime, or middle position as dictated by the feature's strand 
 value. Alternatively, specify '53' to indicate that the start adjustment 
 adjusts the 5 prime end and the stop adjustment adjusts the 3 prime end. 
-The default is '53'.
+If the input file is C<narrowPeak> format, adjustments can be made 
+relative to the summit or peak position by specifying 'p' (non-peak files 
+report midpoint). The default is '53'.
 
 =item --collapse
 
