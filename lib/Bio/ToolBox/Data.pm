@@ -1194,9 +1194,15 @@ sub summary_file {
 			}
 
 			# determine mean value
-			my $window_mean = sum0(@values) / scalar(@values);
-			if ($log) {
-				$window_mean = log($window_mean) / log(2);
+			my $window_mean;
+			if (@values) {
+				$window_mean = sum0(@values) / scalar(@values);
+				if ($log) {
+					$window_mean = log($window_mean) / log(2);
+				}
+			}
+			else {
+				$window_mean = 0;
 			}
 
 			# push to summed output
