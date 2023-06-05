@@ -276,6 +276,7 @@ if ( $cpu > 1 ) {
 		# bw mean goes super fast, but bam rpkms are really slow
 		$cpu--;
 	}
+	print " Reducing number of process forks to $cpu due to number of input features\n";
 }
 
 # execute data collection in 1 or more processes

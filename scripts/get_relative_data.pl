@@ -264,6 +264,7 @@ if ( $cpu > 1 ) {
 		# splits to something more worthwhile
 		$cpu--;
 	}
+	print " Reducing number of process forks to $cpu due to number of input features\n";
 }
 
 if ( $cpu > 1 ) {
