@@ -421,7 +421,7 @@ m/^ (?: median | mean | stddev | min | max | range | sum | count | pcount | ncou
 
 		# check the strand request that was defined on the command line
 		unless ( $stranded =~ m/^ (?: all | antisense | sense )$/xi ) {
-			print STDERR " FATAL: unknown strand '$stranded'!";
+			print STDERR " FATAL: unknown strand '$stranded'!\n";
 			exit 1;
 		}
 	}

@@ -88,7 +88,7 @@ if ($print_version) {
 
 ### Check for required values
 unless ($infile) {
-	print STDERR " FATAL: No file name supplied!";
+	print STDERR " FATAL: No file name supplied!\n";
 	exit 1;
 }
 
