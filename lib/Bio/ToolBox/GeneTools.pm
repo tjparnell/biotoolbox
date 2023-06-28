@@ -225,7 +225,24 @@ sub get_alt_common_exons {
 sub get_introns {
 	my $transcript = shift;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
-	my @introns;
+
+	# check whether we were passed a gene object
+	if ( $transcript->primary_tag =~ /gene/i ) {
+		my @transcripts = get_transcripts($transcript);
+		my @introns;
+		foreach my $t (@transcripts) {
+			my $i = get_introns($t);
+			if ( $i and scalar( @{$i} ) ) {
+				push @introns, ( $i );
+			}
+		}
+		if (@introns) {
+			@introns = map { $_->[0] }
+				sort { $a->[1] <=> $b->[1] }
+				map { [ $_, $_->start ] } @introns;
+		}
+		return wantarray ? @introns : \@introns;
+	}
 
 	# find the exons and/or CDSs
 	my @exons = get_exons($transcript);
@@ -235,10 +252,14 @@ sub get_introns {
 	# identify the last exon index position
 	my $last_i = scalar(@exons) - 1;
 
+	# collect introns based on strand
+	my @introns;
+
 	# forward strand
 	if ( $transcript->strand >= 0 ) {
 
 		# each intron is created based on the previous exon
+		# use 1-base counting for the actual name instead of 0-base
 		for ( my $i = 0; $i < $last_i; $i++ ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
@@ -248,8 +269,8 @@ sub get_introns {
 				-strand       => $transcript->strand,
 				-primary_tag  => 'intron',
 				-source_tag   => $transcript->source_tag,
-				-primary_id   => $transcript->display_name . ".intron$i",
-				-display_name => $transcript->display_name . ".intron$i",
+				-primary_id   => sprintf("%s.intron%d", $transcript->id, $i+1),
+				-display_name => sprintf("%s.intron%d", $transcript->display_name, $i+1),
 			);
 			push @introns, $i;
 		}
@@ -259,6 +280,7 @@ sub get_introns {
 	else {
 		# each intron is created based on the previous exon
 		# ordering from 5' to 3' end direction for convenience in naming
+		# this actually works out to be 1-base naming
 		for ( my $i = $last_i; $i > 0; $i-- ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
@@ -268,8 +290,8 @@ sub get_introns {
 				-strand      => $transcript->strand,
 				-primary_tag => 'intron',
 				-source_tag  => $transcript->source_tag,
-				-primary_id  => $transcript->display_name . ".intron$i",
-				-display_name => $transcript->display_name . ".intron$i",
+				-primary_id  => sprintf("%s.intron%d", $transcript->id, $i),
+				-display_name => sprintf("%s.intron%d", $transcript->display_name, $i),
 			);
 			push @introns, $i;
 		}
