@@ -266,8 +266,8 @@ if ( $datasets[0] eq 'none' ) {
 }
 
 # check whether it is worth doing parallel execution
-if ( $cpu > 1 ) {
-	while ( $cpu > 1 and $Data->last_row / $cpu < 100 ) {
+if ( $cpu > 1 and ( $Data->number_rows / $cpu ) < 100 ) {
+	while ( $cpu > 1 and ( $Data->number_rows / $cpu ) < 100 ) {
 
 		# We need at least 100 lines in each fork split to make
 		# it worthwhile to do the split, otherwise, reduce the number of
