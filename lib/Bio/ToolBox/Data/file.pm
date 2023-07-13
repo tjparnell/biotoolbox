@@ -1305,39 +1305,52 @@ sub add_bed_metadata {
 	my ( $self, $column_count, $force ) = @_;
 	$force ||= 0;
 
-	# check bed type and set metadata appropriately
-	my $column_names;
+	# check bed type and collect column names
+	my $names;
 	if ( $self->format =~ /bedgraph/i or $self->extension =~ m/(?: bg | bdg | graph )/xi )
 	{
+		$self->{'bed'} = $column_count;
 		$self->format('bedGraph');
-		$column_names = $self->standard_column_names('bdg');
+		$names = $self->standard_column_names('bedGraph');
+	}
+	elsif ( $self->format =~ /bedpe/i or $self->extension =~ m/bedpe/i ) {
+		$self->{'bed'} = 0;     # this will bypass verification checks which would fail
+		$self->format('bedpe');
+		$names = $self->standard_column_names('bedpe');
 	}
 	else {
-		$self->format( sprintf "bed%d", $column_count );
-		my $names = $self->standard_column_names('bed12');
-		if ( $column_count < scalar @{$names} ) {
+		$self->{'bed'} = $column_count;
+		$self->format( sprintf( "bed%d", $column_count ) );
+		$names = $self->standard_column_names('bed12');
+	}
+		
+	# set the column names
+	my $column_names;
+	if ( $column_count == scalar @{$names} ) {
+		$column_names = $names;
+	}
+	elsif ( $column_count < scalar @{$names} ) {
 
-			# subset names as appropriate
-			my $n            = $column_count - 1;
-			my @wanted_names = @{$names}[ 0 .. $n ];
-			$column_names = \@wanted_names;
-		}
-		elsif ( $column_count > scalar @{$names} ) {
+		# subset names as appropriate
+		my $n            = $column_count - 1;
+		my @wanted_names = @{$names}[ 0 .. $n ];
+		$column_names = \@wanted_names;
+	}
+	elsif ( $column_count > scalar @{$names} ) {
 
-			# add additional names as appropriate
-			my $n = scalar( @{$column_names} ) + 1;
-			for my $i ( $n .. $column_count ) {
-				push @{$column_names}, sprintf "Column_$i";
-			}
+		# add additional names as appropriate
+		$column_names = $names;
+		my $n = scalar( @{$column_names} ) + 1;
+		for my $i ( $n .. $column_count ) {
+			push @{$column_names}, sprintf "Column_$i";
 		}
-		else {
-			$column_names = $names;
-		}
+	}
+	else {
+		confess "programming error!";
 	}
 	$self->add_standard_metadata( $force, $column_names );
 
 	# add additional metadata
-	$self->{'bed'}       = $column_count;
 	$self->{'zerostart'} = 1;
 	unless ( $self->{1}{'name'} =~ /^#/ ) {
 		$self->{'headers'} = 0;
@@ -1569,6 +1582,9 @@ sub standard_column_names {
 		'ucsc10' => [    # genepred
 			qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount
 				exonStarts exonEnds)
+		],
+		'bedpe'  => [    # Bedtools BEDPE format
+			qw(chrom1 start1 end1 chrom2 start2 end2 name score strand1 strand2)
 		],
 	);
 	$column_names{'genepredext'} = $column_names{'ucsc15'};
