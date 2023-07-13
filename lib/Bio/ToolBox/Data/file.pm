@@ -398,9 +398,10 @@ sub parse_headers {
 				$self->add_standard_metadata( 0, \@header_names );    # do not force
 			}
 
-			# we will continue here in case the commented header line was part of a
-			# formatted file type, which will be checked by extension or possibly
-			# the format (if determined) below
+			# we will next check for specific standard file types as determined by
+			# the format (if known) or the file extension
+			# and assign column names and metadata as appropriate
+			# this may be in addition to commented headers cus you never know
 			my $format = $self->format || $self->extension;
 
 			### a GFF file
@@ -432,7 +433,7 @@ sub parse_headers {
 			}
 
 			### standard text file with headers, i.e. everything else
-			unless ( $self->number_columns ) {
+			else {
 
 				# we have not yet parsed the row of data column names
 				# we will do so now
@@ -1241,9 +1242,8 @@ sub add_column_metadata {
 # however, the columns are the same in all versions
 # more info on gff can be found http://gmod.org/wiki/GFF3
 sub add_gff_metadata {
-	my $self    = shift;
-	my $version = shift || undef;
-	my $force   = shift || 0;
+	my ( $self, $version, $force ) = @_;
+	$force ||= 0;
 
 	# set the gff version based on the extension if it isn't already
 	# normally gff version should already be defined from pragma when parsing headers
@@ -1302,8 +1302,8 @@ sub add_gff_metadata {
 # these only have four columns, no more, no less
 # the fourth column is score, not name
 sub add_bed_metadata {
-	my ( $self, $column_count ) = @_;
-	my $force = shift || 0;
+	my ( $self, $column_count, $force ) = @_;
+	$force ||= 0;
 
 	# check bed type and set metadata appropriately
 	my $column_names;
@@ -1353,8 +1353,8 @@ sub add_bed_metadata {
 # three different types of peak files are available
 # see http://genome.ucsc.edu/FAQ/FAQformat.html
 sub add_peak_metadata {
-	my ( $self, $column_count ) = @_;
-	my $force = shift || 0;
+	my ( $self, $column_count, $force ) = @_;
+	$force ||= 0;
 
 	# check bed type and set metadata appropriately
 	# most of these are bed6 plus extra columns
@@ -1406,8 +1406,8 @@ sub add_peak_metadata {
 # see http://genome.ucsc.edu/FAQ/FAQformat.html#format9 for details
 # also biotoolbox script ucsc_table2gff3.pl
 sub add_ucsc_metadata {
-	my ( $self, $column_count ) = @_;
-	my $force = shift || 0;
+	my ( $self, $column_count, $force ) = @_;
+	$force ||= 0;
 
 	# set format and determine column names;
 	my $column_names;
@@ -1488,10 +1488,21 @@ sub add_standard_metadata {
 
 			# set the name to match the actual column name
 			if ( $namelist->[$i] ne $self->{$j}->{'name'} ) {
-				unless ($force) {
-					print " WARNING: metadata and header names for column $j do not match!\n";
+				if ($force) {
+					$self->{$j}->{'name'} = $namelist->[$i];
+					$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
 				}
-				$self->{$j}->{'name'} = $namelist->[$i];
+				else {
+					unless ( $self->{'data_table'}->[0]->[1] =~ /^#/) {
+
+						# this sometimes get triggered when commented header lines
+						# are in the file and they may not match expectations for
+						# predefined file formats, like bed files
+						# only print a warning when neither force nor commented header
+						print 
+" WARNING: metadata and header names for column $j do not match!\n";
+					}
+				}
 			}
 		}
 		else {
@@ -1500,11 +1511,7 @@ sub add_standard_metadata {
 				'index' => $j,
 				'AUTO'  => 3,
 			};
-		}
-
-		# assign table name
-		if ( $force or not defined $self->{'data_table'}->[0]->[$j] ) {
-			$self->{'data_table'}->[0]->[$j] = $self->{$j}{'name'};
+			$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
 		}
 	}
 
