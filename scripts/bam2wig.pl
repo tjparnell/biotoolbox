@@ -546,8 +546,10 @@ sub check_defaults {
 
 	# check mapping quality
 	if ( defined $min_mapq ) {
-		print STDERR " FATAL: quality score must be 0-255!\n" if $min_mapq > 255;
-		exit 1;
+		if ($min_mapq > 255 or $min_mapq < 0) {
+			print STDERR " FATAL: quality score must be 0-255!\n" ;
+			exit 1;
+		}
 	}
 	else {
 		$min_mapq = 0;
