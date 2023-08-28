@@ -283,6 +283,7 @@ sub parse_table {
 
 		# we already have a table, presumably representing the features
 		my $count = 0;
+		my @missing;
 		$self->iterate(
 			sub {
 				my $row = shift;
@@ -291,14 +292,29 @@ sub parse_table {
 					$self->store_seqfeature( $row->row_index, $f );
 					$count++;
 				}
+				else {
+					push @missing, $row->id;
+				}
 			}
 		);
-		unless ( $count == $self->last_row ) {
+		if ( $count != $self->number_rows ) {
+			my $n = $self->number_rows;
+			my $d = $n - $count;
+			my $list;
+			if (scalar @missing <= 10) {
+				$list = join ', ', @missing;
+			}
+			else {
+				$list = sprintf "%s...", join ', ', ($missing[ 0..9 ] );
+			}
 			croak <<PARSEFAIL;
-Not all features in the input file could be matched to a corresponding SeqFeature 
-object in the annotation file $file.
-Double check your input and annotation files. You can create a new table by just 
-providing your annotation file.
+
+ There were $d features out of $n that failed to match to a corresponding SeqFeature
+ in the annotation file '$file'. 
+ Missing IDs include: $list.
+ This may happen when the annotation file has changed or is not being parsed in the 
+ same manner. Suggestions include using the original annotation file or generating
+ a new table.
 PARSEFAIL
 		}
 	}
