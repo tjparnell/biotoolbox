@@ -27,7 +27,7 @@ unless (@ARGV) {
 }
 
 ### Get command line options and initialize values
-my ( $infile, $index, $tag, $max, $gz, $prefix, $help, $print_version, );
+my ( $infile, $index, $tag, $max, $gz, $prefix, $noheader, $help, $print_version, );
 
 # Command line options
 GetOptions(
@@ -36,6 +36,7 @@ GetOptions(
 	't|tag=s'       => \$tag,              # attribute tag name
 	'm|max=i'       => \$max,              # maximum number of lines per file
 	'p|prefix=s'    => \$prefix,           # output file prefix
+	'H|noheader'    => \$noheader,         # file has no headers
 	'z|gz!'         => \$gz,               # compress output files
 	'h|help'        => \$help,             # request help
 	'v|version'     => \$print_version,    # print the version
@@ -84,9 +85,10 @@ unless ( defined $gz ) {
 		$gz = 0;
 	}
 }
+$noheader = defined $noheader ? $noheader : 0;
 
 ### Load Input file
-my $Input = Bio::ToolBox::Data::Stream->new( in => $infile )
+my $Input = Bio::ToolBox::Data::Stream->new( in => $infile, noheader => $noheader )
 	or die "Unable to open input file!\n";
 
 # Identify the column
@@ -248,6 +250,7 @@ split_data_file.pl [--options] <filename>
   File options:
   -i --in <filename>                (txt bed gff gtf vcf refFlat ucsc etc)
   -p --prefix <text>                output file prefix (input basename)
+  -H --noheader                     input file has no headers
   
   Splitting options:
   -x --index <column_index>         column with values to split upon
@@ -277,6 +280,12 @@ The file may be compressed with gzip.
 Optionally provide a filename prefix for the output files. The default 
 prefix is the input filename base name. If no prefix is desired, using 
 just the values as filenames, then set the prefix to 'none'.
+
+=item --noheader
+
+Indicate that the input file has no column header line, and that dummy 
+headers will be provided. Not necessary for BED, GFF, or recognized UCSC 
+file formats.
 
 =back
 
