@@ -101,7 +101,7 @@ if ($use_type) {
 " FATAL: unable to identify a name or ID column. Database lookup unlikely to work\n";
 		exit 1;
 	}
-	unless ( defined $type_i or $use_type ) {
+	unless ( defined $type_i or $use_type or $Data->feature ) {
 		print
 " WARNING: No type column present or type specified. Database lookup may have problems\n";
 	}
