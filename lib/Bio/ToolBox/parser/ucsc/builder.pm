@@ -930,7 +930,7 @@ UTR_LOOP:
 			my $utr2;
 
 			# look for existing utr
-			if ( $ucsc->share ) {
+			if ( $ucsc->share and $gene ) {
 				$utr2 = $self->find_existing_subfeature( $gene, $tag2, $start2, $stop2 );
 			}
 
@@ -1195,6 +1195,7 @@ sub add_codons {
 
 sub find_existing_subfeature {
 	my ( $self, $gene, $type, $start, $stop ) = @_;
+	return unless $gene;
 
 	# we will try to find a pre-existing subfeature at identical coordinates
 	foreach my $transcript ( $gene->get_SeqFeatures() ) {
