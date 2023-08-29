@@ -1499,21 +1499,22 @@ sub add_standard_metadata {
 		# add file metadata for this column
 		if ( exists $self->{$j} ) {
 
-			# set the name to match the actual column name
-			if ( $namelist->[$i] ne $self->{$j}->{'name'} ) {
+			if ( $self->{$j}->{'name'} eq $namelist->[$i] ) {
+				# names match, assign table
+				$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
+			}
+			else {
+				# names do not match, there will be errors!
 				if ($force) {
 					$self->{$j}->{'name'} = $namelist->[$i];
 					$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
 				}
 				else {
-					unless ( $self->{'data_table'}->[0]->[1] =~ /^#/) {
-
-						# this sometimes get triggered when commented header lines
-						# are in the file and they may not match expectations for
-						# predefined file formats, like bed files
-						# only print a warning when neither force nor commented header
-						print 
-" WARNING: metadata and header names for column $j do not match!\n";
+					print 
+					" WARNING: metadata and header names for column $j do not match!\n";
+					# go ahead and use the provided name if one is not set
+					unless ( defined $self->{'data_table'}->[0]->[$j] ) {
+						$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
 					}
 				}
 			}
