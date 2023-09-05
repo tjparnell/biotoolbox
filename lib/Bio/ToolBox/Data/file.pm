@@ -385,46 +385,84 @@ sub parse_headers {
 			# specific file formats have implicit predefined column formats
 			# these file formats do NOT have column headers
 			# we will first check for those file formats and process accordingly
-
-			### Data tables with a commented header line
-			if ( $self->_commented_header_line($line) ) {
-
-				# these will have one comment line marked with #
-				# that really contains the column headers
-
-				# process the real header line
-				my @header_names = split /\t/, pop @{ $self->{'comments'} };
-				chomp $header_names[-1];
-				$self->add_standard_metadata( 0, \@header_names );    # do not force
-			}
-
-			# we will next check for specific standard file types as determined by
-			# the format (if known) or the file extension
-			# and assign column names and metadata as appropriate
-			# this may be in addition to commented headers cus you never know
 			my $format = $self->format || $self->extension;
+			my $count = scalar( split /\t/, $line );
 
 			### a GFF file
 			if ( $format =~ m/g[tvf]f/i ) {
-				$self->add_gff_metadata;
+				if ($count == 9) {
+					$self->add_gff_metadata();
+				}
+				else {
+					print "WARNING: Incorrect column count for GFF format\n";
+				}
 			}
 
 			### a peak file
 			elsif ( $format =~ m/peak/i ) {
-				my $count = scalar( split /\t/, $line );
-				$self->add_peak_metadata($count);
+				my $success = $self->add_peak_metadata($count);
+				unless ($success) {
+					# failed to add peak metadata because of incorrect column count
+					# check for a commented header line
+					if ( $self->_commented_header_line($line) ) {
+						my @header_names = split /\t/, pop @{ $self->{'comments'} };
+						chomp $header_names[-1];
+						$self->add_standard_metadata( \@header_names );
+						# assume interbase and region
+						$self->interbase(1);
+						unless ( defined $self->{'feature'} ) {
+							$self->{'feature'} = 'region';
+						}
+					}
+					else {
+						print
+" WARNING: Incorrect column count for a known Encode Peak format\n";
+						# first line will be column headers as below
+					}
+				}
 			}
 
-			### a Bed or BedGraph file
-			elsif ( $format =~ m/bg|bdg|bed/i ) {
-				my $count = scalar( split /\t/, $line );
+			### a BedGraph file
+			elsif ( $format =~ m/bg | bdg | bedgraph/xi and $count == 4 ) {
 				$self->add_bed_metadata($count);
+			}
+
+			### a Bed file
+			elsif ( $format =~ m/bed/i ) {
+				# check for a commented header line
+				if ( $self->_commented_header_line($line) ) {
+					my @header_names = split /\t/, pop @{ $self->{'comments'} };
+					chomp $header_names[-1];
+					$self->add_standard_metadata( \@header_names );
+					# we will not enforce bed structure by setting the bed flag
+					# but will assume 0-based formatting
+					$self->interbase(1);
+					unless ( defined $self->{'feature'} ) {
+						$self->{'feature'} = 'region';
+					}
+				}
+				else {
+					$self->add_bed_metadata($count);
+				}
 			}
 
 			### a UCSC gene table
 			elsif ( $format =~ m/(?: ref+lat | genepred | ucsc )/xi ) {
-				my $count = scalar( split /\t/, $line );
-				$self->add_ucsc_metadata($count);
+				my $s = $self->add_ucsc_metadata($count);
+				unless ($s) {
+					# failed to add ucsc metadata because of incorrect column count
+					# check for a commented header line
+					if ( $self->_commented_header_line($line) ) {
+						my @header_names = split /\t/, pop @{ $self->{'comments'} };
+						chomp $header_names[-1];
+						$self->add_standard_metadata( \@header_names );
+					}
+					else {
+						print
+" WARNING: Incorrect column count for a standard UCSC table format\n";
+						# first line will be column headers as below
+					}
+				}
 			}
 
 			### a SGR file
@@ -433,16 +471,24 @@ sub parse_headers {
 			}
 
 			### standard text file with headers, i.e. everything else
-			else {
+			unless ($self->number_columns) {
 
-				# we have not yet parsed the row of data column names
-				# we will do so now
-				chomp $line;
-				my @header_names = split /\t/, $line;
-				$self->add_standard_metadata( 0, \@header_names );    # do not force
+				# check for a commented header line
+				if ( $self->_commented_header_line($line) ) {
+					my @header_names = split /\t/, pop @{ $self->{'comments'} };
+					chomp $header_names[-1];
+					$self->add_standard_metadata( \@header_names );
+				}
+				else {
+					# we have not yet parsed the row of data column names
+					# we will do so now
+					chomp $line;
+					my @header_names = split /\t/, $line;
+					$self->add_standard_metadata( \@header_names, 0 );    # do not force
 
-				# count as a header line
-				$header_line_count++;
+					# count as a header line
+					$header_line_count++;
+				}
 			}
 		}
 
@@ -453,18 +499,6 @@ sub parse_headers {
 		else {
 			undef $line;
 		}
-	}
-
-	# if we didn't find columns, check that it wasn't actually commented
-	# for example, an empty vcf file
-	if (    $self->number_columns == 0
-		and scalar( @{ $self->{comments} } )
-		and $self->{comments}->[-1] =~ /\t/ )
-	{
-		# process the real header line
-		my @header_names = split /\t/, pop @{ $self->{'comments'} };
-		chomp $header_names[-1];
-		$self->add_standard_metadata( 0, \@header_names );
 	}
 
 	# No header was requested
@@ -1277,7 +1311,7 @@ sub add_gff_metadata {
 	}
 
 	# set the metadata
-	$self->add_standard_metadata( $force, $self->standard_column_names('gff') );
+	$self->add_standard_metadata( $self->standard_column_names('gff'), $force );
 	$self->{'zerostart'} = 0;
 	unless ( $self->{1}{'name'} =~ /^#/ ) {
 		$self->{'headers'} = 0;
@@ -1348,7 +1382,7 @@ sub add_bed_metadata {
 	else {
 		confess "programming error!";
 	}
-	$self->add_standard_metadata( $force, $column_names );
+	$self->add_standard_metadata( $column_names, $force );
 
 	# add additional metadata
 	$self->{'zerostart'} = 1;
@@ -1387,17 +1421,9 @@ sub add_peak_metadata {
 		$column_names = $self->standard_column_names('gappedpeak');
 	}
 	else {
-		# how did we get here???? Hope for the best.....
-		$self->bed($column_count);
-		$column_names = $self->standard_column_names('bed12');
-		if ( $column_count > scalar @{$column_names} ) {
-			my $n = scalar( @{$column_names} ) + 1;
-			for my $i ( $n .. $column_count ) {
-				push @{$column_names}, sprintf "Column_$i";
-			}
-		}
+		return 0;
 	}
-	$self->add_standard_metadata( $force, $column_names );
+	$self->add_standard_metadata( $column_names, $force );
 
 	# add additional metadata
 	$self->{'bed'}       = $column_count;
@@ -1444,7 +1470,10 @@ sub add_ucsc_metadata {
 		$self->format('genePred');
 		$column_names = $self->standard_column_names('ucsc10');
 	}
-	$self->add_standard_metadata( $force, $column_names );
+	else {
+		return 0;
+	}
+	$self->add_standard_metadata( $column_names, $force );
 
 	# set additional metadata
 	$self->{'ucsc'}      = $column_count;
@@ -1468,7 +1497,7 @@ sub add_sgr_metadata {
 	my $force = shift || 0;
 
 	# set column metadata
-	$self->add_standard_metadata( $force, $self->standard_column_names('sgr') );
+	$self->add_standard_metadata( $self->standard_column_names('sgr'), $force );
 
 	# set additional metadata
 	$self->format('sgr');
@@ -1484,11 +1513,12 @@ sub add_sgr_metadata {
 
 ### Internal subroutine to generate metadata for standard files
 sub add_standard_metadata {
-	my ( $self, $force, $namelist ) = @_;
+	my ( $self, $namelist, $force ) = @_;
 
 	# add first data table row of names
 	# the first column will always be blank to fake base 1 column indexing
-	$self->{'data_table'}->[0] ||= ['BLANK'];
+	$self->{'data_table'}->[0] ||= [];
+	$self->{'data_table'}->[0]->[0] = 'BLANK';
 
 	# we will define the columns based on
 	for my $i ( 0 .. $#{$namelist} ) {
