@@ -38,6 +38,7 @@ my %DB_METHODS;              # cache for database score methods
 my %SCORE_CALCULATOR_SUB = (
 	'mean' => sub {
 		my $s = shift;
+		return '.' unless scalar( @{$s} );
 		return sum0( @{$s} ) / ( scalar( @{$s} ) || 1 );
 	},
 	'sum' => sub {
