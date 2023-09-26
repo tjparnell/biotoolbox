@@ -231,7 +231,7 @@ if ($sum) {
 	print " Generating summary file....\n";
 	my $sumfile = $Data->summary_file(
 		'filename' => $outfile,
-		'dataset'  => @datasets,
+		'dataset'  => \@datasets,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
