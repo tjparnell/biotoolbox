@@ -7,6 +7,7 @@ use strict;
 use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
+use Scalar::Util qw(looks_like_number);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -660,8 +661,9 @@ sub get_dataset {
 				'extend'     => $extend,
 				'subfeature' => $subfeature,
 			);
-			$score = sprintf( $formatter, $score )
-				if ( $formatter and $score ne '.' );
+			if ( $formatter and looks_like_number($score) ) {
+				$score = sprintf( $formatter, $score ) ;
+			}
 			$row->value( $index, $score );
 		}
 	);
@@ -753,8 +755,9 @@ sub get_adjusted_dataset {
 				'method'   => $method,
 				'stranded' => $stranded,
 			);
-			$score = sprintf( $formatter, $score )
-				if ( $formatter and $score ne '.' );
+			if ( $formatter and looks_like_number($score) ) {
+				$score = sprintf( $formatter, $score ) ;
+			}
 			$row->value( $index, $score );
 		}
 	);
@@ -826,8 +829,9 @@ sub get_fractionated_dataset {
 				'method'   => $method,
 				'stranded' => $stranded,
 			);
-			$score = sprintf( $formatter, $score )
-				if ( $formatter and $score ne '.' );
+			if ( $formatter and looks_like_number($score) ) {
+				$score = sprintf( $formatter, $score ) ;
+			}
 			$row->value( $index, $score );
 		}
 	);

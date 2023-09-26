@@ -4,9 +4,10 @@
 
 use warnings;
 use strict;
-use Pod::Usage;
 use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
+use Pod::Usage;
+use Scalar::Util qw(looks_like_number);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -683,7 +684,9 @@ sub collect_binned_long_data {
 				'method'   => $method,
 				'stranded' => $stranded,
 			);
-			$score = sprintf( $formatter, $score ) if ( $formatter and $score ne '.' );
+			if ( $formatter and looks_like_number($score) ) {
+				$score = sprintf( $formatter, $score ) ;
+			}
 			$row->value( $column, $score );
 		}
 	}
@@ -751,8 +754,9 @@ sub record_the_bin_values {
 
 		# calculate the value
 		my $window_score = calculate_score( $method, \@scores );
-		$window_score = sprintf( $formatter, $window_score )
-			if ( $formatter and $window_score ne '.' );
+		if ( $formatter and looks_like_number($window_score) ) {
+			$window_score = sprintf( $formatter, $window_score ) ;
+		}
 
 		# record the value
 		$row->value( $column, $window_score );
@@ -800,8 +804,9 @@ sub go_interpolate_values {
 				# apply fractional values
 				for ( my $n = $col; $n < $next_i; $n++ ) {
 					my $score = $initial + ( $fraction * ( $n - $col + 1 ) );
-					$score = sprintf( $formatter, $score )
-						if ( $formatter and $score ne '.' );
+					if ( $formatter and looks_like_number($score) ) {
+						$score = sprintf( $formatter, $score ) ;
+					}
 					$row->value( $n, $score );
 				}
 

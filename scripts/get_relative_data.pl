@@ -7,6 +7,7 @@ use strict;
 use English qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
+use Scalar::Util qw(looks_like_number);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -690,7 +691,9 @@ sub map_relative_data {
 
 			# put the value into the data table
 			my $score = calculate_score( $method, \@scores );
-			$score = sprintf( $formatter, $score ) if ( $formatter and $score ne '.' );
+			if ( $formatter and looks_like_number($score) ) {
+				$score = sprintf( $formatter, $score ) ;
+			}
 			$row->value( $column, $score );
 		}
 	}
@@ -726,7 +729,9 @@ sub map_relative_long_data {
 				'method'   => $method,
 				'stranded' => $strand_sense,
 			);
-			$score = sprintf( $formatter, $score ) if ( $formatter and $score ne '.' );
+			if ( $formatter and looks_like_number($score) ) {
+				$score = sprintf( $formatter, $score ) ;
+			}
 			$row->value( $column, $score );
 		}
 	}
