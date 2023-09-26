@@ -305,7 +305,7 @@ sub parse_table {
 				$list = join ', ', @missing;
 			}
 			else {
-				$list = sprintf "%s...", join ', ', (@missing[ 0..9 ] );
+				$list = sprintf "%s...", join ', ', (map { $_ || q() } @missing[ 0..9 ] );
 			}
 			croak <<PARSEFAIL;
 
