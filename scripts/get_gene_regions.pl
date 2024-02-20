@@ -35,31 +35,35 @@ unless (@ARGV) {
 }
 
 ### Get command line options and initialize values
-my ( $infile, $outfile, $database, $request, $transcript_type, $tsl, $gencode, $tbiotype,
-	$start_adj, $stop_adj, $unique, $slop, $chromosome_exclude, $bed, $gz, $help, 
-	$print_version, );
+my (
+	$infile,             $outfile,  $database, $request,
+	$transcript_type,    $tsl,      $gencode,  $tbiotype,
+	$start_adj,          $stop_adj, $unique,   $slop,
+	$chromosome_exclude, $bed,      $gz,       $help,
+	$print_version,
+);
 my @feature_types;
 
 # Command line options
 GetOptions(
-	'i|in=s'          => \$infile,             # the input data file
-	'o|out=s'         => \$outfile,            # name of output file
-	'd|db=s'          => \$database,           # source annotation database
-	'f|feature=s'     => \@feature_types,      # the features requested from database
-	'r|region=s'      => \$request,            # the region requested
-	't|transcript=s'  => \$transcript_type,    # which transcripts to take
-	'tsl=s'           => \$tsl,                # filter on transcript support level
-	'gencode!'        => \$gencode,            # filter on gencode basic tag
-	'biotype=s'       => \$tbiotype,           # filter on transcript biotype
-	'b|begin|start=i' => \$start_adj,          # start coordinate adjustment
-	'e|end|stop=i'    => \$stop_adj,           # stop coordinate adjustment
-	'u|unique!'       => \$unique,             # boolean to ensure uniqueness
-	'l|slop=i'        => \$slop,               # slop factor in bp to identify uniqueness
-	'K|chrskip=s'     => \$chromosome_exclude, # skip chromosomes
-	'bed!'            => \$bed,                # convert the output to bed format
-	'z|gz!'           => \$gz,                 # compress output
-	'h|help'          => \$help,               # request help
-	'v|version'       => \$print_version,      # print the version
+	'i|in=s'          => \$infile,              # the input data file
+	'o|out=s'         => \$outfile,             # name of output file
+	'd|db=s'          => \$database,            # source annotation database
+	'f|feature=s'     => \@feature_types,       # the features requested from database
+	'r|region=s'      => \$request,             # the region requested
+	't|transcript=s'  => \$transcript_type,     # which transcripts to take
+	'tsl=s'           => \$tsl,                 # filter on transcript support level
+	'gencode!'        => \$gencode,             # filter on gencode basic tag
+	'biotype=s'       => \$tbiotype,            # filter on transcript biotype
+	'b|begin|start=i' => \$start_adj,           # start coordinate adjustment
+	'e|end|stop=i'    => \$stop_adj,            # stop coordinate adjustment
+	'u|unique!'       => \$unique,              # boolean to ensure uniqueness
+	'l|slop=i'        => \$slop,                # slop factor in bp to identify uniqueness
+	'K|chrskip=s'     => \$chromosome_exclude,  # skip chromosomes
+	'bed!'            => \$bed,                 # convert the output to bed format
+	'z|gz!'           => \$gz,                  # compress output
+	'h|help'          => \$help,                # request help
+	'v|version'       => \$print_version,       # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -104,7 +108,7 @@ if (    $database
 
 unless ( defined $outfile ) {
 	print STDERR
-" FATAL: must define an output file name! use --help for more information\n";
+		" FATAL: must define an output file name! use --help for more information\n";
 	exit 1;
 }
 
@@ -189,7 +193,7 @@ sub determine_method {
 		$request = collect_method_from_user();
 	}
 	$request = lc $request;
-	
+
 	# determine the method
 	# also change the name of the request from short to long form
 	if ( $request eq 'tss' ) {
@@ -540,7 +544,7 @@ sub collect_from_file {
 	else {
 		$Parser->simplify(1);
 	}
-	
+
 	# process the features
 	my @bad_features;
 	while ( my $seqfeat = $Parser->next_top_feature ) {
@@ -555,7 +559,7 @@ sub collect_from_file {
 		if ( $type =~ /gene$/i ) {
 
 			# gene, including things like gene, miRNA_gene, pseudogene, etc
-			my @regions = process_gene( $seqfeat );
+			my @regions = process_gene($seqfeat);
 			foreach (@regions) {
 				$Data->add_row($_);
 			}
@@ -563,7 +567,7 @@ sub collect_from_file {
 		elsif ( $type =~ /rna | transcript/xi ) {
 
 			# any sort of RNA transcript
-			my @regions = process_transcript( $seqfeat );
+			my @regions = process_transcript($seqfeat);
 
 			# remove duplicates if requested
 			if ($unique) {
@@ -597,22 +601,25 @@ sub collect_from_file {
 sub generate_output_structure {
 	my $Data = Bio::ToolBox::Data->new(
 		feature => "region",
-		columns => [qw(Gene Transcript Name Chromosome Start Stop Strand)],
+		columns => [
+			qw(GeneID GeneName TranscriptID TranscriptName Name Chromosome Start
+				Stop Strand)
+		],
 	);
 	$Data->program("$PROGRAM_NAME, v $VERSION");
 	my $r = $request;
 	$r =~ s/\s/_/g;    # remove spaces
-	$Data->metadata( 1, 'type', $transcript_type );
-	$Data->metadata( 2, 'type', $r );
+	$Data->metadata( 3, 'type', $transcript_type );
+	$Data->metadata( 5, 'type', $r );
 	if ($start_adj) {
-		$Data->metadata( 4, 'start_adjusted', $start_adj );
+		$Data->metadata( 7, 'start_adjusted', $start_adj );
 	}
 	if ($stop_adj) {
-		$Data->metadata( 5, 'stop_adjusted', $stop_adj );
+		$Data->metadata( 8, 'stop_adjusted', $stop_adj );
 	}
 	if ($unique) {
-		$Data->metadata( 2, 'unique', 1 );
-		$Data->metadata( 2, 'slop',   $slop );
+		$Data->metadata( 5, 'unique', 1 );
+		$Data->metadata( 5, 'slop',   $slop );
 	}
 
 	return $Data;
@@ -667,9 +674,9 @@ sub process_gene {
 	}
 	return unless @regions;
 
-	# add gene name
+	# finally add gene name
 	foreach my $region (@regions) {
-		unshift @{$region}, $gene->display_name;
+		unshift @{$region}, $gene->primary_id, $gene->display_name;
 	}
 
 	# remove duplicates if requested
@@ -710,9 +717,9 @@ sub process_transcript {
 	# call appropriate method
 	my @regions = &{$method}($transcript);
 
-	# add non-existent gene name
+	# add non-existent gene id and name
 	foreach my $region (@regions) {
-		unshift @{$region}, '.';
+		unshift @{$region}, '.', '.';
 	}
 	return @regions;
 }
@@ -749,7 +756,11 @@ sub collect_tss {
 	my $name = $transcript->display_name . '_TSS';
 
 	return _adjust_positions(
-		[ $transcript->display_name, $name, $chromo, $start, $stop, $strand ] );
+		[
+			$transcript->primary_id, $transcript->display_name, $name, $chromo,
+			$start, $stop, $strand
+		]
+	);
 }
 
 sub collect_tts {
@@ -784,7 +795,11 @@ sub collect_tts {
 	my $name = $transcript->display_name . '_TTS';
 
 	return _adjust_positions(
-		[ $transcript->display_name, $name, $chromo, $start, $stop, $strand ] );
+		[
+			$transcript->primary_id, $transcript->display_name, $name, $chromo,
+			$start, $stop, $strand
+		]
+	);
 }
 
 sub collect_exons {
@@ -796,9 +811,10 @@ sub collect_exons {
 		push @exons,
 			_adjust_positions(
 				[
-					$transcript->display_name, $e->display_name,
-					$e->seq_id,                $e->start,
-					$e->end,                   $e->strand,
+					$transcript->primary_id, $transcript->display_name,
+					$e->display_name,        $e->seq_id,
+					$e->start,               $e->end,
+					$e->strand
 				]
 			);
 	}
@@ -828,8 +844,10 @@ sub collect_first_exon {
 	# finished
 	return _adjust_positions(
 		[
-			$transcript->display_name, $name,       $first->seq_id,
-			$first->start,             $first->end, $first->strand,
+			$transcript->primary_id, $transcript->display_name,
+			$name,                   $first->seq_id,
+			$first->start,           $first->end,
+			$first->strand
 		]
 	);
 }
@@ -851,8 +869,10 @@ sub collect_last_exon {
 	# finished
 	return _adjust_positions(
 		[
-			$transcript->display_name, $name,      $last->seq_id,
-			$last->start,              $last->end, $last->strand,
+			$transcript->primary_id, $transcript->display_name,
+			$name,                   $last->seq_id,
+			$last->start,            $last->end,
+			$last->strand
 		]
 	);
 }
@@ -869,8 +889,9 @@ sub collect_alt_exons {
 			push @exons,
 				_adjust_positions(
 					[
-						$transcript, $e->display_name, $e->seq_id,
-						$e->start,   $e->end,          $e->strand,
+						$transcript->primary_id, $transcript, $e->display_name,
+						$e->seq_id,              $e->start,   $e->end,
+						$e->strand
 					]
 				);
 		}
@@ -884,6 +905,7 @@ sub collect_uncommon_exons {
 		push @exons, _adjust_positions(
 			[
 				'uncommon',    # more than one transcript, so put generic identifier
+				'uncommon',
 				$e->display_name,
 				$e->seq_id,
 				$e->start,
@@ -901,6 +923,7 @@ sub collect_common_exons {
 		push @exons, _adjust_positions(
 			[
 				'common',    # more than one transcript, so put generic identifier
+				'common',
 				$e->display_name,
 				$e->seq_id,
 				$e->start,
@@ -944,9 +967,9 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_3\'',
-							$exon->seq_id,             $exon->end + 1,
-							$exon->end + 1,            $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_3p',           $exon->seq_id,
+							$exon->end + 1,          $exon->end + 1
 						]
 					);
 			}
@@ -956,9 +979,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_5\'',
-							$exon->seq_id,             $exon->start - 1,
-							$exon->start - 1,          $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_5p',           $exon->seq_id,
+							$exon->start - 1,        $exon->start - 1,
+							$exon->strand
 						]
 					);
 
@@ -971,9 +995,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_5\'',
-							$exon->seq_id,             $exon->start - 1,
-							$exon->start - 1,          $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_5p',           $exon->seq_id,
+							$exon->start - 1,        $exon->start - 1,
+							$exon->strand
 						]
 					);
 
@@ -981,9 +1006,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_3\'',
-							$exon->seq_id,             $exon->end + 1,
-							$exon->end + 1,            $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_3p',           $exon->seq_id,
+							$exon->end + 1,          $exon->end + 1,
+							$exon->strand
 						]
 					);
 			}
@@ -1006,9 +1032,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_3\'',
-							$exon->seq_id,             $exon->start - 1,
-							$exon->start - 1,          $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_3p',           $exon->seq_id,
+							$exon->start - 1,        $exon->start - 1,
+							$exon->strand
 						]
 					);
 			}
@@ -1018,9 +1045,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_5\'',
-							$exon->seq_id,             $exon->end + 1,
-							$exon->end + 1,            $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_5p',           $exon->seq_id,
+							$exon->end + 1,          $exon->end + 1,
+							$exon->strand
 						]
 					);
 
@@ -1033,9 +1061,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_5\'',
-							$exon->seq_id,             $exon->end + 1,
-							$exon->end + 1,            $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_5p',           $exon->seq_id,
+							$exon->end + 1,          $exon->end + 1,
+							$exon->strand
 						]
 					);
 
@@ -1043,9 +1072,10 @@ sub collect_splice_sites {
 				push @splices,
 					_adjust_positions(
 						[
-							$transcript->display_name, $name . '_3\'',
-							$exon->seq_id,             $exon->start - 1,
-							$exon->start - 1,          $exon->strand,
+							$transcript->primary_id, $transcript->display_name,
+							$name . '_3p',           $exon->seq_id,
+							$exon->start - 1,        $exon->start - 1,
+							$exon->strand
 						]
 					);
 			}
@@ -1065,9 +1095,10 @@ sub collect_introns {
 		push @introns,
 			_adjust_positions(
 				[
-					$transcript->display_name, $int->display_name,
-					$int->seq_id,              $int->start,
-					$int->end,                 $int->strand,
+					$transcript->primary_id, $transcript->display_name,
+					$int->display_name,      $int->seq_id,
+					$int->start,             $int->end,
+					$int->strand
 				]
 			);
 	}
@@ -1092,9 +1123,10 @@ sub collect_first_intron {
 	my $first = $transcript->strand >= 0 ? shift @list : pop @list;
 	return _adjust_positions(
 		[
-			$transcript->display_name, $first->display_name,
-			$first->seq_id,            $first->start,
-			$first->end,               $first->strand,
+			$transcript->primary_id, $transcript->display_name,
+			$first->display_name,    $first->seq_id,
+			$first->start,           $first->end,
+			$first->strand
 		]
 	);
 }
@@ -1110,9 +1142,10 @@ sub collect_last_intron {
 	my $last = $transcript->strand >= 0 ? pop @list : shift @list;
 	return _adjust_positions(
 		[
-			$transcript->display_name, $last->display_name,
-			$last->seq_id,             $last->start,
-			$last->end,                $last->strand,
+			$transcript->primary_id, $transcript->display_name,
+			$last->display_name,     $last->seq_id,
+			$last->start,            $last->end,
+			$last->strand
 		]
 	);
 }
@@ -1127,8 +1160,8 @@ sub collect_alt_introns {
 			push @introns,
 				_adjust_positions(
 					[
-						$transcript, $i->display_name, $i->seq_id,
-						$i->start,   $i->end,          $i->strand,
+						$transcript, $transcript, $i->display_name, $i->seq_id,
+						$i->start,   $i->end,     $i->strand
 					]
 				);
 		}
@@ -1142,6 +1175,7 @@ sub collect_uncommon_introns {
 		push @introns, _adjust_positions(
 			[
 				'uncommon',    # more than one transcript, so put generic identifier
+				'uncommon',
 				$i->display_name,
 				$i->seq_id,
 				$i->start,
@@ -1159,6 +1193,7 @@ sub collect_common_introns {
 		push @introns, _adjust_positions(
 			[
 				'common',    # more than one transcript, so put generic identifier
+				'common',
 				$i->display_name,
 				$i->seq_id,
 				$i->start,
@@ -1179,9 +1214,10 @@ sub collect_utrs {
 		push @utrs,
 			_adjust_positions(
 				[
-					$transcript->display_name, $u->display_name,
-					$u->seq_id,                $u->start,
-					$u->end,                   $u->strand,
+					$transcript->primary_id, $transcript->display_name,
+					$u->display_name,        $u->seq_id,
+					$u->start,               $u->end,
+					$u->strand
 				]
 			);
 	}
@@ -1204,7 +1240,11 @@ sub collect_cds_start {
 	my $name   = $transcript->display_name . '_cdsStart';
 
 	return _adjust_positions(
-		[ $transcript->display_name, $name, $chromo, $pos, $pos, $strand ] );
+		[
+			$transcript->primary_id, $transcript->display_name, $name, $chromo, $pos,
+			$pos, $strand
+		]
+	);
 }
 
 sub collect_cds_stop {
@@ -1222,14 +1262,18 @@ sub collect_cds_stop {
 	my $name   = $transcript->display_name . '_cdsStart';
 
 	return _adjust_positions(
-		[ $transcript->display_name, $name, $chromo, $pos, $pos, $strand ] );
+		[
+			$transcript->primary_id, $transcript->display_name, $name, $chromo, $pos,
+			$pos, $strand
+		]
+	);
 }
 
 sub acceptable_transcript {
 	my $transcript = shift;
-	my $t = $transcript->primary_tag;
+	my $t          = $transcript->primary_tag;
 	return 1
-		if ( $t =~ m/rna | transcript | retained_intron | antisense | nonsense/xi
+		if (    $t =~ m/rna | transcript | retained_intron | antisense | nonsense/xi
 			and $do_all_rna );
 	return 1 if ( is_coding($transcript) and $do_mrna );
 	return 1 if ( $t =~ /mirna/i  and $do_mirna );
@@ -1239,8 +1283,7 @@ sub acceptable_transcript {
 	return 1 if ( $t =~ /trna/i   and $do_rrna );
 	return 1 if ( $t =~ /rrna/i   and $do_rrna );
 	return 1
-		if ( $t =~
-			m/misc_rna | transcript | retained_intron | antisense | nonsense/xi
+		if (    $t =~ m/misc_rna | transcript | retained_intron | antisense | nonsense/xi
 			and $do_miscrna );
 	return 1 if ( $t =~ /lincrna/i and $do_lincrna );
 	return 0;
@@ -1250,32 +1293,32 @@ sub _adjust_positions {
 
 	my $region = shift;
 
-	# region is an anonymous array of 5 elements
-	# [$transcript_name, $name, $chromo, $start, $stop, $strand]
+	# region is an anonymous array of 7 elements
+	# [$transcript_id, $transcript_name, $name, $chromo, $start, $stop, $strand]
 
 	# adjust the start and end positions according to strand
-	if ( $region->[5] == 1 ) {
+	if ( $region->[6] == 1 ) {
 
 		# forward strand
 
 		if ($start_adj) {
-			$region->[3] += $start_adj;
+			$region->[4] += $start_adj;
 		}
 		if ($stop_adj) {
-			$region->[4] += $stop_adj;
+			$region->[5] += $stop_adj;
 		}
 	}
-	elsif ( $region->[5] == -1 ) {
+	elsif ( $region->[6] == -1 ) {
 
 		# reverse strand
 
 		if ($start_adj) {
-			$region->[4] -= $start_adj;
+			$region->[5] -= $start_adj;
 		}
 
 		# stop
 		if ($stop_adj) {
-			$region->[3] -= $stop_adj;
+			$region->[4] -= $stop_adj;
 		}
 	}
 
@@ -1286,6 +1329,9 @@ sub _adjust_positions {
 sub remove_duplicates {
 
 	my $regions = shift;
+
+	# regions are an anonymous arrays of 9 elements
+	# start/stop are indexes 6,7
 
 	# look for duplicates using a quick hash of seen positions
 	my %seenit;
@@ -1308,7 +1354,7 @@ sub remove_duplicates {
 
 				# generate an array of possible start positions
 				# with a default slop of 0, this will only be 1 position
-				( $regions->[$i]->[4] - $slop ) .. ( $regions->[$i]->[4] + $slop )
+				( $regions->[$i]->[6] - $slop ) .. ( $regions->[$i]->[6] + $slop )
 				)
 			{
 				if ( exists $seenit{$pos} ) {
@@ -1323,7 +1369,7 @@ sub remove_duplicates {
 	else {
 		# without slop, we look for precise matches based on both start and end
 		for my $i ( 0 .. $#{$regions} ) {
-			my ( $s, $e ) = ( $regions->[$i]->[4], $regions->[$i]->[5] );
+			my ( $s, $e ) = ( $regions->[$i]->[6], $regions->[$i]->[7] );
 			if ( exists $seenit{$s}{$e} ) {
 				push @to_remove, $i;
 			}
