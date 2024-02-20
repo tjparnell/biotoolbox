@@ -1255,6 +1255,13 @@ Alternatively, the dataset may be a database file, including bigWig (.bw),
 bigBed (.bb), useq (.useq), or Bam alignment (.bam) files. The files may 
 be local or remote (specified with a http: or ftp: prefix).
 
+Note that counting Bam alignments is I<very> limited. All supplementary, 
+secondary, and marked duplicates are ignored. One end of the alignment 
+must be within the feature (or both ends with method C<pcount>). Splices 
+and indels are ignored. Paired-end alignment strand is inferred from the
+first read. In some cases, pre-filtering the alignments or converting 
+to another format (bigWig or bigBed) may be preferable.
+
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
 
