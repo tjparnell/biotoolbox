@@ -155,7 +155,7 @@ unless ( $automatic or $user_list ) {
 # clean up metadata we added but shouldn't keep
 # this was put in here for remembering original file names for renaming purposes
 for my $i ( 1 .. $output_data->number_columns ) {
-	$output_data->delete_metadata($i, 'original_file');
+	$output_data->delete_metadata( $i, 'original_file' );
 }
 
 ### Print the output
@@ -211,31 +211,41 @@ sub read_file {
 		}
 
 		# identify coordinate columns
-		unless ( defined $Data->chromo_column and defined $Data->start_column ) {
-			warn " cannot generate coordinates for file\n";
+		if ( defined $Data->chromo_column and defined $Data->start_column ) {
+			print "  generating coordinate string for lookup\n";
+		}
+		else {
+			print
+"  cannot generate coordinates for file!! No chromosome and/or start columns\n";
 			return $Data;
 		}
 
 		# add new column
 		my $coord_i = $Data->add_column('MergeDatasetCoordinate');
 
-		# generate coordinates
-		# we will take the exact coordinate columns, in case we're working with
+		# generate two coordinate strings for lookup
+		# one should be 1-based, the other 0-based, hopefully we will match on one
 		my $chr   = $Data->chromo_column;
 		my $start = $Data->start_column;
 		my $stop  = $Data->stop_column;
+		my $inter = $Data->interbase;
 		if ( defined $stop ) {
 
 			# merge chromosome:start-stop
 			$Data->iterate(
 				sub {
 					my $row = shift;
-					$row->value(
-						$coord_i,
-						sprintf( "%s:%s-%s",
-							$row->value($chr), $row->value($start),
-							$row->value($stop) )
-					);
+					my $v   = sprintf "%s:%s-%s", $row->seq_id, $row->start, $row->stop;
+					if ($inter) {
+						$v .= sprintf ",%s:%s-%s", $row->seq_id, $row->value($start),
+							$row->stop;    # actual 0-base start coordinate
+					}
+					else {
+						$v .= sprintf ",%s:%s-%s", $row->seq_id,
+							$row->value($start) - 1,
+							$row->stop;    # mimic 0-base start coordinate
+					}
+					$row->value( $coord_i, $v );
 				}
 			);
 		}
@@ -244,8 +254,14 @@ sub read_file {
 			$Data->iterate(
 				sub {
 					my $row = shift;
-					$row->value( $coord_i,
-						sprintf( "%s:%s", $row->value($chr), $row->value($start) ) );
+					my $v   = sprintf "%s:%s", $row->seq_id, $row->start;
+					if ($inter) {
+						$v .= sprintf ",%s:%s", $row->seq_id, $row->value($start);
+					}
+					else {
+						$v .= sprintf ",%s:%s", $row->seq_id, $row->value($start) - 1;
+					}
+					$row->value( $coord_i, $v );
 				}
 			);
 		}
@@ -269,8 +285,7 @@ sub merge_two_datasets {
 	if ( $lookup or $check ) {
 
 		# we need to merge by lookup values
-		merge_two_datasets_by_lookup( $input_data1, $input_data2 );
-		return;
+		return merge_two_datasets_by_lookup( $input_data1, $input_data2 );
 	}
 
 	# Otherwise Merge the two datasets blindly
@@ -360,17 +375,20 @@ sub merge_two_datasets_by_lookup {
 	}
 
 	# add coordinate column to output if necessary
-	if (
-		$lookup_name
-		and ($lookup_name eq 'MergeDatasetCoordinate' and not $automatic)
-	) {
+	if ( $lookup_name
+		and ( $lookup_name eq 'MergeDatasetCoordinate' and not $automatic ) )
+	{
 
 		# check if we taking from file 1 or 2
 		if ( $order[0] =~ /[a-z]+/i ) {
-			unshift @order, $lookup_i2;
+			if ( $input_data2->name($lookup_i2) eq 'MergeDatasetCoordinate' ) {
+				unshift @order, $lookup_i2;
+			}
 		}
 		else {
-			unshift @order, $lookup_i1;
+			if ( $input_data1->name($lookup_i1) eq 'MergeDatasetCoordinate' ) {
+				unshift @order, $lookup_i1;
+			}
 		}
 	}
 
@@ -406,7 +424,7 @@ sub merge_two_datasets_by_lookup {
 	$output_data = initialize_output_data_structure($input_data1);
 
 	# add comment lines from second files, first was take care of during initialization
-	foreach ( $input_data1->comments ) {
+	foreach ( $input_data2->comments ) {
 		$output_data->add_comment($_);
 	}
 
@@ -452,19 +470,39 @@ sub merge_two_datasets_by_lookup {
 			$column = $output_data->add_column( $input_data2->name($request_number) );
 
 			# copy the dataset via lookup process
-			foreach my $r1 ( 1 .. $input_data1->last_row ) {
+			if ( $input_data1->name($lookup_i1) eq 'MergeDatasetCoordinate' ) {
+				foreach my $r1 ( 1 .. $input_data1->last_row ) {
 
-				# identify the appropriate row in file2 by lookup value
-				my $lookup_val = $input_data1->value( $r1, $lookup_i1 );
-				my $r2         = $index->{$lookup_val} || undef;
+					# identify the appropriate row in file2 by lookup value
+					# using both primary and alternate coordinate string
+					my ( $k1, $k2 ) = split /,/, $input_data1->value( $r1, $lookup_i1 );
+					my $r2 = $index->{$k1} || $index->{$k2} || undef;
 
-				# copy the appropriate value
-				if ( defined $r2 ) {
-					$output_data->value( $r1, $column,
-						$input_data2->value( $r2, $request_number ) );
+					# copy the appropriate value
+					if ( defined $r2 ) {
+						$output_data->value( $r1, $column,
+							$input_data2->value( $r2, $request_number ) );
+					}
+					else {
+						$output_data->value( $r1, $column, '.' );    # null value
+					}
 				}
-				else {
-					$output_data->value( $r1, $column, '.' );    # null value
+			}
+			else {
+				foreach my $r1 ( 1 .. $input_data1->last_row ) {
+
+					# identify the appropriate row in file2 by lookup value
+					my $lookup_val = $input_data1->value( $r1, $lookup_i1 );
+					my $r2         = $index->{$lookup_val} || undef;
+
+					# copy the appropriate value
+					if ( defined $r2 ) {
+						$output_data->value( $r1, $column,
+							$input_data2->value( $r2, $request_number ) );
+					}
+					else {
+						$output_data->value( $r1, $column, '.' );    # null value
+					}
 				}
 			}
 
@@ -567,32 +605,52 @@ sub add_datasets {
 
 			# check that we have the output lookup index
 			unless ( defined $output_lookup_i ) {
-				die " The lookup index for column '$lookup_name' is "
-					. "not defined in the output!\n"
-					. " Please ensure you include column '$lookup_name' in"
-					. " the output file.\n";
+				print <<MESSAGE;
+ FATAL: The lookup index for column '$lookup_name' is not defined in the output!
+ Please ensure you include column '$lookup_name' in the output file.
+MESSAGE
+				exit 1;
 			}
 
 			# add new empty column
 			$column = $output_data->add_column( $data->name($request) );
 
 			# copy the dataset via lookup process
-			$output_data->iterate(
-				sub {
-					my $row = shift;
+			if ( $output_data->name($output_lookup_i) eq 'MergeDatasetCoordinate' ) {
+				$output_data->iterate(
+					sub {
+						my $row = shift;
 
-					# identify the appropriate row in source data table by lookup value
-					my $r = $index->{ $row->value($output_lookup_i) } || undef;
+						# lookup the row using either primary or alternate coordinates
+						# then replace if a value is found
+						my ( $key1, $key2 ) = split /,/,
+							$row->value($output_lookup_i);
+						my $r = $index->{$key1} || $index->{$key2} || undef;
+						if ($r) {
+							$row->value( $column, $data->value( $r, $request ) );
+						}
+						else {
+							$row->value( $column, '.' );    # null value
+						}
+					}
+				);
+			}
+			else {
+				$output_data->iterate(
+					sub {
+						my $row = shift;
 
-					# copy the appropriate value
-					if ($r) {
-						$row->value( $column, $data->value( $r, $request ) );
+					   # identify the appropriate row in source data table by lookup value
+						my $r = $index->{ $row->value($output_lookup_i) } || undef;
+						if ($r) {
+							$row->value( $column, $data->value( $r, $request ) );
+						}
+						else {
+							$row->value( $column, '.' );    # null value
+						}
 					}
-					else {
-						$row->value( $column, '.' );    # null value
-					}
-				}
-			);
+				);
+			}
 		}
 
 		# merging blindly
@@ -679,28 +737,39 @@ sub request_lookup_indices {
 	# Automatic methods of determining the lookup index
 	if ( not $manual ) {
 
-		# Determine if we need one or two
+		# Only one data table that we're adding, find the lookup column
 		if ( not defined $data2 and $lookup_name ) {
 
 			# we already have a lookup name
 			# just need to find same column for one dataset
-
 			$index1 = $data1->find_column("^$lookup_name\$");
-			unless ( defined $index1 ) {
-				die " Cannot find lookup column with name '$lookup_name'"
-					. " in file "
-					. $data1->filename . "\n";
+			if ( defined $index1 ) {
+				printf "\n  using column $index1 (%s) as lookup index for file '%s'\n",
+					$data1->name($index1), $data1->filename;
+				return $index1;
 			}
+			else {
+				printf "\n Cannot find lookup column '%s' in file '%s'!!!\n",
+					$lookup_name, $data1->filename;
 
-			# print the found column name
-			printf "  using column $index1 (%s) as lookup index for file %s\n",
-				$data1->name($index1), $data1->filename;
-			return $index1;
+				# try some other possibilities?
+				if ( $lookup_name eq 'MergeDatasetCoordinate' ) {
+					foreach my $name (qw(coordinate primary_id)) {
+						$index1 = $data1->find_column("^$name\$");
+						if ( defined $index1 ) {
+							printf " Trying column $index1 (%s) as lookup index\n",
+								$data1->name($index1);
+							return $index1;
+						}
+					}
+				}
+				exit 1;
+			}
 		}
 
 		# First try some known column identifiers we could use automatically
 		# don't forget to add the user-requested lookup name
-		my @name_list = qw(MergeDatasetCoordinate coordinate name id transcript gene);
+		my @name_list = qw(MergeDatasetCoordinate coordinate id name transcript gene);
 		if ($user_lookup_name) {
 			unshift @name_list, $user_lookup_name;
 		}
@@ -719,9 +788,9 @@ sub request_lookup_indices {
 				$lookup_name = $name;              # for future lookups
 
 				# report
-				printf "  using column $index1 (%s) as lookup index for file %s\n",
+				printf "\n  using column $index1 (%s) as lookup index for file '%s'\n",
 					$data1->name($index1), $data1->filename;
-				printf "  using column $index2 (%s) as lookup index for file %s\n",
+				printf "  using column $index2 (%s) as lookup index for file '%s'\n",
 					$data2->name($index2), $data2->filename;
 
 				# don't go through remaining list
@@ -735,11 +804,15 @@ sub request_lookup_indices {
 		# Automatic identification didn't work
 		# must bother the user for help
 		if ($automatic) {
-			die " Unable to identify appropriate lookup columns automatically!\n"
-				. " Please execute interactively to identify lookup columns\n";
+			print <<MESSAGE;
+
+ Unable to identify appropriate lookup columns automatically!
+ Please execute interactively to identify lookup columns.
+MESSAGE
+			exit 1;
 		}
 
-		print " Unable to identify appropriate lookup columns automatically!\n"
+		print "\n Unable to identify appropriate lookup columns automatically!\n"
 			unless $manual;
 
 		# Print the index headers
@@ -936,10 +1009,9 @@ sub print_datasets {
 		for my $i ( 1 .. $data->number_columns ) {
 
 			# skip the coordinate
-			if (
-				$data->name($i) eq 'MergeDatasetCoordinate'
-				and not $include_coordinate
-			) {
+			if ( $data->name($i) eq 'MergeDatasetCoordinate'
+				and not $include_coordinate )
+			{
 				next;
 			}
 
@@ -955,10 +1027,9 @@ sub print_datasets {
 		for my $i ( 1 .. $data->number_columns ) {
 
 			# skip the coordinate
-			if (
-				$data->name($i) eq 'MergeDatasetCoordinate'
-				and not $include_coordinate
-			) {
+			if ( $data->name($i) eq 'MergeDatasetCoordinate'
+				and not $include_coordinate )
+			{
 				next;
 			}
 
@@ -1004,26 +1075,51 @@ sub index_dataset {
 	# load up the lookup index hash for the current data table
 	my %index;
 	my $index_warning = 0;
-	$data->iterate(
-		sub {
-			my $row = shift;
-			my $key = $row->value($lookup_i);
-			if ( exists $index{$key} ) {
-
-				# value is not unique
-				$index_warning++;
+	if ( $data->name($lookup_i) eq 'MergeDatasetCoordinate' ) {
+		$data->iterate(
+			sub {
+				my $row = shift;
+				my ( $key1, $key2 ) = split /,/, $row->value($lookup_i);
+				die "no primary,alternate coordinates!"
+					unless ( defined $key1 and defined $key2 );
+				if ( exists $index{$key1} ) {
+					$index_warning++;
+				}
+				else {
+					$index{$key1} = $row->row_index;
+				}
+				if ( exists $index{$key2} ) {
+					$index_warning++;
+				}
+				else {
+					$index{$key2} = $row->row_index;
+				}
 			}
-			else {
-				# value is ok
-				$index{$key} = $row->row_index;
+		);
+	}
+	else {
+		$data->iterate(
+			sub {
+				my $row = shift;
+				my $key = $row->value($lookup_i);
+				if ( exists $index{$key} ) {
+					$index_warning++;
+				}
+				else {
+					$index{$key} = $row->row_index;
+				}
 			}
-		}
-	);
+		);
+	}
 	if ($index_warning) {
-		warn " WARNING: $index_warning rows had two or more duplicate lookup values\n"
-			. "  for column $lookup_i in file "
-			. $data->filename
-			. "\n  Only the first occurence was used\n";
+		my $f = $data->filename;
+		my $n = $data->name($lookup_i);
+		print <<MESSAGE;
+  WARNING: $index_warning rows had two or more duplicate lookup values
+  for column '$n' (index $lookup_i) in file '$f'.
+  Only the first occurence was used.
+MESSAGE
+
 	}
 	return \%index;
 }
@@ -1080,9 +1176,9 @@ sub copy_metadata {
 		# use file basename appended with Score
 		$output_data->name( $index, $data->basename . '_Score' );
 	}
-	
+
 	# add original filename
-	$output_data->metadata($index, 'original_file', $data->filename);
+	$output_data->metadata( $index, 'original_file', $data->filename );
 }
 
 ### Re-name the dataset names
@@ -1143,7 +1239,7 @@ sub get_number_letters {
 
 	# fill up the lookup hashes
 	my $first;
-	for my $i (0 .. 701 ) {
+	for my $i ( 0 .. 701 ) {
 
 		# this gives range from a to zz
 
@@ -1155,7 +1251,7 @@ sub get_number_letters {
 		# generate the letter
 		# two letters [null..z][a..z]
 		my $letter;
-		if (defined $first) {
+		if ( defined $first ) {
 			$letter = sprintf "%s%s", $first, $lookup{ $i % 26 };
 		}
 		else {
@@ -1163,7 +1259,7 @@ sub get_number_letters {
 		}
 
 		# store in hashes, converting 0-base numbers to 1-base numbers
-		$n2l{$i + 1}  = $letter;
+		$n2l{ $i + 1 } = $letter;
 		$l2n{$letter} = $i + 1;
 	}
 
