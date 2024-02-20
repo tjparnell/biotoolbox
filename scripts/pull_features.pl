@@ -156,7 +156,7 @@ sub identify_indices {
 		# simple one-column file
 		# the answer is obvious
 		print "  list file only has 1 column, using it\n";
-		$list_index = 0;
+		$list_index = 1;
 
 		# be VERY careful, though, it may not have a column header name
 	}
@@ -165,8 +165,8 @@ sub identify_indices {
 		# a cluster gene file
 		# the answer is obvious
 		print "  using .kgg file as list\n";
-		$list_index  = 0;
-		$group_index = 1;
+		$list_index  = 1;
+		$group_index = 2;
 
 		# KGG files have column headers
 	}
@@ -226,7 +226,7 @@ sub identify_indices {
 				#### WE ARE MESSING WITH THE INTERNALS OF THE OBJECT HERE
 				#### DONT DO THIS!!!!!!!
 				unshift @{ $List->{'data_table'} }, 'Name';
-				$List->{0}{'name'} = 'Name';
+				$List->{1}{'name'} = 'Name';
 				$List->{'last_row'}++;
 			}
 		}
