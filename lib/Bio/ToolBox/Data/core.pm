@@ -972,13 +972,16 @@ sub delete_column {
 	}
 
 	# identify columns to retain
-	my @deletion_list = sort { $a <=> $b } @_;
+	my @deletion_list = @_;
+	if ( scalar @_ > 1 ) {
+		@deletion_list = sort { $a <=> $b } @_;
+	}
 	my @retain_list;
 	for my $i ( 1 .. $self->{'number_columns'} ) {
 
 		# compare each current index with the first one in the list of
 		# deleted indices. if it matches, delete. if not, keep
-		if ( @deletion_list and $i == $deletion_list[0] ) {
+		if ( defined $deletion_list[0] and $i == $deletion_list[0] ) {
 			shift @deletion_list;    # this particular index should be deleted
 		}
 		else {
