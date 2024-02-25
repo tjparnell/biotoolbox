@@ -408,18 +408,18 @@ sub display_name {
 sub coordinate {
 	my $self = shift;
 	carp 'ERROR: name is a read only method' if @_;
-
-	# to avoid auto-converting start0 coordinates, which might confuse people or programs,
-	# we will take the start value as is when it's available, otherwise calculate start
-	my $start_i = $self->{data}->start_column;
-	my $coord   = sprintf( "%s:%d",
-		$self->seq_id,
-		$start_i                  ? $self->value($start_i)
-		: exists $self->{feature} ? $self->{feature}->start
-		:                           0 );
-	my $end = $self->end;
-	$coord .= "-$end" if $end;
-	return CORE::length($coord) > 2 ? $coord : undef;
+	my $c = $self->seq_id;
+	my $s = $self->start;
+	my $e = $self->end;
+	if ( $c and $s and $e ) {
+		return sprintf "%s:%d-%d", $c, $s, $e;
+	}
+	elsif ( $c and $s ) {
+		return sprintf "%s:%d", $c, $s;
+	}
+	else {
+		return undef;
+	}
 }
 
 sub type {
@@ -1729,9 +1729,9 @@ The name of the feature.
 
 =item coordinate
 
-Returns a coordinate string formatted as C<seqid:start-stop>. This uses the 
-start coordinate as listed in the source file and does not convert 0-based 
-start values to 1-based values. This may confound downstream applications. 
+Returns a coordinate string formatted as C<seqid:start-stop>. The start
+coordinate is converted to 1-based where relevant, in concordance with
+HTS tools (I<samtools> and I<tabix>).
 
 =item type
 

@@ -291,7 +291,7 @@ is( $row->start,      35155,              'row object start value' );
 is( $row->end,        36303,              'row object end value' );
 is( $row->name,       'Feature41',        'row object feature name' );
 is( $row->type,       'region',           'row object type value' );
-is( $row->coordinate, 'chrI:35154-36303', 'row object coordinate string' );
+is( $row->coordinate, 'chrI:35155-36303', 'row object coordinate string' );
 
 # grab row feature directly and change attributes using high API functions - v1.68
 $row = $Data->get_row(25);
@@ -389,7 +389,7 @@ is( $f->stop,       36303,              'feature stop position' );
 is( $f->midpoint,   35729,              'feature midpoint position' );
 is( $f->peak,       35729,              'feature peak position, default to midpoint' );
 is( $f->name,       'Feature41',        'feature name' );
-is( $f->coordinate, 'chrI:35154-36303', 'feature coordinate string' );
+is( $f->coordinate, 'chrI:35155-36303', 'feature coordinate string' );
 
 $Stream->close_fh;
 undef $Stream;
