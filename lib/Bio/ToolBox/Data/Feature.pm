@@ -123,7 +123,7 @@ sub seq_id {
 		$c = $self->{feature}->seq_id;
 	}
 	elsif ($j) {
-		$self->_from_coordinate_string($j);
+		$self->_extract_coordinate_string($j);
 		return $self->{seqid};
 	}
 	elsif ( $self->feature_type eq 'named' ) {
@@ -185,7 +185,7 @@ sub start {
 		$s = $self->{feature}->start;
 	}
 	elsif ($j) {
-		$self->_from_coordinate_string($j);
+		$self->_extract_coordinate_string($j);
 		return $self->{start};
 	}
 	elsif ( $self->feature_type eq 'named' ) {
@@ -237,7 +237,7 @@ sub end {
 		$e = $self->{feature}->end;
 	}
 	elsif ($j) {
-		$self->_from_coordinate_string($j);
+		$self->_extract_coordinate_string($j);
 		return $self->{end};
 	}
 	elsif ( $self->feature_type eq 'named' ) {
@@ -319,8 +319,8 @@ sub _strand {
 	}
 }
 
-sub _from_coordinate_string {
-	my ( $self, $i ) = shift;
+sub _extract_coordinate_string {
+	my ( $self, $i ) = @_;
 	if ( $self->value($i) =~ /^ ([\w\.\-]+) : (\d+) (?: \.\. | \-) (\d+) $/x ) {
 		
 		# chromosome:start-end or chromosome:start..end
