@@ -211,12 +211,20 @@ sub read_file {
 		}
 
 		# identify coordinate columns
-		if ( defined $Data->chromo_column and defined $Data->start_column ) {
-			print "  generating coordinate string for lookup\n";
+		if ( ( defined $Data->chromo_column and defined $Data->start_column )
+			or defined $Data->coord_column )
+		{
+			my @columns;
+			push @columns, $Data->chromo_column;
+			push @columns, $Data->start_column;
+			push @columns, $Data->stop_column;
+			push @columns, $Data->coord_column;
+			printf "  generating coordinate lookup string from columns %s\n",
+				join( ', ', grep {defined} @columns );
 		}
 		else {
 			print
-"  cannot generate coordinates for file!! No chromosome and/or start columns\n";
+"  cannot generate coordinates for file!! No chromosome, start, or coordinate columns\n";
 			return $Data;
 		}
 
@@ -225,46 +233,22 @@ sub read_file {
 
 		# generate two coordinate strings for lookup
 		# one should be 1-based, the other 0-based, hopefully we will match on one
-		my $chr   = $Data->chromo_column;
-		my $start = $Data->start_column;
-		my $stop  = $Data->stop_column;
-		my $inter = $Data->interbase;
-		if ( defined $stop ) {
-
-			# merge chromosome:start-stop
-			$Data->iterate(
-				sub {
-					my $row = shift;
-					my $v   = sprintf "%s:%s-%s", $row->seq_id, $row->start, $row->stop;
-					if ($inter) {
-						$v .= sprintf ",%s:%s-%s", $row->seq_id, $row->value($start),
-							$row->stop;    # actual 0-base start coordinate
-					}
-					else {
-						$v .= sprintf ",%s:%s-%s", $row->seq_id,
-							$row->value($start) - 1,
-							$row->stop;    # mimic 0-base start coordinate
-					}
-					$row->value( $coord_i, $v );
+		$Data->iterate(
+			sub {
+				my $row = shift;
+				my $c   = $row->seq_id;
+				my $e   = $row->end;
+				my $v;
+				if ( defined $e ) {
+					$v = sprintf "%s:%d-%d,%s:%d-%d", $c, $row->start, $e,
+						$c, $row->start - 1, $e;
 				}
-			);
-		}
-		else {
-			# merge chromosome:start
-			$Data->iterate(
-				sub {
-					my $row = shift;
-					my $v   = sprintf "%s:%s", $row->seq_id, $row->start;
-					if ($inter) {
-						$v .= sprintf ",%s:%s", $row->seq_id, $row->value($start);
-					}
-					else {
-						$v .= sprintf ",%s:%s", $row->seq_id, $row->value($start) - 1;
-					}
-					$row->value( $coord_i, $v );
+				else {
+					$v = sprintf "%s:%d,%s:%d", $c, $row->start, $c, $row->start - 1;
 				}
-			);
-		}
+				$row->value( $coord_i, $v );
+			}
+		);
 	}
 
 	# return
@@ -278,7 +262,7 @@ sub merge_two_datasets {
 	# Check the input data
 	my $check = check_data_tables( $input_data1, $input_data2 );
 	if ( $check and not $lookup ) {
-		print " Files have non-equal numbers of data rows! Enabling lookup\n";
+		print "\n Files have non-equal numbers of data rows! Enabling lookup\n";
 	}
 
 	# Merge by lookup values
@@ -382,7 +366,7 @@ sub merge_two_datasets_by_lookup {
 		# check if we taking from file 1 or 2
 		if ( $order[0] =~ /[a-z]+/i ) {
 			if ( $input_data2->name($lookup_i2) eq 'MergeDatasetCoordinate' ) {
-				unshift @order, $lookup_i2;
+				unshift @order, $letter_of->{$lookup_i2};
 			}
 		}
 		else {
@@ -393,7 +377,7 @@ sub merge_two_datasets_by_lookup {
 	}
 
 	# rearrange as necessary to make the first data structure dominant
-	if ( $order[0] =~ /[a-z]+/i ) {
+	if ( $order[0] =~ /[a-z]+/ ) {
 
 		# it looks like the user wants the second file to be dominant
 		# the dominant file is where we'll be taking all of the values
@@ -769,7 +753,13 @@ sub request_lookup_indices {
 
 		# First try some known column identifiers we could use automatically
 		# don't forget to add the user-requested lookup name
-		my @name_list = qw(MergeDatasetCoordinate coordinate id name transcript gene);
+		my @name_list;
+		if ($use_coordinate) {
+			@name_list = qw(MergeDatasetCoordinate coordinate id);
+		}
+		else {
+			@name_list = qw(name primary_id gene.?id transcript.?id gene transcript);
+		}
 		if ($user_lookup_name) {
 			unshift @name_list, $user_lookup_name;
 		}
@@ -807,13 +797,19 @@ sub request_lookup_indices {
 			print <<MESSAGE;
 
  Unable to identify appropriate lookup columns automatically!
- Please execute interactively to identify lookup columns.
+ Use --coordinate option if coordinates should be used for lookup.
+ Otherwise, please execute interactively to identify lookup columns.
 MESSAGE
 			exit 1;
 		}
 
-		print "\n Unable to identify appropriate lookup columns automatically!\n"
-			unless $manual;
+		unless ($manual) {
+			print <<MESSAGE;
+
+ Unable to identify appropriate lookup columns automatically!
+ If using coordinates, re-execute with the --coordinate option.
+MESSAGE
+		}
 
 		# Print the index headers
 		# use numbers for the first one
@@ -1340,13 +1336,11 @@ values include 'Name', 'ID', 'Transcript', or 'Gene'.
 
 =item --coordinate
 
-Force using genomic coordinates when performing a lookup. This effectively 
-merges the chromosome:start-stop coordinates into a single string for 
-lookup matching. The Coordinates column is temporary. This is automatically 
-enabled when working with BED or GFF files that may or may not have unique 
-names but will have unique coordinates. This may be disabled, for example 
-to force using a BED feature name as the lookup value, by specifying 
---nocoordinate.
+Use genomic coordinates when performing a lookup. Both 1-base and 0-base
+coordinate files can be safely and effectively matched. The generated
+coordinates column is temporary. This is automatically enabled when working
+with coordinate files, such as BED and GFF. This may be disabled by
+specifying --nocoordinate, or simply specifying a column lookup name.
 
 =back
 
