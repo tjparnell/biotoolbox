@@ -1625,9 +1625,6 @@ sub interbase {
 			$self->{zerostart} = 0;
 			$self->name( $i, 'Start' );
 		}
-		else {
-			carp 'ERROR: use 1 (true) or 0 (false) to set interbase mode';
-		}
 	}
 	return $self->{zerostart};
 }
