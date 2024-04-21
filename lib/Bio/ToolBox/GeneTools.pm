@@ -557,6 +557,7 @@ sub collapse_transcripts {
 
 sub get_transcript_length {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	if ( $transcript->primary_tag =~ /gene$/i ) {
 
@@ -580,7 +581,7 @@ sub get_transcript_length {
 
 sub is_coding {
 	my $transcript = shift;
-	return                             unless $transcript;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	if ( $transcript->primary_tag =~ /gene$/i ) {
 
@@ -623,7 +624,7 @@ sub is_coding {
 
 sub get_cds {
 	my $transcript = shift;
-	return                             unless $transcript;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my @cds;
 	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
@@ -638,6 +639,7 @@ sub get_cds {
 
 sub get_cdsStart {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
@@ -658,6 +660,7 @@ sub get_cdsStart {
 
 sub get_cdsEnd {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
@@ -677,6 +680,7 @@ sub get_cdsEnd {
 
 sub get_transcript_cds_length {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $total = 0;
 	foreach my $subf ( $transcript->get_SeqFeatures ) {
@@ -688,6 +692,7 @@ sub get_transcript_cds_length {
 
 sub get_start_codon {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $start_codon;
 
@@ -729,6 +734,7 @@ sub get_start_codon {
 
 sub get_stop_codon {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $stop_codon;
 
@@ -772,6 +778,7 @@ sub get_stop_codon {
 
 sub get_utrs {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 
 	# collect the various types of subfeatures
@@ -890,6 +897,7 @@ sub get_utrs {
 
 sub get_transcript_utr_length {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $utrs  = get_utrs($transcript);
 	my $total = 0;
@@ -901,6 +909,7 @@ sub get_transcript_utr_length {
 
 sub get_5p_utrs {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 
 	# get all UTRs
@@ -913,6 +922,7 @@ sub get_5p_utrs {
 
 sub get_3p_utrs {
 	my $transcript = shift;
+	return unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 
 	# get all UTRs
