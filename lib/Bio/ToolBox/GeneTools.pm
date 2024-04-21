@@ -1005,6 +1005,17 @@ sub gtf_string {
 	if ($tsl) {
 		$group .= " transcript_support_level \"$tsl\";";
 	}
+	my $tag = $feature->get_tag_values('tag');
+	if ($tag) {
+		if ( ref($tag) eq 'ARRAY' ) {
+			foreach my $t ( @{$tag} ) {
+				$group .= " tag \"$t\";";
+			}
+		}
+		else {
+			$group .= " tag \"$tag\";";
+		}
+	}
 
 	# skip transcript as it is technically not part of the GTF standard....
 
