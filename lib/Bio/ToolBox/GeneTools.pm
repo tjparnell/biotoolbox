@@ -1170,8 +1170,16 @@ sub filter_transcript_support_level {
 	my %results = map { $_ => [] } @list;
 	foreach my $t (@transcripts) {
 		my ($tsl) = $t->get_tag_values('transcript_support_level');
-		$tsl ||= 'Missing';    # default in case nothing is present
-		push @{ $results{$tsl} }, $t;
+		# the value may be just a number, or may have additional text 
+		if ( $tsl =~ /^([12345])/ ) {
+			push @{ $results{$1} }, $t;
+		}
+		elsif ( $tsl =~ /^NA/ ) {
+			push @{ $results{NA} }, $t;
+		}
+		else {
+			push @{ $results{Missing} }, $t;
+		}
 	}
 
 	# take appropriate transcripts
