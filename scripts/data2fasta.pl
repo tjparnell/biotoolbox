@@ -7,12 +7,6 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $bio;
-eval {
-	require Bio::Seq;
-	require Bio::SeqIO;
-	$bio = 1;
-};
 
 our $VERSION = '1.70';
 
@@ -85,15 +79,6 @@ if ($print_version) {
 }
 
 ### Check for requirements
-unless ($bio) {
-	print <<END;
- This program requires Bio::Seq to ensure properly formatted fasta files.
- Please install the Bio::Perl package. You will need this to also obtain
- fasta indexing and retrieval modules, including Bio::DB::HTS, Bio::DB::Sam, 
- or Bio::DB::Fasta.
-END
-	exit;
-}
 unless ($infile) {
 	if (@ARGV) {
 		$infile = shift @ARGV;
@@ -197,37 +182,30 @@ sub write_direct_single_fasta {
 		}
 	);
 
-	# create final sequence object
-	my $seq = Bio::Seq->new(
-		-id   => $Data->basename,
-		-desc => "Concatenated sequences",
-		-seq  => $concat_seq,
-	);
-
 	# write out
-	my $seq_io = open_output_fasta();
-	$seq_io->write_seq($seq);
+	my $seq_fh = open_output_fasta();
+	write_fasta_seq($seq_fh, $Data->basename, 'Concatenated sequences',
+		$concat_seq);
+	$seq_fh->close;
 }
 
 sub write_direct_multi_fasta {
 
 	# write multi-fasta with the provided sequences
-	my $seq_io = open_output_fasta();
+	my $seq_fh = open_output_fasta();
 	$Data->iterate(
 		sub {
-			my $row = shift;
-
-			# create seq object
-			my $seq = Bio::Seq->new(
-				-id  => $row->value($id_i),
-				-seq => $row->value($seq_i),
-			);
+			my $row  = shift;
+			my $id   = $row->value($id_i);
+			my $seq  = $row->value($seq_i);
+			my $desc = q();
 			if ( defined $desc_i ) {
-				$seq->desc( $row->value($desc_i) );
+				$desc = $row->value($desc_i);
 			}
-			$seq_io->write_seq($seq);
+			write_fasta_seq($seq_fh, $id, $desc, $seq);
 		}
 	);
+	$seq_fh->close;
 }
 
 sub fetch_seq_and_write_single_fasta {
@@ -282,16 +260,12 @@ sub fetch_seq_and_write_single_fasta {
 		}
 	);
 
-	# create final sequence object
-	my $seq = Bio::Seq->new(
-		-id   => $Data->basename,
-		-desc => "Concatenated sequences",
-		-seq  => $concat_seq,
-	);
-
 	# write out
-	my $seq_io = open_output_fasta();
-	$seq_io->write_seq($seq);
+	my $seq_fh = open_output_fasta();
+	my $id     = $Data->basename;
+	my $desc   = 'Concatenated sequences';
+	write_fasta_seq($seq_fh, $id, $desc, $concat_seq);
+	$seq_fh->close;
 }
 
 sub fetch_seq_and_write_multi_fasta {
@@ -318,7 +292,7 @@ sub fetch_seq_and_write_multi_fasta {
 	}
 
 	# open output file
-	my $seq_io = open_output_fasta();
+	my $seq_fh = open_output_fasta();
 
 	# collect sequences and write
 	$Data->iterate(
@@ -336,26 +310,23 @@ sub fetch_seq_and_write_multi_fasta {
 			push @args, ( 'extend',     $extend )                if $extend;
 
 			# collect sequence based on values obtained above
-			my $sequence = $row->get_sequence(@args);
-			unless ($sequence) {
+			my $seq = $row->get_sequence(@args);
+			unless ($seq) {
 				printf "no sequence for line %d, %s", $row->line_number,
 					$row->name || $row->coordinate;
 				next;
 			}
 
-			# create seq object
-			my $seq = Bio::Seq->new(
-				-id  => $row->name || $row->coordinate,
-				-seq => $sequence,
-			);
-			if ( $desc_i ) {
-				$seq->desc( $row->value($desc_i) );
+			# write out sequence
+			my $id   = $row->name || $row->coordinate;
+			my $desc = q();
+			if ( defined $desc_i ) {
+				$desc = $row->value($desc_i);
 			}
-
-			# write out
-			$seq_io->write_seq($seq);
+			write_fasta_seq($seq_fh, $id, $desc, $seq);
 		}
 	);
+	$seq_fh->close;
 }
 
 sub open_output_fasta {
@@ -374,13 +345,24 @@ sub open_output_fasta {
 	# open for writing
 	my $out_fh = Bio::ToolBox::Data->open_to_write_fh( $outfile, $gz )
 		or die "unable to open '$outfile' for writing!\n";
+	return $out_fh;
+}
 
-	# open SeqIO object
-	my $seq_io = Bio::SeqIO->new(
-		-fh     => $out_fh,
-		-format => 'fasta',
-	);
-	return $seq_io;
+sub write_fasta_seq {
+	my ($fh, $id, $desc, $seq) = @_;
+	if ($desc) {
+		$fh->printf(">%s %s\n", $id, $desc);
+	}
+	else {
+		$fh->printf(">%s\n", $id);
+	}
+	while ( length($seq) > 60 ) {
+		my $line = substr $seq, 0, 60, q();
+		$fh->printf("%s\n", $line); 
+	}
+	if ( length $seq ) {
+		$fh->printf("%s\n", $seq); 
+	}
 }
 
 __END__
