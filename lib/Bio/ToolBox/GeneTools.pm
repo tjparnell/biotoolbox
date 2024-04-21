@@ -1239,8 +1239,16 @@ sub filter_transcript_gencode_basic {
 	# take appropriate transcripts
 	my @keepers;
 	foreach my $t (@transcripts) {
-		my ($basic) = $t->get_tag_values('tag');
-		if ( $basic and $basic eq 'basic' ) {
+		my $tag = $t->get_tag_values('tag');
+		if ( ref($tag) eq 'ARRAY' ) {
+			foreach ( @{$tag} ) {
+				if ( $_ eq 'basic' ) {
+					push @keepers, $t;
+					last;
+				}
+			}
+		}
+		elsif ( $tag and $tag eq 'basic' ) {
 			push @keepers, $t;
 		}
 	}
