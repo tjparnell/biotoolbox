@@ -488,10 +488,23 @@ sub _gtf_to_seqf {
 	# process the group tags
 	$fields->[8] =~ s/;$//;     # remove any trailing semi-colon
 	my %att;
-	foreach ( split /;\s+/, $fields->[8] ) {
-		my ( $k, $v ) = split / /, $_, 2;
+	foreach ( split /;\s?/, $fields->[8] ) {
+		my ( $k, $v ) = split /\s/, $_, 2;
 		$v =~ s/"//g;
-		$att{$k} = $v;
+
+		# attribute keys should be unique, but Ensembl re-uses 'tag' key, so tolerate
+		if ( exists $att{$k} ) {
+			if ( ref($att{$k}) eq 'ARRAY' ) {
+				push @{ $att{$k} }, $v;
+			}
+			else {
+				my $current = $att{$k};
+				$att{$k} = [ $current, $v ];
+			}
+		}
+		else {
+			$att{$k} = $v;
+		}
 	}
 
 	# common attributes
