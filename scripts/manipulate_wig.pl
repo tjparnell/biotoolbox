@@ -306,9 +306,9 @@ if (
 ### Print final messages
 my $statMessage;
 if ($doStats) {
-	my $basecount = $stats->{count};
-	my $min       = $stats->{minVal};
-	my $max       = $stats->{maxVal};
+	my $basecount = $stats->{count}  || 0;
+	my $min       = $stats->{minVal} || q();
+	my $max       = $stats->{maxVal} || q();
 	my $mean =
 		$stats->{count} ? sprintf( "%.05f", $stats->{sumData} / $stats->{count} ) : 0;
 	my $stddev = sprintf( "%.05f", sqrt( binVariance() ) );
