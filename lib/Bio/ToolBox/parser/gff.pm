@@ -246,31 +246,12 @@ TOP_FEATURE_LOOP:
 			or not $feature->has_tag('Parent') )
 		{
 			# remember this feature as it likely will have children features
-
-			my $id = $feature->primary_id;
-
-			# remember this feature since we have an ID
-			if ( exists $self->{loaded}{$id} ) {
-
-				# this ID should be unique in the GFF file
-				# otherwise it might be a shared duplicate or a malformed GFF file
-				# generally only a concern for top level features
-				$self->{duplicate_ids}{$id} += 1;
-
-				# store all of the features as an array
-				if ( ref( $self->{loaded}{$id} ) eq 'ARRAY' ) {
-
-					# there's more than two duplicates! pile it on!
-					push @{ $self->{loaded}{$id} }, $feature;
-				}
-				else {
-					my $existing = $self->{loaded}{$id};
-					$self->{loaded}{$id} = [ $existing, $feature ];
-				}
-			}
-			else {
-				# unique ID, so remember it
-				$self->{loaded}{$id} = $feature;
+			# this ID should be unique in the GFF file
+			# otherwise it might be a shared duplicate or a malformed GFF file
+			# generally only a concern for top level features
+			my $result = $self->_add_loaded_feature($feature);
+			if ($result > 1) {
+				$self->{duplicate_ids}{ $feature->primary_id } += 1;
 			}
 		}
 
@@ -280,13 +261,11 @@ TOP_FEATURE_LOOP:
 			# must be a child
 			# there may be more than one parent, per the GFF3 specification
 			foreach my $parent_id ( $feature->get_tag_values('Parent') ) {
-				if ( exists $self->{loaded}{$parent_id} ) {
+				my $parent = $self->_get_loaded_feature($parent_id, qr/\w+/, $feature);
+				if ($parent) {
 
-					# we've seen this id
 					# associate the child with the parent
-					my $parent = $self->{loaded}{$parent_id};
 					$parent->add_SeqFeature($feature);
-
 					# check boundaries for gtf genes
 					# gtf genes may not be explicitly defined so must correct as necessary
 					# gff3 files shouldn't have this issue
@@ -304,7 +283,8 @@ TOP_FEATURE_LOOP:
 							# in all likelihood parent is a transcript and there is a
 							# gene that probably also needs fixin'
 							my ($grandparent_id) = $parent->get_tag_values('Parent');
-							my $grandparent = $self->{loaded}{$grandparent_id};
+							my $grandparent = $self->_get_loaded_feature( $grandparent_id,
+								qr/gene/, $feature );
 							if ( $feature->start < $grandparent->start ) {
 								$grandparent->start( $feature->start );
 							}
@@ -380,6 +360,9 @@ sub _make_gene_parent {
 	if ( exists $att->{'gene_biotype'} ) {
 		$gene->add_tag_value( 'gene_biotype', $att->{'gene_biotype'} );
 	}
+	elsif ( exists $att->{'gene_type'} ) {
+		$gene->add_tag_value( 'gene_type', $att->{'gene_type'} );
+	}
 	if ( exists $att->{'gene_source'} ) {
 		$gene->add_tag_value( 'gene_source', $att->{'gene_source'} );
 	}
@@ -407,6 +390,9 @@ sub _make_rna_parent {
 	}
 	if ( exists $att->{'transcript_biotype'} ) {
 		$rna->add_tag_value( 'transcript_biotype', $att->{'transcript_biotype'} );
+	}
+	elsif ( exists $att->{'transcript_type'} ) {
+		$rna->add_tag_value( 'transcript_biotype', $att->{'transcript_type'} );
 	}
 	if ( exists $att->{'transcript_source'} ) {
 		$rna->add_tag_value( 'transcript_source', $att->{'transcript_source'} );
@@ -518,7 +504,10 @@ sub _gtf_to_seqf {
 
 	# assign special tags based on the feature type
 	my $type = lc $fields->[2];
-	if ( $type =~ m/(?: cds | exon | utr | codon | untranslated )/x ) {
+	if ( $type eq 'exon' or $type eq 'cds' or
+		$type eq 'utr' or $type eq 'five_prime_utr' or $type eq 'three_prime_utr' or
+		$type eq 'start_codon' or $type eq 'stop_codon'
+	) {
 		$feature->add_tag_value( 'Parent', $transcript_id );
 
 		# exon id if present
@@ -532,46 +521,54 @@ sub _gtf_to_seqf {
 		}
 
 		# check gene parent
-		if ( $self->do_gene ) {
-			if ( $gene_id and not exists $self->{loaded}{$gene_id} ) {
-				my $gene = $self->_make_gene_parent( $fields, \%att );
-				$self->{loaded}{$gene_id} = $gene;
+		my $gene;
+		if ( $self->do_gene and $gene_id ) {
+			$gene = $self->_get_loaded_feature($gene_id, qr/gene/, $feature);
+			unless ($gene) {
+				$gene = $self->_make_gene_parent( $fields, \%att );
+				my $result = $self->_add_loaded_feature($gene);
+				if ($result > 1) {
+					$self->{duplicate_ids}{ $gene_id } += 1;
+				}
 				push @{ $self->{top_features} }, $gene;
 			}
 		}
 
 		# check transcript parent
-		if ( $transcript_id and not exists $self->{loaded}{$transcript_id} ) {
-			my $rna = $self->_make_rna_parent( $fields, \%att );
-			$self->{loaded}{$transcript_id} = $rna;
-			if ( $self->do_gene ) {
-				$rna->add_tag_value( 'Parent', $gene_id );
-				$self->{loaded}{$gene_id}->add_SeqFeature($rna);
-			}
-			else {
-				push @{ $self->{top_features} }, $rna;
+		if ( $transcript_id ) {
+			my $rna = $self->_get_loaded_feature($transcript_id,
+				qr/(?: rna | transcript)/x, $feature);
+			unless ($rna) {
+				$rna = $self->_make_rna_parent( $fields, \%att );
+				my $result = $self->_add_loaded_feature($rna);
+				if ($result > 1) {
+					$self->{duplicate_ids}{ $gene_id } += 1;
+				}
+				if ($gene) {
+					$rna->add_tag_value( 'Parent', $gene_id );
+					$gene->add_SeqFeature($rna);
+				}
+				else {
+					# this will become a top feature
+					push @{ $self->{top_features} }, $rna;
+					if ($gene_id) {
+						$rna->add_tag_value('gene_id', $gene_id);
+					}
+				}
 			}
 		}
 	}
 
 	# transcript
-	elsif ( $type =~ m/transcript | rna/x ) {
+	elsif ( $type eq 'transcript' or $type =~ m/rna/ ) {
 
 		# these are sometimes present in GTF files, such as from Ensembl
 
-		# transcript information
-		$feature->primary_id($transcript_id);    # this should be present!!!
-		if ( exists $att{'transcript_name'} ) {
-			$feature->display_name( $att{'transcript_name'} );
-		}
-
 		# check if this was previously autogenerated
-		if ( exists $self->{loaded}{$transcript_id}
-			and $self->{loaded}{$transcript_id}->has_tag('autogenerate') )
-		{
+		my $existing = $self->_get_loaded_feature($transcript_id, $type, $feature);
+		if ( $existing and $existing->has_tag('autogenerate') ) {
 			# this may happen when lines are out of order
 			# rather than replace we just update
-			my $existing = $self->{loaded}{$transcript_id};
 			$existing->start( $feature->start );
 			$existing->stop( $feature->stop );
 			$existing->display_name( $feature->display_name );
@@ -586,16 +583,34 @@ sub _gtf_to_seqf {
 			return $self->next_feature;
 		}
 
-		# otherwise we continue
+		# add transcript information
+		$feature->primary_id($transcript_id);    # this should be present!!!
+		if ( exists $att{'transcript_name'} ) {
+			$feature->display_name( $att{'transcript_name'} );
+		}
+		if ( exists $att{'transcript_biotype'} ) {
+			$feature->add_tag_value( 'transcript_biotype', $att{'transcript_biotype'} );
+		}
+		elsif ( exists $att{'transcript_type'} ) {
+			$feature->add_tag_value( 'transcript_type', $att{'transcript_type'} );
+		}
 
 		# check gene parent
-		if ( $self->do_gene ) {
-			if ( $gene_id and not exists $self->{loaded}{$gene_id} ) {
-				my $gene = $self->_make_gene_parent( $fields, \%att );
-				$self->{loaded}{$gene_id} = $gene;
+		if ( $self->do_gene and $gene_id ) {
+			my $gene = $self->_get_loaded_feature($gene_id, qr/gene/, $feature);
+			unless ($gene) {
+				$gene = $self->_make_gene_parent( $fields, \%att );
+				my $result = $self->_add_loaded_feature($gene);
+				if ($result > 1) {
+					$self->{duplicate_ids}{ $gene_id } += 1;
+				}
 				push @{ $self->{top_features} }, $gene;
 			}
 			$feature->add_tag_value( 'Parent', $gene_id );
+		}
+		elsif ($gene_id) {
+			# not doing gene parents, then at least add the gene_id tag back
+			$feature->add_tag_value( 'gene_id', $gene_id );
 		}
 	}
 
@@ -605,19 +620,11 @@ sub _gtf_to_seqf {
 		# these are sometimes present in GTF files, such as from Ensembl
 		# but are not required and often absent
 
-		# gene information
-		$feature->primary_id($gene_id);    # this should be present!!!
-		if ( exists $att{'gene_name'} ) {
-			$feature->display_name( $att{'gene_name'} );
-		}
-
 		# check if this was previously autogenerated
-		if ( exists $self->{loaded}{$gene_id}
-			and $self->{loaded}{$gene_id}->has_tag('autogenerate') )
-		{
+		my $existing = $self->_get_loaded_feature($gene_id, $type, $feature);
+		if ( $existing and $existing->has_tag('autogenerate') ) {
 			# this may happen when lines are out of order
 			# rather than replace we just update
-			my $existing = $self->{loaded}{$gene_id};
 			$existing->start( $feature->start );
 			$existing->stop( $feature->stop );
 			$existing->display_name( $feature->display_name );
@@ -630,6 +637,19 @@ sub _gtf_to_seqf {
 
 			# move on to next feature
 			return $self->next_feature;
+		}
+		else {
+			# add gene information
+			$feature->primary_id($gene_id);    # this should be present!!!
+			if ( exists $att{'gene_name'} ) {
+				$feature->display_name( $att{'gene_name'} );
+			}
+			if ( exists $att{'gene_biotype'} ) {
+				$feature->add_tag_value( 'gene_biotype', $att{'gene_biotype'} );
+			}
+			elsif ( exists $att{'gene_type'} ) {
+				$feature->add_tag_value( 'gene_type', $att{'gene_type'} );
+			}
 		}
 	}
 
@@ -655,12 +675,15 @@ sub _gtf_to_seqf {
 
 sub _add_remaining_gtf_attributes {
 	my ( $self, $feature, $att ) = @_;
-	foreach my $key (
-		grep { !m/(?: transcript_id | transcript_name | gene_id | gene_name | exon_id )/x }
-		keys %{ $att }
-		)
-	{
-		$feature->add_tag_value( $key, $att->{$key} );
+	foreach my $key ( keys %{ $att } ) {
+		next if $key eq 'transcript_id';
+		next if $key eq 'transcript_name';
+		next if $key eq 'gene_id';
+		next if $key eq 'gene_name';
+		next if $key eq 'exon_id';
+		unless ( $feature->has_tag($key) ) {
+			$feature->add_tag_value( $key, $att->{$key} );
+		}
 	}
 }
 
@@ -736,11 +759,9 @@ sub check_orphanage {
 
 		# find the parent
 		foreach my $parent ( $orphan->get_tag_values('Parent') ) {
-			if ( exists $self->{loaded}{$parent} ) {
-
-				# we have loaded the parent
-				# associate each orphan feature with the parent
-				$self->{loaded}{$parent}->add_SeqFeature($orphan);
+			my $existing = $self->_get_loaded_feature($parent, qr/\w+/, $orphan);
+			if ($existing) {
+				$existing->add_SeqFeature($orphan);
 				$success++;
 			}
 		}
@@ -764,6 +785,68 @@ sub orphans {
 	}
 	return wantarray ? @orphans : \@orphans;
 }
+
+sub _get_loaded_feature {
+	my ($self, $id, $type, $feature) = @_;
+	if ( exists $self->{loaded}{$id} ) {
+		if ( ref($self->{loaded}{$id}) eq 'ARRAY' ) {
+			# multiple objects, need to check
+			foreach my $f ( @{ $self->{loaded}{$id} } ) {
+				# we could do a more stringent intersection test than just overlap
+				# but that might miss what we're really after, especially if the
+				# parent was autogenerated and needs to be expanded
+				# return the first one that matches
+				# if there are multiple then there are serious issues
+				if ( $f->primary_tag =~ m/$type/ and $feature->overlaps($f) ) {
+					return $f;
+				}
+			}
+			return;
+		}
+		else {
+			# assume a single SeqFeature object
+			return $self->{loaded}{$id};
+		}
+	}
+	else {
+		return;
+	}
+}
+
+sub _add_loaded_feature {
+	my ($self, $feature) = @_;
+	my $id = $feature->primary_id;
+	if ( exists $self->{loaded}{$id} ) {
+		# store all of the features as an array
+		if ( ref( $self->{loaded}{$id} ) eq 'ARRAY' ) {
+
+			# there's more than two duplicates! pile it on!
+			my $check = 1;
+			foreach my $f ( @{ $self->{loaded}{$id} } ) {
+				$check++ if ( $feature->primary_tag eq $f->primary_tag );
+			}
+			push @{ $self->{loaded}{$id} }, $feature;
+			return $check;
+		}
+		else {
+			my $existing = $self->{loaded}{$id};
+			$self->{loaded}{$id} = [ $existing, $feature ];
+			if ( $existing->primary_tag eq $feature->primary_tag ) {
+				return 2;
+			}
+			else {
+				return 1;
+			}
+		}
+	}
+	else {
+		# unique ID, so remember it
+		$self->{loaded}{$id} = $feature;
+		return 1;
+	}
+	return;
+}
+
 
 1;
 
