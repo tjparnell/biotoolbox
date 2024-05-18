@@ -2970,7 +2970,10 @@ sub addname_function {
 
 	# Identify column
 	my $idx = $Data->name_column;
-	if ( not defined $idx ) {
+	if ( defined $idx) {
+		printf " Replacing name contents in column %d, '%s'\n", $idx, $Data->name($idx);
+	}
+	else {
 
 		# we are adding a new column
 		my $name;
@@ -2981,6 +2984,7 @@ sub addname_function {
 			$name = 'Name';
 		}
 		$idx = $Data->add_column($name);
+		printf " Adding feature names to column %d, '%s'\n", $idx, $name;
 	}
 
 	# generate the new names
@@ -2993,7 +2997,6 @@ sub addname_function {
 	);
 
 	# done
-	print " Added feature names to index $idx\n";
 	return 1;
 }
 
