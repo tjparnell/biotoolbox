@@ -1222,17 +1222,20 @@ sub close_fh {
 sub _commented_header_line {
 	my ( $data, $line ) = @_;
 
-	# prepare arrays from the other lines and current line
-	my @commentdata;
-	if ( scalar @{ $data->{'comments'} } >= 1 ) {
-
-		# take the last line in the other array
-		@commentdata = split /\t/, $data->{'comments'}->[-1];
+	# only continue if we have comment lines
+	unless ( scalar @{ $data->{'comments'} } >= 1 ) {
+		return 0;
 	}
-	my @linedata = split /\t/, $line;
+
+	# prepare arrays from the comment lines and current line
+	my @commentdata = split /\t/, $data->{'comments'}->[-1];
+	my @linedata    = split /\t/, $line;
 
 	# check if the counts are equal
-	if ( scalar @commentdata == scalar @linedata ) {
+	# we avoid using the comment for one-column data files because they are probably wrong
+	if ( scalar @commentdata > 1 and scalar @linedata > 1 and
+		scalar @commentdata == scalar @linedata
+	) {
 		return 1;
 	}
 	else {
