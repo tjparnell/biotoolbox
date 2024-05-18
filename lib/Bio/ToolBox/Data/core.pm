@@ -1418,13 +1418,41 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper
 	# anchoring and grouping - long story why, don't ask
-	my $name =
-		$self->find_column('^name|gene.?name|transcript.?name|geneid|id|gene|alias');
+	# some of these have progressively more relaxed criteria to avoid false positives
+	my $name = $self->find_column('^name$');
+	unless (defined $name) {
+		# try more agressive search for names
+		$name  = $self->find_column('^gene.?name|transcript.?name$');
+	}
+	unless (defined $name) {
+		# take any column with "name" in it
+		$name  = $self->find_column('name');
+	}
+	unless (defined $name) {
+		# try even more agressive for annotation identifiers
+		$name  = $self->find_column('^gene|gene.?id|transcript.?id$');
+	}
+	unless (defined $name) {
+		# use an id
+		$name  = $self->find_column('^id$');
+	}
 	my $type   = $self->find_column('^type|class|primary_tag|biotype');
-	my $id     = $self->find_column('^primary_id');
-	my $chromo = $self->find_column('^chr|seq|ref|ref.?seq');
-	my $start  = $self->find_column('^start|position|pos|txStart');
-	my $stop   = $self->find_column('^stop|end|txEnd');
+	my $id     = $self->find_column('^primary_id$');  # database specific primary id
+	my $chromo = $self->find_column('^chromosome|chromo|chrom|chr|seq.*id$');
+	unless (defined $chromo) {
+		$chromo = $self->find_column('chr');
+	}
+	my $start  = $self->find_column('^start$');
+	unless (defined $start) {
+		$start = $self->find_column('start');
+	}
+	unless (defined $start) {
+		$start = $self->find_column('^position|pos');
+	}
+	my $stop   = $self->find_column('^stop|end$');
+	unless (defined $stop) {
+		$stop  = $self->find_column('stop|end');
+	}
 	my $strand = $self->find_column('^strand');
 	my $score  = $self->find_column('^score$');
 
