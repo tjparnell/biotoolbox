@@ -118,6 +118,10 @@ my $Data = Bio::ToolBox::Data->new( file => $datafile )
 ### Load the list of specified values
 print " Collecting lookup values from file '$listfile'...\n";
 identify_indices();
+unless ( defined $list_index and defined $data_index ) {
+	print " FATAL: data and list lookup indexes are still not defined!\n";
+	exit 1;
+}
 my ( $requests, $pulled ) = collect_request_list();
 
 # these are global references to two data hashes
@@ -187,9 +191,12 @@ sub identify_indices {
 
 			# found something
 			$list_index = $possible;
-			printf "  found column '%s', using list index $list_index\n",
-				$List->name($list_index);
+			printf "  found column '%s', using List index %d\n",
+				$List->name($list_index), $list_index;
 			return;
+		}
+		else {
+			print "  could not find corresponding List column index for '$lookup'\n";
 		}
 	}
 
@@ -209,13 +216,14 @@ sub identify_indices {
 
 			# found something
 			$data_index = $possible;
-			printf "  found column '%s', using data index $data_index\n",
-				$Data->name($data_index);
+			printf "  found column '%s', using Data index %d\n",
+				$Data->name($data_index), $data_index;
 			return;
 		}
 		else {
 			# did not find something
 			# is it possible it is a simple list of names?
+			print "  could not find corresponding Data column index for '$lookup'\n";
 			if ( $List->number_columns == 1 ) {
 
 				# we likely only have a simple list of features
@@ -235,17 +243,37 @@ sub identify_indices {
 	# neither was specified
 	elsif ( not defined $data_index and not defined $list_index ) {
 
-		# just try the built-in name column index
-		# this uses a few common names
+		# try with common name columns
 		$data_index = $Data->name_column;
 		$list_index = $List->name_column;
+
+		if ( defined $data_index and defined $list_index and
+			$Data->name($data_index) eq $List->name($list_index)
+		) {
+
+			# report
+			printf "  using List column '%s', index $list_index\n",
+				$List->name($list_index);
+			printf "  using Data column '%s', index $data_index\n",
+				$Data->name($data_index);
+			return;
+		}
+		else {
+			# nope, do not have a match, forget our guesses
+			undef $data_index;
+			undef $list_index;
+		}
+
+		# try with primary_id column
+		$data_index = $Data->id_column;
+		$list_index = $List->id_column;
 
 		if ( defined $data_index and defined $list_index ) {
 
 			# report
-			printf "  using list column '%s', index $list_index\n",
+			printf "  using List column '%s', index $list_index\n",
 				$List->name($list_index);
-			printf "  using data column '%s', index $data_index\n",
+			printf "  using Data column '%s', index $data_index\n",
 				$Data->name($data_index);
 			return;
 		}
@@ -272,15 +300,15 @@ sub identify_indices {
 	# End automatic guessing of index numbers, ask the user
 	unless ( defined $list_index ) {
 		$list_index = ask_user_for_index( $List,
-			" Enter the unique identifier lookup column index from the list file    "
+			" Enter the unique identifier lookup column index from the List file    "
 		);
 	}
 	unless ( defined $data_index ) {
 		$data_index = ask_user_for_index( $Data,
-			" Enter the unique identifier lookup column index from the data file    "
+			" Enter the unique identifier lookup column index from the Data file    "
 		);
 	}
-	printf " We are using\n  list lookup index %d, '%s'\n  data lookup index %d, '%s'\n",
+	printf " We are using\n  List lookup index %d, '%s'\n  Data lookup index %d, '%s'\n",
 		$list_index, $List->name($list_index), $data_index, $Data->name($data_index);
 	if ( defined $group_index ) {
 		printf "  group index %d, '%s'\n", $group_index, $List->name($group_index);
