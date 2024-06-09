@@ -7,6 +7,7 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use List::Util qw(sum0 max);
+use Scalar::Util qw(looks_like_number);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility qw(parse_list ask_user_for_index);
@@ -424,7 +425,7 @@ sub set_method_sub {
 
 	# for combining values from duplicate positions we need a method
 	if ( $method eq 'mean' ) {
-		return sub { return sum0(@_) / scalar(@_); };
+		return sub { return sum0(@_) / ( scalar(@_) || 1 ); };
 	}
 	elsif ( $method eq 'median' ) {
 		return \&median;
@@ -480,7 +481,9 @@ sub set_score_sub {
 			foreach (@score_indices) {
 				my $s = $attribs->{$_}{$attribute_name} || 0;
 				$s =~ s/\%$//;    # remove stupid percents if present
-				push @scores, $s;
+				if ( looks_like_number($s) ) {
+					push @scores, $s;
+				}
 			}
 			return &{$method_sub}(@scores);
 		};
@@ -490,7 +493,9 @@ sub set_score_sub {
 		# collect over multiple score columns from array reference
 		return sub {
 			my $data = shift;
-			return &{$method_sub}( map { $data->[$_] } @score_indices );
+			my @v = grep { looks_like_number($_) } map { $data->[$_] }
+				@score_indices;
+			return &{$method_sub}(@v);
 		};
 	}
 	elsif ( @score_indices and not $fast ) {
@@ -498,7 +503,9 @@ sub set_score_sub {
 		# collect over multiple score columns from Feature row object
 		return sub {
 			my $row = shift;
-			return &{$method_sub}( map { $row->value($_) } @score_indices );
+			my @v = grep { looks_like_number($_) } map { $row->value($_) }
+				@score_indices;
+			return &{$method_sub}(@v);
 		};
 	}
 	elsif ( defined $score_index and $fast ) {
