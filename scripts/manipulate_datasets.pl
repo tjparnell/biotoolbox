@@ -2585,7 +2585,7 @@ sub write_summary_function {
 	# this will write out a summary file of the data
 
 	# determine indices to summarize
-	my ( $startcolumn, $stopcolumn );
+	my ( $startcolumn, $stopcolumn, $method );
 	if ($function) {
 
 		# running under automatic mode
@@ -2597,14 +2597,25 @@ sub write_summary_function {
 			$startcolumn = $opt_indices[0];
 			$stopcolumn  = $opt_indices[-1];
 		}
-
 		# otherwise the summary module will automatically deduce the columns
+		
+		if ($opt_target) {
+			$method = $opt_target;
+		}
+		else {
+			$method = 'mean';
+		}
 	}
 	else {
 		# request indices only when running interactively and not automatically
 		( $startcolumn, $stopcolumn ) = _request_indices(
 			" Enter the starting and/or ending indices of the datasets to summarize\n"
 				. " Or nothing for automatic detection     " );
+		my $p = " Enter the method [mean (default), trimmean, median]:  ";
+		$method = prompt($p);
+		unless ($method) {
+			$method = 'mean';
+		}
 	}
 
 	# write the summary
@@ -2612,6 +2623,7 @@ sub write_summary_function {
 		'filename'    => $outfile,
 		'startcolumn' => $startcolumn,
 		'endcolumn'   => $stopcolumn,
+		'method'      => $method,
 	);
 
 	# report outcome
@@ -3891,9 +3903,13 @@ column has start and stop metadata. The program will automatically
 identify available columns to summarize based on their name. In 
 interactive mode, it will request the contiguous range of start and 
 ending columns to summarize. The contiguous columns may also be 
-indicated using the --index option. By default, a new file using the 
-input file base name appended with '_summary' is written, or a 
-filename may be specified using the --out option.
+indicated using the --index option. The method of summarizing the 
+data can be specified interactively or with the --target option. 
+Methods include 'mean' (default), 'median', or 'trimmean', where
+the top and bottom 1% of values are discarded and a mean determined
+from the remaining 98% of values. By default, a new file using the 
+input file base name appended with '_<method>_summary' is written, or
+a filename may be specified using the --out option.
 
 =item B<export> (menu option B<x>)
 
