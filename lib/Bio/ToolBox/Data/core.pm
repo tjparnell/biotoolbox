@@ -1645,11 +1645,11 @@ sub interbase {
 	if (@_) {
 		my $i = $self->start_column;
 		my $n = $self->name($i);
-		if ( $_[0] eq '1' and $n =~ /^start$/i ) {
+		if ( $_[0] eq '1' and lc $n eq 'start' ) {
 			$self->{zerostart} = 1;
 			$self->name( $i, 'Start0' );
 		}
-		elsif ( $_[0] eq '0' and $n =~ /^start0$/i ) {
+		elsif ( $_[0] eq '0' and $n eq 'start0' ) {
 			$self->{zerostart} = 0;
 			$self->name( $i, 'Start' );
 		}
