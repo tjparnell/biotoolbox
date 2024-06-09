@@ -4,6 +4,7 @@ use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use List::Util qw(sum0);
+use Scalar::Util qw(looks_like_number);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Iterator;
 use Bio::ToolBox::db_helper qw(
@@ -713,159 +714,67 @@ sub sort_data {
 
 	# confirm options
 	return unless exists $self->{$index}{name};
-	unless ( $direction =~ /^[id]/i ) {
+	unless ( $direction eq 'i' or $direction eq 'd' ) {
 		carp "ERROR: unrecognized sort order '$direction'! Must be i or d";
 		return;
 	}
-
-	# Sample the dataset values
-	# this will be used to guess the sort method, below
-	my $example;    # an example of the dataset
-	for my $r ( 1 .. $self->last_row ) {
-
-		# we want to avoid null values, so keep trying
-		# null being . or any variation of N/A, NaN, inf
-		my $v = $self->value( $r, $index );
-		if ( defined $v and $v !~ m/^(?: \. | n\/?a | nan | \-?inf )$/xi ) {
-			$example = $v;    # a non-null value, take it
-			last;
+	
+	# put items into appropriate bins for sorting
+	my @numeric_items;
+	my @mixed_items;
+	my @asci_items;
+	for my $row_i ( 1 .. $self->last_row ) {
+		my $v = $self->value( $row_i, $index );
+		if ( looks_like_number($v) ) {
+			push @numeric_items, [ $v, $row_i ];
 		}
-	}
-
-	# Determine sort method, either numerical or alphabetical
-	my $sortmethod;
-	if ( $example =~ /[a-z]/i ) {
-
-		# there are detectable letters
-		$sortmethod = 'ascii';
-	}
-	elsif ( $example =~ m/^\-?\d+ \.? \d*$/x ) {
-
-		# there are only digits, allowing for minus sign and a decimal point
-		# I don't think this allows for exponents, though
-		$sortmethod = 'numeric';
-	}
-	else {
-		# unable to determine (probably alphanumeric), sort asciibetical
-		$sortmethod = 'ascii';
-	}
-
-	# Re-order the datasets
-	# Directly sorting the @data array is proving difficult. It keeps giving me
-	# a segmentation fault. So I'm using a different approach by copying the
-	# @data_table into a temporary hash.
-	# put data_table array into a temporary hash
-	# the hash key will the be dataset value,
-	# the hash value will be the reference the row data
-	my %datahash;
-
-	# reorder numerically
-	if ( $sortmethod eq 'numeric' ) {
-		for my $row ( 1 .. $self->last_row ) {
-			my $value = $self->value( $row, $index );
-
-			# check to see whether this value exists or not
-			while ( exists $datahash{$value} ) {
-
-				# add a really small number to bump it up and make it unique
-				# this, of course, presumes that none of the dataset values
-				# are really this small - this may be an entirely bad
-				# assumption!!!!! I suppose we could somehow calculate an
-				# appropriate value.... nah.
-				# don't worry, we're only modifying the value used for sorting,
-				# not the actual value
-				$value += 0.00000001;
-			}
-
-			# store the row data reference
-			$datahash{$value} = $self->{data_table}->[$row];
-		}
-
-		# re-fill the array based on the sort direction
-		if ( $direction =~ /^i/i ) {
-
-			# increasing sort
-			my $i = 1;    # keep track of the row, skip the header
-			foreach ( sort { $a <=> $b } keys %datahash ) {
-
-				# put back the reference to the anonymous array of row data
-				$self->{data_table}->[$i] = $datahash{$_};
-				$i++;     # increment for next row
-			}
+		elsif ( $v =~ /(\d+)/ ) {
+			push @mixed_items, [ $1, $v, $row_i ];
 		}
 		else {
-			# decreasing sort
-			my $i = 1;    # keep track of the row, skip the header
-			foreach ( sort { $b <=> $a } keys %datahash ) {
-
-				# put back the reference to the anonymous array of row data
-				$self->{data_table}->[$i] = $datahash{$_};
-				$i++;     # increment for next row
-			}
+			push @asci_items, [ $v, $row_i ];
 		}
-
-		# summary prompt
-		printf " Data table sorted numerically by the contents of %s\n",
-			$self->name($index);
 	}
 
-	# reorder asciibetically
-	elsif ( $sortmethod eq 'ascii' ) {
-		for my $row ( 1 .. $self->last_row ) {
-
-			# get the value to sort by
-			my $value = $self->value( $row, $index );
-			if ( exists $datahash{$value} ) {
-
-				# not unique
-				my $n      = 1;
-				my $lookup = $value . sprintf( "03%d", $n );
-
-				# we'll try to make a unique value by appending
-				# a number to the original value
-				while ( exists $datahash{$lookup} ) {
-
-					# keep bumping up the number till it's unique
-					$n++;
-					$lookup = $value . sprintf( "03%d", $n );
-				}
-				$datahash{$lookup} = $self->{data_table}->[$row];
-			}
-			else {
-				# unique
-				$datahash{$value} = $self->{data_table}->[$row];
-			}
+	# sort each bin into replacement table
+	my @new_table;
+	push @new_table, $self->{data_table}->[0];
+	if ($direction eq 'i') {
+		if (@numeric_items) {
+			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
+				sort { $a->[0] <=> $b->[0] }
+				@numeric_items;
 		}
-
-		# re-fill the array based on the sort direction
-		if ( $direction eq 'i' or $direction eq 'I' ) {
-
-			# increasing
-			my $i = 1;    # keep track of the row
-			foreach ( sort { $a cmp $b } keys %datahash ) {
-
-				# put back the reference to the anonymous array of row data
-				$self->{data_table}->[$i] = $datahash{$_};
-				$i++;     # increment for next row
-			}
+		if (@mixed_items) {
+			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
+				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] }
+				@mixed_items;
 		}
-		elsif ( $direction eq 'd' or $direction eq 'D' ) {
-
-			# decreasing
-			my $i = 1;    # keep track of the row
-			foreach ( sort { $b cmp $a } keys %datahash ) {
-
-				# put back the reference to the anonymous array of row data
-				$self->{data_table}->[$i] = $datahash{$_};
-				$i++;     # increment for next row
-			}
+		if (@asci_items) {
+			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
+				sort { $a->[0] cmp $b->[0] }
+				@asci_items;
 		}
-
-		# summary prompt
-		printf " Data table sorted asciibetically by the contents of '%s'\n",
-			$self->name($index);
 	}
-
+	if ($direction eq 'd') {
+		if (@numeric_items) {
+			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
+				sort { $b->[0] <=> $a->[0] }
+				@numeric_items;
+		}
+		if (@mixed_items) {
+			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
+				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] }
+				@mixed_items;
+		}
+		if (@asci_items) {
+			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
+				sort { $b->[0] cmp $a->[0] }
+				@asci_items;
+		}
+	}
+	$self->{data_table} = \@new_table;
+	
 	return 1;
 }
 
