@@ -39,7 +39,7 @@ our @EXPORT_OK = qw(
 	gff_string
 	gtf_string
 	ucsc_string
-	bed_string
+	bed12_string
 	filter_transcript_support_level
 	filter_transcript_gencode_basic
 	filter_transcript_biotype
@@ -97,7 +97,7 @@ our %EXPORT_TAGS = (
 			gff_string
 			gtf_string
 			ucsc_string
-			bed_string
+			bed12_string
 		)
 	],
 	filter => [
@@ -1103,7 +1103,7 @@ sub ucsc_string {
 	return $string;
 }
 
-sub bed_string {
+sub bed12_string {
 	my $feature = shift;
 	confess 'FATAL: not a SeqFeature object!' unless ref($feature) =~ /seqfeature/i;
 	my @ucsc_list;
@@ -1513,7 +1513,7 @@ L</get_cdsStart>, L</get_cdsEnd>, L</get_transcript_cds_length>, and L</get_utrs
 =item :export
 
 Import all of the export methods, including L</gff_string>, L</gtf_string>, 
-L</ucsc_string>, and L</bed_string>;
+L</ucsc_string>, and L</bed12_string>;
 
 =item :filter
 
@@ -1816,9 +1816,9 @@ Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#fo
 for details. Multiple transcript genes are exported as multiple text lines 
 concatenated together.
 
-=item bed_string
+=item bed12_string
 
-	my $string = bed_string($gene);
+	my $string = bed12_string($gene);
 
 This will export a gene or transcript model as a UCSC Bed formatted transcript 
 line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1>

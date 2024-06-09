@@ -553,7 +553,7 @@ sub export_to_bed {
 			sub {
 				my $row    = shift;
 				my $f      = $row->seqfeature(1);    # make sure we get the seqfeature
-				my $string = bed_string($f);
+				my $string = bed12_string($f);
 				foreach ( split /\n/, $string ) {
 					$outData->add_row($_);
 				}
