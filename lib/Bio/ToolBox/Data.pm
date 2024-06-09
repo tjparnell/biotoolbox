@@ -988,6 +988,13 @@ sub summary_file {
 	elsif ( $args{endcolumn} and ref( $args{endcolumn} ) eq 'SCALAR' ) {
 		push @endcolumns, $args{endcolumn};
 	}
+	$args{method} ||= 'mean';
+	if ($args{method} ne 'mean' and $args{method} ne 'median' and 
+		$args{method} ne 'trimmean'
+	) {
+		carp 'ERROR: unrecognized summary file method!';
+		return;
+	}
 
 	# Check required values
 	unless ( defined $outfile ) {
@@ -1109,7 +1116,16 @@ sub summary_file {
 			my @values;
 			for my $row ( 1 .. $self->last_row ) {
 				my $v = $self->value( $row, $column );
-				push @values, $v eq '.' ? 0 : $v;    # treat nulls as zero
+				if ( looks_like_number($v) ) {
+					push @values, $v;
+				}
+				else {
+					# we treat this as zero, as opposed to skipping it, so that we
+					# do not over-emphasize the remaining signal from those columns 
+					# that do not have much signal to begin with
+					# it distorts the interpretation
+					push @values, 0;
+				}
 			}
 
 			# adjust if log value
@@ -1119,15 +1135,46 @@ sub summary_file {
 			}
 
 			# determine mean value
-			my $window_mean;
+			my $window_value;
+			my $num_values = scalar(@values);
 			if (@values) {
-				$window_mean = sum0(@values) / scalar(@values);
+				if ($args{method} eq 'mean') {
+					$window_value = sum0(@values) / $num_values;
+				}
+				elsif ($args{method} eq 'trimmean') {
+					if (scalar @values == 1) {
+						$window_value = $values[0];
+					}
+					elsif (scalar @values < 100) {
+						# use standard mean
+						$window_value = sum0(@values) / $num_values;
+					}
+					else {
+						@values = sort {$a <=> $b} @values;
+						my $x = sprintf("%.0f", $num_values / 100 );
+						$window_value = sum0( @values[ $x .. ( $num_values - $x ) ] ) / 
+							( $num_values - (2 * $x) )
+					}
+				}
+				elsif ($args{method} eq 'median') {
+					if (scalar @values == 1) {
+						$window_value = $values[0];
+					}
+					elsif ($num_values & 1) {
+						# odd number of values
+						$window_value = $values[ ($#values / 2) ]
+					}
+					else {
+						my $mid = $num_values / 2;
+						$window_value = sum0( $values[$mid-1], $values[$mid] ) / 2;
+					}
+				}
 				if ($log) {
-					$window_mean = log($window_mean) / log(2);
+					$window_value = log($window_value) / log(2);
 				}
 			}
 			else {
-				$window_mean = 0;
+				$window_value = 0;
 			}
 
 			# push to summed output
@@ -1135,7 +1182,7 @@ sub summary_file {
 
 				# this is the first dataset, so we need to add a row
 				$summed_data->add_row(
-					[ $self->{$column}{'name'}, $midpoint, $window_mean ] );
+					[ $self->{$column}{'name'}, $midpoint, $window_value ] );
 			}
 			else {
 				# we're summarizing multiple datasets, we already have name midpoint
@@ -1145,7 +1192,7 @@ sub summary_file {
 'ERROR: unable to summarize multiple datasets with nonequal columns of data!';
 					return;
 				}
-				$summed_data->value( $row, $i, $window_mean );
+				$summed_data->value( $row, $i, $window_value );
 			}
 			$row++;
 		}
@@ -1154,7 +1201,7 @@ sub summary_file {
 	# Write summed data
 	$outfile =~ s/\.txt (\.gz)?$//xi;    # strip any .txt or .gz extensions if present
 	my $written_file = $summed_data->write_file(
-		'filename' => $outfile . '_summary.txt',
+		'filename' => sprintf( "%s_%s_summary.txt", $outfile, $args{method} ),
 		'gz'       => 0,
 	);
 	return $written_file;
@@ -2142,7 +2189,7 @@ You may pass these options. They are optional.
 =item filename
 
 Pass an optional new filename. The default is to take the basename 
-and append "_summed" to it.
+and append "_<method>_summary" to it.
 
 =item startcolumn
 
@@ -2158,6 +2205,15 @@ The default ending column is the last rightmost column. Indexes are
 Pass a string that is the name of the dataset. This could be collected 
 from the metadata, if present. This will become the name of the score 
 column if defined.
+
+=item method
+
+Pass the name of the method to combine the values. Methods include 
+C<mean> (default if not specified), C<median>, or C<trimmean>, where 
+the top and bottom 1% of the sorted values are discarded and a mean
+of the remaining 98% of the values is used. If fewer than 100 values
+are available, no trimming is done and a straight mean value is 
+determined.
 
 =back
 
