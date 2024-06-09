@@ -205,10 +205,10 @@ is( $md->{'index'},  10,              'metadata of copied column' );
 
 # sort table
 $Data->sort_data( 9, 'd' );
-is( $Data->value( 1,  9 ), 'Feature9', 'check first name after reverse sort' );
-is( $Data->value( 1,  4 ), 538,        'check first start after reverse sort' );
-is( $Data->value( 78, 9 ), 'Feature1', 'check last name after reverse sort' );
-is( $Data->value( 78, 4 ), 1,          'check last start after reverse sort' );
+is( $Data->value( 1,  9 ), 'Feature78', 'check first name after reverse sort' );
+is( $Data->value( 1,  4 ), 58695,       'check first start after reverse sort' );
+is( $Data->value( 78, 9 ), 'Feature1',  'check last name after reverse sort' );
+is( $Data->value( 78, 4 ), 1,           'check last start after reverse sort' );
 
 # genomic sort rows
 $Data->gsort_data;    # Data still tagged as gff, which influences gsort method
