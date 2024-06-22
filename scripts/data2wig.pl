@@ -606,7 +606,12 @@ sub fast_convert_to_fixedStep {
 	my $fh = $Input->fh;
 	while ( my $line = $fh->getline ) {
 		chomp $line;
-		my @data       = split( /\t/, $line );
+		my @data = split( /\t/, $line );
+
+		# working with raw array, need to shift values to compensate
+		# for 1-base indexing of column indexes
+		unshift @data, 0;
+
 		my $chromosome = $data[$chr_index];
 		my $start      = $data[$start_index];
 		$start++ if $interbase;
@@ -715,7 +720,12 @@ sub fast_convert_to_variableStep {
 	my $fh = $Input->fh;
 	while ( my $line = $fh->getline ) {
 		chomp $line;
-		my @data       = split( /\t/, $line );
+		my @data = split( /\t/, $line );
+
+		# working with raw array, need to shift values to compensate
+		# for 1-base indexing of column indexes
+		unshift @data, 0;
+
 		my $chromosome = $data[$chr_index];
 		my $start      = $data[$start_index];
 		$start++ if $interbase;
@@ -814,6 +824,10 @@ sub fast_convert_to_bedgraph {
 	while ( my $line = $fh->getline ) {
 		chomp $line;
 		my @data = split( /\t/, $line );
+
+		# working with raw array, need to shift values to compensate
+		# for 1-base indexing of column indexes
+		unshift @data, 0;
 
 		# adjust start position
 		$data[$start_index]-- unless ($interbase);
