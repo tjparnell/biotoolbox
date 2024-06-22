@@ -229,10 +229,11 @@ else {
 ## Generate summed data -
 # an average across all features at each position suitable for plotting
 if ($sum) {
-	print " Generating summary file....\n";
+	print " Generating trimmed-mean summary file....\n";
 	my $sumfile = $Data->summary_file(
 		'filename' => $outfile,
 		'dataset'  => \@datasets,
+		'method'   => 'trimmean'
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
