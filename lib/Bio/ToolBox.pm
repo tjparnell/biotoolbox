@@ -37,7 +37,7 @@ sub parse_file {
 
 sub new_data {
 	my $self = shift;
-	if ( $_[0] =~ m/^(?: columns | datasets )$/x ) {
+	if ( scalar(@_) and $_[0] =~ m/^(?: columns | datasets )$/x ) {
 
 		# looks like a correctly formatted list
 		return Bio::ToolBox::Data->new(@_);
