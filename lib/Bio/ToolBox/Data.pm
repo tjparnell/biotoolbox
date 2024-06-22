@@ -721,6 +721,7 @@ sub sort_data {
 	
 	# put items into appropriate bins for sorting
 	my @numeric_items;
+	my @mixed_items_end;
 	my @mixed_items;
 	my @asci_items;
 	for my $row_i ( 1 .. $self->last_row ) {
@@ -728,7 +729,12 @@ sub sort_data {
 		if ( looks_like_number($v) ) {
 			push @numeric_items, [ $v, $row_i ];
 		}
-		elsif ( $v =~ /(\d+)/ ) {
+		elsif ( $v =~ /(\d+)$/x ) {
+			# integer at end of string
+			push @mixed_items_end, [ $1, $v, $row_i ];
+		}
+		elsif ( $v =~ /(\d+)/) {
+			# integer someplace else
 			push @mixed_items, [ $1, $v, $row_i ];
 		}
 		else {
@@ -750,6 +756,11 @@ sub sort_data {
 				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] }
 				@mixed_items;
 		}
+		if (@mixed_items_end) {
+			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
+				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] }
+				@mixed_items_end;
+		}
 		if (@asci_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
 				sort { $a->[0] cmp $b->[0] }
@@ -766,6 +777,11 @@ sub sort_data {
 			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
 				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] }
 				@mixed_items;
+		}
+		if (@mixed_items_end) {
+			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
+				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] }
+				@mixed_items_end;
 		}
 		if (@asci_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
