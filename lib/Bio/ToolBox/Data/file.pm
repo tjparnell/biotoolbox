@@ -1007,6 +1007,7 @@ sub write_file {
 		# the simple format will strip the non-value '.' from the table
 		my $n = $self->{'number_columns'};
 		for my $i ( 1 .. $self->last_row ) {
+			no warnings "uninitialized";
 
 			# we will step though the data_table array one row at a time
 			# skipping the first (empty) element
@@ -1022,6 +1023,7 @@ sub write_file {
 		# normal data files
 		my $n = $self->{'number_columns'};
 		for my $i ( 1 .. $self->last_row ) {
+			no warnings "uninitialized";
 
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
