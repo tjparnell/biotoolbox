@@ -514,7 +514,7 @@ sub check_defaults {
 				require Statistics::Descriptive;
 				$stat = 1;
 			};
-			if ($stat) {
+			unless ($stat) {
 				print STDERR
 " FATAL: Provide a shift value or install the Perl module Statistics::Descriptive\n"
 					. " to empirically determine the shift value.\n";
@@ -1313,17 +1313,15 @@ sub write_model_file {
 	}
 
 	# Prepare the data structure
-	my $profile = Bio::ToolBox->new_data(
-		feature  => 'shift_model_profile',
-		datasets => [ 'Start', "$outfile\_F", "$outfile\_R", "$outfile\_shift" ],
-	);
-	return unless $profile;
-	$profile->add_comment("Average profile of read start point sums");
-	$profile->add_comment("Only profiles of trimmed shift value samples included");
-	$profile->add_comment("Final shift value calculated as $value bp");
-	$profile->metadata( 2, 'minimum_r',                     $correlation_min );
-	$profile->metadata( 2, 'number_of_chromosomes_sampled', $chr_number );
-	$profile->metadata( 2, 'regions_sampled',               scalar( @{$f_profile} ) );
+	my $Data = Bio::ToolBox->new_data( 'Start', sprintf("%s_F", $outfile), 
+		sprintf("%s_R", $outfile), sprintf("%s_shift", $outfile) );
+	return unless $Data;
+	$Data->add_comment('Average profile of read start point sums');
+	$Data->add_comment('Only profiles of trimmed shift value samples included');
+	$Data->add_comment("Final shift value calculated as $value bp");
+	$Data->metadata( 4, 'minimum_r',                     $correlation_min );
+	$Data->metadata( 4, 'number_of_chromosomes_sampled', $chr_number );
+	$Data->metadata( 4, 'regions_sampled',               scalar( @{$f_profile} ) );
 
 	# Load data table
 	# first we will put the mean value for all the regions
@@ -1333,23 +1331,21 @@ sub write_model_file {
 		my $r = mean( map { $centered_r_profile[$_][$i] } ( 0 .. $#centered_r_profile ) );
 		my $m = mean( map { $centered_shifted_profile[$_][$i] }
 				( 0 .. $#centered_shifted_profile ) );
-		$profile->add_row( [ $s, $f, $r, $m ] );
+		$Data->add_row( [ $s, $f, $r, $m ] );
 	}
 
 	# Write the model file
-	my $profile_file = $profile->write_file(
-		'filename' => "$outfile\_model.txt",
+	my $profile_file = $Data->write_file(
+		'filename' => sprintf("%s_model.txt", $outfile),
 		'gz'       => 0,
 	);
 	print "  Wrote shift profile model data file $profile_file\n" if $profile_file;
 
 	### R squared data
 	# prepare the data structure
-	my $Data = Bio::ToolBox->new_data(
-		feature  => 'Shift_correlations',
-		datasets => [ 'Shift', "$outfile\_R" ],
-	);
-	$Data->add_comment("Average correlation values for each shift");
+	undef $Data;
+	$Data = Bio::ToolBox->new_data( 'Shift', sprintf("%s_R", $outfile) );
+	$Data->add_comment('Average correlation values for each shift');
 	$Data->add_comment("Final shift value calculated as $value bp");
 	$Data->metadata( 1, 'minimum_r',                     $correlation_min );
 	$Data->metadata( 1, 'number_of_chromosomes_sampled', $chr_number );
@@ -1369,22 +1365,20 @@ sub write_model_file {
 
 	# write the r squared file
 	my $success = $Data->write_file(
-		'filename' => "$outfile\_correlations.txt",
+		'filename' => sprintf("%s_correlations.txt", $outfile),
 		'gz'       => 0,
 	);
 	print "  Wrote shift correlation data file $success\n" if $success;
 
 	### Write regions
 	undef $Data;
-	$Data = Bio::ToolBox->new_data(
-		feature  => 'Correlated regions',
-		datasets => [ 'Region', 'Shift', 'BestCorrelation' ]
-	);
+	$Data = Bio::ToolBox->new_data( 'Region', 'Shift', 'BestCorrelation' );
+	$Data->add_comment('All correlated regions identified');
 	for my $i ( 0 .. $#{$regions} ) {
 		$Data->add_row( [ $regions->[$i], $region_shifts->[$i], $region_bestr->[$i] ] );
 	}
 	$success = $Data->write_file(
-		'filename' => "$outfile\_correlated_regions.txt",
+		'filename' => sprintf("%s_correlated_regions.txt", $outfile),
 		'gz'       => 0
 	);
 	print "  Wrote correlated regions data file $success\n" if $success;
