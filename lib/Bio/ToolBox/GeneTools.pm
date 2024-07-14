@@ -1920,8 +1920,7 @@ transcripts is returned.
 
 =head1 SEE ALSO
 
-L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, 
-L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>,
+L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::Parser>, L<Bio::Tools::GFF>,
 L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, L<Bio::SeqFeatureI>
 
 =head1 AUTHOR

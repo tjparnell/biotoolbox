@@ -1023,7 +1023,7 @@ explicitly tested.
 =head1 SEE ALSO
 
 L<Bio::SeqFeatureI>, L<Bio::SeqFeature::Lite>, L<Bio::Seqfeature::Generic>, 
-L<Bio::RangeI>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>
+L<Bio::RangeI>, L<Bio::ToolBox::Parser>
 
 =head1 AUTHOR
 

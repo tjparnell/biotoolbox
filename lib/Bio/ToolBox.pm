@@ -152,12 +152,22 @@ an arbitrary text file. A number of convenience methods are present for
 collecting data from data files. This module is not used directly by the 
 user, but its objects are returned when using L<Bio::ToolBox::Data> iterators.
 
-=item Annotation parsers
+=item L<Bio::ToolBox::Parser>
 
-Included are two generic parsers for loading an entire genome-worth of 
-annotation into memory within a reasonably short amount of time. 
+This is the working base class for parsing annotation files, including
+BED and related formats, GFF, GTF, GFF3, and UCSC-derived refFlat, 
+genePred, and genePredExt tables. This is designed to slurp an entire 
+genome-worth of annotation into memory within a reasonably short amount
+of time. Sub-classes include the following.
 
 =over 4
+
+=item L<Bio::ToolBox::Parser::bed>
+
+This parses simple BED formats (3-6 columns), gene-based BED files (12 columns),
+ENCODE-style peak formats (narrowPeak, broadPeak, and gappedPeak), and other 
+BED-related derivatives. Gene-based BED12 files are parsed into hierarchical
+parent and child subfeatures.
 
 =item L<Bio::ToolBox::parser::gff>
 

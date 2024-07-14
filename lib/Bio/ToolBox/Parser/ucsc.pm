@@ -1,11 +1,11 @@
-package Bio::ToolBox::parser::ucsc;
+package Bio::ToolBox::Parser::ucsc;
 
 use warnings;
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
-use Bio::ToolBox::parser::ucsc::builder;
+use Bio::ToolBox::Parser::ucsc::builder;
 
 our $VERSION = '1.70';
 
@@ -252,7 +252,7 @@ sub next_feature {
 		}
 		chomp $line;
 		my @linedata = split /\t/, $line;
-		my $builder  = Bio::ToolBox::parser::ucsc::builder->new( \@linedata, $self );
+		my $builder  = Bio::ToolBox::Parser::ucsc::builder->new( \@linedata, $self );
 		$self->{line_count}++;
 		unless ($builder) {
 
@@ -330,7 +330,7 @@ __END__
 
 =head1 NAME
 
-Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
+Bio::ToolBox::Parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
 
 =head1 SYNOPSIS
 
@@ -551,8 +551,7 @@ parsed file.
 
 =head1 SEE ALSO
 
-L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, 
-L<Bio::ToolBox::SeqFeature>
+L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>
 
 =head1 AUTHOR
 

@@ -27,7 +27,7 @@ sub new {
 	my $flavor   = $args{flavor}   || undef;
 	my $filetype = $args{filetype} || undef;
 	if ( not $flavor or not $filetype ) {
-		if ( $class =~ m/Bio::ToolBox::parser::(\w+)/x ) {
+		if ( $class =~ m/Bio::ToolBox::Parser::(\w+)/x ) {
 
 			# we got the flavor directly from a flavored parser new function
 			$flavor ||= $1;
@@ -40,7 +40,7 @@ sub new {
 		}
 	}
 	if ( $flavor and $flavor =~ m/^(?: gff | bed | ucsc )$/xi ) {
-		$class = 'Bio::ToolBox::parser::' . $flavor;
+		$class = 'Bio::ToolBox::Parser::' . $flavor;
 		load $class;
 	}
 	else {
@@ -176,7 +176,7 @@ sub new {
 
 sub do_gene {
 	my $self = shift;
-	return 0 if ( ref($self) eq 'Bio::ToolBox::parser::bed' );
+	return 0 if ( ref($self) eq 'Bio::ToolBox::Parser::bed' );
 	if (@_) {
 		$self->{'do_gene'} = shift;
 	}
@@ -217,7 +217,7 @@ sub do_codon {
 
 sub do_name {
 	my $self = shift;
-	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::ucsc' );
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::Parser::ucsc' );
 
 	# does nothing with gff and bed
 	if (@_) {
@@ -228,7 +228,7 @@ sub do_name {
 
 sub share {
 	my $self = shift;
-	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::ucsc' );
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::Parser::ucsc' );
 
 	# does nothing with gff and bed
 	if (@_) {
@@ -239,7 +239,7 @@ sub share {
 
 sub simplify {
 	my $self = shift;
-	return 0 unless ( ref($self) eq 'Bio::ToolBox::parser::gff' );
+	return 0 unless ( ref($self) eq 'Bio::ToolBox::Parser::gff' );
 
 	# does nothing with ucsc and bed
 	if ( defined $_[0] ) {
@@ -375,8 +375,8 @@ Bio::ToolBox::Parser - generic parsing tool for GFF, UCSC, BED
   ) or die "unable to open $filename!\n";
   # file is tasted and appropriate parser automatically selected
   # returns parser object if recognized
-  # could be one of Bio::ToolBox::parser::bed, 
-  # Bio::ToolBox::parser::gff, or Bio::ToolBox::parser::ucsc
+  # could be one of Bio::ToolBox::Parser::bed, 
+  # Bio::ToolBox::Parser::gff, or Bio::ToolBox::Parser::ucsc
   
   # do something with parser
   while (my $feature = $parser->next_top_feature() ) {
@@ -394,17 +394,17 @@ open it automatically. These parsers include the following.
 
 =over 4
 
-=item L<Bio::ToolBox::parser::bed>
+=item L<Bio::ToolBox::Parser::bed>
 
 Parses most Bed file formats, including 3-12 column Bed formats, and some 
 specific Encode formats, including C<narrowPeak>, C<broadPeak>, and 
 C<gappedPeak>. 
 
-=item L<Bio::ToolBox::parser::gff>
+=item L<Bio::ToolBox::Parser::gff>
 
 Parses any GFF flavor, including GTF and GFF3. 
 
-=item L<Bio::ToolBox::parser::ucsc>
+=item L<Bio::ToolBox::Parser::ucsc>
 
 Parses some of the common UCSC annotation table formats, including 
 C<refFlat>, C<genePred>, C<genePredExt>, and C<knownGene>. Support for 
@@ -651,8 +651,8 @@ Only useful after </parse_file> is called.
 
 =head1 SEE ALSO
 
-L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>, 
-L<Bio::ToolBox::parser::bed>, L<Bio::ToolBox::SeqFeature>
+L<Bio::ToolBox::Parser::gff>, L<Bio::ToolBox::Parser::ucsc>, 
+L<Bio::ToolBox::Parser::bed>, L<Bio::ToolBox::SeqFeature>
 
 =head1 AUTHOR
 

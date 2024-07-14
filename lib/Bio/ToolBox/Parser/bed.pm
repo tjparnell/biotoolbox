@@ -1,4 +1,4 @@
-package Bio::ToolBox::parser::bed;
+package Bio::ToolBox::Parser::bed;
 
 use warnings;
 use strict;
@@ -48,7 +48,7 @@ sub open_file {
 							  # gappedPeak is essentially bed12 with extra columns
 		  # we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		  # we need more object stuff that the ucsc parser expects
-		load 'Bio::ToolBox::parser::ucsc::builder';
+		load 'Bio::ToolBox::Parser::ucsc::builder';
 		$self->{bed}         = 15;
 		$self->{id2count}    = {};
 		$self->{refseqsum}   = {};
@@ -341,7 +341,7 @@ sub _parse_bed12 {
 	);
 
 	# create builder
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new( \@new, $self );
+	my $builder = Bio::ToolBox::Parser::ucsc::builder->new( \@new, $self );
 	my $feature = $builder->build_transcript;
 	$feature->add_tag_value( 'itemRGB', $data[8] );
 	$feature->score( $data[4] );
@@ -387,7 +387,7 @@ sub _parse_gappedPeak {
 	);
 
 	# create builder and process
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new( \@new, $self );
+	my $builder = Bio::ToolBox::Parser::ucsc::builder->new( \@new, $self );
 	my $feature = $builder->build_transcript;
 
 	# clean up feature and add extra values
@@ -538,8 +538,8 @@ object to parse a new file.
 
 =item new
 
-  my $parser = Bio::ToolBox::parser::bed->new($filename);
-  my $parser = Bio::ToolBox::parser::bed->new(
+  my $parser = Bio::ToolBox::Parser::bed->new($filename);
+  my $parser = Bio::ToolBox::Parser::bed->new(
       file    => 'file.bed',
       do_gene => 1,
       do_cds  => 1,
@@ -600,8 +600,7 @@ and 'feature' for everything else.
 
 =head1 SEE ALSO
 
-L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
-L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::gff>
+L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>
 
 =head1 AUTHOR
 

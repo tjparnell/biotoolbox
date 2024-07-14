@@ -21,12 +21,12 @@ else {
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 ## use critic
 
-require_ok 'Bio::ToolBox::parser::gff'
-	or BAIL_OUT "Cannot load Bio::ToolBox::parser::gff";
-require_ok 'Bio::ToolBox::parser::ucsc'
-	or BAIL_OUT "Cannot load Bio::ToolBox::parser::ucsc";
-require_ok 'Bio::ToolBox::parser::bed'
-	or BAIL_OUT "Cannot load Bio::ToolBox::parser::bed";
+require_ok 'Bio::ToolBox::Parser::gff'
+	or BAIL_OUT "Cannot load Bio::ToolBox::Parser::gff";
+require_ok 'Bio::ToolBox::Parser::ucsc'
+	or BAIL_OUT "Cannot load Bio::ToolBox::Parser::ucsc";
+require_ok 'Bio::ToolBox::Parser::bed'
+	or BAIL_OUT "Cannot load Bio::ToolBox::Parser::bed";
 require_ok 'Bio::ToolBox::Data'
 	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
 
@@ -76,11 +76,11 @@ sub test_gff {
 	print " >> Testing GFF parser with $sfclass\n";
 
 	# open and check parser
-	my $gff = Bio::ToolBox::parser::gff->new(
+	my $gff = Bio::ToolBox::Parser::gff->new(
 		file  => $gfffile,
 		class => $sfclass,
 	);
-	isa_ok( $gff, 'Bio::ToolBox::parser::gff', 'GFF3 Parser' );
+	isa_ok( $gff, 'Bio::ToolBox::Parser::gff', 'GFF3 Parser' );
 	is( $gff->do_gene, 1, 'gff do_gene' );
 	is( $gff->do_exon, 0, 'gff do_exon' );
 	my $fh = $gff->fh;
@@ -106,7 +106,7 @@ sub test_gff {
 
 	# reload the table to parse everything
 	undef $gff;
-	$gff = Bio::ToolBox::parser::gff->new(
+	$gff = Bio::ToolBox::Parser::gff->new(
 		file     => $gfffile,
 		class    => $sfclass,
 		do_gene  => 1,
@@ -162,12 +162,12 @@ sub test_gtf {
 	print " >> Testing gtf parser with $sfclass\n";
 
 	# open and check parser
-	my $gtf = Bio::ToolBox::parser::gff->new(
+	my $gtf = Bio::ToolBox::Parser::gff->new(
 		file    => $gtffile,
 		class   => $sfclass,
 		do_exon => 1,
 	);
-	isa_ok( $gtf, 'Bio::ToolBox::parser::gff', 'gff Parser' );
+	isa_ok( $gtf, 'Bio::ToolBox::Parser::gff', 'gff Parser' );
 	my $fh = $gtf->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
 	is( $gtf->version,  'gtf', 'GFF version' );
@@ -260,12 +260,12 @@ sub test_ucsc {
 	print " >> Testing UCSC parser with $sfclass\n";
 
 	# open and check parser
-	my $ucsc = Bio::ToolBox::parser::ucsc->new(
+	my $ucsc = Bio::ToolBox::Parser::ucsc->new(
 		file    => $ucscfile,
 		class   => $sfclass,
 		do_exon => 1,
 	);
-	isa_ok( $ucsc, 'Bio::ToolBox::parser::ucsc', 'UCSC Parser' );
+	isa_ok( $ucsc, 'Bio::ToolBox::Parser::ucsc', 'UCSC Parser' );
 	my $fh = $ucsc->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
 	is( $ucsc->do_gene,  1,         'ucsc do_gene' );
@@ -405,11 +405,11 @@ sub test_bed6 {
 	print " >> Testing BED6 parser with $sfclass\n";
 
 	# open and check parser
-	my $bed = Bio::ToolBox::parser::bed->new(
+	my $bed = Bio::ToolBox::Parser::bed->new(
 		file  => $bed6file,
 		class => $sfclass,
 	);
-	isa_ok( $bed, 'Bio::ToolBox::parser::bed', 'Bed Parser' );
+	isa_ok( $bed, 'Bio::ToolBox::Parser::bed', 'Bed Parser' );
 	my $fh = $bed->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
 	is( $bed->do_gene,  0,      'ucsc do_gene' );
@@ -435,7 +435,7 @@ sub test_bed6 {
 	# reload the table to parse everything
 	undef $f;
 	undef $bed;
-	$bed = Bio::ToolBox::parser::bed->new(
+	$bed = Bio::ToolBox::Parser::bed->new(
 		file  => $bed6file,
 		class => $sfclass,
 	);
@@ -461,12 +461,12 @@ sub test_bed12 {
 	print " >> Testing BED12 parser with $sfclass\n";
 
 	# open and check parser
-	my $bed = Bio::ToolBox::parser::bed->new(
+	my $bed = Bio::ToolBox::Parser::bed->new(
 		file    => $bed12file,
 		class   => $sfclass,
 		do_exon => 1,
 	);
-	isa_ok( $bed, 'Bio::ToolBox::parser::bed', 'Bed Parser' );
+	isa_ok( $bed, 'Bio::ToolBox::Parser::bed', 'Bed Parser' );
 	my $fh = $bed->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
 	is( $bed->do_gene,  0,       'ucsc do_gene' );
@@ -499,7 +499,7 @@ sub test_bed12 {
 	# reload the table to parse everything
 	undef $f;
 	undef $bed;
-	$bed = Bio::ToolBox::parser::bed->new(
+	$bed = Bio::ToolBox::Parser::bed->new(
 		file    => $bed12file,
 		class   => $sfclass,
 		do_exon => 1,
@@ -541,8 +541,8 @@ sub test_narrowPeak {
 	my $sfclass = 'Bio::ToolBox::SeqFeature';
 
 	# open and check parser
-	my $bed = Bio::ToolBox::parser::bed->new( file => $peakfile, );
-	isa_ok( $bed, 'Bio::ToolBox::parser::bed', 'Bed Parser' );
+	my $bed = Bio::ToolBox::Parser::bed->new( file => $peakfile, );
+	isa_ok( $bed, 'Bio::ToolBox::Parser::bed', 'Bed Parser' );
 	my $fh = $bed->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
 	is( $bed->version, 'narrowPeak', 'bed version string' );
@@ -590,8 +590,8 @@ sub test_gappedPeak {
 	my $sfclass = 'Bio::ToolBox::SeqFeature';
 
 	# open and check parser
-	my $bed = Bio::ToolBox::parser::bed->new( file => $gapfile, );
-	isa_ok( $bed, 'Bio::ToolBox::parser::bed', 'Bed Parser' );
+	my $bed = Bio::ToolBox::Parser::bed->new( file => $gapfile, );
+	isa_ok( $bed, 'Bio::ToolBox::Parser::bed', 'Bed Parser' );
 	my $fh = $bed->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
 	is( $bed->version, 'gappedPeak', 'bed version string' );
@@ -625,7 +625,7 @@ sub test_gappedPeak {
 	undef @subpeaks;
 	undef $f;
 	undef $bed;
-	$bed = Bio::ToolBox::parser::bed->new( file => $gapfile, );
+	$bed = Bio::ToolBox::Parser::bed->new( file => $gapfile, );
 
 	# top features
 	my @top = $bed->top_features;

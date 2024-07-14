@@ -1,4 +1,4 @@
-package Bio::ToolBox::parser::ucsc::builder;
+package Bio::ToolBox::Parser::ucsc::builder;
 
 use warnings;
 use strict;
@@ -1222,11 +1222,11 @@ __END__
 
 =head1 NAME
 
-Bio::ToolBox::parser::ucsc::builder - Build gene and transcript SeqFeatures from UCSC formats
+Bio::ToolBox::Parser::ucsc::builder - Build gene and transcript SeqFeatures from UCSC formats
 
 =head1 USAGE
 
-Don't use this directly. This is an accessory module for the L<Bio::ToolBox::parser::ucsc> 
+Don't use this directly. This is an accessory module for the L<Bio::ToolBox::Parser::ucsc> 
 module.
 
 It will take a line from a UCSC-formatted gene table (refFlat, genePred, knownGene) 
@@ -1239,7 +1239,7 @@ and assemble a hierarchical gene or transcript SeqFeature object.
 =item new
 
 Pass an ARRAY reference representing the tab-delimited fields from a line 
-read from UCSC-formatted file and the L<Bio::ToolBox::parser::ucsc> object
+read from UCSC-formatted file and the L<Bio::ToolBox::Parser::ucsc> object
 itself. The method of parsing is determined by the number of elements.
 
 =item build_transcript

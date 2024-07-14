@@ -1,4 +1,4 @@
-package Bio::ToolBox::parser::gff;
+package Bio::ToolBox::Parser::gff;
 
 use warnings;
 use strict;
@@ -864,7 +864,7 @@ __END__
 
 =head1 NAME
 
-Bio::ToolBox::parser::gff - parse GFF3, GTF, and generic GFF files 
+Bio::ToolBox::Parser::gff - parse GFF3, GTF, and generic GFF files 
 
 =head1 SYNOPSIS
 
@@ -933,8 +933,8 @@ object to parse a new file
 
 =item new
 
-  my $parser = Bio::ToolBox::parser::gff->new($filename);
-  my $parser = Bio::ToolBox::parser::gff->new(
+  my $parser = Bio::ToolBox::Parser::gff->new($filename);
+  my $parser = Bio::ToolBox::Parser::gff->new(
       file    => 'file.gtf.gz',
       do_gene => 1,
       do_utr  => 1,
@@ -1027,8 +1027,7 @@ are not allowed, thus requiring them to be escaped.
 
 =head1 SEE ALSO
 
-L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, 
-L<Bio::ToolBox::parser::ucsc>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>
+L<Bio::ToolBox::Parser>, L<Bio::ToolBox::SeqFeature>, L<Bio::Tools::GFF>
 
 =head1 AUTHOR
 

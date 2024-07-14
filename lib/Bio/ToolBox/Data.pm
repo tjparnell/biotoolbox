@@ -1502,7 +1502,7 @@ one or more argument options. Possible options include:
 
 The file name of the gene table to be parsed. This may 
 be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
-These will be parsed using Bio::ToolBox::parser::* adapters.
+These will be parsed using Bio::ToolBox::Parser::* adapters.
 
 =item feature
 

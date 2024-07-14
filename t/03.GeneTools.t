@@ -12,14 +12,14 @@ BEGIN {
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
-	use_ok('Bio::ToolBox::parser::ucsc');
+	use_ok('Bio::ToolBox::Parser::ucsc');
 	use_ok( 'Bio::ToolBox::GeneTools', qw(:all) );
 }
 
 my $ucscfile = File::Spec->catfile( $Bin, "Data", "ensGene.txt" );
 my $enssrc   = File::Spec->catfile( $Bin, "Data", "ensemblSource.txt" );
 
-my $ucsc = Bio::ToolBox::parser::ucsc->new(
+my $ucsc = Bio::ToolBox::Parser::ucsc->new(
 	file    => $ucscfile,
 	enssrc  => $enssrc,
 	do_gene => 1,
