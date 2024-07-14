@@ -3,18 +3,18 @@ package Bio::ToolBox::big_helper;
 use warnings;
 use strict;
 use English qw(-no_match_vars);
-use Carp qw(carp cluck croak);
+use Carp    qw(carp cluck croak);
 use File::Temp;
 use File::Which;
 use IO::File;
-use Bio::ToolBox::db_helper qw(get_chromosome_list);
+use Bio::ToolBox::db_helper         qw(get_chromosome_list);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG);
 require Exporter;
 
 our $VERSION = '1.70';
 
 ### Export
-our @ISA    = qw(Exporter);
+our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(
 	wig_to_bigwig_conversion
 	open_wig_to_bigwig_fh
@@ -67,7 +67,8 @@ sub wig_to_bigwig_conversion {
 		};
 	}
 	unless ( $args{bwapppath} ) {
-		carp q(Utility 'wigToBigWig' not specified and can not be found! Conversion failed!);
+		carp
+q(Utility 'wigToBigWig' not specified and can not be found! Conversion failed!);
 		return;
 	}
 
@@ -79,7 +80,8 @@ sub wig_to_bigwig_conversion {
 		# need to generate one from the database
 		$args{db} ||= undef;
 		unless ( $args{db} ) {
-			carp 'No requisite database or chromosome info file provided! Conversion failed';
+			carp
+'No requisite database or chromosome info file provided! Conversion failed';
 			return;
 		}
 		$args{chromo} = generate_chromosome_file( $args{db} );
@@ -125,12 +127,12 @@ sub wig_to_bigwig_conversion {
 	}
 	else {
 		if ( -e $bw_file ) {
-			unlink $bw_file; # remove any partial file
+			unlink $bw_file;    # remove any partial file
 		}
 		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
 
 			# leave the temp chromosome file as a courtesy
-			carp 
+			carp
 " Conversion failed. You should try manually and watch for errors\n Leaving temporary chromosome file '$args{chromo}'.";
 		}
 		else {
@@ -185,7 +187,8 @@ sub open_wig_to_bigwig_fh {
 		# need to generate one from the database
 		$args{db} ||= undef;
 		unless ( $args{db} ) {
-			carp 'No requisite database or chromosome info file provided! Conversion failed';
+			carp
+'No requisite database or chromosome info file provided! Conversion failed';
 			return;
 		}
 		$args{chrskip} ||= undef;
@@ -337,12 +340,12 @@ sub bed_to_bigbed_conversion {
 	}
 	else {
 		if ( -e $bb_file ) {
-			unlink $bb_file; # remove any partial file
+			unlink $bb_file;    # remove any partial file
 		}
 		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
 
 			# leave the temp chromosome file as a courtesy
-			carp 
+			carp
 " Conversion failed. You should try manually and watch for errors\n Leaving temporary chromosome file '$args{chromo}'.";
 		}
 		else {
@@ -369,8 +372,7 @@ sub generate_chromosome_file {
 	my $chr_fh = new File::Temp(
 		'UNLINK'   => 0,
 		'TEMPLATE' => 'chr_sizes_XXXXX',
-	)
-		or croak "unable to open chromosome temp file! $OS_ERROR";
+	) or croak "unable to open chromosome temp file! $OS_ERROR";
 	my $chromo_file = $chr_fh->filename;
 
 	# write out

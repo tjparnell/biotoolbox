@@ -191,7 +191,7 @@ sub get_exons {
 sub get_alt_exons {
 	my $ac_exons = get_alt_common_exons(@_);
 	my @alts;
-	foreach my $k ( keys %{ $ac_exons } ) {
+	foreach my $k ( keys %{$ac_exons} ) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
 		push @alts, @{ $ac_exons->{$k} };
@@ -233,7 +233,7 @@ sub get_introns {
 		foreach my $t (@transcripts) {
 			my $i = get_introns($t);
 			if ( $i and scalar( @{$i} ) ) {
-				push @introns, ( $i );
+				push @introns, ($i);
 			}
 		}
 		if (@introns) {
@@ -269,8 +269,9 @@ sub get_introns {
 				-strand       => $transcript->strand,
 				-primary_tag  => 'intron',
 				-source_tag   => $transcript->source_tag,
-				-primary_id   => sprintf("%s.intron%d", $transcript->id, $i+1),
-				-display_name => sprintf("%s.intron%d", $transcript->display_name, $i+1),
+				-primary_id   => sprintf( "%s.intron%d", $transcript->id, $i + 1 ),
+				-display_name =>
+					sprintf( "%s.intron%d", $transcript->display_name, $i + 1 ),
 			);
 			push @introns, $i;
 		}
@@ -284,14 +285,15 @@ sub get_introns {
 		for ( my $i = $last_i; $i > 0; $i-- ) {
 			my $e = $exons[$i];
 			my $i = $e->new(
-				-seq_id      => $e->seq_id,
-				-start       => $exons[ $i - 1 ]->end + 1,              # end of next exon
-				-end         => $e->start - 1,
-				-strand      => $transcript->strand,
-				-primary_tag => 'intron',
-				-source_tag  => $transcript->source_tag,
-				-primary_id  => sprintf("%s.intron%d", $transcript->id, $i),
-				-display_name => sprintf("%s.intron%d", $transcript->display_name, $i),
+				-seq_id       => $e->seq_id,
+				-start        => $exons[ $i - 1 ]->end + 1,    # end of next exon
+				-end          => $e->start - 1,
+				-strand       => $transcript->strand,
+				-primary_tag  => 'intron',
+				-source_tag   => $transcript->source_tag,
+				-primary_id   => sprintf( "%s.intron%d", $transcript->id, $i ),
+				-display_name =>
+					sprintf( "%s.intron%d", $transcript->display_name, $i ),
 			);
 			push @introns, $i;
 		}
@@ -311,7 +313,7 @@ sub get_introns {
 sub get_alt_introns {
 	my $ac_introns = get_alt_common_introns(@_);
 	my @alts;
-	foreach my $k ( keys %{ $ac_introns } ) {
+	foreach my $k ( keys %{$ac_introns} ) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
 		push @alts, @{ $ac_introns->{$k} };
@@ -418,7 +420,7 @@ sub _get_alt_common_things {
 
 sub get_transcripts {
 	my $gene = shift;
-	return                             unless $gene;
+	return                                    unless $gene;
 	confess 'FATAL: not a SeqFeature object!' unless ref($gene) =~ /seqfeature/i;
 	return $gene if ( $gene->primary_tag =~ m/rna | transcript/xi );
 	my @transcripts;
@@ -557,7 +559,7 @@ sub collapse_transcripts {
 
 sub get_transcript_length {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	if ( $transcript->primary_tag =~ /gene$/i ) {
 
@@ -581,7 +583,7 @@ sub get_transcript_length {
 
 sub is_coding {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	if ( $transcript->primary_tag =~ /gene$/i ) {
 
@@ -592,7 +594,7 @@ sub is_coding {
 		}
 		return $code_potential;
 	}
-	return 1 if $transcript->primary_tag =~ /mrna/i;              # assumption
+	return 1 if $transcript->primary_tag =~ /mrna/i;                  # assumption
 	return 1 if $transcript->source      =~ m/protein .? coding/xi;
 	if ( $transcript->has_tag('transcript_biotype') ) {
 
@@ -624,7 +626,7 @@ sub is_coding {
 
 sub get_cds {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my @cds;
 	foreach my $subfeat ( $transcript->get_SeqFeatures ) {
@@ -639,7 +641,7 @@ sub get_cds {
 
 sub get_cdsStart {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
@@ -660,7 +662,7 @@ sub get_cdsStart {
 
 sub get_cdsEnd {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
@@ -680,7 +682,7 @@ sub get_cdsEnd {
 
 sub get_transcript_cds_length {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $total = 0;
 	foreach my $subf ( $transcript->get_SeqFeatures ) {
@@ -692,7 +694,7 @@ sub get_transcript_cds_length {
 
 sub get_start_codon {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $start_codon;
 
@@ -725,7 +727,7 @@ sub get_start_codon {
 			-start       => $cdss->[-1]->end - 2,
 			-end         => $cdss->[-1]->end,
 			-strand      => -1,
-			-phase       => 0,
+			-phase       =>  0,
 			-primary_id  => $transcript->primary_id . '.start_codon',
 		);
 	}
@@ -734,7 +736,7 @@ sub get_start_codon {
 
 sub get_stop_codon {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $stop_codon;
 
@@ -769,7 +771,7 @@ sub get_stop_codon {
 			-start       => $cdss->[0]->start,
 			-end         => $cdss->[0]->start + 2,
 			-strand      => -1,
-			-phase       => 0,
+			-phase       =>  0,
 			-primary_id  => $transcript->primary_id . '.stop_codon',
 		);
 	}
@@ -778,7 +780,7 @@ sub get_stop_codon {
 
 sub get_utrs {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 
 	# collect the various types of subfeatures
@@ -897,11 +899,11 @@ sub get_utrs {
 
 sub get_transcript_utr_length {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 	my $utrs  = get_utrs($transcript);
 	my $total = 0;
-	foreach my $utr (@{ $utrs }) {
+	foreach my $utr ( @{$utrs} ) {
 		$total += $utr->length;
 	}
 	return $total;
@@ -909,27 +911,27 @@ sub get_transcript_utr_length {
 
 sub get_5p_utrs {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
-	return unless scalar(@{ $utrs });
+	return unless scalar( @{$utrs} );
 
-	my @fivers = grep { $_->primary_tag =~ /5|five/i } @{ $utrs };
+	my @fivers = grep { $_->primary_tag =~ /5|five/i } @{$utrs};
 	return wantarray ? @fivers : \@fivers;
 }
 
 sub get_3p_utrs {
 	my $transcript = shift;
-	return unless $transcript;
+	return                                    unless $transcript;
 	confess 'FATAL: not a SeqFeature object!' unless ref($transcript) =~ /seqfeature/i;
 
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
-	return unless scalar(@{ $utrs });
+	return unless scalar( @{$utrs} );
 
-	my @threes = grep { $_->primary_tag =~ /3|three/i } @{ $utrs };
+	my @threes = grep { $_->primary_tag =~ /3|three/i } @{$utrs};
 	return wantarray ? @threes : \@threes;
 }
 
@@ -937,7 +939,7 @@ sub get_transcript_5p_utr_length {
 	my $transcript = shift;
 	my $utrs       = get_5p_utrs($transcript);
 	my $total      = 0;
-	foreach my $utr (@{ $utrs }) {
+	foreach my $utr ( @{$utrs} ) {
 		$total += $utr->length;
 	}
 	return $total;
@@ -947,7 +949,7 @@ sub get_transcript_3p_utr_length {
 	my $transcript = shift;
 	my $utrs       = get_3p_utrs($transcript);
 	my $total      = 0;
-	foreach my $utr (@{ $utrs }) {
+	foreach my $utr ( @{$utrs} ) {
 		$total += $utr->length;
 	}
 	return $total;
@@ -983,7 +985,7 @@ sub gtf_string {
 	# mandatory identifiers
 	my ( $gene_id, $gene_name, $gene_biotype );
 	if ($gene) {
-		$gene_id   = $gene->primary_id || $gene->display_name || q();
+		$gene_id   = $gene->primary_id   || $gene->display_name || q();
 		$gene_name = $gene->display_name || q();
 		($gene_biotype) =
 			   $gene->get_tag_values('gene_biotype')
@@ -1169,7 +1171,7 @@ sub filter_transcript_support_level {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif ( ref($gene) eq 'ARRAY' ) {
-		@transcripts = @{ $gene };
+		@transcripts = @{$gene};
 	}
 	else {
 		return;
@@ -1180,7 +1182,8 @@ sub filter_transcript_support_level {
 	my %results = map { $_ => [] } @list;
 	foreach my $t (@transcripts) {
 		my ($tsl) = $t->get_tag_values('transcript_support_level');
-		# the value may be just a number, or may have additional text 
+
+		# the value may be just a number, or may have additional text
 		if ( $tsl =~ /^([12345])/ ) {
 			push @{ $results{$1} }, $t;
 		}
@@ -1240,7 +1243,8 @@ sub filter_transcript_support_level {
 		@keepers = @{ $results{'NA'} };
 	}
 	else {
-		confess "FATAL: unrecognized minimum TSL value '$min_tsl' Check the documentation!";
+		confess
+			"FATAL: unrecognized minimum TSL value '$min_tsl' Check the documentation!";
 	}
 	@keepers = @{ $results{'Missing'} } unless @keepers;
 
@@ -1258,7 +1262,7 @@ sub filter_transcript_gencode_basic {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif ( ref($gene) eq 'ARRAY' ) {
-		@transcripts = @{ $gene };
+		@transcripts = @{$gene};
 	}
 	else {
 		return;
@@ -1298,7 +1302,7 @@ sub filter_transcript_biotype {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif ( ref($gene) eq 'ARRAY' ) {
-		@transcripts = @{ $gene };
+		@transcripts = @{$gene};
 	}
 	else {
 		return;

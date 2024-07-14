@@ -195,7 +195,7 @@ is( $row->name, 'YAL044C', 'Feature name' );
 	position => 5,
 );
 is( min( keys %score1 ), -467, 'min 5prime relative position in positioned score hash' );
-is( max( keys %score1 ), 467,  'max 5prime relative position in positioned score hash' );
+is( max( keys %score1 ),  467, 'max 5prime relative position in positioned score hash' );
 is( $score1{218}, 0.62,
 	'score at position 218 in 5prime relative positioned score hash' );
 
@@ -209,7 +209,7 @@ is( $score1{218}, 0.62,
 
 # print "3' position_score is \n" . print_hash(\%score1);
 is( min( keys %score1 ), -430, 'min 3prime relative position in positioned score hash' );
-is( max( keys %score1 ), 481,  'max 3prime relative position in positioned score hash' );
+is( max( keys %score1 ),  481, 'max 3prime relative position in positioned score hash' );
 is( $score1{187}, 0.75,
 	'score at position 187 in 3prime relative positioned score hash' );
 

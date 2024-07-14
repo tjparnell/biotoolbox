@@ -3,10 +3,11 @@
 # documentation at end of file
 
 use warnings;
-no warnings qw(uninitialized); 
-# This script results in a ton of uninitialized warnings when packing chromosomal 
-# coverage arrays into binary strings due to vast stretches of chromosomes without 
-# alignments (think megabases of Ns in the human genome). 
+no warnings qw(uninitialized);
+
+# This script results in a ton of uninitialized warnings when packing chromosomal
+# coverage arrays into binary strings due to vast stretches of chromosomes without
+# alignments (think megabases of Ns in the human genome).
 # Taking time to convert into proper zeroes unnecessarily slows down run time.
 # Since we pack frequently throughout the app, it's easiest to simply turn off
 # uninitialized warnings globally.
@@ -15,9 +16,9 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use File::Spec;
 use File::Temp;
-use List::Util qw(sum0);
+use List::Util      qw(sum0);
 use List::MoreUtils qw(any natatime);
-use English qw(-no_match_vars);
+use English         qw(-no_match_vars);
 use Bio::ToolBox;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -25,7 +26,7 @@ use Bio::ToolBox::db_helper qw(
 	low_level_bam_fetch
 	$BAM_ADAPTER
 );
-use Bio::ToolBox::utility qw(format_with_commas);
+use Bio::ToolBox::utility    qw(format_with_commas);
 use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh
 	generate_chromosome_file
@@ -56,20 +57,20 @@ unless (@ARGV) {
 
 ### Get command line options and initialize values
 my (
-	$outfile,      $position,        $splice,          $paired,
-	$fastpaired,   $shift,
-	$chr_number,   $correlation_min, $zmin,            $zmax,
-	$model,        $do_strand,       $flip,            $min_mapq,
-	$nosecondary,  $noduplicate,     $nosupplementary, $max_isize,
-	$min_isize,    $first_read,      $second_read,     $multi_hit_scale,
-	$splice_scale, $rpm,             $do_mean,         $chrnorm,
-	$chrapply,     $chr_exclude,     $black_list,      $bin_size,
-	$dec_precison, $bigwig,          $no_zero,         $bwapp,
-	$cpu,          $max_intron,      $window,          $verbose,
-	$gz,           $tempdir,         $help,            $print_version,
+	$outfile,         $position,        $splice,       $paired,
+	$fastpaired,      $shift,           $chr_number,   $correlation_min,
+	$zmin,            $zmax,            $model,        $do_strand,
+	$flip,            $min_mapq,        $nosecondary,  $noduplicate,
+	$nosupplementary, $max_isize,       $min_isize,    $first_read,
+	$second_read,     $multi_hit_scale, $splice_scale, $rpm,
+	$do_mean,         $chrnorm,         $chrapply,     $chr_exclude,
+	$black_list,      $bin_size,        $dec_precison, $bigwig,
+	$no_zero,         $bwapp,           $cpu,          $max_intron,
+	$window,          $verbose,         $gz,           $tempdir,
+	$help,            $print_version,
 );
-my $use_start    = 0;  # these need to be explicitly set to zero because I sum them 
-my $use_mid      = 0;  # to verify user input
+my $use_start    = 0;    # these need to be explicitly set to zero because I sum them
+my $use_mid      = 0;    # to verify user input
 my $use_span     = 0;
 my $use_cspan    = 0;
 my $use_extend   = 0;
@@ -485,7 +486,8 @@ sub check_defaults {
 		$splice = 0;
 	}
 	if ( $shift and $splice ) {
-		print " WARNING: enabling both shift and splices is currently not allowed. Pick one.\n";
+		print
+" WARNING: enabling both shift and splices is currently not allowed. Pick one.\n";
 		exit 1;
 	}
 	if ( $shift and $paired ) {
@@ -546,8 +548,8 @@ sub check_defaults {
 
 	# check mapping quality
 	if ( defined $min_mapq ) {
-		if ($min_mapq > 255 or $min_mapq < 0) {
-			print STDERR " FATAL: quality score must be 0-255!\n" ;
+		if ( $min_mapq > 255 or $min_mapq < 0 ) {
+			print STDERR " FATAL: quality score must be 0-255!\n";
 			exit 1;
 		}
 	}
@@ -601,7 +603,7 @@ sub check_defaults {
 	# set bin size
 	if ($bin_size) {
 		if ( $bin_size < 0 ) {
-			print STDERR " FATAL: bin size cannot be negative!\n" ;
+			print STDERR " FATAL: bin size cannot be negative!\n";
 			exit 1;
 		}
 	}
@@ -685,7 +687,7 @@ sub check_defaults {
 		}
 		else {
 			print STDERR
-" FATAL: Define an output filename when providing multiple bam files!\n";
+				" FATAL: Define an output filename when providing multiple bam files!\n";
 			exit 1;
 		}
 	}
@@ -1313,8 +1315,12 @@ sub write_model_file {
 	}
 
 	# Prepare the data structure
-	my $Data = Bio::ToolBox->new_data( 'Start', sprintf("%s_F", $outfile), 
-		sprintf("%s_R", $outfile), sprintf("%s_shift", $outfile) );
+	my $Data = Bio::ToolBox->new_data(
+		'Start',
+		sprintf( "%s_F",     $outfile ),
+		sprintf( "%s_R",     $outfile ),
+		sprintf( "%s_shift", $outfile )
+	);
 	return unless $Data;
 	$Data->add_comment('Average profile of read start point sums');
 	$Data->add_comment('Only profiles of trimmed shift value samples included');
@@ -1336,7 +1342,7 @@ sub write_model_file {
 
 	# Write the model file
 	my $profile_file = $Data->write_file(
-		'filename' => sprintf("%s_model.txt", $outfile),
+		'filename' => sprintf( "%s_model.txt", $outfile ),
 		'gz'       => 0,
 	);
 	print "  Wrote shift profile model data file $profile_file\n" if $profile_file;
@@ -1344,7 +1350,7 @@ sub write_model_file {
 	### R squared data
 	# prepare the data structure
 	undef $Data;
-	$Data = Bio::ToolBox->new_data( 'Shift', sprintf("%s_R", $outfile) );
+	$Data = Bio::ToolBox->new_data( 'Shift', sprintf( "%s_R", $outfile ) );
 	$Data->add_comment('Average correlation values for each shift');
 	$Data->add_comment("Final shift value calculated as $value bp");
 	$Data->metadata( 1, 'minimum_r',                     $correlation_min );
@@ -1365,7 +1371,7 @@ sub write_model_file {
 
 	# write the r squared file
 	my $success = $Data->write_file(
-		'filename' => sprintf("%s_correlations.txt", $outfile),
+		'filename' => sprintf( "%s_correlations.txt", $outfile ),
 		'gz'       => 0,
 	);
 	print "  Wrote shift correlation data file $success\n" if $success;
@@ -1378,7 +1384,7 @@ sub write_model_file {
 		$Data->add_row( [ $regions->[$i], $region_shifts->[$i], $region_bestr->[$i] ] );
 	}
 	$success = $Data->write_file(
-		'filename' => sprintf("%s_correlated_regions.txt", $outfile),
+		'filename' => sprintf( "%s_correlated_regions.txt", $outfile ),
 		'gz'       => 0
 	);
 	print "  Wrote correlated regions data file $success\n" if $success;
@@ -1568,9 +1574,10 @@ sub process_bam_coverage_on_chromosome {
 
 	# identify chromosome target id
 	my ( $tid, undef, undef ) = $sam->header->parse_region($seq_id);
-	unless (defined $tid) {
+	unless ( defined $tid ) {
 		printf " WARNING: unable to parse target id for '%s' from bam file %s!\n",
 			$seq_id, $bamfiles[$samid];
+
 		# we continue but this will silently fail the low level fetch below
 		# but at least an empty temp file will be written allowing program to finish
 	}
@@ -1948,9 +1955,10 @@ sub process_alignments_on_chromosome {
 
 	# identify chromosome target id
 	my ( $tid, undef, undef ) = $sam->header->parse_region($seq_id);
-	unless (defined $tid) {
+	unless ( defined $tid ) {
 		printf " WARNING: unable to parse target id for '%s' from bam file %s!\n",
 			$seq_id, $bamfiles[$samid];
+
 		# we continue but this will silently fail the low level fetch below
 		# but at least an empty temp file will be written allowing program to finish
 	}
@@ -3037,7 +3045,7 @@ sub pe_start {
 	else {
 		die sprintf(
 " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
-			$a->query->name);
+			$a->query->name );
 	}
 }
 
@@ -3061,7 +3069,7 @@ sub pe_strand_start {
 	else {
 		die sprintf(
 " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
-			$a->query->name);
+			$a->query->name );
 	}
 }
 
@@ -3091,7 +3099,7 @@ sub pe_strand_mid {
 	else {
 		die sprintf(
 " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
-			$a->query->name);
+			$a->query->name );
 	}
 }
 
@@ -3129,7 +3137,7 @@ sub pe_strand_span {
 	else {
 		die sprintf(
 " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
-			$a->query->name);
+			$a->query->name );
 	}
 }
 
@@ -3171,7 +3179,7 @@ sub pe_strand_center_span {
 	else {
 		die sprintf(
 " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
-			$a->query->name);
+			$a->query->name );
 	}
 }
 
@@ -3317,7 +3325,7 @@ sub pe_strand_ends {
 	else {
 		die sprintf(
 " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end read %s.",
-			$a->query->name);
+			$a->query->name );
 	}
 }
 

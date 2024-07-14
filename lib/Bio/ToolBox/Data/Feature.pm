@@ -3,7 +3,7 @@ package Bio::ToolBox::Data::Feature;
 use warnings;
 use strict;
 use English qw(-no_match_vars);
-use Carp qw(carp cluck croak confess);
+use Carp    qw(carp cluck croak confess);
 use Module::Load;
 use Bio::ToolBox::db_helper qw(
 	get_db_feature
@@ -322,14 +322,14 @@ sub _strand {
 sub _extract_coordinate_string {
 	my ( $self, $i ) = @_;
 	if ( $self->value($i) =~ /^ ([\w\.\-]+) : (\d+) (?: \.\. | \-) (\d+) $/x ) {
-		
+
 		# chromosome:start-end or chromosome:start..end
 		$self->{seqid} = $1 unless exists $self->{seqid};
 		$self->{start} = $2 unless exists $self->{start};
 		$self->{end}   = $3 unless exists $self->{end};
 	}
 	elsif ( $self->value($i) =~ /^([\w\.\-]+) : (\d+) $/x ) {
-		
+
 		# chromosome:start
 		$self->{seqid} = $1 unless exists $self->{seqid};
 		$self->{start} = $2 unless exists $self->{start};
@@ -340,8 +340,9 @@ sub peak {
 	my $self = shift;
 	if ( $self->{data}->format eq 'narrowPeak' ) {
 		if ( exists $self->{feature} and $self->{feature}->has_tag('peak') ) {
-			return ( int( $self->{feature}->get_tag_values('peak') )
-						+ $self->{feature}->start );
+			return (
+				int( $self->{feature}->get_tag_values('peak') ) +
+					$self->{feature}->start );
 		}
 		else {
 			# hard coded start and peak columns
@@ -650,7 +651,7 @@ sub seqfeature {
 	my $self  = shift;
 	my $force = shift || 0;
 	carp 'ERROR: feature is a read only method' if @_;
-	return $self->{feature}              if exists $self->{feature};
+	return $self->{feature}                     if exists $self->{feature};
 
 	# normally this is only for named features in a data table
 	# skip this for coordinate features like bed files
@@ -701,7 +702,7 @@ sub get_features {
 	my %args = @_;
 	my $db   = $args{db} || $self->{data}->open_meta_database || undef;
 	carp 'ERROR: no database defined to get features!' unless defined $db;
-	return                                      unless $db->can('features');
+	return                                             unless $db->can('features');
 
 	# convert the argument style for most bioperl db APIs
 	my %opts;
@@ -1245,7 +1246,7 @@ sub calculate_reference {
 		}
 	}
 	elsif ( $args->{position} == 10 or $args->{position} == 9 ) {
-		
+
 		# also accept old 0-based index of 9 for narrowPeak
 		$coordinate = $self->peak;
 	}

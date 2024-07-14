@@ -4,7 +4,7 @@
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
+use English      qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use IO::Prompt::Tiny qw(prompt);
@@ -15,7 +15,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Parser;
 use Bio::ToolBox::GeneTools qw(:all);
-use Bio::ToolBox::utility qw(parse_list format_with_commas);
+use Bio::ToolBox::utility   qw(parse_list format_with_commas);
 
 our $VERSION = '1.70';
 

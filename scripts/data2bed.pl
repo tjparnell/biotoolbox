@@ -6,10 +6,10 @@ use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use List::MoreUtils qw(mesh);
+use List::MoreUtils  qw(mesh);
 use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility qw( ask_user_for_index format_with_commas );
+use Bio::ToolBox::utility    qw( ask_user_for_index format_with_commas );
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 
 our $VERSION = '1.70';
@@ -156,7 +156,7 @@ if ($ask) {
 	print " Press Return to accept the suggested index\n";
 
 	# request chromosome index
-	unless ( $chr_index ) {
+	unless ($chr_index) {
 		my $suggestion = $Input->chromo_column;
 		$chr_index = ask_user_for_index( $Input,
 			" Enter the index for the chromosome column [$suggestion]  " );
@@ -168,7 +168,7 @@ if ($ask) {
 	}
 
 	# request start index
-	unless ( $start_index ) {
+	unless ($start_index) {
 		my $suggestion = $Input->start_column || q();
 		$start_index = ask_user_for_index( $Input,
 			" Enter the index for the start column [$suggestion]  " );
@@ -180,7 +180,7 @@ if ($ask) {
 	}
 
 	# request stop index
-	unless ( $stop_index ) {
+	unless ($stop_index) {
 		my $suggestion = $Input->stop_column || q();
 		$stop_index = ask_user_for_index( $Input,
 			" Enter the index for the stop or end column [$suggestion]  " );
@@ -192,14 +192,14 @@ if ($ask) {
 	}
 
 	# request name index or text
-	unless ( $name ) {
+	unless ($name) {
 
 		# this is a special input, can't use the ask_user_for_index sub
 		# accepts either index or text string
 		my $suggestion = $Input->name_column || q();
 		my $prompt     = " Enter the index for the feature name column or\n"
 			. "   the base text for auto-generated names [$suggestion]  ";
-		my $in = prompt( $prompt );
+		my $in = prompt($prompt);
 		if ( $in =~ /^(\d+)$/ ) {
 			$name_index = $1;
 		}
@@ -209,7 +209,7 @@ if ($ask) {
 	}
 
 	# request score index
-	unless ( $score_index ) {
+	unless ($score_index) {
 		my $suggestion = $Input->find_column('^score$') || q();
 		$score_index = ask_user_for_index( $Input,
 			" Enter the index for the feature score column [$suggestion]  " );
@@ -217,7 +217,7 @@ if ($ask) {
 	}
 
 	# request strand index
-	unless ( $strand_index ) {
+	unless ($strand_index) {
 		my $suggestion = $Input->strand_column || q();
 		$strand_index = ask_user_for_index( $Input,
 			" Enter the index for the feature strand column [$suggestion]  " );
@@ -230,7 +230,8 @@ else {
 		or ( $chr_index and $start_index and $stop_index )
 		or ( $Input->feature_type eq 'named' and ( $database or $Input->database ) ) )
 	{
-		print STDERR " FATAL: Not enough information has been provided to convert to bed file.\n"
+		print STDERR
+			" FATAL: Not enough information has been provided to convert to bed file.\n"
 			. "Coordinate column names must be recognizable or specified. Use --help\n";
 		exit 1;
 	}
@@ -252,32 +253,32 @@ printf " Converting using \n  - chromosome index %s\n  - start index %s\n"
 	: $Input->score_column ? $Input->score_column
 	: '-', $strand_index ? $strand_index
 	: $Input->strand_column ? $Input->strand_column
-	:                                 '-';
+	:                         '-';
 
 # generate arguments list
 my @arg_keys;
 my @arg_indices;
-if ( $chr_index ) {
+if ($chr_index) {
 	push @arg_keys,    'chromo';
 	push @arg_indices, $chr_index;
 }
-if ( $start_index ) {
+if ($start_index) {
 	push @arg_keys,    'start';
 	push @arg_indices, $start_index;
 }
-if ( $stop_index ) {
+if ($stop_index) {
 	push @arg_keys,    'stop';
 	push @arg_indices, $stop_index;
 }
-if ( $name_index ) {
+if ($name_index) {
 	push @arg_keys,    'name';
 	push @arg_indices, $name_index;
 }
-if ( $score_index ) {
+if ($score_index) {
 	push @arg_keys,    'score';
 	push @arg_indices, $score_index;
 }
-if ( $strand_index ) {
+if ($strand_index) {
 	push @arg_keys,    'strand';
 	push @arg_indices, $strand_index;
 }
@@ -287,7 +288,7 @@ unless ($bed) {
 	if ( $strand_index or $Input->strand_column ) {
 		$bed = 6;
 	}
-	elsif ( $score_index ) {
+	elsif ($score_index) {
 		$bed = 5;
 	}
 	elsif ( $name_index or $name_base or $Input->name_column ) {
@@ -319,7 +320,7 @@ while ( my $row = $Input->next_row ) {
 	$args{bed} = $bed;
 
 	# extras
-	if ( $name_base ) {
+	if ($name_base) {
 		$args{name} = sprintf( "%s_%07d", $name_base, $count );
 	}
 	if ( $zero_based and $start_index ) {

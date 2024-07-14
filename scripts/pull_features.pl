@@ -247,9 +247,10 @@ sub identify_indices {
 		$data_index = $Data->name_column;
 		$list_index = $List->name_column;
 
-		if ( defined $data_index and defined $list_index and
-			$Data->name($data_index) eq $List->name($list_index)
-		) {
+		if (    defined $data_index
+			and defined $list_index
+			and $Data->name($data_index) eq $List->name($list_index) )
+		{
 
 			# report
 			printf "  using List column '%s', index $list_index\n",
@@ -437,7 +438,7 @@ sub generate_output_data_structures {
 	# only one output data structure
 	if ( scalar keys %{$pulled} == 1 ) {
 
-		my $group = (keys %{$pulled})[0];  # use the actual group name
+		my $group = ( keys %{$pulled} )[0];    # use the actual group name
 
 		# generate new file name data
 		my $newfile = $outfile;

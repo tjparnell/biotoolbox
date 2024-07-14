@@ -3,8 +3,8 @@ package Bio::ToolBox::db_helper::bigbed;
 use warnings;
 use strict;
 use Carp;
-use English qw(-no_match_vars);
-use List::Util qw(min max sum);
+use English          qw(-no_match_vars);
+use List::Util       qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigBed;
@@ -13,7 +13,7 @@ require Exporter;
 our $VERSION = '1.70';
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users
@@ -55,7 +55,7 @@ sub collect_bigbed_scores {
 	# usually there is only one, but for stranded data there may be
 	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	my @scores;
-	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 
 		# open the bedfile
 		my $bb = _get_bb( $param->[$d] );
@@ -126,7 +126,7 @@ sub collect_bigbed_position_scores {
 	# look at each bedfile
 	# usually there is only one, but there may be more
 	my %pos2data;
-	for ( my $i = DATA; $i < scalar @{ $param }; $i++ ) {
+	for ( my $i = DATA; $i < scalar @{$param}; $i++ ) {
 
 		# open the bedfile
 		my $bb = _get_bb( $param->[$i] );
@@ -268,7 +268,7 @@ sub open_bigbed_db {
 	if ($bb) {
 		return $bb;
 	}
-	elsif ($EVAL_ERROR or $OS_ERROR) {
+	elsif ( $EVAL_ERROR or $OS_ERROR ) {
 		carp $EVAL_ERROR;
 		carp $OS_ERROR;
 		return;

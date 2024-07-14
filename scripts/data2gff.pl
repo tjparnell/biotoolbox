@@ -259,7 +259,7 @@ if ($ask) {
 		if ( $in =~ /^(\d+)$/ ) {
 			$name_index = $1;
 		}
-		elsif ($in =~ /\w+/) {
+		elsif ( $in =~ /\w+/ ) {
 			$name_base = $in;
 		}
 	}
@@ -268,7 +268,7 @@ if ($ask) {
 	unless ( defined $id_index ) {
 		my $suggestion = $Input->id_column;
 		$suggestion = q() unless $suggestion;
-		$id_index = ask_user_for_index( $Input,
+		$id_index   = ask_user_for_index( $Input,
 			" Enter the index for the feature unique ID column [$suggestion]: " );
 		$id_index = defined $id_index ? $id_index : $suggestion;
 	}
@@ -285,7 +285,8 @@ else {
 		or ( defined $chr_index and defined $start_index and defined $stop_index )
 		or ( $Input->feature_type eq 'named' and $Input->database ) )
 	{
-		print STDERR " FATAL: Not enough information has been provided to convert to GFF file.\n"
+		print STDERR
+			" FATAL: Not enough information has been provided to convert to GFF file.\n"
 			. "Coordinate column names must be recognizable or specified. Use --help\n";
 		exit;
 	}
@@ -305,7 +306,7 @@ if ( defined $start_index and substr( $Input->name($start_index), -1 ) eq '0' ) 
 }
 if ( $unique and not( defined $name_index or $name_base ) ) {
 	print STDERR
-" FATAL: must provide a name index or name base to make unique feature names!\n";
+		" FATAL: must provide a name index or name base to make unique feature names!\n";
 	exit 1;
 }
 my $unique_name_counter = {};    # hash for making unique feature names
@@ -321,50 +322,50 @@ while ( my $row = $Input->next_row ) {
 	# build the arguments
 	# retrieve information from row object if indices were provided
 	my @args;
-	if ( $chr_index ) {
+	if ($chr_index) {
 		my $c = $row->value($chr_index);
 		next if $c eq '.';
 		push @args, 'chromo', $c;
 	}
-	if ( $start_index ) {
+	if ($start_index) {
 		my $s = $row->value($start_index);
 		next    if $s eq '.';
 		$s += 1 if $interbase;
 		push @args, 'start', $s;
 	}
-	if ( $stop_index ) {
+	if ($stop_index) {
 		push @args, 'stop', $row->value($stop_index);
 	}
-	if ( $strand_index ) {
+	if ($strand_index) {
 		push @args, 'strand', $row->value($strand_index);
 	}
-	if ( $score_index ) {
+	if ($score_index) {
 		push @args, 'score', $row->value($score_index);
 	}
-	if ( $name_index ) {
+	if ($name_index) {
 		my $name =
 			$unique
 			? generate_unique_name( $row->value($name_index), $unique_name_counter )
 			: $row->value($name_index);
 		push @args, 'name', $name;
 	}
-	elsif ( $name_base ) {
+	elsif ($name_base) {
 		push @args, 'name', sprintf( "%s_%07d", $name_base, $count );
 	}
-	if ( $id_index ) {
+	if ($id_index) {
 		my $id = $row->value($id_index);
 		push @args, 'id', generate_unique_name( $id, $unique_id_counter );
 	}
-	if ( $type_index ) {
+	if ($type_index) {
 		push @args, 'type', $row->value($type_index);
 	}
-	elsif ( $type_base ) {
+	elsif ($type_base) {
 		push @args, 'type', $type_base;
 	}
-	if ( $source_index ) {
+	if ($source_index) {
 		push @args, 'source', $row->value($source_index);
 	}
-	elsif ( $source_base ) {
+	elsif ($source_base) {
 		push @args, 'source', $source_base;
 	}
 	if (@tag_indices) {

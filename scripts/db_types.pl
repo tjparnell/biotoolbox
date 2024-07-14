@@ -5,7 +5,7 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use IO::Prompt::Tiny qw(prompt);
+use IO::Prompt::Tiny        qw(prompt);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_dataset_list
@@ -135,7 +135,7 @@ sub request_db_from_user {
 	foreach ( sort { $a <=> $b } keys %num2db ) {
 		print "   $_\t$num2db{$_}\n";
 	}
-	my $p = " Enter the number of the database to examine   ";
+	my $p      = " Enter the number of the database to examine   ";
 	my $number = prompt($p);
 	return unless exists $num2db{$number};
 	return $num2db{$number};

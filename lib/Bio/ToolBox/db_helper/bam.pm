@@ -20,7 +20,7 @@ eval {
 our $VERSION = '1.70';
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 ## no critic
 ## this is never intended to be used directly by end users
 ## and exporting everything is required
@@ -70,7 +70,7 @@ sub open_bam_db {
 	if ($sam) {
 		return $sam;
 	}
-	elsif ($EVAL_ERROR or $OS_ERROR) {
+	elsif ( $EVAL_ERROR or $OS_ERROR ) {
 		carp "ERROR: Unable to open Bam file: $EVAL_ERROR $OS_ERROR";
 		return;
 	}
@@ -114,7 +114,7 @@ sub check_bam_index {
 	my $bam_mtime = ( stat($bamfile) )[9];
 
 	# optional index names
-	my $bam_index = "$bamfile.bai";                # .bam.bai
+	my $bam_index = "$bamfile.bai";                   # .bam.bai
 	my $alt_index = $bamfile;
 	$alt_index =~ s/bam$/bai/i;    # picard uses .bai instead of .bam.bai as samtools does
 
@@ -172,7 +172,7 @@ sub collect_bam_scores {
 
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	for ( my $b = DATA; $b < scalar @{ $param }; $b++ ) {
+	for ( my $b = DATA; $b < scalar @{$param}; $b++ ) {
 
 		## Open the Bam File
 		my $bamfile = $param->[$b];
@@ -238,7 +238,7 @@ sub collect_bam_scores {
 
 			# convert the coverage data
 			# by default, this should return the coverage at 1 bp resolution
-			if ( scalar @{ $coverage } ) {
+			if ( scalar @{$coverage} ) {
 
 				# check whether we need to index the scores
 				if ( $param->[RETT] == 2 ) {
@@ -260,7 +260,7 @@ sub collect_bam_scores {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
-		return wantarray ? @{ $scores } : $scores;
+		return wantarray ? @{$scores} : $scores;
 	}
 }
 

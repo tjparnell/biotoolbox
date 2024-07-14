@@ -2,10 +2,10 @@ package Bio::ToolBox::db_helper;
 
 use warnings;
 use strict;
-use Carp qw(carp cluck croak confess);
+use Carp    qw(carp cluck croak confess);
 use English qw(-no_match_vars);
 use Module::Load;    # for dynamic loading during runtime
-use List::Util qw(min max sum0 uniq);
+use List::Util       qw(min max sum0 uniq);
 use Statistics::Lite qw(median range stddevp);
 use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::db_helper::constants;
@@ -1115,7 +1115,8 @@ sub get_new_genome_list {
 				);
 			}
 			else {
-				carp 'ERROR: Set::IntervalTree must be installed to use exclusion intervals!';
+				carp
+'ERROR: Set::IntervalTree must be installed to use exclusion intervals!';
 			}
 		}
 		else {
@@ -1533,7 +1534,7 @@ sub low_level_bam_fetch {
 	my ( $sam, $tid, $start, $stop, $callback, $data ) = @_;
 
 	# the low level fetch returns an undocumented code that is essentially useless
-	# all real data is in the $data reference 
+	# all real data is in the $data reference
 	# so we silently fail here too if something doesn't look right, and $data is unaltered
 	return unless defined $sam;
 	return unless defined $tid;
@@ -1816,12 +1817,13 @@ sub _lookup_db_method {
 	else {
 		confess 'FATAL: no recognizeable dataset provided!' unless $param->[DATA];
 		confess 'FATAL: no database passed!'                unless $param->[DB];
-		confess sprintf "FATAL: something went wrong! parameters: %s", join ', ', @{$param};
+		confess sprintf "FATAL: something went wrong! parameters: %s", join ', ',
+			@{$param};
 	}
 
 	### Cache and return the results
-	$DB_METHODS{ $param->[METH] }{ $param->[RETT] }{ $param->[DB] || '.' }{ $param->[DATA] } =
-		$score_method;
+	$DB_METHODS{ $param->[METH] }{ $param->[RETT] }{ $param->[DB]
+			|| '.' }{ $param->[DATA] } = $score_method;
 	return $score_method;
 }
 

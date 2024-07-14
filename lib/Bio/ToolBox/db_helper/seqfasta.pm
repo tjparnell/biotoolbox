@@ -5,7 +5,7 @@ use strict;
 use Carp;
 use English qw(-no_match_vars);
 use Module::Load;    # for dynamic loading during runtime
-use List::Util qw(min max sum);
+use List::Util       qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::db_helper::config;
@@ -13,10 +13,10 @@ use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 require Exporter;
 
-our $VERSION   = '1.70';
+our $VERSION = '1.70';
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users
@@ -43,7 +43,8 @@ sub open_fasta_db {
 		$db = Bio::DB::Fasta->new($database);
 	};
 	unless ($db) {
-		carp "ERROR: unable to open fasta file as database! Make sure the file's directory\n"
+		carp
+"ERROR: unable to open fasta file as database! Make sure the file's directory\n"
 			. "writable, and if a *.index file exists, try deleting it so it can be rebuilt\n";
 		return;
 	}
@@ -95,7 +96,7 @@ sub open_store_db {
 
 		# check for empty passwords
 		# config::simple passes an empty array when nothing was defined
-		if ( ref($pass) eq 'ARRAY' and scalar @{ $pass } == 0 ) { $pass = undef }
+		if ( ref($pass) eq 'ARRAY' and scalar @{$pass} == 0 ) { $pass = undef }
 
 		# set up the dsn
 		# it can be specifically defined
@@ -136,7 +137,7 @@ sub collect_store_scores {
 	my $param = shift;
 
 	# database feature types
-	my @types = splice( @{ $param }, DATA );
+	my @types = splice( @{$param}, DATA );
 
 	# set up iterator from database
 	my $iterator = $param->[DB]->get_seq_stream(
@@ -187,9 +188,9 @@ sub collect_store_scores {
 
 			# get the full list of features to pass off to the
 			# helper subroutine
-			push @{ $param }, $feature;
+			push @{$param}, $feature;
 			while ( my $f = $iterator->next_seq ) {
-				push @{ $param }, $f;
+				push @{$param}, $f;
 			}
 
 			# check that we have wiggle support

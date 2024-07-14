@@ -122,8 +122,7 @@ sub add_program {
 sub _write_new_config {
 	my $fh = IO::File->new( '>', $default_path );
 	unless ($fh) {
-		carp
-"ERROR: Cannot write biotoolbox configuration file $default_path! $OS_ERROR";
+		carp "ERROR: Cannot write biotoolbox configuration file $default_path! $OS_ERROR";
 		return;
 	}
 	$fh->print($default);

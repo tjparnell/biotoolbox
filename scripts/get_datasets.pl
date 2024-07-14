@@ -4,7 +4,7 @@
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
+use English      qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Scalar::Util qw(looks_like_number);
@@ -223,7 +223,7 @@ unless ( $datasets[0] eq 'none' ) {
 	);
 }
 unless (@datasets) {
-	print STDERR 
+	print STDERR
 " FATAL: No verifiable datasets provided. Check your file path, database, or dataset.\n";
 	exit 1;
 }
@@ -409,7 +409,7 @@ m/^ (?: median | mean | stddev | min | max | range | sum | count | pcount | ncou
 	if ($fpkm_method) {
 		unless ( $fpkm_method eq 'region' or $fpkm_method eq 'genome' ) {
 			print STDERR
-" FATAL: fpkm option must be one of 'region' or 'genome'! see help\n";
+				" FATAL: fpkm option must be one of 'region' or 'genome'! see help\n";
 			exit 1;
 		}
 		unless ( $method =~ /count|sum/ ) {
@@ -503,7 +503,7 @@ m/^ (?: median | mean | stddev | min | max | range | sum | count | pcount | ncou
 	}
 	if ( $subfeature and ( defined $fstart or defined $start_adj ) ) {
 		print STDERR
-" FATAL: Cannot modify coordinates when subfeatures are requested!\n";
+			" FATAL: Cannot modify coordinates when subfeatures are requested!\n";
 		exit 1;
 	}
 	if (    $subfeature
@@ -548,10 +548,11 @@ sub parallel_execution {
 		}
 
 		# collapse transcripts if needed
-		if (
-			$feature and $feature =~ /gene/i
-			and $subfeature and $subfeature =~ m/exon | intron/xi
-		) {
+		if (    $feature
+			and $feature =~ /gene/i
+			and $subfeature
+			and $subfeature =~ m/exon | intron/xi )
+		{
 			my $c = $Data->collapse_gene_transcripts;
 			if ( $c != $Data->last_row ) {
 				printf " Not all row SeqFeatures could be collapsed, %d failed\n",
@@ -594,10 +595,11 @@ sub parallel_execution {
 sub single_execution {
 
 	# collapse transcripts if needed
-	if (
-		$feature and $feature =~ /gene/i
-		and $subfeature and $subfeature =~ m/exon | intron/xi
-	) {
+	if (    $feature
+		and $feature =~ /gene/i
+		and $subfeature
+		and $subfeature =~ m/exon | intron/xi )
+	{
 		my $c = $Data->collapse_gene_transcripts;
 		if ( $c != $Data->last_row ) {
 			printf " Not all row SeqFeatures could be collapsed, %d failed\n",
@@ -624,7 +626,7 @@ sub collect_dataset {
 	if ($set_strand) {
 		unless ( defined $Data->strand_column ) {
 			print STDERR
-" FATAL: requested to set strand but a strand column was not found!\n";
+				" FATAL: requested to set strand but a strand column was not found!\n";
 			exit 1;
 		}
 	}
@@ -662,7 +664,7 @@ sub get_dataset {
 				'subfeature' => $subfeature,
 			);
 			if ( $formatter and looks_like_number($score) ) {
-				$score = sprintf( $formatter, $score ) ;
+				$score = sprintf( $formatter, $score );
 			}
 			$row->value( $index, $score );
 		}
@@ -756,7 +758,7 @@ sub get_adjusted_dataset {
 				'stranded' => $stranded,
 			);
 			if ( $formatter and looks_like_number($score) ) {
-				$score = sprintf( $formatter, $score ) ;
+				$score = sprintf( $formatter, $score );
 			}
 			$row->value( $index, $score );
 		}
@@ -830,7 +832,7 @@ sub get_fractionated_dataset {
 				'stranded' => $stranded,
 			);
 			if ( $formatter and looks_like_number($score) ) {
-				$score = sprintf( $formatter, $score ) ;
+				$score = sprintf( $formatter, $score );
 			}
 			$row->value( $index, $score );
 		}

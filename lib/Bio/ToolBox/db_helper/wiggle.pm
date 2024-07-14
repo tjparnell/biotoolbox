@@ -10,7 +10,7 @@ require Exporter;
 our $VERSION = '1.51';
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users
@@ -22,7 +22,7 @@ our @EXPORT = qw(
 ## use critic
 
 # Hashes of opened file objects
-my %OPENED_WIGFILES;  # opened wigfile objects
+my %OPENED_WIGFILES;   # opened wigfile objects
                        # in empirical testing, this doesn't really seem to speed things up
                        # like I thought it would
                        # oh well, keep it anyway????
@@ -38,7 +38,7 @@ sub collect_wig_scores {
 	return unless $wig_data;
 
 	# return the values
-	my @values = values %{ $wig_data };
+	my @values = values %{$wig_data};
 	return wantarray ? @values : \@values;
 }
 
@@ -52,7 +52,7 @@ sub collect_wig_position_scores {
 	# usually there is only one, but for stranded data there may be
 	# two wigfiles (+ and -), so we'll check each wig file for strand info
 	my %pos2score;    # position => score
-	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 
 		my $feature = $param->[$d];
 		confess 'FATAL: dataset is not a seqfeature object!'

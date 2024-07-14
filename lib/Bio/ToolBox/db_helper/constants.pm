@@ -17,7 +17,7 @@ use constant {
 	DATA => 8,    # first dataset, additional may be present
 };
 
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users

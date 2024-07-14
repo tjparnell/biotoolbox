@@ -104,13 +104,13 @@ unless ($database) {
 }
 
 ### Identify columns ####
-unless ( $id_i ) {
+unless ($id_i) {
 	$id_i = $Data->name_column;
 }
-unless ( $seq_i ) {
+unless ($seq_i) {
 	$seq_i = $Data->find_column('sequence');
 }
-unless ( $desc_i ) {
+unless ($desc_i) {
 	$desc_i = $Data->find_column('description|note');
 }
 my $coords = 0;
@@ -184,8 +184,7 @@ sub write_direct_single_fasta {
 
 	# write out
 	my $seq_fh = open_output_fasta();
-	write_fasta_seq($seq_fh, $Data->basename, 'Concatenated sequences',
-		$concat_seq);
+	write_fasta_seq( $seq_fh, $Data->basename, 'Concatenated sequences', $concat_seq );
 	$seq_fh->close;
 }
 
@@ -202,7 +201,7 @@ sub write_direct_multi_fasta {
 			if ( defined $desc_i ) {
 				$desc = $row->value($desc_i);
 			}
-			write_fasta_seq($seq_fh, $id, $desc, $seq);
+			write_fasta_seq( $seq_fh, $id, $desc, $seq );
 		}
 	);
 	$seq_fh->close;
@@ -226,7 +225,7 @@ sub fetch_seq_and_write_single_fasta {
 		# hope it works....
 	}
 	else {
-		print STDERR 
+		print STDERR
 " FATAL: A sequence or fasta database must be provided to collect sequence!\n";
 		exit 1;
 	}
@@ -264,7 +263,7 @@ sub fetch_seq_and_write_single_fasta {
 	my $seq_fh = open_output_fasta();
 	my $id     = $Data->basename;
 	my $desc   = 'Concatenated sequences';
-	write_fasta_seq($seq_fh, $id, $desc, $concat_seq);
+	write_fasta_seq( $seq_fh, $id, $desc, $concat_seq );
 	$seq_fh->close;
 }
 
@@ -323,7 +322,7 @@ sub fetch_seq_and_write_multi_fasta {
 			if ( defined $desc_i ) {
 				$desc = $row->value($desc_i);
 			}
-			write_fasta_seq($seq_fh, $id, $desc, $seq);
+			write_fasta_seq( $seq_fh, $id, $desc, $seq );
 		}
 	);
 	$seq_fh->close;
@@ -349,19 +348,19 @@ sub open_output_fasta {
 }
 
 sub write_fasta_seq {
-	my ($fh, $id, $desc, $seq) = @_;
+	my ( $fh, $id, $desc, $seq ) = @_;
 	if ($desc) {
-		$fh->printf(">%s %s\n", $id, $desc);
+		$fh->printf( ">%s %s\n", $id, $desc );
 	}
 	else {
-		$fh->printf(">%s\n", $id);
+		$fh->printf( ">%s\n", $id );
 	}
 	while ( length($seq) > 60 ) {
 		my $line = substr $seq, 0, 60, q();
-		$fh->printf("%s\n", $line); 
+		$fh->printf( "%s\n", $line );
 	}
 	if ( length $seq ) {
-		$fh->printf("%s\n", $seq); 
+		$fh->printf( "%s\n", $seq );
 	}
 }
 

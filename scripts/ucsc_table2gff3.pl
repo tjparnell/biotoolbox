@@ -9,7 +9,7 @@ use Pod::Usage;
 use Bio::ToolBox;
 use Bio::ToolBox::Parser;
 use Bio::ToolBox::GeneTools qw(gtf_string);
-use Bio::ToolBox::utility qw(format_with_commas sane_chromo_sort);
+use Bio::ToolBox::utility   qw(format_with_commas sane_chromo_sort);
 
 # check for additional requirements
 my $net = 0;
@@ -37,32 +37,31 @@ unless (@ARGV) {
 
 ### Command line options
 my (
-	$ftp_file,      $database,   $host,         $do_chromo,
-	$kgxreff,       $chromof,    $user_source,  $do_gene,
-	$do_cds,        $do_utr,     $do_codon,     $share,
-	$do_name,       $do_gtf,     $gz,           $help,
-	$print_version,
+	$ftp_file, $database,    $host,    $do_chromo, $kgxreff,
+	$chromof,  $user_source, $do_gene, $do_cds,    $do_utr,
+	$do_codon, $share,       $do_name, $do_gtf,    $gz,
+	$help,     $print_version,
 );
 my @genetables;
 GetOptions(
-	'f|ftp=s'     => \$ftp_file,          # which database table to retrieve
-	'd|db=s'      => \$database,          # which ucsc genome to use
-	'h|host=s'    => \$host,              # the ftp server to connect to
-	'chr!'        => \$do_chromo,         # include the chromosome file from ftp
-	't|table=s'   => \@genetables,        # the input gene table files
-	'k|kgxref=s'  => \$kgxreff,           # the kgXref info file
-	'c|chromo=s'  => \$chromof,           # a chromosome file
-	'source=s'    => \$user_source,       # user provided source
-	'gene!'       => \$do_gene,           # include genes in output
-	'cds!'        => \$do_cds,            # include CDS in output
-	'utr!'        => \$do_utr,            # include UTRs in output
-	'codon!'      => \$do_codon,          # include start & stop codons in output
-	'share!'      => \$share,             # share common exons and UTRs
-	'name!'       => \$do_name,           # assign names to CDSs, UTRs, and exons
-	'g|gtf!'      => \$do_gtf,            # write a gtf file instead
-	'z|gz!'       => \$gz,                # compress file
-	'h|help'      => \$help,              # request help
-	'v|version'   => \$print_version,     # print the version
+	'f|ftp=s'    => \$ftp_file,         # which database table to retrieve
+	'd|db=s'     => \$database,         # which ucsc genome to use
+	'h|host=s'   => \$host,             # the ftp server to connect to
+	'chr!'       => \$do_chromo,        # include the chromosome file from ftp
+	't|table=s'  => \@genetables,       # the input gene table files
+	'k|kgxref=s' => \$kgxreff,          # the kgXref info file
+	'c|chromo=s' => \$chromof,          # a chromosome file
+	'source=s'   => \$user_source,      # user provided source
+	'gene!'      => \$do_gene,          # include genes in output
+	'cds!'       => \$do_cds,           # include CDS in output
+	'utr!'       => \$do_utr,           # include UTRs in output
+	'codon!'     => \$do_codon,         # include start & stop codons in output
+	'share!'     => \$share,            # share common exons and UTRs
+	'name!'      => \$do_name,          # assign names to CDSs, UTRs, and exons
+	'g|gtf!'     => \$do_gtf,           # write a gtf file instead
+	'z|gz!'      => \$gz,               # compress file
+	'h|help'     => \$help,             # request help
+	'v|version'  => \$print_version,    # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -128,7 +127,7 @@ foreach my $file (@genetables) {
 	if ($user_source) {
 		$ucsc->source($user_source);
 	}
-	if ($file =~ /knowngene/i and $kgxreff) {
+	if ( $file =~ /knowngene/i and $kgxreff ) {
 		my $c = $ucsc->load_extra_data( $kgxreff, 'kgxref' );
 		printf " Loaded %s transcripts from supplemental data file '$kgxreff'\n",
 			format_with_commas($c);
@@ -156,26 +155,26 @@ foreach my $file (@genetables) {
 	# report outcomes
 	my $count = $ucsc->counts;
 	print "  converted ", format_with_commas( $count->{gene} ), " gene features\n"
-		if ( exists $count->{gene} and $count->{gene}> 0 );
+		if ( exists $count->{gene} and $count->{gene} > 0 );
 	print "  converted ", format_with_commas( $count->{mrna} ), " mRNA transcripts\n"
-		if ( exists $count->{mrna} and $count->{mrna}> 0 );
+		if ( exists $count->{mrna} and $count->{mrna} > 0 );
 	print "  converted ", format_with_commas( $count->{pseudogene} ),
 		" pseudogene transcripts\n"
-		if ( exists $count->{pseudogene} and $count->{pseudogene}> 0 );
+		if ( exists $count->{pseudogene} and $count->{pseudogene} > 0 );
 	print "  converted ", format_with_commas( $count->{ncrna} ), " ncRNA transcripts\n"
-		if ( exists $count->{ncrna} and $count->{ncrna}> 0 );
+		if ( exists $count->{ncrna} and $count->{ncrna} > 0 );
 	print "  converted ", format_with_commas( $count->{mirna} ), " miRNA transcripts\n"
-		if ( exists $count->{mirna} and $count->{mirna}> 0 );
+		if ( exists $count->{mirna} and $count->{mirna} > 0 );
 	print "  converted ", format_with_commas( $count->{snrna} ), " snRNA transcripts\n"
-		if ( exists $count->{snrna} and $count->{snrna}> 0 );
+		if ( exists $count->{snrna} and $count->{snrna} > 0 );
 	print "  converted ", format_with_commas( $count->{snorna} ), " snoRNA transcripts\n"
-		if ( exists $count->{snorna} and $count->{snorna}> 0 );
+		if ( exists $count->{snorna} and $count->{snorna} > 0 );
 	print "  converted ", format_with_commas( $count->{trna} ), " tRNA transcripts\n"
-		if ( exists $count->{trna} and $count->{trna}> 0 );
+		if ( exists $count->{trna} and $count->{trna} > 0 );
 	print "  converted ", format_with_commas( $count->{rrna} ), " rRNA transcripts\n"
-		if ( exists $count->{rrna} and $count->{rrna}> 0 );
+		if ( exists $count->{rrna} and $count->{rrna} > 0 );
 	print "  converted ", format_with_commas( $count->{other} ), " other transcripts\n"
-		if ( exists $count->{other} and $count->{other}> 0 );
+		if ( exists $count->{other} and $count->{other} > 0 );
 
 	# Finished
 	printf "  wrote file '$outfile' in %.1f minutes\n", ( time - $start_time ) / 60;
@@ -194,12 +193,13 @@ sub check_options {
 	}
 	if ($ftp_file) {
 		unless ($net) {
-			print STDERR " FATAL: please install Perl module Net::FTP to download files\n";
+			print STDERR
+				" FATAL: please install Perl module Net::FTP to download files\n";
 			exit 1;
 		}
 		unless ( $ftp_file =~ m/^ refgene | known | all $/xi ) {
 			print STDERR
-" FATAL: requested table '$ftp_file' by FTP not supported! see help\n";
+				" FATAL: requested table '$ftp_file' by FTP not supported! see help\n";
 			exit 1;
 		}
 		unless ( defined $database ) {
@@ -380,8 +380,8 @@ sub print_current_gene_list {
 	# print both parent and children.
 	print "  Writing features to GFF....\n";
 	foreach my $chr ( sane_chromo_sort( keys %pos2seqf ) ) {
-		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{$chr} } )
-		{
+		foreach my $start ( sort { $a <=> $b } keys %{ $pos2seqf{$chr} } ) {
+
 			# print the seqfeature recursively
 			if ($do_gtf) {
 				$gff_fh->print( gtf_string( $pos2seqf{$chr}{$start} ) );

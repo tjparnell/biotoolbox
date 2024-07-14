@@ -169,7 +169,7 @@ sub find_overlapping_features {
 	else {
 		# unable to identify
 		print STDERR
-" FATAL: unable to identify feature information columns in source file "
+			" FATAL: unable to identify feature information columns in source file "
 			. "'$infile'\n No chromosome, start, stop, name, ID,  and/or type columns\n";
 		exit 1;
 	}
@@ -301,7 +301,6 @@ sub intersect_named_features {
 			# no region defined
 			printf " WARNING: unable to establish region for %s %s\n",
 				$row->type, $row->name;
-			
 
 			# fill in table anyway
 			process_no_feature( $row, $number_i, $name_i, $type_i, $strand_i,

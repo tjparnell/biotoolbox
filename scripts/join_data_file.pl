@@ -85,7 +85,7 @@ unless ($outfile) {
 	else {
 		# ask the user for input, what else to do?
 		my $p       = ' please enter the output file name: ';
-		my $default = File::Spec->catfile( $first_data->path, 
+		my $default = File::Spec->catfile( $first_data->path,
 			sprintf( "%s.joined%s", $first_data->basename, $first_data->extension ) );
 		$outfile = prompt( $p, $default );
 	}
@@ -140,7 +140,7 @@ foreach my $file (@ARGV) {
 
 	# check for equal number of columns
 	unless ( $Output->number_columns == $Data->number_columns ) {
-		printf STDERR 
+		printf STDERR
 "\n FATAL: Column number mismatch!\n %s has %d columns instead of %d!\n Unable to proceed!\n",
 			$file, $Data->number_columns, $Output->number_columns;
 		exit 1;
@@ -149,7 +149,7 @@ foreach my $file (@ARGV) {
 	# check first and last column names
 	my @output_names = $Output->list_columns;
 	my @data_names   = $Data->list_columns;
-	if ( join(q( ), @output_names) ne join(q( ), @data_names) ) {
+	if ( join( q( ), @output_names ) ne join( q( ), @data_names ) ) {
 		print "\n  WARNING! Column header names don't match!!\n";
 		for my $i ( 0 .. $#output_names ) {
 			if ( $output_names[$i] ne $data_names[$i] ) {

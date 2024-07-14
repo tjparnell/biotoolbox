@@ -4,10 +4,10 @@
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
+use English      qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use List::Util qw(sum0 min max);
+use List::Util       qw(sum0 min max);
 use Statistics::Lite qw(median stddevp);
 use Statistics::Descriptive;
 use Bio::ToolBox::Data;

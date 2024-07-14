@@ -3,7 +3,7 @@ package Bio::ToolBox::Parser;
 use warnings;
 use strict;
 use English qw(-no_match_vars);
-use Carp qw(carp cluck croak confess);
+use Carp    qw(carp cluck croak confess);
 use Module::Load;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::SeqFeature;    # alternative to Bio::SeqFeature::Lite

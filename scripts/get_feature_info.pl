@@ -6,7 +6,7 @@ use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use IO::Prompt::Tiny qw(prompt);
+use IO::Prompt::Tiny        qw(prompt);
 use Bio::ToolBox::db_helper qw(open_db_connection);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw( format_with_commas parse_list );
@@ -97,7 +97,7 @@ if ($use_type) {
 	my $id_i   = $Data->id_column;
 	my $type_i = $Data->type_column;
 	unless ( defined $name_i or defined $id_i ) {
-		print STDERR 
+		print STDERR
 " FATAL: unable to identify a name or ID column. Database lookup unlikely to work\n";
 		exit 1;
 	}

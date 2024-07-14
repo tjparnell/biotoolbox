@@ -5,10 +5,10 @@
 use warnings;
 use strict;
 use Pod::Usage;
-use Getopt::Long qw(:config no_ignore_case bundling);
+use Getopt::Long     qw(:config no_ignore_case bundling);
 use IO::Prompt::Tiny qw(prompt);
-use Scalar::Util qw(looks_like_number);
-use List::Util qw(min max sum0);
+use Scalar::Util     qw(looks_like_number);
+use List::Util       qw(min max sum0);
 use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
@@ -497,7 +497,8 @@ sub rename_function {
 			@newnames = map {$opt_name} @indices;
 		}
 		else {
-			print " WARNING: unequal number of provided names and indices!? nothing done\n";
+			print
+				" WARNING: unequal number of provided names and indices!? nothing done\n";
 			return 0;
 		}
 	}
@@ -522,7 +523,7 @@ sub rename_function {
 
 	# reset the noheader flag if it was originally specified in command line options
 	if ($noheader) {
-		$Data->{'headers'} = 1;  # there is no explicit function for this
+		$Data->{'headers'} = 1;    # there is no explicit function for this
 	}
 
 	return $count;
@@ -540,7 +541,8 @@ sub concatenate_function {
 		return 0;
 	}
 	unless ( scalar @indices >= 2 ) {
-		print " WARNING: at least two columns are required to concatenate! nothing done\n";
+		print
+			" WARNING: at least two columns are required to concatenate! nothing done\n";
 		return 0;
 	}
 
@@ -673,7 +675,8 @@ sub coordinate_function {
 	unless ( $Data->feature_type eq 'coordinate' ) {
 
 		# cannot add coordinate column, do without ?
-		print " WARNING: cannot generate coordinates, no chromosome or start column found\n";
+		print
+" WARNING: cannot generate coordinates, no chromosome or start column found\n";
 		return 0;
 	}
 
@@ -736,9 +739,10 @@ INDEX_LOOP: foreach my $index (@indices) {
 
 		# Retrieve values and calculate median
 		my @cv = $Data->column_values($index);
-		shift @cv; # skip header
+		shift @cv;            # skip header
 		my @values = grep { looks_like_number($_) and $_ != 0 } @cv;
-			# I had historically always skipped zero values before, so continue to do so?
+
+		# I had historically always skipped zero values before, so continue to do so?
 		unless (@values) {
 			printf " WARNING: no numeric values dataset %s, index %d!\n",
 				$Data->name($index), $index;
@@ -755,7 +759,7 @@ INDEX_LOOP: foreach my $index (@indices) {
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				my $v = $row->value($index);
+				my $v   = $row->value($index);
 				next unless looks_like_number($v);
 				$v *= $correction_value;
 				$row->value( $index, $v );
@@ -807,14 +811,14 @@ sub percentile_rank_function {
 
 		# Calculate percent rank of values
 		my @cv = $Data->column_values($index);
-		shift @cv; # skip header
+		shift @cv;            # skip header
 		my @values = grep { looks_like_number($_) } @cv;
 		unless (@values) {
-			printf " WARNING: no numeric values in dataset %d, %s! Skipping\n", 
+			printf " WARNING: no numeric values in dataset %d, %s! Skipping\n",
 				$index, $Data->name($index);
 			next;
 		}
-		my $total  = scalar @values;
+		my $total = scalar @values;
 		my %percentrank;
 		my $n = 1;
 		foreach ( sort { $a <=> $b } @values ) {
@@ -830,7 +834,7 @@ sub percentile_rank_function {
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				my $v = $row->value($index);
+				my $v   = $row->value($index);
 				next unless looks_like_number($v);
 				$row->value( $index, $percentrank{$v} );
 			}
@@ -880,7 +884,7 @@ sub zscore_function {
 
 		# generate statistics on the dataset
 		my @cv = $Data->column_values($index);
-		shift @cv; # skip header
+		shift @cv;            # skip header
 		my @values = grep { looks_like_number($_) } @cv;
 		unless (@values) {
 			printf " WARNING: no numeric values for index %d, %s! skipping\n",
@@ -896,7 +900,7 @@ sub zscore_function {
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				my $v = $row->value($index);
+				my $v   = $row->value($index);
 				next unless looks_like_number($v);
 				$v = ( $v - $mean ) / $std;
 				$row->value( $index, $v );
@@ -1068,7 +1072,8 @@ sub toss_nulls_function {
 							$zero = 0;
 						}
 						else {
-							print " WARNING: unrecognized answer, defaulting to 'n'\n";
+							print
+								" WARNING: unrecognized answer, defaulting to 'n'\n";
 							$zero = 0;
 						}
 					}
@@ -1468,7 +1473,8 @@ sub convert_nulls_function {
 							$zero = 0;
 						}
 						else {
-							print " WARNING: unrecognized answer, defaulting to 'n'\n";
+							print
+								" WARNING: unrecognized answer, defaulting to 'n'\n";
 							$zero = 0;
 						}
 
@@ -2458,7 +2464,7 @@ sub math_function {
 
 			# collect dataset statistics
 			my @cv = $Data->column_values($index);
-			shift @cv; # skip header
+			shift @cv;                     # skip header
 			my @values = grep { looks_like_number($_) } @cv;
 			unless (@values) {
 				printf " WARNING: no numeric values for index $index, %s\n",
@@ -2500,8 +2506,7 @@ sub math_function {
 				my $row = shift;
 				my $v   = $row->value($index);
 				if ( looks_like_number($v) ) {
-					$row->value( $index,
-						&{$calculate}( $v, $value ) );
+					$row->value( $index, &{$calculate}( $v, $value ) );
 				}
 				else {
 					$failed_count++;
@@ -2597,8 +2602,9 @@ sub write_summary_function {
 			$startcolumn = $opt_indices[0];
 			$stopcolumn  = $opt_indices[-1];
 		}
+
 		# otherwise the summary module will automatically deduce the columns
-		
+
 		if ($opt_target) {
 			$method = $opt_target;
 		}
@@ -2901,7 +2907,7 @@ sub center_function {
 			# adjust the datapoints
 			foreach my $d (@datasets) {
 				my $v = $row->value($d);
-				next unless  looks_like_number($v);
+				next unless looks_like_number($v);
 				$row->value( $d, ( $v - $median_value ) );
 			}
 		}
@@ -2926,7 +2932,7 @@ sub new_column_function {
 	if ( defined $opt_name ) {
 		$name = $opt_name;
 	}
-	elsif ( $function ) {
+	elsif ($function) {
 		$name = "$function\_Column";
 	}
 	else {
@@ -2982,7 +2988,7 @@ sub addname_function {
 
 	# Identify column
 	my $idx = $Data->name_column;
-	if ( defined $idx) {
+	if ( defined $idx ) {
 		printf " Replacing name contents in column %d, '%s'\n", $idx, $Data->name($idx);
 	}
 	else {
@@ -3324,7 +3330,7 @@ sub _get_statistics_hash {
 	shift @invalues;    # remove header
 	my @goodvalues;
 	foreach my $v (@invalues) {
-		$v =~s/[, ]+//g;
+		$v =~ s/[, ]+//g;
 		next unless looks_like_number($v);
 		if ( $v == 0 ) {
 

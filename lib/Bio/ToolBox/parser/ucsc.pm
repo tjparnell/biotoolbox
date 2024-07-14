@@ -140,7 +140,8 @@ sub load_extra_data {
 			next if ( $line =~ /^#/ );
 			my @line_data = split /\t/, $line;
 			if ( scalar @line_data != 2 ) {
-				carp sprintf "ERROR: file $file doesn't seem right!? Line has %d elements!",
+				carp sprintf
+					"ERROR: file $file doesn't seem right!? Line has %d elements!",
 					scalar @line_data;
 				return;
 			}
@@ -209,8 +210,9 @@ sub load_extra_data {
 
 sub typelist {
 	my $self = shift;
-	
+
 	if ( keys %{ $self->{counts} } ) {
+
 		# actual list of counted types
 		my @items;
 		foreach my $k ( keys %{ $self->{counts} } ) {
@@ -220,7 +222,7 @@ sub typelist {
 	}
 	else {
 		# generic list based on expectations
-		if ($self->filetype eq 'genePred') {
+		if ( $self->filetype eq 'genePred' ) {
 			return 'mRNA,ncRNA,exon,CDS';
 		}
 		else {
@@ -274,7 +276,7 @@ sub next_feature {
 }
 
 *parse_file = \&parse_table;
-*parse_file if 0;  # avoid once warning
+*parse_file if 0;    # avoid once warning
 
 sub parse_table {
 	my $self = shift;

@@ -4,7 +4,7 @@
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
+use English      qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Scalar::Util qw(looks_like_number);
@@ -197,7 +197,8 @@ unless ($outfile) {
 # make sure data table supports avoid option
 if ($avoid) {
 	unless ($main_database) {
-		print " WARNING: avoid option not supported without an annotation database! Disabling\n";
+		print
+" WARNING: avoid option not supported without an annotation database! Disabling\n";
 		undef $avoid;    # 0 complicates things, leave undefined
 	}
 	if ($avoidtype) {
@@ -247,11 +248,12 @@ my $ending_point = $win * $down_number;
 # likewise default values will give endingpoint of 1000
 
 # Print collection statement
-printf " Collecting %s $method data between %d..%d from the %s in %d bp windows from %s\n",
+printf
+	" Collecting %s $method data between %d..%d from the %s in %d bp windows from %s\n",
 	$long_data ? 'long' : 'hashed',
 	$starting_point, $ending_point,
-	$position == 5   ? "5' end"
-	: $position == 4 ? "midpoint"
+	$position == 5    ? "5' end"
+	: $position == 4  ? "midpoint"
 	: $position == 10 ? "peak summit"
 	: "3' end",
 	$win, join( ', ', @datasets ),;
@@ -395,7 +397,7 @@ sub check_defaults {
 			or $method =~ /^\w?count$/ )
 		{
 			print STDERR
-" FATAL: Unknown method '$method'!\n Use --help for more information\n";
+				" FATAL: Unknown method '$method'!\n Use --help for more information\n";
 			exit 1;
 		}
 	}
@@ -693,7 +695,7 @@ sub map_relative_data {
 			# put the value into the data table
 			my $score = calculate_score( $method, \@scores );
 			if ( $formatter and looks_like_number($score) ) {
-				$score = sprintf( $formatter, $score ) ;
+				$score = sprintf( $formatter, $score );
 			}
 			$row->value( $column, $score );
 		}
@@ -731,7 +733,7 @@ sub map_relative_long_data {
 				'stranded' => $strand_sense,
 			);
 			if ( $formatter and looks_like_number($score) ) {
-				$score = sprintf( $formatter, $score ) ;
+				$score = sprintf( $formatter, $score );
 			}
 			$row->value( $column, $score );
 		}
@@ -762,7 +764,7 @@ sub go_interpolate_values {
 
 				# find the next real value
 				my $next_i;
-				for my $i ( ($col + 1) .. $lastwindow ) {
+				for my $i ( ( $col + 1 ) .. $lastwindow ) {
 					if ( $row->value($i) ne '.' ) {
 						$next_i = $i;
 						last;
@@ -779,7 +781,7 @@ sub go_interpolate_values {
 					( $row->value($next_i) - $initial ) / ( $next_i - $col + 1 );
 
 				# apply fractional values
-				for my $n ( $col .. ($next_i - 1) ) {
+				for my $n ( $col .. ( $next_i - 1 ) ) {
 					my $score = $initial + ( $fraction * ( $n - $col + 1 ) );
 					$score = sprintf( $formatter, $score )
 						if ( $formatter and $score ne '.' );

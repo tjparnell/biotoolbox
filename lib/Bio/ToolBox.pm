@@ -7,7 +7,6 @@ use Bio::ToolBox::Data;
 
 our $VERSION = '1.700';
 
-
 sub load_file {
 	my $self = shift;
 	if ( scalar(@_) == 1 ) {

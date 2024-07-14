@@ -4,13 +4,13 @@
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
+use English      qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use File::Spec;
-use FindBin qw($Bin);
+use FindBin                         qw($Bin);
 use Bio::ToolBox::db_helper::config qw(add_database);
-use Bio::ToolBox::db_helper qw(open_db_connection);
+use Bio::ToolBox::db_helper         qw(open_db_connection);
 use Bio::DB::SeqFeature::Store;
 use Bio::DB::SeqFeature::Store::GFF3Loader;
 

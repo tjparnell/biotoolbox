@@ -4,7 +4,7 @@
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
+use English      qw(-no_match_vars);
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Scalar::Util qw(looks_like_number);
@@ -415,10 +415,11 @@ sub parallel_execution {
 		}
 
 		# collapse transcripts if needed
-		if (
-			$feature and $feature =~ /gene/i
-			and $subfeature and $subfeature =~ m/exon | intron/xi
-		) {
+		if (    $feature
+			and $feature =~ /gene/i
+			and $subfeature
+			and $subfeature =~ m/exon | intron/xi )
+		{
 			$Data->collapse_gene_transcripts;
 		}
 
@@ -487,10 +488,11 @@ sub parallel_execution {
 sub single_execution {
 
 	# collapse transcripts if needed
-	if (
-		$feature and $feature =~ /gene/i
-		and $subfeature and $subfeature =~ m/exon | intron/xi
-	) {
+	if (    $feature
+		and $feature =~ /gene/i
+		and $subfeature
+		and $subfeature =~ m/exon | intron/xi )
+	{
 		$Data->collapse_gene_transcripts;
 	}
 
@@ -686,7 +688,7 @@ sub collect_binned_long_data {
 				'stranded' => $stranded,
 			);
 			if ( $formatter and looks_like_number($score) ) {
-				$score = sprintf( $formatter, $score ) ;
+				$score = sprintf( $formatter, $score );
 			}
 			$row->value( $column, $score );
 		}
@@ -756,7 +758,7 @@ sub record_the_bin_values {
 		# calculate the value
 		my $window_score = calculate_score( $method, \@scores );
 		if ( $formatter and looks_like_number($window_score) ) {
-			$window_score = sprintf( $formatter, $window_score ) ;
+			$window_score = sprintf( $formatter, $window_score );
 		}
 
 		# record the value
@@ -806,7 +808,7 @@ sub go_interpolate_values {
 				for ( my $n = $col; $n < $next_i; $n++ ) {
 					my $score = $initial + ( $fraction * ( $n - $col + 1 ) );
 					if ( $formatter and looks_like_number($score) ) {
-						$score = sprintf( $formatter, $score ) ;
+						$score = sprintf( $formatter, $score );
 					}
 					$row->value( $n, $score );
 				}

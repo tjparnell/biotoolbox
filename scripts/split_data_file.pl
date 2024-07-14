@@ -103,12 +103,12 @@ unless ( defined $index or defined $tag ) {
 if ($tag) {
 	unless ( $Input->gff or $Input->vcf ) {
 		print STDERR
-" FATAL: Input file must be in GFF or VCF format to use attribute tags!";
+			" FATAL: Input file must be in GFF or VCF format to use attribute tags!";
 		exit 1;
 	}
 	if ( $Input->vcf and not defined $index ) {
 		print STDERR
-" FATAL: Please provide a column index for accessing VCF attributes.\n"
+			" FATAL: Please provide a column index for accessing VCF attributes.\n"
 			. " The INFO column is 0-based index 7, and sample columns begin\n"
 			. " at index 9.\n";
 		exit 1;

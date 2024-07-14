@@ -2,8 +2,8 @@ package Bio::ToolBox::Data;
 
 use warnings;
 use strict;
-use Carp qw(carp cluck croak confess);
-use List::Util qw(sum0);
+use Carp         qw(carp cluck croak confess);
+use List::Util   qw(sum0);
 use Scalar::Util qw(looks_like_number);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Iterator;
@@ -51,10 +51,10 @@ sub new {
 		unless ( $self->parse_table( \%args ) ) {
 			my $l = $self->load_file( $args{file} );
 			return unless $l;
-			if ( 
-				$self->database and $self->database =~ /^Parsed:(.+)$/x and
-				$self->feature_type eq 'named'
-			) {
+			if (    $self->database
+				and $self->database =~ /^Parsed:(.+)$/x
+				and $self->feature_type eq 'named' )
+			{
 
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
@@ -302,11 +302,12 @@ sub parse_table {
 			my $n = $self->number_rows;
 			my $d = $n - $count;
 			my $list;
-			if (scalar @missing <= 10) {
+			if ( scalar @missing <= 10 ) {
 				$list = join ', ', @missing;
 			}
 			else {
-				$list = sprintf "%s...", join ', ', (map { $_ || q() } @missing[ 0..9 ] );
+				$list = sprintf "%s...", join ', ',
+					( map { $_ || q() } @missing[ 0 .. 9 ] );
 			}
 			croak <<PARSEFAIL;
 
@@ -581,7 +582,7 @@ sub store_seqfeature {
 sub delete_seqfeature {
 	my ( $self, $row_i ) = @_;
 	carp 'ERROR: invalid row index' unless ( $row_i <= $self->last_row );
-	return                      unless $self->{SeqFeatureObjects};
+	return                          unless $self->{SeqFeatureObjects};
 	undef $self->{SeqFeatureObjects}->[$row_i];
 }
 
@@ -609,10 +610,10 @@ sub collapse_gene_transcripts {
 	else {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
-		my $db = $self->open_meta_database(1);   # force open a new db connection
+		my $db = $self->open_meta_database(1);    # force open a new db connection
 		unless ($db) {
-			 carp 'ERROR: No SeqFeature objects stored and no database connection!';
-			 return;
+			carp 'ERROR: No SeqFeature objects stored and no database connection!';
+			return;
 		}
 		my $name_i = $self->name_column;
 		my $id_i   = $self->id_column;
@@ -718,7 +719,7 @@ sub sort_data {
 		carp "ERROR: unrecognized sort order '$direction'! Must be i or d";
 		return;
 	}
-	
+
 	# put items into appropriate bins for sorting
 	my @numeric_items;
 	my @mixed_items_end;
@@ -730,10 +731,12 @@ sub sort_data {
 			push @numeric_items, [ $v, $row_i ];
 		}
 		elsif ( $v =~ /(\d+)$/x ) {
+
 			# integer at end of string
 			push @mixed_items_end, [ $1, $v, $row_i ];
 		}
-		elsif ( $v =~ /(\d+)/) {
+		elsif ( $v =~ /(\d+)/ ) {
+
 			# integer someplace else
 			push @mixed_items, [ $1, $v, $row_i ];
 		}
@@ -745,52 +748,44 @@ sub sort_data {
 	# sort each bin into replacement table
 	my @new_table;
 	push @new_table, $self->{data_table}->[0];
-	if ($direction eq 'i') {
+	if ( $direction eq 'i' ) {
 		if (@numeric_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
-				sort { $a->[0] <=> $b->[0] }
-				@numeric_items;
+				sort { $a->[0] <=> $b->[0] } @numeric_items;
 		}
 		if (@mixed_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] }
-				@mixed_items;
+				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] } @mixed_items;
 		}
 		if (@mixed_items_end) {
 			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] }
-				@mixed_items_end;
+				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] } @mixed_items_end;
 		}
 		if (@asci_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
-				sort { $a->[0] cmp $b->[0] }
-				@asci_items;
+				sort { $a->[0] cmp $b->[0] } @asci_items;
 		}
 	}
-	if ($direction eq 'd') {
+	if ( $direction eq 'd' ) {
 		if (@numeric_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
-				sort { $b->[0] <=> $a->[0] }
-				@numeric_items;
+				sort { $b->[0] <=> $a->[0] } @numeric_items;
 		}
 		if (@mixed_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] }
-				@mixed_items;
+				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] } @mixed_items;
 		}
 		if (@mixed_items_end) {
 			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] }
-				@mixed_items_end;
+				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] } @mixed_items_end;
 		}
 		if (@asci_items) {
 			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
-				sort { $b->[0] cmp $a->[0] }
-				@asci_items;
+				sort { $b->[0] cmp $a->[0] } @asci_items;
 		}
 	}
 	$self->{data_table} = \@new_table;
-	
+
 	return 1;
 }
 
@@ -1005,9 +1000,10 @@ sub summary_file {
 		push @endcolumns, $args{endcolumn};
 	}
 	$args{method} ||= 'mean';
-	if ($args{method} ne 'mean' and $args{method} ne 'median' and 
-		$args{method} ne 'trimmean'
-	) {
+	if (    $args{method} ne 'mean'
+		and $args{method} ne 'median'
+		and $args{method} ne 'trimmean' )
+	{
 		carp 'ERROR: unrecognized summary file method!';
 		return;
 	}
@@ -1137,7 +1133,7 @@ sub summary_file {
 				}
 				else {
 					# we treat this as zero, as opposed to skipping it, so that we
-					# do not over-emphasize the remaining signal from those columns 
+					# do not over-emphasize the remaining signal from those columns
 					# that do not have much signal to begin with
 					# it distorts the interpretation
 					push @values, 0;
@@ -1154,35 +1150,37 @@ sub summary_file {
 			my $window_value;
 			my $num_values = scalar(@values);
 			if (@values) {
-				if ($args{method} eq 'mean') {
+				if ( $args{method} eq 'mean' ) {
 					$window_value = sum0(@values) / $num_values;
 				}
-				elsif ($args{method} eq 'trimmean') {
-					if (scalar @values == 1) {
+				elsif ( $args{method} eq 'trimmean' ) {
+					if ( scalar @values == 1 ) {
 						$window_value = $values[0];
 					}
-					elsif (scalar @values < 100) {
+					elsif ( scalar @values < 100 ) {
+
 						# use standard mean
 						$window_value = sum0(@values) / $num_values;
 					}
 					else {
-						@values = sort {$a <=> $b} @values;
-						my $x = sprintf("%.0f", $num_values / 100 );
-						$window_value = sum0( @values[ $x .. ( $num_values - $x ) ] ) / 
-							( $num_values - (2 * $x) )
+						@values = sort { $a <=> $b } @values;
+						my $x = sprintf( "%.0f", $num_values / 100 );
+						$window_value = sum0( @values[ $x .. ( $num_values - $x ) ] ) /
+							( $num_values - ( 2 * $x ) );
 					}
 				}
-				elsif ($args{method} eq 'median') {
-					if (scalar @values == 1) {
+				elsif ( $args{method} eq 'median' ) {
+					if ( scalar @values == 1 ) {
 						$window_value = $values[0];
 					}
-					elsif ($num_values & 1) {
+					elsif ( $num_values & 1 ) {
+
 						# odd number of values
-						$window_value = $values[ ($#values / 2) ]
+						$window_value = $values[ ( $#values / 2 ) ];
 					}
 					else {
 						my $mid = $num_values / 2;
-						$window_value = sum0( $values[$mid-1], $values[$mid] ) / 2;
+						$window_value = sum0( $values[ $mid - 1 ], $values[$mid] ) / 2;
 					}
 				}
 				if ($log) {

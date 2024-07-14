@@ -9,7 +9,7 @@ require Exporter;
 our $VERSION = '1.62';
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users

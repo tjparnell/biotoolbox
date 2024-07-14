@@ -3,7 +3,7 @@ package Bio::ToolBox::Data::Stream;
 use warnings;
 use strict;
 use English qw(-no_match_vars);
-use Carp qw(carp cluck croak confess);
+use Carp    qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Feature;
 

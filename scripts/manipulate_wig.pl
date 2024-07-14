@@ -145,7 +145,7 @@ else {
 }
 
 # Output
-if ( $outfile ) {
+if ($outfile) {
 	if ( $outfile =~ /^stdout$/i ) {
 		$outfh = IO::Handle->new;
 		$outfh->fdopen( fileno(STDOUT), 'w' );
@@ -175,7 +175,8 @@ if ( $outfile ) {
 			) or die "unable to open output bigWig file '$outfile'!\n";
 		}
 		else {
-			die "unable to open output bigWig file handle without chromosome information!\n";
+			die
+"unable to open output bigWig file handle without chromosome information!\n";
 		}
 
 	}
@@ -294,12 +295,11 @@ $infh->close;
 $outfh->close if $outfh;
 
 # remove chromosome file if we generated it
-if (
-	$outfile
+if (    $outfile
 	and $outfile =~ m/(?: bw | bigwig )$/xi
 	and $database
-	and $chromofile =~ m/^chr_sizes_\w{5}$/x
-) {
+	and $chromofile =~ m/^chr_sizes_\w{5}$/x )
+{
 	unlink $chromofile;
 }
 

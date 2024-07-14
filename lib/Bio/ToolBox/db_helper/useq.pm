@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use English qw(-no_match_vars);
 use Carp;
-use List::Util qw(min max sum);
+use List::Util       qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::USeq;
@@ -13,7 +13,7 @@ require Exporter;
 our $VERSION = '1.70';
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users
@@ -67,7 +67,7 @@ sub collect_useq_scores {
 
 	# unlikely there are more than one useq file, but just in case
 	my @scores;
-	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 
 		# open a new db object
 		my $useq = _get_useq( $param->[$d] );
@@ -166,7 +166,7 @@ sub collect_useq_position_scores {
 
 	# unlikely there are more than one useq file, but just in case
 	my %pos2score;
-	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 
 		# open a new db object
 		my $useq = _get_useq( $param->[$d] );

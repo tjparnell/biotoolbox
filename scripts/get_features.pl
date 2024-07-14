@@ -34,11 +34,11 @@ unless (@ARGV) {
 
 ### Get command line options and initialize values
 my (
-	$input,               $database,       $id_list,        $get_subfeatures,
-	$include_coordinates, $start_adj,      $stop_adj,       $position,
-	$tsl,                 $gencode,        $tbiotype,       $collapse,
-	$chromosome_exclude,  $outfile,        $sort_data,      $gz,
-	$bgz,                 $help,           $print_version,
+	$input,               $database,  $id_list,   $get_subfeatures,
+	$include_coordinates, $start_adj, $stop_adj,  $position,
+	$tsl,                 $gencode,   $tbiotype,  $collapse,
+	$chromosome_exclude,  $outfile,   $sort_data, $gz,
+	$bgz,                 $help,      $print_version,
 );
 my $convert_to_bed     = 0;
 my $convert_to_gff     = 0;
@@ -179,7 +179,8 @@ sub check_requirements {
 		@features = split /,/, shift @features;
 	}
 	if ( scalar(@features) > 1 and $input ) {
-		printf " WARNING: Only one top feature allowed when parsing an input file!\n Subfeatures do not need to be specified. Using '%s'\n\n",
+		printf
+" WARNING: Only one top feature allowed when parsing an input file!\n Subfeatures do not need to be specified. Using '%s'\n\n",
 			$features[0];
 	}
 
@@ -197,8 +198,8 @@ sub check_requirements {
 	# check collapse
 	if ($collapse) {
 		unless ($get_subfeatures) {
-			print STDERR 
-" FATAL: Cannot collapse transcript unless subfeatures are turned on!\n";
+			print STDERR
+				" FATAL: Cannot collapse transcript unless subfeatures are turned on!\n";
 			exit 1;
 		}
 		unless ( $convert_to_gff
@@ -218,7 +219,7 @@ sub check_requirements {
 		# automatically include coordinates if we're adjusting them
 		if ($get_subfeatures) {
 			print STDERR
-" FATAL: Cannot adjust coordinates when including subfeatures!\n";
+				" FATAL: Cannot adjust coordinates when including subfeatures!\n";
 			exit 1;
 		}
 		$include_coordinates = 1;
@@ -318,9 +319,9 @@ sub load_from_infile {
 		printf " Loaded %s features from $input.\n", format_with_commas( $D->last_row );
 	}
 	else {
-		print STDERR 
+		print STDERR
 " FATAL: No top features loaded from file '$input'!\n Check your feature type. If you are attempting to parse subfeatures\n"
-		. " like exon or CDS, try the program get_gene_regions instead.\n";
+			. " like exon or CDS, try the program get_gene_regions instead.\n";
 		exit 1;
 	}
 	return $D;

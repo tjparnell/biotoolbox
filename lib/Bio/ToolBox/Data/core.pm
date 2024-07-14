@@ -1420,38 +1420,42 @@ sub _find_column_indices {
 	# anchoring and grouping - long story why, don't ask
 	# some of these have progressively more relaxed criteria to avoid false positives
 	my $name = $self->find_column('^name$');
-	unless (defined $name) {
+	unless ( defined $name ) {
+
 		# try more agressive search for names
-		$name  = $self->find_column('^gene.?name|transcript.?name$');
+		$name = $self->find_column('^gene.?name|transcript.?name$');
 	}
-	unless (defined $name) {
+	unless ( defined $name ) {
+
 		# take any column with "name" in it
-		$name  = $self->find_column('name');
+		$name = $self->find_column('name');
 	}
-	unless (defined $name) {
+	unless ( defined $name ) {
+
 		# try even more agressive for annotation identifiers
-		$name  = $self->find_column('^gene|gene.?id|transcript.?id$');
+		$name = $self->find_column('^gene|gene.?id|transcript.?id$');
 	}
-	unless (defined $name) {
+	unless ( defined $name ) {
+
 		# use an id
-		$name  = $self->find_column('^id$');
+		$name = $self->find_column('^id$');
 	}
 	my $type   = $self->find_column('^type|class|primary_tag|biotype');
-	my $id     = $self->find_column('^primary_id$');  # database specific primary id
+	my $id     = $self->find_column('^primary_id$');    # database specific primary id
 	my $chromo = $self->find_column('^chromosome|chromo|chrom|chr|seq.*id$');
-	unless (defined $chromo) {
+	unless ( defined $chromo ) {
 		$chromo = $self->find_column('chr');
 	}
-	my $start  = $self->find_column('^start$');
-	unless (defined $start) {
+	my $start = $self->find_column('^start$');
+	unless ( defined $start ) {
 		$start = $self->find_column('start');
 	}
-	unless (defined $start) {
+	unless ( defined $start ) {
 		$start = $self->find_column('^position|pos');
 	}
-	my $stop   = $self->find_column('^stop|end$');
-	unless (defined $stop) {
-		$stop  = $self->find_column('stop|end');
+	my $stop = $self->find_column('^stop|end$');
+	unless ( defined $stop ) {
+		$stop = $self->find_column('stop|end');
 	}
 	my $strand = $self->find_column('^strand');
 	my $score  = $self->find_column('^score$');

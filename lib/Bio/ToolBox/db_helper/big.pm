@@ -3,7 +3,7 @@ package Bio::ToolBox::db_helper::big;
 use warnings;
 use strict;
 use Carp;
-use English qw(-no_match_vars);
+use English    qw(-no_match_vars);
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Big;
@@ -20,7 +20,7 @@ BEGIN {
 }
 
 # Exported names
-our @ISA    = qw(Exporter);
+our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users
@@ -99,7 +99,7 @@ sub collect_bigwig_score {
 	$param->[METH] = 'std' if $param->[METH] eq 'stddev';
 
 	# check how many features we have
-	if ( scalar @{ $param } == 9 ) {
+	if ( scalar @{$param} == 9 ) {
 
 		# only one bw, great!
 		my $bw     = _get_bigwig( $param->[DATA] );
@@ -115,7 +115,7 @@ sub collect_bigwig_score {
 	else {
 		# we have multiple bigwigs
 		my @scores;
-		for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+		for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 			my $bw     = _get_bigwig( $param->[$d] );
 			my $chromo = $BIG_CHROMOS{ $param->[$d] }{ $param->[CHR] } or next;
 			$param->[STRT] = $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo}
@@ -146,7 +146,7 @@ sub collect_bigwig_scores {
 	my $param = shift;
 
 	# check how many features we have
-	if ( scalar @{ $param } == 9 ) {
+	if ( scalar @{$param} == 9 ) {
 
 		# only one, great!
 		my $bw     = _get_bigwig( $param->[DATA] );
@@ -156,13 +156,13 @@ sub collect_bigwig_scores {
 		$param->[STOP] = $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo}
 			if $param->[STOP] > $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo};
 		my $raw_scores = $bw->get_values( $chromo, $param->[STRT] - 1, $param->[STOP] );
-		my @scores     = grep {defined} @{ $raw_scores };
+		my @scores     = grep {defined} @{$raw_scores};
 		return wantarray ? @scores : \@scores;
 	}
 	else {
 		# we have multiple bigwigs
 		my @scores;
-		for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+		for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 			my $bw     = _get_bigwig( $param->[$d] );
 			my $chromo = $BIG_CHROMOS{ $param->[$d] }{ $param->[CHR] } or next;
 			$param->[STRT] = $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo}
@@ -170,7 +170,7 @@ sub collect_bigwig_scores {
 			$param->[STOP] = $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo}
 				if $param->[STOP] > $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo};
 			my $raw = $bw->get_values( $chromo, $param->[STRT] - 1, $param->[STOP] );
-			push @scores, grep {defined} @{ $raw };
+			push @scores, grep {defined} @{$raw};
 		}
 		return wantarray ? @scores : \@scores;
 	}
@@ -184,7 +184,7 @@ sub collect_bigwig_position_scores {
 	my %pos2score;
 
 	# check how many features we have
-	if ( scalar @{ $param } == 9 ) {
+	if ( scalar @{$param} == 9 ) {
 
 		# only one, great!
 		my $bw     = _get_bigwig( $param->[DATA] );
@@ -196,7 +196,7 @@ sub collect_bigwig_position_scores {
 		my $intervals = $bw->get_intervals( $chromo, $param->[STRT] - 1, $param->[STOP] );
 
 		# record intervals into hash
-		foreach my $i (@{ $intervals }) {
+		foreach my $i ( @{$intervals} ) {
 			for ( my $p = $i->{start} + 1; $p <= $i->{end}; $p++ ) {
 				$pos2score{$p} = $i->{value};
 			}
@@ -207,7 +207,7 @@ sub collect_bigwig_position_scores {
 		my %duplicates;    # hash of duplicate positions, position => number
 
 		# collect from each one
-		for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+		for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 			my $bw     = _get_bigwig( $param->[$d] );
 			my $chromo = $BIG_CHROMOS{ $param->[$d] }{ $param->[CHR] } or next;
 			$param->[STRT] = $BIG_CHROMOLENGTHS{ $param->[DATA] }{$chromo}
@@ -218,7 +218,7 @@ sub collect_bigwig_position_scores {
 				$bw->get_intervals( $chromo, $param->[STRT] - 1, $param->[STOP] );
 
 			# record intervals into hash
-			foreach my $i (@{ $intervals }) {
+			foreach my $i ( @{$intervals} ) {
 				for ( my $p = $i->{start} + 1; $p <= $i->{end}; $p++ ) {
 
 					# check every position to see if it's a duplicate
@@ -274,7 +274,7 @@ sub collect_bigbed_scores {
 	# usually there is only one, but for stranded data there may be
 	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	my @scores;
-	for ( my $d = DATA; $d < scalar @{ $param }; $d++ ) {
+	for ( my $d = DATA; $d < scalar @{$param}; $d++ ) {
 
 		# open the bedfile
 		my $bb = _get_bigbed( $param->[$d] );
@@ -344,7 +344,7 @@ sub collect_bigbed_position_scores {
 	# look at each bedfile
 	# usually there is only one, but there may be more
 	my %pos2data;
-	for ( my $i = DATA; $i < scalar @{ $param }; $i++ ) {
+	for ( my $i = DATA; $i < scalar @{$param}; $i++ ) {
 
 		# open the bedfile
 		my $bb = _get_bigbed( $param->[$i] );
@@ -497,11 +497,11 @@ sub collect_bigwigset_score {
 
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
-	return unless scalar(@{ $ids }) > 0;
+	return unless scalar( @{$ids} ) > 0;
 	croak(
 'FATAL: multiple selected bigWig files from a BigWigSet is not supported with single score method'
-	) if scalar(@{ $ids }) > 1;
-	push @{ $param }, @{ $ids };
+	) if scalar( @{$ids} ) > 1;
+	push @{$param}, @{$ids};
 
 	# use the low level single bigWig API
 	return collect_bigwig_score($param);
@@ -515,8 +515,8 @@ sub collect_bigwigset_scores {
 
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
-	return unless scalar( @{ $ids } ) > 0;
-	push @{ $param }, @{ $ids };
+	return unless scalar( @{$ids} ) > 0;
+	push @{$param}, @{$ids};
 
 	# use the low level single bigWig API
 	return collect_bigwig_scores($param);
@@ -530,8 +530,8 @@ sub collect_bigwigset_position_scores {
 
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
-	return unless scalar(@{ $ids }) > 0;
-	push @{ $param }, @{ $ids };
+	return unless scalar( @{$ids} ) > 0;
+	push @{$param}, @{$ids};
 
 	# use the low level single bigWig API
 	return collect_bigwig_position_scores($param);
@@ -547,7 +547,7 @@ sub _open_big {
 	if ($big) {
 		return $big;
 	}
-	elsif ($EVAL_ERROR or $OS_ERROR) {
+	elsif ( $EVAL_ERROR or $OS_ERROR ) {
 		carp $EVAL_ERROR;
 		carp $OS_ERROR;
 		return;
@@ -591,7 +591,7 @@ sub _record_seqids {
 	my ( $file, $big ) = @_;
 	$BIG_CHROMOS{$file} = {};
 	my $chroms = $big->chroms();    # returns hash seq_id => length
-	foreach my $c ( keys %{ $chroms } ) {
+	foreach my $c ( keys %{$chroms} ) {
 		my $chr = $chroms->{$c}{name};
 		my $len = $chroms->{$c}{length};
 
@@ -636,7 +636,7 @@ sub _lookup_bigwigset_wigs {
 	my $param = shift;
 
 	# the datasets, could be either types or names, unfortunately
-	my @types = splice( @{ $param }, DATA );
+	my @types = splice( @{$param}, DATA );
 
 	# we cache the list of looked up bigwigs to avoid doing this over and over
 	my $lookup =
@@ -836,7 +836,7 @@ sub filter_bigwigs {
 		# most users won't even bother with a genuine metadata file
 		# in fact, why am I even bothering with this at all?
 		# because they are a cool concept and I occasionally use them. huh.
-		foreach my $b (@{ $start_list }) {
+		foreach my $b ( @{$start_list} ) {
 			if ( exists $md->{$b}{type} ) {
 				push @filtered, $b if $name eq $md->{$b}{type};
 			}

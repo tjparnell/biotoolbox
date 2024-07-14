@@ -2,8 +2,8 @@ package Bio::ToolBox::Data::file;
 
 use warnings;
 use strict;
-use English qw(-no_match_vars);
-use Carp qw(carp cluck croak confess);
+use English        qw(-no_match_vars);
+use Carp           qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
@@ -386,11 +386,11 @@ sub parse_headers {
 			# these file formats do NOT have column headers
 			# we will first check for those file formats and process accordingly
 			my $format = $self->format || $self->extension;
-			my $count = scalar( split /\t/, $line );
+			my $count  = scalar( split /\t/, $line );
 
 			### a GFF file
 			if ( $format =~ m/g[tvf]f/i ) {
-				if ($count == 9) {
+				if ( $count == 9 ) {
 					$self->add_gff_metadata();
 				}
 				else {
@@ -402,12 +402,14 @@ sub parse_headers {
 			elsif ( $format =~ m/peak/i ) {
 				my $success = $self->add_peak_metadata($count);
 				unless ($success) {
+
 					# failed to add peak metadata because of incorrect column count
 					# check for a commented header line
 					if ( $self->_commented_header_line($line) ) {
 						my @header_names = split /\t/, pop @{ $self->{'comments'} };
 						chomp $header_names[-1];
 						$self->add_standard_metadata( \@header_names );
+
 						# assume interbase and region
 						$self->interbase(1);
 						unless ( defined $self->{'feature'} ) {
@@ -417,6 +419,7 @@ sub parse_headers {
 					else {
 						print
 " WARNING: Incorrect column count for a known Encode Peak format\n";
+
 						# first line will be column headers as below
 					}
 				}
@@ -429,11 +432,13 @@ sub parse_headers {
 
 			### a Bed file
 			elsif ( $format =~ m/bed/i ) {
+
 				# check for a commented header line
 				if ( $self->_commented_header_line($line) ) {
 					my @header_names = split /\t/, pop @{ $self->{'comments'} };
 					chomp $header_names[-1];
 					$self->add_standard_metadata( \@header_names );
+
 					# we will not enforce bed structure by setting the bed flag
 					# but will assume 0-based formatting
 					$self->interbase(1);
@@ -450,6 +455,7 @@ sub parse_headers {
 			elsif ( $format =~ m/(?: ref+lat | genepred | ucsc )/xi ) {
 				my $s = $self->add_ucsc_metadata($count);
 				unless ($s) {
+
 					# failed to add ucsc metadata because of incorrect column count
 					# check for a commented header line
 					if ( $self->_commented_header_line($line) ) {
@@ -460,6 +466,7 @@ sub parse_headers {
 					else {
 						print
 " WARNING: Incorrect column count for a standard UCSC table format\n";
+
 						# first line will be column headers as below
 					}
 				}
@@ -471,7 +478,7 @@ sub parse_headers {
 			}
 
 			### standard text file with headers, i.e. everything else
-			unless ($self->number_columns) {
+			unless ( $self->number_columns ) {
 
 				# check for a commented header line
 				if ( $self->_commented_header_line($line) ) {
@@ -998,7 +1005,8 @@ sub write_file {
 		$fh->printf(
 			"%s\n",
 			join( "\t",
-				@{ $self->{'data_table'}[0] }[ 1 .. $self->{'number_columns'} ] ) );
+				@{ $self->{'data_table'}[0] }[ 1 .. $self->{'number_columns'} ] )
+		);
 	}
 
 	# Write the data table
@@ -1013,8 +1021,8 @@ sub write_file {
 			# skipping the first (empty) element
 			# convert any non-value '.' to empty
 			# and print using a tab-delimited format
-			my @linedata = map { q() if $_ eq '.' }
-				@{ $self->{'data_table'}[$i] }[ 1 .. $n ];
+			my @linedata =
+				map { q() if $_ eq '.' } @{ $self->{'data_table'}[$i] }[ 1 .. $n ];
 			$fh->printf( "%s\n", join( "\t", @linedata ) );
 		}
 	}
@@ -1028,8 +1036,8 @@ sub write_file {
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
 			# using a tab-delimited format, skipping the first (empty) element
-			$fh->printf(
-				"%s\n", join( "\t", @{ $self->{'data_table'}[$i] }[ 1 .. $n ] ) );
+			$fh->printf( "%s\n",
+				join( "\t", @{ $self->{'data_table'}[$i] }[ 1 .. $n ] ) );
 		}
 	}
 
@@ -1135,7 +1143,8 @@ sub open_to_write_fh {
 			$gzip_app = which('gzip');
 		}
 		unless ($gzip_app) {
-			carp 'ERROR: No gzip application in PATH to open compressed file handle output!';
+			carp
+'ERROR: No gzip application in PATH to open compressed file handle output!';
 			$gz = 0;
 			$filename =~ s/\.gz$//;
 		}
@@ -1152,7 +1161,8 @@ sub open_to_write_fh {
 			$bgzip_app .= ' -@ 3 -c';
 		}
 		unless ($bgzip_app) {
-			carp 'ERROR: No bgzip application in PATH to open compressed file handle output!';
+			carp
+'ERROR: No bgzip application in PATH to open compressed file handle output!';
 			$gz = 0;
 			$filename =~ s/\.gz$//;
 		}
@@ -1235,9 +1245,10 @@ sub _commented_header_line {
 
 	# check if the counts are equal
 	# we avoid using the comment for one-column data files because they are probably wrong
-	if ( scalar @commentdata > 1 and scalar @linedata > 1 and
-		scalar @commentdata == scalar @linedata
-	) {
+	if (    scalar @commentdata > 1
+		and scalar @linedata > 1
+		and scalar @commentdata == scalar @linedata )
+	{
 		return 1;
 	}
 	else {
@@ -1353,7 +1364,7 @@ sub add_bed_metadata {
 		$names = $self->standard_column_names('bedGraph');
 	}
 	elsif ( $self->format =~ /bedpe/i or $self->extension =~ m/bedpe/i ) {
-		$self->{'bed'} = 0;     # this will bypass verification checks which would fail
+		$self->{'bed'} = 0;    # this will bypass verification checks which would fail
 		$self->format('bedpe');
 		$names = $self->standard_column_names('bedpe');
 	}
@@ -1362,7 +1373,7 @@ sub add_bed_metadata {
 		$self->format( sprintf( "bed%d", $column_count ) );
 		$names = $self->standard_column_names('bed12');
 	}
-		
+
 	# set the column names
 	my $column_names;
 	if ( $column_count == scalar @{$names} ) {
@@ -1535,6 +1546,7 @@ sub add_standard_metadata {
 		if ( exists $self->{$j} ) {
 
 			if ( $self->{$j}->{'name'} eq $namelist->[$i] ) {
+
 				# names match, assign table
 				$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
 			}
@@ -1545,8 +1557,9 @@ sub add_standard_metadata {
 					$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
 				}
 				else {
-					print 
-					" WARNING: metadata and header names for column $j do not match!\n";
+					print
+" WARNING: metadata and header names for column $j do not match!\n";
+
 					# go ahead and use the provided name if one is not set
 					unless ( defined $self->{'data_table'}->[0]->[$j] ) {
 						$self->{'data_table'}->[0]->[$j] = $namelist->[$i];
@@ -1619,7 +1632,7 @@ sub standard_column_names {
 			qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount
 				exonStarts exonEnds)
 		],
-		'bedpe'  => [    # Bedtools BEDPE format
+		'bedpe' => [     # Bedtools BEDPE format
 			qw(chrom1 start1 end1 chrom2 start2 end2 name score strand1 strand2)
 		],
 	);

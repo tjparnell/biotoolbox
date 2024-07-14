@@ -6,11 +6,11 @@ use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use List::Util qw(sum0 max);
-use Scalar::Util qw(looks_like_number);
+use List::Util       qw(sum0 max);
+use Scalar::Util     qw(looks_like_number);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility qw(parse_list ask_user_for_index);
+use Bio::ToolBox::utility    qw(parse_list ask_user_for_index);
 use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh
 	generate_chromosome_file
@@ -137,7 +137,7 @@ my $printer = set_print_string();
 
 if ($fast) {
 	if ($midpoint) {
-		print 
+		print
 " WARNING: cannot use midpoint position in fast mode!\nrunning in slow mode...\n";
 		$fast = 0;
 	}
@@ -240,7 +240,7 @@ sub check_indices {
 	if ( $ask or not $start_index ) {
 		$start_index = ask_user_for_index( $Input,
 			" Enter the index for the start or position column  " );
-		unless ( $start_index ) {
+		unless ($start_index) {
 			print " FATAL: No identifiable start column index!\n";
 			exit 1;
 		}
@@ -262,7 +262,7 @@ sub check_indices {
 		# first look for a generic score index
 		$score_index =
 			ask_user_for_index( $Input, " Enter the index for the score column  " );
-		unless ( $score_index ) {
+		unless ($score_index) {
 			print " FATAL: No identifiable score column index!\n";
 			exit 1;
 		}
@@ -325,7 +325,7 @@ sub check_step {
 		# double check that the data file supports this
 		# assign the step size as necessary
 		if ( defined $Input->metadata( $start_index, 'step' ) ) {
-			if ( $step_size ) {
+			if ($step_size) {
 				if ( $step_size != $Input->metadata( $start_index, 'step' ) ) {
 					print
 " FATAL: Requested step size $step_size does not match metadata step size!!!\n";
@@ -350,8 +350,8 @@ sub check_step {
 			# set step size
 			$step      = 'fixed';
 			$step_size = $Input->metadata( $start_index, 'step' );
-			print 
-" Automatically generating 'fixedStep' wig with step of $step_size bp\n";
+			print
+				" Automatically generating 'fixedStep' wig with step of $step_size bp\n";
 		}
 		else {
 			print " Automatically generating 'variableStep' wig\n";
@@ -367,7 +367,7 @@ sub check_step {
 			and $Input->metadata( $start_index, 'win' ) != $span )
 		{
 			# the requested span and metadata window size do not match
-			print 
+			print
 " FATAL: Requested span size $span does not match metadata window size!!!\n";
 			exit 1;
 		}
@@ -493,8 +493,7 @@ sub set_score_sub {
 		# collect over multiple score columns from array reference
 		return sub {
 			my $data = shift;
-			my @v = grep { looks_like_number($_) } map { $data->[$_] }
-				@score_indices;
+			my @v    = grep { looks_like_number($_) } map { $data->[$_] } @score_indices;
 			return &{$method_sub}(@v);
 		};
 	}
@@ -503,8 +502,8 @@ sub set_score_sub {
 		# collect over multiple score columns from Feature row object
 		return sub {
 			my $row = shift;
-			my @v = grep { looks_like_number($_) } map { $row->value($_) }
-				@score_indices;
+			my @v =
+				grep { looks_like_number($_) } map { $row->value($_) } @score_indices;
 			return &{$method_sub}(@v);
 		};
 	}
@@ -569,14 +568,14 @@ sub convert_to_fixedStep {
 			$current_chr  = $chromosome;
 			$previous_pos = $start;        # temporary artificial
 		}
-		elsif ( $start > ($previous_pos + $span) ) {
+		elsif ( $start > ( $previous_pos + $span ) ) {
 
 			# skipped a chunk here
 			$out_fh->printf( "fixedStep chrom=%s start=%d step=%d span=%d\n",
 				$chromosome, $start, $step_size, $span );
 		}
 		elsif ( $start < $previous_pos ) {
-			 printf STDERR 
+			printf STDERR
 " FATAL: input file is not genomically sorted! %d comes after %d at line %d\n",
 				$start, $previous_pos, $row->line_number;
 			exit 1;
@@ -590,7 +589,7 @@ sub convert_to_fixedStep {
 
 sub fast_convert_to_fixedStep {
 	my $current_chr = q();    # current chromosome
-	unless ( $chr_index ) {
+	unless ($chr_index) {
 		$chr_index = $Input->chromo_column;
 	}
 	unless ( $chr_index and $start_index ) {
@@ -629,9 +628,9 @@ sub fast_convert_to_fixedStep {
 }
 
 sub convert_to_variableStep {
-	my $current_chr  = q();  # current chromosome
-	my $previous_pos = 0;    # previous position to avoid duplicates in wig file
-	my @scores;              # reusable array for putting multiple data points in
+	my $current_chr  = q();    # current chromosome
+	my $previous_pos = 0;      # previous position to avoid duplicates in wig file
+	my @scores;                # reusable array for putting multiple data points in
 	while ( my $row = $Input->next_row ) {
 
 		# coordinates
@@ -704,7 +703,7 @@ sub convert_to_variableStep {
 
 sub fast_convert_to_variableStep {
 	my $current_chr = q();    # current chromosome
-	unless ( $chr_index ) {
+	unless ($chr_index) {
 		$chr_index = $Input->chromo_column;
 	}
 	unless ( $chr_index and $start_index ) {
@@ -744,8 +743,8 @@ sub fast_convert_to_variableStep {
 sub convert_to_bedgraph {
 
 	# variables to check for overlap
-	my $current_chr  = q();  # current chromosome
-	my $previous_pos = 0;    # previous position to avoid overlap
+	my $current_chr  = q();    # current chromosome
+	my $previous_pos = 0;      # previous position to avoid overlap
 	while ( my $row = $Input->next_row ) {
 
 		# coordinates
@@ -767,7 +766,8 @@ sub convert_to_bedgraph {
 
 				# check for overlap
 				if ( $start < $previous_pos ) {
-					print " WARNING: There are overlapping intervals or the file is not sorted by"
+					print
+" WARNING: There are overlapping intervals or the file is not sorted by"
 						. " coordinates!\n Compare $chromosome:$start"
 						. " with previous stop position $previous_pos\n";
 
@@ -804,17 +804,17 @@ sub convert_to_bedgraph {
 
 sub fast_convert_to_bedgraph {
 
-	unless ( $chr_index ) {
+	unless ($chr_index) {
 		$chr_index = $Input->chromo_column;
 	}
-	unless ( $stop_index ) {
+	unless ($stop_index) {
 		$stop_index = $Input->end_column;
 	}
 	unless ( $chr_index and $start_index and $stop_index ) {
 		print " WARNING: coordinate columns not defined!\n";
 		exit 1;
 	}
-	unless ( $score_index ) {
+	unless ($score_index) {
 		print "WARNING: no score column defined!\n";
 		exit 1;
 	}

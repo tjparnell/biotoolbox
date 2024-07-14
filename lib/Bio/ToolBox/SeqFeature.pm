@@ -20,7 +20,6 @@ use constant {
 
 our $VERSION = '1.70';
 
-
 #### Aliases ####
 # to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we
 # put in plenty of aliases to some of the methods
@@ -36,17 +35,17 @@ our $VERSION = '1.70';
 *gff3_string         = \&gff_string;
 
 # avoid once warning errors
-*stop                 if 0;
-*name                 if 0;
-*id                   if 0;
-*method               if 0;
-*source               if 0;
-*add_segment          if 0;
-*get_all_SeqFeatures  if 0;
-*segments             if 0;
-*each_tag_value       if 0;
-*get_all_tags         if 0;
-*gff3_string          if 0;
+*stop                if 0;
+*name                if 0;
+*id                  if 0;
+*method              if 0;
+*source              if 0;
+*add_segment         if 0;
+*get_all_SeqFeatures if 0;
+*segments            if 0;
+*each_tag_value      if 0;
+*get_all_tags        if 0;
+*gff3_string         if 0;
 
 #### METHODS ####
 sub new {
@@ -67,10 +66,10 @@ sub new {
 		|| $args{'-ref'}
 		|| $args{chrom}
 		|| undef;
-	$self->[START] = int $args{-start} || undef;
-	$self->[STOP]  = int $args{-end}   || $args{-stop} || undef;
-	$self->[NAME] = $args{-display_name} || $args{-name} || undef;
-	$self->[ID]   = $args{-primary_id}   || $args{-id}   || undef;
+	$self->[START] = int $args{-start}    || undef;
+	$self->[STOP]  = int $args{-end}      || $args{-stop} || undef;
+	$self->[NAME]  = $args{-display_name} || $args{-name} || undef;
+	$self->[ID]    = $args{-primary_id}   || $args{-id}   || undef;
 	if ( exists $args{-strand} and defined $args{-strand} ) {
 		$self->strand( $args{-strand} );
 	}
@@ -106,11 +105,10 @@ sub new {
 			$self->[ATTRB] = $args{-attributes};
 		}
 	}
-	if (
-		exists $args{-segments}
-		and    $args{-segments}
-		and ref( $args{-segments} ) eq 'ARRAY'
-	) {
+	if (    exists $args{-segments}
+		and $args{-segments}
+		and ref( $args{-segments} ) eq 'ARRAY' )
+	{
 		$self->[SUBF] = [];
 		foreach my $s ( @{ $args{-segments} } ) {
 			unless ( ref($s) eq $class ) {
@@ -149,7 +147,7 @@ sub end {
 
 sub strand {
 	my $self = shift;
-	if (defined $_[0]) {
+	if ( defined $_[0] ) {
 		my $str = $_[0];
 		if ( $str eq '+' ) {
 			$self->[STRND] = 1;
@@ -572,7 +570,7 @@ sub gff_string {
 		next if $tag eq 'Parent';
 		my $value = $self->get_tag_values($tag);
 		if ( ref($value) eq 'ARRAY' ) {
-			$value = join( ',', map { $self->_encode($_) } @{ $value } );
+			$value = join( ',', map { $self->_encode($_) } @{$value} );
 		}
 		else {
 			$value = $self->_encode($value);
