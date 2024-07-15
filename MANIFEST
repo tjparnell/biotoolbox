@@ -22,10 +22,10 @@ lib/Bio/ToolBox/db_helper/seqfasta.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
 lib/Bio/ToolBox/Parser.pm
-lib/Bio/ToolBox/parser/bed.pm
-lib/Bio/ToolBox/parser/gff.pm
-lib/Bio/ToolBox/parser/ucsc.pm
-lib/Bio/ToolBox/parser/ucsc/builder.pm
+lib/Bio/ToolBox/Parser/bed.pm
+lib/Bio/ToolBox/Parser/gff.pm
+lib/Bio/ToolBox/Parser/ucsc.pm
+lib/Bio/ToolBox/Parser/ucsc/builder.pm
 lib/Bio/ToolBox/SeqFeature.pm
 lib/Bio/ToolBox/utility.pm
 LICENSE

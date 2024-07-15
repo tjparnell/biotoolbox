@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Test script for Bio::ToolBox::parser modules
+# Test script for Bio::ToolBox::Parser modules
 
 use strict;
 use Test::More;
@@ -189,7 +189,7 @@ sub test_gtf {
 	# reload the table to parse everything
 	undef $f;
 	undef $gtf;
-	$gtf = Bio::ToolBox::parser::gff->new(
+	$gtf = Bio::ToolBox::Parser::gff->new(
 		file     => $gtffile,
 		class    => $sfclass,
 		do_gene  => 1,
@@ -567,7 +567,7 @@ sub test_narrowPeak {
 	# reload the table to parse everything
 	undef $f;
 	undef $bed;
-	$bed = Bio::ToolBox::parser::bed->new( file => $peakfile, );
+	$bed = Bio::ToolBox::Parser::bed->new( file => $peakfile, );
 
 	# top features
 	my @top = $bed->top_features;

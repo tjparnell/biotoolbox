@@ -74,7 +74,7 @@ sub open_file {
 
 		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		# we need more object stuff that the ucsc parser expects
-		load 'Bio::ToolBox::parser::ucsc::builder';
+		load 'Bio::ToolBox::Parser::ucsc::builder';
 		$self->{id2count}    = {};
 		$self->{refseqsum}   = {};
 		$self->{refseqstat}  = {};
@@ -412,7 +412,7 @@ __END__
 
 =head1 NAME
 
-Bio::ToolBox::parser::bed - Parser for BED-style formats
+Bio::ToolBox::Parser::bed - Parser for BED-style formats
 
 =head1 SYNOPSIS
 

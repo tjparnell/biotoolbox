@@ -169,7 +169,7 @@ ENCODE-style peak formats (narrowPeak, broadPeak, and gappedPeak), and other
 BED-related derivatives. Gene-based BED12 files are parsed into hierarchical
 parent and child subfeatures.
 
-=item L<Bio::ToolBox::parser::gff>
+=item L<Bio::ToolBox::Parser::gff>
 
 This parses both GTF and GFF3 file formats. Unlike many other GFF parsers 
 that work line-by-line only, this maintains parent and child hierarchical 
@@ -177,7 +177,7 @@ relationships as parent feature and child subfeatures. To further maintain
 control and reduce unnecessary parsing, unwanted feature types can be 
 selectively skipped.
 
-=item L<Bio::ToolBox::parser::ucsc>
+=item L<Bio::ToolBox::Parser::ucsc>
 
 This parses various UCSC file formats, including different refFlat, GenePred, 
 and knownGene flavors. Genes, transcripts, and exons are assembled into 
