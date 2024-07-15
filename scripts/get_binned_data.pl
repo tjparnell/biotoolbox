@@ -24,7 +24,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This script will collect binned values across features\n\n";
 

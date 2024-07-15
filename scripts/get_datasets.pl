@@ -26,7 +26,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n A program to collect data for a list of features\n\n";
 

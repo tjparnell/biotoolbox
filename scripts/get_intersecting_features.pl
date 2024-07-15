@@ -15,7 +15,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::utility qw(format_with_commas);
 
-our $VERSION = 1.70;
+our $VERSION = '2.00';
 
 print "\n A script to pull out overlapping features\n\n";
 

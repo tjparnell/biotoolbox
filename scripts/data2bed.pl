@@ -12,7 +12,7 @@ use Bio::ToolBox::Data;
 use Bio::ToolBox::utility    qw( ask_user_for_index format_with_commas );
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This program will write a BED file\n";
 

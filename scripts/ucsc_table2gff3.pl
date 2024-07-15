@@ -18,7 +18,7 @@ eval {
 	$net = 1;
 };
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 

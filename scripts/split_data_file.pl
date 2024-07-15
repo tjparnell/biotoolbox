@@ -9,7 +9,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This script will split a data file by features\n\n";
 

@@ -13,7 +13,7 @@ use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n A tool for manipulating datasets in data files\n";
 

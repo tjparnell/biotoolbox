@@ -16,7 +16,7 @@ use Bio::ToolBox::utility qw(
 );
 require Exporter;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources

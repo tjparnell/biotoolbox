@@ -5,7 +5,7 @@ use strict;
 use Carp qw(cluck);
 use Bio::ToolBox::Data;
 
-our $VERSION = '1.700';
+our $VERSION = '2.00';
 
 sub load_file {
 	my $self = shift;

@@ -13,7 +13,7 @@ use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 require Exporter;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 # Exported names
 our @ISA = qw(Exporter);

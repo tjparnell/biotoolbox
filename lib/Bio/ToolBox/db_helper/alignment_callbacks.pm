@@ -6,7 +6,7 @@ use Carp;
 use Bio::ToolBox::db_helper::constants;
 require Exporter;
 
-our $VERSION = '1.62';
+our $VERSION = '2.00';
 
 # Exported names
 our @ISA = qw(Exporter);

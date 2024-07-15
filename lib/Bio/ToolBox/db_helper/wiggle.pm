@@ -7,7 +7,7 @@ use Bio::ToolBox::db_helper::constants;
 use Bio::Graphics::Wiggle;
 require Exporter;
 
-our $VERSION = '1.51';
+our $VERSION = '2.00';
 
 # Exported names
 our @ISA = qw(Exporter);

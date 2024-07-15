@@ -33,7 +33,7 @@ eval {
 # served by separate database queries for each window.
 use constant DATASET_HASH_LIMIT => 4999;
 
-our $VERSION = 'v1.70';
+our $VERSION = '2.00';
 
 print
 	"\n A script to collect windowed data flanking a relative position of a feature\n\n";

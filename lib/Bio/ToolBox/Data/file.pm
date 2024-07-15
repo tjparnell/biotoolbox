@@ -8,7 +8,7 @@ use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 # List of acceptable filename extensions
 our $SUFFIX =

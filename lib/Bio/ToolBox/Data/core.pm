@@ -12,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Module::Load;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 #### Initialization and verification ###############################################
 

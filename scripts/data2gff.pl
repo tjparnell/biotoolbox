@@ -10,7 +10,7 @@ use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(parse_list ask_user_for_index format_with_commas);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This script will convert a data file to a GFF\n\n";
 

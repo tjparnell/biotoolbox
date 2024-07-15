@@ -11,7 +11,7 @@ use Bio::ToolBox::db_helper qw(open_db_connection);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw( format_with_commas parse_list );
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This script will collect information for a list of features\n\n";
 

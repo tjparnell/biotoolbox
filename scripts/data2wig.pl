@@ -16,7 +16,7 @@ use Bio::ToolBox::big_helper qw(
 	generate_chromosome_file
 );
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This script will export a data file to a wig file\n\n";
 

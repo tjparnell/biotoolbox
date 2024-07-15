@@ -7,7 +7,7 @@ use File::Spec;
 use IO::Prompt::Tiny qw(prompt);
 require Exporter;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 ### Variables
 # Export

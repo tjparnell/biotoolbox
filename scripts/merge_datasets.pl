@@ -9,7 +9,7 @@ use Pod::Usage;
 use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n A progam to merge datasets from two files\n";
 

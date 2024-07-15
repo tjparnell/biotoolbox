@@ -3,7 +3,7 @@ package Bio::ToolBox::Parser::ucsc::builder;
 use warnings;
 use strict;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 sub new {
 	my ( $class, $linedata, $ucsc ) = @_;

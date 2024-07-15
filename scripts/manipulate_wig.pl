@@ -14,7 +14,7 @@ use Bio::ToolBox::big_helper qw(
 	generate_chromosome_file
 );
 
-our $VERSION = 1.70;
+our $VERSION = '2.00';
 
 ### Quick help
 unless (@ARGV) {    # when no command line options are present

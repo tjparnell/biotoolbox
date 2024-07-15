@@ -9,7 +9,7 @@ use IO::File;
 use Config::Simple;
 require Exporter;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 # variables
 my $default;

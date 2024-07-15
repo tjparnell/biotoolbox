@@ -9,7 +9,7 @@ use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Big;
 require Exporter;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 # Initialize CURL buffers
 BEGIN {

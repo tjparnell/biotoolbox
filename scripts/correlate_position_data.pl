@@ -37,7 +37,7 @@ my $ORDINAL      = 0;
 
 use constant LOG10 => log(10);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 

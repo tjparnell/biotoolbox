@@ -8,7 +8,7 @@ use Module::Load;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::SeqFeature;    # alternative to Bio::SeqFeature::Lite
 
-our $VERSION = 1.70;
+our $VERSION = '2.00';
 
 sub new {
 	my $class = shift;

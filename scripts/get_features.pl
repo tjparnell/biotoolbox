@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(
 );
 use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This program will collect features from annotation sources\n\n";
 

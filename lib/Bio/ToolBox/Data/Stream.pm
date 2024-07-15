@@ -7,7 +7,7 @@ use Carp    qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Feature;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 #### Initialize ####
 

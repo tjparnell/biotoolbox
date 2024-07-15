@@ -18,7 +18,7 @@ use constant {
 	SUBF  => 11,
 };
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 #### Aliases ####
 # to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we

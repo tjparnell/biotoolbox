@@ -12,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::config;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n A script to print all available feature types in a database\n\n";
 

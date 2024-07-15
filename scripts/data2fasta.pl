@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This program will convert a data file to fasta\n\n";
 

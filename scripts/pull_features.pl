@@ -9,7 +9,7 @@ use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(ask_user_for_index);
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n A script to pull out specific features from a data file\n";
 

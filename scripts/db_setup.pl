@@ -21,7 +21,7 @@ eval {
 	$sql = 1;
 };
 
-our $VERSION = '1.70';
+our $VERSION = '2.00';
 
 print "\n This program will set up an annotation database\n\n";
 
