@@ -20,20 +20,20 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     is officially recommended. It defaults to installing in `/usr/local` but doesn't 
     have to be; see below. 
 
-        $ curl -o htslib-1.9.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2 
-        $ tar -xf htslib-1.9.tar.bz2
-        $ cd htslib-1.9
-        $ make && make install
-        $ cd ..
+        curl -o htslib-1.9.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2 
+        tar -xf htslib-1.9.tar.bz2
+        cd htslib-1.9
+        make && make install
+        cd ..
 
     Install [libBigWig](https://github.com/dpryan79/libBigWig) for bigWig and bigBed 
     support. It defaults to installing in `/usr/local`.
     
-        $ curl -o libBigWig-0.4.4.tar.gz -L https://github.com/dpryan79/libBigWig/archive/0.4.4.tar.gz 
-        $ tar -xf libBigWig-0.4.4.tar.gz
-        $ cd libBigWig-0.4.4
-        $ make && make install
-        $ cd ..
+        curl -o libBigWig-0.4.7.tar.gz -L https://github.com/dpryan79/libBigWig/archive/0.4.7.tar.gz 
+        tar -xf libBigWig-0.4.7.tar.gz
+        cd libBigWig-0.4.7
+        make && make install
+        cd ..
 
 - Install Perl modules
 
@@ -43,23 +43,23 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     information. This assumes [CPAN Minus](https://metacpan.org/pod/App::cpanminus) is 
     installed. 
 
-        $ curl -O -L https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
-        $ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
-        $ cpanm Minimal-BioPerl-1.7.8.tar.gz
-        $ cpanm bio-db-big-master.zip
-        $ cpanm Bio::DB::HTS
-        $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
+        curl -O -L https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
+        curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
+        cpanm Minimal-BioPerl-1.7.8.tar.gz
+        cpanm bio-db-big-master.zip
+        cpanm Bio::DB::HTS
+        cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
 
 - External applications
 
     These are external helper applications for converting to and from bigWig and bigBed 
     formats. Assumes installation to `/usr/local/bin`.
 
-        $ curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig
-        $ curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigWigToWig
-        $ curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedToBigBed
-        $ chmod +x wigToBigWig bigWigToWig bedToBigBed
-        $ mv wigToBigWig bigWigToWig bedToBigBed /usr/local/bin/
+        curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig
+        curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigWigToWig
+        curl -O -L http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedToBigBed
+        chmod +x wigToBigWig bigWigToWig bedToBigBed
+        mv wigToBigWig bigWigToWig bedToBigBed /usr/local/bin/
 
 ## Detailed guide
 
@@ -88,9 +88,9 @@ described in the documentation. This can also be used for targeted, standalone
 installations; adjust accordingly. For example, the following command will install 
 `local::lib` and the CPAN Minus application
 
-    $ curl -L https://cpanmin.us | perl - -l $HOME/perl5 local::lib App::cpanminus \
-      && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.profile \
-      && . ~/.profile
+    curl -L https://cpanmin.us | perl - -l $HOME/perl5 local::lib App::cpanminus \
+    && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.profile \
+    && . ~/.profile
 
 ### Custom installation
 
@@ -105,7 +105,7 @@ An alternate package manager may be used to install a Perl version in a generall
 available location. For example, MacOS users can easily install a modern Perl using
 [Homebrew](https://brew.sh). Similarly, Linux (and evidently Microsoft Windows Subsystem
 for Linux) users can use [Linuxbrew](http://linuxbrew.sh). These typically install the
-latest production release, currently `5.32`, with a single command.
+latest production release with a single command.
 
 To install a Perl in your home directory (or other location) with a simple, but powerful,
 tool, use the excellent [PerlBrew](https://perlbrew.pl). This tool can painlessly compile,
@@ -141,15 +141,14 @@ installed.
 
 - [HTSlib](https://github.com/samtools/htslib)
 
-    Follow the directions within for installation. 
-    [Version 1.9](https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2) 
-    is known to work; later versions should work too. By default, it installs into `/usr/local`, 
-    or it may be set to another directory (`$HOME` for example) by adding `--prefix=$HOME` 
-    option to the `configure` step. This may also be available via OS or other package 
-    managers. 
-    
-    So far, more modern versions of htslib (up to version 1.20) appear to work with
-    Bio::DB::HTS; however, be prepared to drop back if/when old APIs are deprecated.
+    Follow the directions within for installation.
+    [Version 1.9](https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2)
+    is officially recommended by its authors; however, later versions appear to
+    work too and may be preferred. Versions of `htslib` up to 1.20 have been used
+    by this author. By default, it installs into `/usr/local`, or
+    it may be set to another directory (`$HOME` for example) by adding
+    `--prefix=$HOME` option to the `configure` step. This may also be available
+    via OS or other package managers. 
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
@@ -157,8 +156,9 @@ installed.
     `/usr/local`. To change to a different location, manually edit the `Makefile`
     to change `prefix` to your desired location, and run `make && make install`.
     
-    Note that the Perl module [Alien::LibBigWig](https://metacpan.org/pod/Alien::LibBigWig)
-    is available to install this library dependency for you automatically for Bio::DB::Big.
+    Note that the Perl module
+    [Alien::LibBigWig](https://metacpan.org/pod/Alien::LibBigWig) is available
+    to install this library dependency for you automatically for Bio::DB::Big.
     
 
 ## Perl modules
@@ -184,7 +184,7 @@ the end you will have installed dozens of packages.
     bundled scripts, the vast majority of which is not needed by Bio::ToolBox.
     However, it is required by Bio::DB::HTS and all of the legacy adapters (see below). 
     
-	*NOTE:* For users with no other explicit need for BioPerl, an unofficial, custom, 
+	**NOTE:** For users with no other explicit need for BioPerl, an unofficial, custom, 
 	[minimal version](https://github.com/tjparnell/bioperl-live/tree/minimal-tjparnell) 
 	has been generated, which is considerably faster to install and has a footprint 
 	one-third the size of the full distribution; use this 
@@ -206,12 +206,10 @@ the end you will have installed dozens of packages.
     locations, but with non-standard locations, you may specify the path with the 
     `--libbigwig` option to `Build.PL`. 
     
-    *NOTE*: The distribution from CPAN will install dozens of unnecessary modules for
-    remote URL testing. You may be better off installing from
+    **NOTE**: The distribution from CPAN will install dozens of unnecessary modules
+    for remote URL testing. You may be better off installing directly from
     [source](https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master).
     
-    **NOTE**: The libBigWig
-
 - [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
 
     This is highly recommended to get multi-cpu support for some of the data collection 
@@ -220,37 +218,44 @@ the end you will have installed dozens of packages.
 - [Set::IntervalTree](https://metacpan.org/pod/Set::IntervalTree)
 
     This is necessary for optional functionality (quick intersection of genomic 
-    intervals, such as black lists) for a few scripts, namely `bam2wig.pl`.
+    intervals, such as black lists) for a few scripts, namely
+    [bam2wig.pl](apps/bam2wig.md).
 
 - [Set::IntSpan::Fast](https://metacpan.org/pod/Set::IntSpan::Fast)
 
-    This is necessary for optional functionality in the `bam2wig.pl` script. For a slight 
-    speed boost, install the [XS version](https://metacpan.org/pod/Set::IntSpan::Fast::XS)
-    if possible. Note that the XS version requires
-    [Data::Swap](https://metacpan.org/pod/Data::Swap); however, this appears to [fail to
-    install](http://matrix.cpantesters.org/?dist=Data-Swap+0.08) on virtually all recent
-    Perl versions, so unless you're living in the past, we're basically stuck with the
-    Perl-only version until someone adopts and fixes it.
+    This is necessary for optional functionality in the
+    [bam2wig.pl](apps/bam2wig.md) script. For a slight speed boost, install the
+    [XS version](https://metacpan.org/pod/Set::IntSpan::Fast::XS) if possible.
+    Note that the XS version requires
+    [Data::Swap](https://metacpan.org/pod/Data::Swap); however, this appears to
+    [fail to install](http://matrix.cpantesters.org/?dist=Data-Swap+0.08) on
+    virtually all recent Perl versions, so unless you're living in the past,
+    we're basically stuck with the Perl-only version until someone adopts and
+    fixes it.
 
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
 
-    $ cpanm Module::Build https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
-    $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
-	$ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
-	$ cpanm --configure-args="--libbigwig $HOME" bio-db-big-master.zip
-    $ cpanm --notest Data::Swap
-    $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
+    cpanm Module::Build https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
+    cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
+	curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
+	cpanm --configure-args="--libbigwig $HOME" bio-db-big-master.zip
+    cpanm --notest Data::Swap
+    cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
 
 ## External applications
 
-Some programs, notably [bam2wig.pl](https://metacpan.org/pod/distribution/Bio-ToolBox/scripts/bam2wig.pl) 
-among others, requires external UCSC utilities for converting wig files to bigWig. You may 
-download these from the UCSC Genome Browser utilities section for either 
-[Linux](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/) or 
-[MacOS](http://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/). Copy them to your 
-`bin` directory in your `PATH`, for example `$HOME/bin`, `$HOME/perl5/bin`, or 
-`/usr/local/bin`. Be sure to make them executable by running `chmod +x` on each file.
+Some programs, for example [bam2wig.pl](apps/bam2wig.md) and
+[data2wig](apps/data2wig.md), requires external utilities for converting text
+formats to binary formats, for example wig files to bigWig. External utilities
+are preferred because they're more efficient and spread the load on modern
+multi-CPU environments. You may download these from the UCSC Genome Browser
+utilities section for either
+[Linux](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/) or
+[macOS](http://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/). Copy them to
+your `bin` directory in your `PATH`, for example `$HOME/bin`, `$HOME/perl5/bin`,
+or `/usr/local/bin`. Be sure to make them executable by running `chmod +x` on
+each file.
 
 - wigToBigWig
 - bedGraphToBigWig
@@ -259,9 +264,9 @@ download these from the UCSC Genome Browser utilities section for either
 
 An example for downloading on Linux:
 
-    $ for name in wigToBigWig bedGraphToBigWig bigWigToWig bedToBigBed; \
-      do curl -o $HOME/bin/$name http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name \
-      && chmod +x $HOME/bin/$name; done;
+    for name in wigToBigWig bedGraphToBigWig bigWigToWig bedToBigBed; \
+    do curl -o $HOME/bin/$name http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name \
+    && chmod +x $HOME/bin/$name; done;
 
 
 ## Legacy Perl modules
@@ -281,24 +286,26 @@ Some notes are below for anyone who may need to install these.
 
 ### Database support
 
-The Bio::DB::SeqFeature::Store is a convenient SeqFeature annotation database backed
-by a SQL engine. It used to be part of the BioPerl distribution prior to release
-1.7.3, but is now split into its own distribution. If you wish to use annotation
-databases, you will need a SQL driver, such as
-[DBD::SQLite](https://metacpan.org/pod/DBD::SQLite) (recommended for individuals) or
-[DBD::mysql](https://metacpan.org/pod/DBD::mysql) (for fancy multi-user installations). 
+The Bio::DB::SeqFeature::Store is a convenient SeqFeature annotation database
+backed by a SQL engine. It used to be part of the BioPerl distribution prior to
+release 1.7.3, but is now split into its own distribution. If you wish to use
+annotation databases, you will need a SQL driver, such as
+[DBD::SQLite](https://metacpan.org/pod/DBD::SQLite) (recommended for
+individuals) or [DBD::mysql](https://metacpan.org/pod/DBD::mysql) (for fancy
+multi-user installations). 
 
 ### Sam library
 
-The Bio::DB::Sam library _only_ works with the legacy Samtools version, which included
-both the C libraries, headers, and executables; use version
-[0.1.19](https://github.com/samtools/samtools/archive/0.1.19.tar.gz) for best results. You
-will need to compile the Samtools code, but you do not have to install it (the library is
-not linked). Before compiling, edit the Makefile to include the cflags `-fPIC` and (most
-likely) `-m64` for 64 bit OS. Export the `SAMTOOLS` environment variable to the path of
-the Samtools build directory, and then you can proceed to build the Perl module; it should
-find the necessary files using the `SAMTOOLS` environment variable. You may obtain the
-latest source from
+The Bio::DB::Sam library _only_ works with the legacy Samtools version, which
+included both the C libraries, headers, and executables; use version
+[0.1.19](https://github.com/samtools/samtools/archive/0.1.19.tar.gz) for best
+results. You will need to compile the Samtools code, but you do not have to
+install it (the library is not linked). Before compiling, edit the Makefile to
+include the cflags `-fPIC` and (most likely) `-m64` for 64 bit OS. Export the
+`SAMTOOLS` environment variable to the path of the Samtools build directory, and
+then you can proceed to build the Perl module; it should find the necessary
+files using the `SAMTOOLS` environment variable. You may obtain the latest
+source from
 [here](https://github.com/GMOD/GBrowse-Adaptors/tree/master/Bio-SamTools).
 
 ### UCSC BigFile library

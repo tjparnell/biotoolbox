@@ -63,17 +63,17 @@ Manual installation is simple with the standard
     ./Build test
     ./Build install
 
-In either case, this will get you a minimal installation that will work with text
-files (BED, GFF, GTF, etc), but not binary files. To work with binary Bam and BigWig
-files, two additional [external
-libraries](docs/AdvancedInstallation.md#external-libraries) must also be compiled and
-installed; This is not hard, and you likely already have one (possibly both)
-installed on your system. Most scripts should fail gently with warnings if required
-modules are missing. These modules are indicated as `recommended` rather than
-`required` in `Build.PL` script.
+In either case, this will get you a minimal installation that will work with
+text files (BED, GFF, GTF, etc), but not binary files. To work with binary Bam
+and BigWig files, two additional
+[external libraries](AdvancedInstallation.md#external-libraries)
+must also be compiled and installed; This is not hard, and you likely already
+have one (possibly both) installed on your system. Most scripts should fail
+gently with warnings if required modules are missing. These modules are
+indicated as `recommended` rather than `required` in `Build.PL` script.
 
 For a step-by-step instructions to get a complete installation, see the 
-[Advanced Installation guide](docs/AdvancedInstallation.md).
+[Advanced Installation guide](AdvancedInstallation.md).
 
 For MacOS-specific installation issues, see the [MacOS notes](MacOSNotes.md) page.
 Even though MacOS is unix, it has its own idiosyncrasies that I've discovered 
@@ -91,7 +91,8 @@ useful for others to know.
 
 This package is free software; you can redistribute it and/or modify
 it under the terms of the Artistic License 2.0. For details, see the
-full text of the license in the file LICENSE.
+full text of the license in the
+[LICENSE](https://github.com/tjparnell/biotoolbox/blob/master/LICENSE).
 
 This package is distributed in the hope that it will be useful, but it
 is provided “as is” and without any express or implied warranties. For

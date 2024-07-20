@@ -162,8 +162,11 @@ in the terminal, or just simply run
 	manipulate_datasets.pl file.txt
 
 This script is designed to run interactively, allowing you to choose functions via 
-letter options from a menu. Alternatively, single functions can be specified on the 
-command line for a programmatic approach in a `bash` script, for example. 
+letter options from a menu. Press `m` for the menu, `q` to save the file and quit, 
+and `Q` to just quit without saving. 
+
+Alternatively, single functions can be specified on the command line for a
+programmatic approach in a `bash` script, for example. 
 
 	manipulate_datasets.pl --in file.txt --func multiply --index 5 --target 0.0133
 
