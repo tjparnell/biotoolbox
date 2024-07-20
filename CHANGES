@@ -1,6 +1,47 @@
 ######## Bio::ToolBox revision history #############
 
 
+v2.0
+	- Version number change, no code changes
+
+v1.70
+	- MAJOR UPDATE: Change all internal and user-oriented column indexing
+	to 1-base instead of 0-base indexing, i.e. column numbers are now
+	listed beginning with 1 instead of 0. WARNING!!! THIS WILL BREAK ALL
+	PRE-EXISTING SCRIPTS AND CODE THAT USES HARD-CODED COLUMN INDEXES!!!
+	- MAJOR UPDATE: Use a single unified Bio::ToolBox::Parser module with
+	subclasses for bed, gff, gtf, and ucsc table formats. NOTE: This changed
+	name capitalization of Bio::ToolBox::Parser subclasses from parser
+	- Improve parsing of gtf files, especially with duplicate tags
+	- Replaced old table sorting algorithm to use numeric, mixed digit-string,
+	and/or string sorting
+	- Improved accuracy of detecting standard columns such as name, ID, start, etc 
+	- Add support for column median and trimmed-mean methods when generating a
+	summary file
+	- Fix bug with filtering features by transcript_support_level and gencode
+	- Remove Bio::Seq::IO requirement for writing fasta files in data2fasta.pl
+	- Changed behavior to always use 1-base coordinate when generating coordinate
+	strings, which is standard behavior e.g. with HTSlib (samtools and tabix) queries
+	- Improve support for coordinate lookup in merge_datasets.pl, including
+	handling either 1-base or 0-base coordinate strings.
+	- Always report both transcript and gene name IDs and names in text output
+	from get_gene_regions.pl
+	- Add bedpe format support
+	- Fix bugs with parsing file headers and assigning standard column metadata
+	- Fix bug with naming empirically derived introns
+	- Add option to skip chromosomes in get_gene_regions.pl
+	- Add option to adjust relative coordinates based on narrowPeak peak
+	in get_features.pl
+	- Fix edge-case bugs with low-level bam parsing
+	- Speed up certain stats functions  and improve detection of numbers
+	in manipulate_datasets.pl
+	- Remove defunct supplementary tables in ucsc_table2gff3.pl
+	- Improve data format verification, and only run it when reading and writing
+	- Improve error reporting in scripts
+	- Use a proper prompting module for user-input
+	- Fix massive numbers of perlcritic and perltidy issues
+	- Hundreds of other bug fixes
+
 v1.691
 	- Fix critical error in script get_relative_data.pl
 	- Fix prerequisite version numbers leading to build failures
