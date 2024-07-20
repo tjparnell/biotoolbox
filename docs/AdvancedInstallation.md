@@ -48,8 +48,7 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
         $ cpanm Minimal-BioPerl-1.7.8.tar.gz
         $ cpanm bio-db-big-master.zip
         $ cpanm Bio::DB::HTS
-        $ cpanm --notest Data::Swap
-        $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
+        $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
 
 - External applications
 
@@ -148,12 +147,19 @@ installed.
     or it may be set to another directory (`$HOME` for example) by adding `--prefix=$HOME` 
     option to the `configure` step. This may also be available via OS or other package 
     managers. 
+    
+    So far, more modern versions of htslib (up to version 1.20) appear to work with
+    Bio::DB::HTS; however, be prepared to drop back if/when old APIs are deprecated.
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
     Follow the directions within for installation. By default, it installs into 
     `/usr/local`. To change to a different location, manually edit the `Makefile`
     to change `prefix` to your desired location, and run `make && make install`.
+    
+    Note that the Perl module [Alien::LibBigWig](https://metacpan.org/pod/Alien::LibBigWig)
+    is available to install this library dependency for you automatically for Bio::DB::Big.
+    
 
 ## Perl modules
 
@@ -203,6 +209,8 @@ the end you will have installed dozens of packages.
     *NOTE*: The distribution from CPAN will install dozens of unnecessary modules for
     remote URL testing. You may be better off installing from
     [source](https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master).
+    
+    **NOTE**: The libBigWig
 
 - [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
 
@@ -219,9 +227,10 @@ the end you will have installed dozens of packages.
     This is necessary for optional functionality in the `bam2wig.pl` script. For a slight 
     speed boost, install the [XS version](https://metacpan.org/pod/Set::IntSpan::Fast::XS)
     if possible. Note that the XS version requires
-    [Data::Swap](https://metacpan.org/pod/Data::Swap), which may [fail to
-    install](http://matrix.cpantesters.org/?dist=Data-Swap+0.08) on recent Perl versions.
-    It's a fairly innocuous test fail, so either skip the tests or force install it.
+    [Data::Swap](https://metacpan.org/pod/Data::Swap); however, this appears to [fail to
+    install](http://matrix.cpantesters.org/?dist=Data-Swap+0.08) on virtually all recent
+    Perl versions, so unless you're living in the past, we're basically stuck with the
+    Perl-only version until someone adopts and fixes it.
 
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
@@ -231,7 +240,7 @@ you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust ac
 	$ curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
 	$ cpanm --configure-args="--libbigwig $HOME" bio-db-big-master.zip
     $ cpanm --notest Data::Swap
-    $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
+    $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
 
 ## External applications
 

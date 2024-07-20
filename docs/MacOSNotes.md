@@ -1,7 +1,9 @@
 # MacOS Notes
 
-While Macs have a Unix-compatible command-line environment, there are a few issues 
-and solutions that I have encountered that may be useful to someone.
+While Macs have a Unix-compatible command-line environment (Darwin), there are a few 
+issues and solutions that I have encountered that may be useful to someone. Some of 
+these pertain to older OS X releases (and left here for posterity), but some, such 
+as [rpath](#rpath_errors), are still relevant to current macOS releases.
 
 ## Install XCode command line tools
 
@@ -66,13 +68,49 @@ the Apple-supplied library in High Sierra (10.13) as described
 [here](https://discussions.apple.com/thread/8125401). The best solution is to 
 install your own `berkley-db` library. 
 
-This issue is not evident on the newer Mojave (10.14) release.
+This issue is not evident on the newer Mojave (10.14) and subsequent releases.
 
 For BioToolBox users, the biggest effect appears to be exceptionally long times 
 during `Build` tests, specifically file `04.DB.t` that uses the in-memory database 
 adapater (maybe 20-30 seconds instead of 1), and excruciatingly long 
 [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store) 
 database builds (possibly days or weeks, I give up). 
+
+
+## Set::IntervalTree failures
+
+Installing [Set::IntervalTree](https://metacpan.org/pod/Set::IntervalTree) may lead
+failures. This isn't necessarily an issue with per se, but rather one of its
+dependencies, [ExtUtils::CppGuess](https://metacpan.org/pod/ExtUtils::CppGuess),
+which fails to install on recent versions of macOS. In fact, most tests of it on
+Darwin [fail](http://matrix.cpantesters.org/?dist=ExtUtils-CppGuess+0.27).
+Fortunately, the failing tests don't appear to be essential for installing
+Set::IntervalTree, so force install ExtUtils::CppGuess and try re-installing
+Set::IntervalTree again – it will probably work.
+
+
+## libBigWig
+
+When manually installing libBigWig on recent versions of macOS (observed with Sonoma,
+14.x and libBigWig v0.4.7), the compilation may fail at first. To check for libCurl
+dependencies, it attempts to compile a small test program and runs the command
+`mktemp --suffix=.c`. While that `--suffix` option is available to versions on Linux
+platforms, it is not available to the version on macOS, thus breaking the detection
+of libCurl. To work around this, we just have to tell it that, yes, we have libCurl.
+Comment out the five lines after `# Create a simple test-program...` and add a new line
+
+	HAVE_CURL=YES
+
+Then re-run `make` and it should compile ok with curl support.
+
+However, it's not over yet. If you run `make test`, the `test/testRemote` test seems to
+fail. This appears to be an innocuous platform-specific error. If you proceed to
+compile the Bio::DB::Big Perl module, it appears to work ok with remote files during
+its testing, albeit through a fake remote test with Test::Fake::HTTPD (if it's
+installed). However, empirical testing with real remote data (via https) seems to work ok.
+
+
+
 
 
 

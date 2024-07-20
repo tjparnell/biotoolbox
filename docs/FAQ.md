@@ -12,10 +12,10 @@ programmer understands but a casual user might not, as well as rationale.
 	what about the files from the download page?
 	
 	Programs that are designed to potentially interpret a gene table, such as
-	[get_datasets](https://metacpan.org/pod/get_datasets.pl), will "taste" a file for
-	potential UCSC formats based on the number of columns present. Other programs, like
-	[manipulate_datasets](https://metacpan.org/pod/manipulate_datasets.pl), don't bother
-	and will take the first line as the header regardless. 
+	[get_datasets](apps/get_datasets.md), will "taste" a file for potential UCSC
+	formats based on the number of columns present. Other programs, like
+	[manipulate_datasets](apps/manipulate_datasets.md), don't bother and will take
+	the first line as the header regardless. 
 	
 	Some programs accept a `--noheader` flag, and it will insert dummy column headers.
 	
@@ -97,12 +97,14 @@ programmer understands but a casual user might not, as well as rationale.
 
 - Why do you prefer bigWig over bam files?
 
-	As currently implemented, the bam adapter for use in data collection scripts is 
-	pretty limited in terms of alignment filtering and manipulating and recording 
-	alignment positions. The [bam2wig](https://metacpan.org/pod/bam2wig.pl) script, 
-	on the other hand, has extensive filtering and reporting capabilities. The bigWig 
-	adapters are generally much faster than bam adapters in collecting data, and you 
-	can always visualize exactly what you are collecting in a genome browser. 
+	As currently implemented, the bam adapter for use in data collection scripts is
+	pretty limited in terms of alignment filtering and manipulating and recording
+	alignment positions. The [bam2wig](apps/bam2wig.md) script, on the other hand,
+	has extensive filtering and reporting capabilities. The bigWig adapters are
+	generally much faster than bam adapters in collecting data, and you can always
+	visualize exactly what you are collecting in a genome browser. If your workflow
+	requires complicated alignment filtering and counting without a bigWig conversion
+	step, there are other tools out there....
 
 - How do you make the programs run faster?
 
@@ -113,14 +115,14 @@ programmer understands but a casual user might not, as well as rationale.
 	reference is split into a separate fork (no love for uni-chromosomal bacteria). It's 
 	not whole-integer multiples faster, but it's better than single-thread. 
 	
-	For data collection, give more cpu cores when possible. The data collection scripts 
-	self-limits the number of forks based on how big the input data file is. The OS will 
-	generally take care of disk I/O and concurrency. If you're constantly loading large 
-	annotation files, consider making them smaller (take just what you need with 
-	[get_features](https://metacpan.org/pod/get_features.pl) or 
-	[get_gene_regions](https://metacpan.org/pod/get_gene_regions.pl)), use simpler 
-	annotation formats (BED and refFlat are fastest), or import them into an annotation 
-	SQLite database file (see above).
+	For data collection, give more cpu cores when possible. The data collection
+	scripts self-limits the number of forks based on how big the input data file is.
+	The OS will generally take care of disk I/O and concurrency. If you're constantly
+	loading large annotation files, consider making them smaller (take just what you
+	need with [get_features](apps/get_features.md) or
+	[get_gene_regions](apps/get_gene_regions.md)), use simpler annotation formats
+	(BED and refFlat are fastest), or import them into an annotation SQLite database
+	file (see above).
 	
 	There is an (unofficial) [effort](http://perl11.org) to make Perl faster by tweaking 
 	the internals. BioToolBox will install under [cperl](http://perl11.org/cperl/), 
@@ -138,6 +140,9 @@ programmer understands but a casual user might not, as well as rationale.
 
 - Why do your column indexes begin at 0 instead of 1?
 
+	**UPDATE**: With version 2 release of Bio::ToolBox, all column indexes are now
+	indexed at 1 instead of 0. 
+	
 	Inexperience, laziness, and legacy code. In Perl (and many programming languages), 
 	an array of variables are indexed beginning at 0. Since data tables are loaded as 
 	an array (rows) of arrays (columns), the first column is 0. When I first started as 

@@ -28,17 +28,19 @@ take you to the full documentation on MetaCPAN.
     regardless of which column it is or whether the table is bed or gff or 
     an arbitrary text file. A number of convenience methods are present for 
     collecting data from data files. This module is not used directly by the 
-    user, but its objects are returned when using [Bio::ToolBox::Data](https://metacpan.org/pod/Bio::ToolBox::Data) iterators.
+    user, but its objects are returned when using
+    [Bio::ToolBox::Data](https://metacpan.org/pod/Bio::ToolBox::Data) iterators.
 
-- Annotation parsers
+- [Bio::ToolBox::Parser](https://metacpan.org/pod/Bio::ToolBox::Parser)
 
-    Included are three generic parsers for loading an entire genome-worth of 
-    annotation into memory within a reasonably short amount of time. In each case 
-    these load features into a SeqFeature object, 
-    [Bio::ToolBox::SeqFeature](https://metacpan.org/pod/Bio::ToolBox::SeqFeature) by 
-    default.
+    This is the base class for working with common annotation formats. By
+    default, these will slurp an entire genomic annotation file into memory
+    in a reasonably short amount of time, including parsing gene annotation
+    into a nested, hierarchical structure. To minimize memory usage, the 
+    [Bio::ToolBox::SeqFeature](https://metacpan.org/pod/Bio::ToolBox::SeqFeature)
+    is used by default. There are three format-specific parsers.
 
-    - [Bio::ToolBox::parser::bed](https://metacpan.org/pod/Bio::ToolBox::parser::bed)
+    - [Bio::ToolBox::Parser::bed](https://metacpan.org/pod/Bio::ToolBox::Parser::bed)
 
         This parses [BED file](http://genome.ucsc.edu/FAQ/FAQformat.html#format1) and 
         related formats, including BED files with 3-12 columns 
@@ -48,7 +50,7 @@ take you to the full documentation on MetaCPAN.
         proper BED12 files, transcripts are parsed with child subfeatures including exon 
         and CDS subfeatures.
 
-    - [Bio::ToolBox::parser::gff](https://metacpan.org/pod/Bio::ToolBox::parser::gff)
+    - [Bio::ToolBox::Parser::gff](https://metacpan.org/pod/Bio::ToolBox::Parser::gff)
 
         This parses both [GTF](http://mblab.wustl.edu/GTF22.html) and 
         [GFF3](https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md) 
@@ -58,7 +60,7 @@ take you to the full documentation on MetaCPAN.
         control and reduce unnecessary parsing, unwanted feature types can be 
         selectively skipped.
 
-    - [Bio::ToolBox::parser::ucsc](https://metacpan.org/pod/Bio::ToolBox::parser::ucsc)
+    - [Bio::ToolBox::Parser::ucsc](https://metacpan.org/pod/Bio::ToolBox::Parser::ucsc)
 
         This parses various [UCSC file formats](http://genome.ucsc.edu/FAQ/FAQformat.html#format9), 
         including different refFlat, GenePred, and knownGene flavors. 
@@ -77,7 +79,8 @@ take you to the full documentation on MetaCPAN.
 
 - [Bio::ToolBox::GeneTools](https://metacpan.org/pod/Bio::ToolBox::GeneTools)
 
-    This is a collection of exportable functions for working with [Bio::SeqFeatureI](https://metacpan.org/pod/Bio::SeqFeatureI) 
+    This is a collection of exportable functions for working with
+    [Bio::SeqFeatureI](https://metacpan.org/pod/Bio::SeqFeatureI) 
     compliant objects representing genes and transcripts. It works with objects derived 
     from one of the ["Annotation parsers"](#annotation-parsers) or a 
     [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store) 
