@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-get\_features.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_features.pl
 
 A program to collect and filter annotated features from source files.
 
-# SYNOPSIS
+## SYNOPSIS
 
 get\_features.pl --in &lt;filename> --out &lt;filename>
 
@@ -51,11 +53,11 @@ get\_features.pl --db &lt;name> --out &lt;filename>
     -v --version                  print version and exit
     -h --help                     show full documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Source data
+### Source data
 
 - --db &lt;text>
 
@@ -70,7 +72,7 @@ The command line flags and descriptions:
     or a UCSC-formatted file including, refFlat, genePred, or knownGene.
     The file may be gzip compressed. Used as an alternate to a database.
 
-## Selection
+### Selection
 
 - --feature &lt;type>
 
@@ -88,7 +90,7 @@ The command line flags and descriptions:
     turned off with `--nosub`. With BED output, it will force a BED12 
     file to be written. It has no effect with standard text. 
 
-## Filter features
+### Filter features
 
 - --list &lt;file>
 
@@ -162,7 +164,7 @@ The command line flags and descriptions:
     marked as part of the GENCODE set. Transcripts not marked as such usually 
     lack sufficient experimental evidence.
 
-## Adjustments
+### Adjustments
 
 - --start=&lt;integer>
 - --stop=&lt;integer>
@@ -193,7 +195,7 @@ The command line flags and descriptions:
     introns, where appropriate. Genes without alternate transcripts are not 
     collapsed.
 
-## Report format options
+### Report format options
 
 - --bed
 
@@ -229,7 +231,7 @@ The command line flags and descriptions:
     in other formats. This is automatically included when adjusting 
     coordinate positions.
 
-## General options
+### General options
 
 - --out &lt;filename>
 
@@ -257,7 +259,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will extract a list of features from a database or input 
 annotation file and write them out to a file. Features may be selected 
@@ -277,7 +279,7 @@ metadata for use in subsequent programs. Coordinates may be optionally
 included in the text file, which preempts using parsed features in other 
 tools. 
 
-## Coordinate adjustments
+### Coordinate adjustments
 
 Coordinates of the features may be adjusted as desired when writing to 
 text or BED file formats. Adjustments may be made relative to either 
@@ -307,7 +309,7 @@ are based on the feature strand. Use the following examples as a guide.
 Note that positions are always in base coordinates, and the resulting regions 
 may be 1 bp longer depending on whether the reference base was included or not.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Dept of Oncological Sciences

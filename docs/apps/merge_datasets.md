@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-merge\_datasets.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## merge\_datasets.pl
 
 A program to merge columns of two or more data files.
 
-# SYNOPSIS
+## SYNOPSIS
 
 merge\_datasets.pl \[--options...\] &lt;file1> &lt;file2> ...
 
@@ -22,11 +24,11 @@ merge\_datasets.pl \[--options...\] &lt;file1> &lt;file2> ...
     -v --version                     print version and exit
     -h --help                        show full documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Merge options
+### Merge options
 
 - --lookup
 
@@ -73,7 +75,7 @@ The command line flags and descriptions:
     with coordinate files, such as BED and GFF. This may be disabled by
     specifying --nocoordinate, or simply specifying a column lookup name.
 
-## General options
+### General options
 
 - --out &lt;filename>
 
@@ -92,7 +94,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will merge two or more tab-delimited data files into one file. 
 Datasets or columns from each file are merged together into an output file. 
@@ -128,7 +130,7 @@ values are recorded when no match is found in the second file.
 After merging in interactive mode only, an opportunity for interactively 
 renaming the dataset names is presented.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

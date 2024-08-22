@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-data2fasta.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## data2fasta.pl
 
 A program to retrieve sequences from a list of features
 
-# SYNOPSIS
+## SYNOPSIS
 
 data2fasta.pl \[--options...\] &lt;filename>
 
@@ -39,11 +41,11 @@ data2fasta.pl \[--options...\] &lt;filename>
     -v --version                      print version and exit
     -h --help                         show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;filename>
 
@@ -61,7 +63,7 @@ The command line flags and descriptions:
 
     Specify the output filename. By default it uses the input file basename.
 
-## Database
+### Database
 
 - --db &lt;name|fasta>
 
@@ -77,7 +79,7 @@ The command line flags and descriptions:
     The database name may be obtained from the input file metadata. 
     Required only if collecting sequence from genomic coordinates.
 
-## Feature selection
+### Feature selection
 
 - --feature &lt;text>
 
@@ -90,7 +92,7 @@ The command line flags and descriptions:
     list available. No merging of overlapping or redundant subfeatures 
     is performed here. See [get\_features.pl](https://metacpan.org/pod/get_features.pl).
 
-## Column indices
+### Column indices
 
 - --name --id &lt;column\_index>
 
@@ -136,7 +138,7 @@ The command line flags and descriptions:
     Optionally specify the index of the description column. It may be 
     automatically determined from the column header.
 
-## Fasta output options
+### Fasta output options
 
 - --cat
 
@@ -150,7 +152,7 @@ The command line flags and descriptions:
     indicate the number of 'N' bases to insert between the individual 
     sequences. The default is zero.
 
-## General options
+### General options
 
 - --gz
 
@@ -164,7 +166,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will take a tab-delimited text file (BED file, 
 for example) and generate either a multi-sequence fasta file containing the 
@@ -184,7 +186,7 @@ databases such as [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio%3A%3
 If strand information is provided, then the sequence reverse complement 
 is returned for reverse strand coordinates.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Dept of Oncological Sciences

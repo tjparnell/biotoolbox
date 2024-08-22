@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-get\_datasets.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_datasets.pl
 
 A program to collect data for a list of features
 
-# SYNOPSIS
+## SYNOPSIS
 
 get\_datasets.pl \[--options...\] &lt;filename>
 
@@ -56,11 +58,11 @@ get\_datasets.pl \[--options...\] --in &lt;filename> &lt;data1> &lt;data2...>
     -v --version                        print version and exit
     -h --help                           show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Options for data files
+### Options for data files
 
 - --in &lt;filename>
 
@@ -78,7 +80,7 @@ The command line flags and descriptions:
     current files. If this is argument is not specified then the input file is 
     overwritten.
 
-## Options for new files
+### Options for new files
 
 - --db &lt;name | filename>
 
@@ -97,7 +99,7 @@ The command line flags and descriptions:
     alias to one or more feature types. More than one feature may be included 
     as a comma-delimited list (no spaces). 
 
-## Options for feature "genome"
+### Options for feature "genome"
 
 - --feature genome
 
@@ -136,7 +138,7 @@ The command line flags and descriptions:
     Provide a text string to prefix the name of generated genomic windows. 
     Names will be appended with an incrementing, unformatted digit. 
 
-## Options for data collection
+### Options for data collection
 
 - --ddb &lt;name>
 
@@ -282,7 +284,7 @@ The command line flags and descriptions:
     that were newly collected. For more advanced filtering, see 
     [manipulate\_datasets.pl](https://metacpan.org/pod/manipulate_datasets.pl).
 
-## Adjustments to features
+### Adjustments to features
 
 - --extend &lt;integer>
 
@@ -328,7 +330,7 @@ The command line flags and descriptions:
     region. Used in combination with fstart and fstop to prevent taking a 
     subregion from a region too small to support it. The default is 10 bp.
 
-## General options
+### General options
 
 - --gz
 
@@ -356,7 +358,7 @@ The command line flags and descriptions:
 
     Display the POD documentation for this program.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will collect dataset values from a variety of sources, including 
 features in a BioPerl Bio::DB::SeqFeature::Store database, binary wig files 
@@ -383,7 +385,7 @@ Stranded data may be collected, if the dataset supports stranded information.
 Also, two or more datasets may be combined and treated as one. Note that 
 collecting stranded data may significantly slow down data collection.
 
-# EXAMPLES
+## EXAMPLES
 
 These are some examples of some common scenarios for collecting data.
 
@@ -476,7 +478,7 @@ These are some examples of some common scenarios for collecting data.
         --data scores.bw 
         
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

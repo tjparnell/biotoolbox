@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-data2gff.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## data2gff.pl
 
 A program to convert a generic data file to GFF format.
 
-# SYNOPSIS
+## SYNOPSIS
 
 data2gff.pl \[--options...\] &lt;filename>
 
@@ -35,11 +37,11 @@ data2gff.pl \[--options...\] &lt;filename>
     -v --version                          print version and exit
     -h --help                             show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;filename>
 
@@ -65,7 +67,7 @@ The command line flags and descriptions:
     Input file is in interbase or 0-based coordinates. This should be 
     automatically detected for most known file formats, e.g. BED.
 
-## Column indices
+### Column indices
 
 - --ask
 
@@ -137,7 +139,7 @@ The command line flags and descriptions:
     the 'score' or 'name' column, if defined. As a last resort, it 
     will use the most creative method of 'Experiment'.
 
-## General options
+### General options
 
 - --unique
 
@@ -168,14 +170,14 @@ The command line flags and descriptions:
 
     Display the POD documentation
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will convert a data file into a GFF version 3 formatted text file. 
 Only simple conversions are performed, where each data line is converted 
 to a single feature. Complex features with parent-child relationships (such 
 as genes) should be converted with something more advanced.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

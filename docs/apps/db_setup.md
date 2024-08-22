@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-db\_setup.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## db\_setup.pl
 
 A program to setup a SeqFeature::Store SQLite database from UCSC data
 
-# SYNOPSIS
+## SYNOPSIS
 
 db\_setup.pl \[--options...\] <UCSC database>
 
@@ -17,7 +19,7 @@ db\_setup.pl \[--options...\] <UCSC database>
     -v --version
     -h --help
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
@@ -56,7 +58,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will simplify the task of generating an annotation database. You 
 provide the short name of the UCSC database for the species and genome version 
@@ -64,7 +66,7 @@ you are interested in, and the script will automatically download gene annotatio
 and build a _Bio::DB::SeqFeature::Store_ database for use with BioToolBox 
 scripts. 
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Huntsman Cancer Institute

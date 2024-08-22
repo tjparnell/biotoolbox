@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-db\_types.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## db\_types.pl
 
 A program to print out the available feature types in a database.
 
-# SYNOPSIS
+## SYNOPSIS
 
 db\_types.pl &lt;database>
 
@@ -14,7 +16,7 @@ db\_types.pl &lt;database>
     --help
     
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
@@ -33,7 +35,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will print a list of all of the known feature types present 
 in a [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio%3A%3ADB%3A%3ASeqFeature%3A%3AStore) database. The types are organized into 
@@ -42,7 +44,7 @@ groups by their source tag.
 BigWigSet databases, comprised of a directory of BigWig files and a 
 metadata file, are also supported.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

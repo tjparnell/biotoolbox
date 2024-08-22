@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-correlate\_position\_data.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## correlate\_position\_data.pl
 
 A script to calculate correlations between two datasets along the length of a feature.
 
-# SYNOPSIS
+## SYNOPSIS
 
 correlate\_position\_data.pl \[--options\] &lt;filename>
 
@@ -32,11 +34,11 @@ correlate\_position\_data.pl \[--options\] &lt;filename>
     -v --version                     print version and exit
     -h --help                        show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Options for data files
+### Options for data files
 
 - --in &lt;filename>
 
@@ -59,7 +61,7 @@ The command line flags and descriptions:
     file), or when using an existing input file with the database indicated 
     in the metadata. 
 
-## Options for data sources
+### Options for data sources
 
 - --ddb &lt;name | filename>
 
@@ -76,7 +78,7 @@ The command line flags and descriptions:
     they may be a BigWig or even Bam file. Both options are required. If 
     not provided, they may be interactively chosen from the database.
 
-## Options for correlating data
+### Options for correlating data
 
 - --pval
 
@@ -130,7 +132,7 @@ The command line flags and descriptions:
     data column in the input file with strand information. The default is 
     no enforcement of strand.
 
-## General options
+### General options
 
 - --gz
 
@@ -144,7 +146,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will calculate statistics between the positioned scores of
 two different datasets over a window from an annotated feature or
@@ -184,7 +186,7 @@ test data look like the reference data? The window is shifted from -2
 radius to +2 radius relative to the reference point, and the highest 
 correlation is reported along with the shift value that generated it. 
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Dept of Oncological Sciences

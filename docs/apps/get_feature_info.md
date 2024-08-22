@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-get\_feature\_info.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_feature\_info.pl
 
 A program to collect feature information from a BioPerl SeqFeature::Store db.
 
-# SYNOPSIS
+## SYNOPSIS
 
 get\_feature\_info.pl &lt;filename> 
 
@@ -46,11 +48,11 @@ get\_feature\_info.pl &lt;filename>
      Primary_ID
      <tag>
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;filename>
 
@@ -66,7 +68,7 @@ The command line flags and descriptions:
     Optionally specify an alternate output file name. The default is to 
     overwrite the input file.
 
-## Database options
+### Database options
 
 - --db &lt;name>
 
@@ -122,7 +124,7 @@ The command line flags and descriptions:
     may be provided. This is especially useful to restrict the database 
     search when there are multiple features with the same name.
 
-## General options
+### General options
 
 - --gz
 
@@ -138,14 +140,14 @@ The command line flags and descriptions:
 
     Display this help. 
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will collect attributes for a list of features from the database. 
 The attributes may be general attributes, such as chromsome, start, stop, 
 strand, etc., or feature specific attributes stored in the original group 
 field of the original source GFF file.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

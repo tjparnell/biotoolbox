@@ -1,4 +1,8 @@
-# ADVANCED INSTALLATION
+# Bio::ToolBox
+
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## Advanced Installation
 
 This is an advanced installation guide for getting a complete installation. 
 
@@ -20,9 +24,9 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     is officially recommended. It defaults to installing in `/usr/local` but doesn't 
     have to be; see below. 
 
-        curl -o htslib-1.9.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2 
-        tar -xf htslib-1.9.tar.bz2
-        cd htslib-1.9
+        curl -o htslib-1.19.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.19/htslib-1.19.tar.bz2 
+        tar -xf htslib-1.19.tar.bz2
+        cd htslib-1.19
         make && make install
         cd ..
 
@@ -141,14 +145,18 @@ installed.
 
 - [HTSlib](https://github.com/samtools/htslib)
 
-    Follow the directions within for installation.
-    [Version 1.9](https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2)
-    is officially recommended by its authors; however, later versions appear to
-    work too and may be preferred. Versions of `htslib` up to 1.20 have been used
-    by this author. By default, it installs into `/usr/local`, or
-    it may be set to another directory (`$HOME` for example) by adding
-    `--prefix=$HOME` option to the `configure` step. This may also be available
-    via OS or other package managers. 
+    Follow the directions within for installation. Version 1.9 is officially
+    recommended by the `Bio::DB::HTS` authors; however, later versions appear to work
+    just fine and should probably be preferred. 
+    [Version 1.19](https://github.com/samtools/htslib/releases/download/1.19/htslib-1.19.tar.bz2)
+    have been used successfully by this author. By default, it installs into
+    `/usr/local`, or it may be set to another directory (`$HOME` for example) by
+    adding `--prefix=$HOME` option to the `configure` step. This may also be
+    available via OS or other package managers. 
+    
+    Note that the `htslib` package is also included with the `samtools` and `bcftools`
+    packages and is compiled therein, but is not installed by default (although it
+    could be).
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
@@ -158,7 +166,9 @@ installed.
     
     Note that the Perl module
     [Alien::LibBigWig](https://metacpan.org/pod/Alien::LibBigWig) is available
-    to install this library dependency for you automatically for Bio::DB::Big.
+    to install this library dependency for you automatically for `Bio::DB::Big`.
+    although by default it installs an older version and brings along a lot of
+    extra `Alien` Perl modules, if that concerns you.
     
 
 ## Perl modules

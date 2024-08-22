@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-manipulate\_datasets.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## manipulate\_datasets.pl
 
 A progam to manipulate tab-delimited data files.
 
-# SYNOPSIS
+## SYNOPSIS
 
 manipulate\_datasets.pl \[--options ...\] &lt;filename> 
 
@@ -39,11 +41,11 @@ manipulate\_datasets.pl \[--options ...\] &lt;filename>
     -v --version                      print version and exit
     -h --help                         show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;filename>
 
@@ -73,7 +75,7 @@ The command line flags and descriptions:
     headers will be provided. Not necessary for BED, GFF, or recognized UCSC 
     file formats.
 
-## Non-interactive functions
+### Non-interactive functions
 
 - --func &lt;function>
 
@@ -98,7 +100,7 @@ The command line flags and descriptions:
     dash between the start and stop. For example, '1,2,5-7,9' would indicate 
     datasets '1, 2, 5, 6, 7, and 9'. 
 
-## Operation options
+### Operation options
 
 - --exp &lt;integer>
 - --num &lt;integer>
@@ -159,7 +161,7 @@ The command line flags and descriptions:
     accurate mathematical calculations in some manipulations. This is not necessary 
     when the log status is appropriately recorded in the dataset metadata.
 
-## General options
+### General options
 
 - --gz 
 
@@ -179,7 +181,7 @@ The command line flags and descriptions:
 
     Display the POD documentation using perldoc. 
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program allows some common mathematical and other manipulations on one
 or more columns in a datafile. The program is designed as a simple
@@ -202,7 +204,7 @@ any are performed, will write out to file the changed data. Unless an
 output file name is provided, it will overwrite the input file (NO backup is
 made!).
 
-# FUNCTIONS
+## FUNCTIONS
 
 This is a list of the functions available for manipulating columns. These may 
 be selected interactively from the main menu (note the case sensitivity!), 
@@ -547,7 +549,7 @@ or specified on the command line using the --func option.
     write an intermediate file during numerous interactive manipulations. 
     Consider this as a 'Save as...'.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

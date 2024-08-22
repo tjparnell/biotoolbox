@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-split\_data\_file.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## split\_data\_file.pl
 
 A program to split a data file by rows based on common data values.
 
-# SYNOPSIS
+## SYNOPSIS
 
 split\_data\_file.pl \[--options\] &lt;filename>
 
@@ -23,11 +25,11 @@ split\_data\_file.pl \[--options\] &lt;filename>
     -v --version                      print version and exit
     -h --help                         show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;filename>
 
@@ -46,7 +48,7 @@ The command line flags and descriptions:
     headers will be provided. Not necessary for BED, GFF, or recognized UCSC 
     file formats.
 
-## Splitting options
+### Splitting options
 
 - --index &lt;column\_index>
 
@@ -68,7 +70,7 @@ The command line flags and descriptions:
     Enter as an integer; underscores may be used as thousands separator, e.g. 
     100\_000. 
 
-## General options
+### General options
 
 - --gz
 
@@ -84,7 +86,7 @@ The command line flags and descriptions:
 
     Display the POD documentation
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will split a data file into multiple files based on common 
 values in the data table. All rows with the same value will be 
@@ -117,7 +119,7 @@ metadata. The original file is preserved.
 
 This program is intended as the complement to 'join\_data\_files.pl'.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

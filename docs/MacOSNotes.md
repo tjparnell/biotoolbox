@@ -1,4 +1,8 @@
-# MacOS Notes
+# Bio::ToolBox
+
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## MacOS Notes
 
 While Macs have a Unix-compatible command-line environment (Darwin), there are a few 
 issues and solutions that I have encountered that may be useful to someone. Some of 
@@ -97,7 +101,8 @@ dependencies, it attempts to compile a small test program and runs the command
 `mktemp --suffix=.c`. While that `--suffix` option is available to versions on Linux
 platforms, it is not available to the version on macOS, thus breaking the detection
 of libCurl. To work around this, we just have to tell it that, yes, we have libCurl.
-Comment out the five lines after `# Create a simple test-program...` and add a new line
+Edit the `Makefile` and comment out the five lines after 
+`# Create a simple test-program...` and add a new line
 
 	HAVE_CURL=YES
 

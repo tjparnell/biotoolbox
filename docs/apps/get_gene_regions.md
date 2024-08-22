@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-get\_gene\_regions.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_gene\_regions.pl
 
 A program to collect specific, often un-annotated, regions from genes.
 
-# SYNOPSIS
+## SYNOPSIS
 
 get\_gene\_regions.pl \[--options...\] --in &lt;filename> --out &lt;filename>
 
@@ -49,11 +51,11 @@ get\_gene\_regions.pl \[--options...\] --db &lt;text> --out &lt;filename>
     -v --version                     print version and exit
     -h --help
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Source data
+### Source data
 
 - --in &lt;filename>
 
@@ -67,7 +69,7 @@ The command line flags and descriptions:
     from which gene or feature annotation may be obtained. Only required if 
     an input gene table is not provided.
 
-## Feature selection
+### Feature selection
 
 - --feature &lt;type>
 
@@ -187,7 +189,7 @@ The command line flags and descriptions:
         'scaffold.+'
         'chr.+alt|chrUn.+|chr.+_random'
 
-## Adjustments
+### Adjustments
 
 - --start &lt;integer>
 - --begin &lt;integer>
@@ -201,7 +203,7 @@ The command line flags and descriptions:
     a start adjustment will always modify the feature's 5'end, either 
     the feature startpoint or endpoint, depending on its orientation. 
 
-## General options
+### General options
 
 - --bed
 
@@ -223,7 +225,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will collect specific regions from annotated genes and/or 
 transcripts. Often these regions are not explicitly defined in the 
@@ -243,7 +245,7 @@ This may be converted into a standard BED or GFF file using the
 appropriate biotoolbox scripts. The file may also be used directly in 
 data collection. 
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-manipulate\_wig.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## manipulate\_wig.pl
 
 A progam to manipulate wiggle files.
 
-# SYNOPSIS
+## SYNOPSIS
 
 manipulate\_wig.pl \[options\] -i &lt;file1.wig> -o &lt;file1.out.wig>
 
@@ -39,11 +41,11 @@ manipulate\_wig.pl \[options\] -i &lt;file1.wig> -o &lt;file1.out.wig>
     -v --version              print version and exit
     -h --help                 show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;file>
 
@@ -60,7 +62,7 @@ The command line flags and descriptions:
     file is provided. Alternatively, the output may be sent to standard output by
     specifying 'stdout' as the file name. 
 
-## Selection functions
+### Selection functions
 
 - --skip &lt;regex>
 
@@ -74,7 +76,7 @@ The command line flags and descriptions:
     provided regular expression, leaving remaining lines untouched. For example, 
     to apply a normalization to the X chromosome, use 'chrX'.
 
-## Manipulation functions
+### Manipulation functions
 
 - --null
 
@@ -119,7 +121,7 @@ The command line flags and descriptions:
 
     Discard lines with a score value of zero.
 
-## BigWig support
+### BigWig support
 
 - chromo &lt;file>
 
@@ -146,7 +148,7 @@ The command line flags and descriptions:
     If the UCSC `wigToBigWig` utility is not in your environment `PATH`, 
     provide the path with this option.
 
-## General functions
+### General functions
 
 - --stats
 
@@ -163,7 +165,7 @@ The command line flags and descriptions:
 
     Display the POD documentation using perldoc. 
 
-# DESCRIPTION
+## DESCRIPTION
 
 A program to manipulate the score value of wig files. This will process all 
 forms of text based wig files, including fixedStep, variableStep, and bedGraph. 
@@ -175,7 +177,7 @@ available.
 in which the score is manipulated. If they are not in the order you want, you 
 may have to pipe to sequential instances. Use 'stdin' and 'stdout' for filenames.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Dept of Oncological Sciences

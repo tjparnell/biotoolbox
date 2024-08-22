@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-data2wig.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## data2wig.pl
 
 A program to convert a generic data file into a wig file.
 
-# SYNOPSIS
+## SYNOPSIS
 
 data2wig.pl \[--options...\] &lt;filename> 
 
@@ -47,11 +49,11 @@ data2wig.pl \[--options...\] &lt;filename>
     -v --version                          print version and exit
     -h --help                             show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options
+### File options
 
 - --in &lt;filename>
 
@@ -80,7 +82,7 @@ The command line flags and descriptions:
     definition 1-based. This is automatically handled for most input  
     files. Default is false.
 
-## Column indices
+### Column indices
 
 - --ask
 
@@ -126,7 +128,7 @@ The command line flags and descriptions:
     from which to take the value (usually 10 or higher) using the --index option. 
     INFO field attributes can also be taken, if desired (use --index 8).
 
-## Wig options
+### Wig options
 
 - --step \[fixed | variable | bed\]
 
@@ -167,7 +169,7 @@ The command line flags and descriptions:
     the oligo probes are the same length and you wish to assign the value 
     across the oligo rather than the midpoint. The default is inherently 1 bp. 
 
-## Conversion options
+### Conversion options
 
 - --fast
 
@@ -207,7 +209,7 @@ The command line flags and descriptions:
     position. Wig files do not tolerate multiple identical positions. 
     Default is mean.
 
-## BigWig options
+### BigWig options
 
 - --bigwig
 - --bw
@@ -236,7 +238,7 @@ The command line flags and descriptions:
     environment path for the utility. If found, it will automatically 
     execute the utility to convert the wig file.
 
-## General options
+### General options
 
 - --gz
 
@@ -251,7 +253,7 @@ The command line flags and descriptions:
 
     Display the POD documentation
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will convert any tab-delimited data text file into a wiggle 
 formatted text file. This requires that the file contains not only the 
@@ -285,7 +287,7 @@ http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires
 BigWig file support, supplied by the external `wigToBigWig` or 
 `bedGraphToBigWig` utility available from UCSC.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

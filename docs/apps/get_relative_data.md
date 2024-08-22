@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-get\_relative\_data.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_relative\_data.pl
 
 A program to collect data in bins around a relative position.
 
-# SYNOPSIS
+## SYNOPSIS
 
 get\_relative\_data.pl \[--options\] --in &lt;filename> --out &lt;filename>
 
@@ -50,11 +52,11 @@ get\_relative\_data.pl \[--options\] -i &lt;filename> &lt;data1> &lt;data2...>
     -v --version                        print version and exit
     -h --help                           show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Options for data files
+### Options for data files
 
 - --in &lt;filename>
 
@@ -71,7 +73,7 @@ The command line flags and descriptions:
     Specify the output file name. Required for new files; otherwise, 
     input files will be overwritten unless specified.
 
-## Options for new files
+### Options for new files
 
 - --db &lt;name | filename>
 
@@ -89,7 +91,7 @@ The command line flags and descriptions:
     of features will be automatically generated from the database. 
     This is only required when an input file is not specified. 
 
-## Options for data collection
+### Options for data collection
 
 - --ddb &lt;name | filename>
 
@@ -193,7 +195,7 @@ The command line flags and descriptions:
     Default is not to format, often leading to more than the intended 
     significant digits.
 
-## Bin specification
+### Bin specification
 
 - --win &lt;integer>
 
@@ -220,7 +222,7 @@ The command line flags and descriptions:
     indicates the middle of the feature is used. The default is to 
     use the 5' end, or the start position of unstranded features. 
 
-## Post-processing
+### Post-processing
 
 - --(no)sum
 
@@ -234,7 +236,7 @@ The command line flags and descriptions:
     Indicate that windows without values should (not) be interpolated
     from neighboring values. The default is false (nosmooth).
 
-## General options
+### General options
 
 - --groups
 
@@ -267,7 +269,7 @@ The command line flags and descriptions:
 
     Display this help
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will collect data around a relative coordinate of a genomic 
 feature or region. The data is collected in a series of windows flanking the 
@@ -285,7 +287,7 @@ orientation.
 When features overlap, or the collection windows of one feature overlaps 
 with another feature, then data may be ignored and not collected (--avoid).
 
-# EXAMPLES
+## EXAMPLES
 
 These are some examples of some common scenarios for collecting data.
 
@@ -315,7 +317,7 @@ These are some examples of some common scenarios for collecting data.
         sense --method count --data alignments.bam --out gene_tss
           
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

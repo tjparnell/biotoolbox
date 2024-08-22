@@ -1,4 +1,8 @@
-# Included Applications
+# Bio::ToolBox
+
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## Included Applications
 
 There are 22 production-quality script applications included in the package. These
 are listed below, grouped by general function. Also see the 

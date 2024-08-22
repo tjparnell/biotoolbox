@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-join\_data\_file.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## join\_data\_file.pl
 
 A program to join two or more data files and concatenate rows.
 
-# SYNOPSIS
+## SYNOPSIS
 
 join\_data\_file.pl \[--options\] &lt;file1> &lt;file2> ...
 
@@ -14,7 +16,7 @@ join\_data\_file.pl \[--options\] &lt;file1> &lt;file2> ...
     -v --version              print version and exit
     -h --help                 show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
@@ -39,7 +41,7 @@ The command line flags and descriptions:
 
     Display the POD documentation
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will join two or or more data files, essentially concatanating
 the files but intelligently dealing with the metadata and column headers. 
@@ -51,7 +53,7 @@ the program 'merge\_datasets.pl' for that.
 
 This program is intended as the complement to 'split\_data\_files.pl'.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

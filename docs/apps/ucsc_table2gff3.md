@@ -1,10 +1,12 @@
-# NAME 
+# Bio::ToolBox
 
-ucsc\_table2gff3.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## ucsc\_table2gff3.pl
 
 A program to convert UCSC gene tables to GFF3 or GTF annotation.
 
-# SYNOPSIS
+## SYNOPSIS
 
      ucsc_table2gff3.pl --ftp <text> --db <text>
      
@@ -37,11 +39,11 @@ A program to convert UCSC gene tables to GFF3 or GTF annotation.
     -v --version                          print version and exit
     -h --help                             show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## UCSC database options
+### UCSC database options
 
 - --ftp \[refgene|known|all\]
 
@@ -63,7 +65,7 @@ The command line flags and descriptions:
     Optionally provide the host FTP address for downloading the current 
     gene table files. The default is 'hgdownload.cse.ucsc.edu'.
 
-## Input file options
+### Input file options
 
 - --table &lt;filename>
 
@@ -87,7 +89,7 @@ The command line flags and descriptions:
     output GFF file (when processing a single table) or written as a 
     separate file (when processing multiple tables). The file may be gzipped.
 
-## Conversion options
+### Conversion options
 
 - --source &lt;text>
 
@@ -148,7 +150,7 @@ The command line flags and descriptions:
     GFF3. Yes, the name of the program says GFF3, but now we can output GTF 
     too, and changing the name of the program is too late now.
 
-## General options
+### General options
 
 - --gz
 
@@ -162,7 +164,7 @@ The command line flags and descriptions:
 
     Display the POD documentation
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will convert a UCSC gene or gene prediction table file into a
 GFF3 (or optionally GTF) format file. It will build canonical 
@@ -193,7 +195,7 @@ If you need to set up a database using UCSC annotation, you should first
 take a look at the BioToolBox script [db\_setup.pl](https://metacpan.org/pod/db_setup.pl), which provides a 
 convenient automated database setup based on UCSC annotation.  
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Huntsman Cancer Institute

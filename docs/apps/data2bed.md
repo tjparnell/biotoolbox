@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-data2bed.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## data2bed.pl
 
 A program to convert a data file to a bed file.
 
-# SYNOPSIS
+## SYNOPSIS
 
 data2bed.pl \[--options...\] &lt;filename>
 
@@ -37,11 +39,11 @@ data2bed.pl \[--options...\] &lt;filename>
     -v --version                          print version and exit
     -h --help                             show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File Options
+### File Options
 
 - --in &lt;filename>
 
@@ -70,7 +72,7 @@ The command line flags and descriptions:
     BioPerl (and, by extension, all biotoolbox) scripts are base 
     (1-based) coordinates. Default behavior is to convert.
 
-## Column indices
+### Column indices
 
 - --bed \[3|4|5|6\]
 
@@ -122,7 +124,7 @@ The command line flags and descriptions:
     for strand information. Accepted values might include
     any of the following: +, -, 1, -1, 0, .
 
-## BigBed options
+### BigBed options
 
 - --bigbed
 - --bb
@@ -153,7 +155,7 @@ The command line flags and descriptions:
     search the default environment path for the utility. If found, it will 
     automatically execute the utility to convert the bed file.
 
-## General options
+### General options
 
 - --sort
 
@@ -177,7 +179,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will convert a tab-delimited data file into a BED file,
 according to the specifications here
@@ -207,7 +209,7 @@ An option exists to further convert the BED file to an indexed, binary BigBed
 format. Jim Kent's bedToBigBed conversion utility must be available, and 
 either a chromosome definition file or access to a Bio::DB database is required.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

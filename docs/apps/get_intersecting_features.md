@@ -1,10 +1,12 @@
-# NAME 
+# Bio::ToolBox
 
-get\_intersecting\_features.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_intersecting\_features.pl
 
 A program to pull out overlapping features from the database.
 
-# SYNOPSIS
+## SYNOPSIS
 
 get\_intersecting\_features.pl \[--options\] &lt;filename>
 
@@ -28,11 +30,11 @@ get\_intersecting\_features.pl \[--options\] &lt;filename>
     -v --version                      print version and exit
     -h --help                         show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## File options:
+### File options:
 
 - --in &lt;filename>
 
@@ -49,7 +51,7 @@ The command line flags and descriptions:
     Optionally specify a new filename. A standard tim data text file is written. 
     The default is to rewrite the input file.
 
-## Database options
+### Database options
 
 - --db &lt;database>
 
@@ -68,7 +70,7 @@ The command line flags and descriptions:
     will be queried for potential GFF types and a list presented to the user to 
     select one.
 
-## Modify search range
+### Modify search range
 
 - --start &lt;integer>
 - --stop &lt;integer>
@@ -101,7 +103,7 @@ The command line flags and descriptions:
     features. Valid options include "start" (or 5' end for stranded features) and 
     "mid" (for midpoint). Default is "start".
 
-## General options
+### General options
 
 - --gz
 
@@ -115,7 +117,7 @@ The command line flags and descriptions:
 
     Display the POD documentation
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will take a list of reference features and identify 
 target features which intersect them. The reference features 
@@ -136,7 +138,7 @@ of the features, or optionally the midpoints. Note that the distance
 measurement is relative to the coordinates after adjustment with the --start, 
 \--stop, and --extend options.
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute

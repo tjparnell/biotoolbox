@@ -1,4 +1,8 @@
-# Frequently Asked Questions
+# Bio::ToolBox
+
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## Frequently Asked Questions
 
 These may or may not have actually been asked, but it's a collection of hints that the 
 programmer understands but a casual user might not, as well as rationale.

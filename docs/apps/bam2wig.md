@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-bam2wig.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## bam2wig.pl
 
 A program to convert Bam alignments into a wig representation file.
 
-# SYNOPSIS
+## SYNOPSIS
 
 bam2wig.pl \[--options...\] &lt;file.bam>
 
@@ -85,11 +87,11 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
      -v --version                  print version information
      -h --help                     show full documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Input
+### Input
 
 - --in &lt;filename>
 
@@ -98,7 +100,7 @@ The command line flags and descriptions:
     or simply appended to the command. Bam files will be automatically 
     indexed if necessary.
 
-## Reporting Options
+### Reporting Options
 
 - --start
 
@@ -152,7 +154,7 @@ The command line flags and descriptions:
 
     Legacy option for supporting previous versions of bam2wig. 
 
-## Alignment reporting options
+### Alignment reporting options
 
 - --splice
 
@@ -175,7 +177,7 @@ The command line flags and descriptions:
     Do this when RNA-Seq alignments map to the opposite strand of the 
     coding sequence, depending on the library preparation method. 
 
-## Paired-end alignments
+### Paired-end alignments
 
 - --pe
 
@@ -215,7 +217,7 @@ The command line flags and descriptions:
     a single-end alignment. No test of insert size or proper pair status is 
     made.
 
-## Alignment filtering options:
+### Alignment filtering options:
 
 - --qual &lt;integer>
 
@@ -269,7 +271,7 @@ The command line flags and descriptions:
     when splitting on splices. If an N operation in the CIGAR string exceeds this 
     limit, the alignment is skipped. Default is 0 (no filtering).
 
-## Shift options
+### Shift options
 
 - --shift
 
@@ -331,7 +333,7 @@ The command line flags and descriptions:
     using the output base name. The default is to not write the model 
     shift data.
 
-## Score Options
+### Score Options
 
 - --rpm
 
@@ -389,7 +391,7 @@ The command line flags and descriptions:
     apply the specific normalization factor. For example, 'chrX$' to specify 
     the X chromosome only.
 
-## Wig format
+### Wig format
 
 - --bin &lt;integer>
 
@@ -418,7 +420,7 @@ The command line flags and descriptions:
     When writing bedGraph format, skip (do not write) intervals with a value of 
     zero. Does not apply to fixedStep or variableStep formats.
 
-## Output Options
+### Output Options
 
 - --out &lt;filename>
 
@@ -443,7 +445,7 @@ The command line flags and descriptions:
     Specify whether (or not) the output text file should be compressed with 
     gzip. Disable with `--nogz`. Does not apply to bigWig format.
 
-## General options
+### General options
 
 - --cpu &lt;integer>
 
@@ -470,7 +472,7 @@ The command line flags and descriptions:
 
     Display this POD documentation.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will enumerate aligned sequence tags and generate a wig, 
 or optionally BigWig, file. Alignments may be counted and recorded 
@@ -502,7 +504,7 @@ bedGraph format. The wig file may be further converted into a
 compressed, indexed, binary bigWig format, dependent on the 
 availability of the appropriate conversion utilities. 
 
-# RECOMMENDED SETTINGS
+## RECOMMENDED SETTINGS
 
 The type of wig file to generate for your Bam sequencing file can vary 
 depending on your particular experimental application. Here are a few 
@@ -605,7 +607,7 @@ the wig or bigWig file.
         bam2wig --smartcov --strand --rpm --in <bamfile>
         
 
-# TEXT REPRESENTATION OF RECORDING ALIGNMENTS
+## TEXT REPRESENTATION OF RECORDING ALIGNMENTS
 
 To help users visualize how this program records alignments in a wig 
 file, drawn below are 10 alignments, five forward and five reverse. 
@@ -672,7 +674,7 @@ are drawn for visualization purposes only. Values of X represent 10.
 
         ....12224455555555555555555555555555555555555555555443333332211111
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Huntsman Cancer Institute

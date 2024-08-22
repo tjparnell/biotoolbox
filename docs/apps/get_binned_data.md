@@ -1,10 +1,12 @@
-# NAME
+# Bio::ToolBox
 
-get\_binned\_data.pl
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+## get\_binned\_data.pl
 
 A program to collect data in bins across a list of features.
 
-# SYNOPSIS
+## SYNOPSIS
 
     get_binned_data.pl [--options] --in <filename> --out <filename>
      
@@ -48,11 +50,11 @@ A program to collect data in bins across a list of features.
      -v --version                        print version and exit
      -h --help                           show extended documentation
 
-# OPTIONS
+## OPTIONS
 
 The command line flags and descriptions:
 
-## Options for data files
+### Options for data files
 
 - --in &lt;filename>
 
@@ -69,7 +71,7 @@ The command line flags and descriptions:
     Specify the output file name. Default is to overwrite the input text 
     file. Required if generating a new file from a database.
 
-## Options for new files
+### Options for new files
 
 - --db &lt;name>
 
@@ -84,7 +86,7 @@ The command line flags and descriptions:
     feature type, feature type and source expressed as 'type:source'. 
     More than one feature may be included as a comma-delimited list (no spaces). 
 
-## Options for data collection
+### Options for data collection
 
 - --ddb &lt;name | filename>
 
@@ -172,7 +174,7 @@ The command line flags and descriptions:
     Default is not to format, often leading to more than the intended 
     significant digits.
 
-## Bin specification
+### Bin specification
 
 - --bins &lt;integer>
 
@@ -199,7 +201,7 @@ The command line flags and descriptions:
     null values). This is to avoid having bin sizes below the average 
     microarray tiling distance. The default is undefined (no limit).
 
-## Post-processing
+### Post-processing
 
 - --sum
 
@@ -213,7 +215,7 @@ The command line flags and descriptions:
     Indicate that windows without values should (not) be interpolated
     from neighboring values. The default is false.
 
-## General options
+### General options
 
 - --groups
 
@@ -246,7 +248,7 @@ The command line flags and descriptions:
 
     This help text.
 
-# DESCRIPTION
+## DESCRIPTION
 
 This program will collect data across a gene or feature body into numerous 
 percentile bins. It is used to determine if there is a spatial 
@@ -255,7 +257,7 @@ of bins may be specified as a command argument (default 10). Additionally,
 extra bins may be extended on either side of the gene (default 0 on either 
 side). The bin size is determined as a percentage of gene length.
 
-# EXAMPLES
+## EXAMPLES
 
 These are some examples of some common scenarios for collecting data.
 
@@ -283,7 +285,7 @@ These are some examples of some common scenarios for collecting data.
         --method count --data alignments.bam --out gene_profile --sum
         
 
-# AUTHOR
+## AUTHOR
 
     Timothy J. Parnell, PhD
     Howard Hughes Medical Institute
