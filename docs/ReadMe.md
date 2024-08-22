@@ -1,5 +1,8 @@
 # Bio::ToolBox
 
+|[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
+
+
 ## Tools for querying and analysis of genomic data
 
 This package provides a number of Perl modules and applications for working 
