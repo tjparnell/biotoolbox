@@ -13,7 +13,7 @@ use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -2987,7 +2987,9 @@ sub addname_function {
 	}
 
 	# Identify column
-	my $idx = $Data->name_column;
+	# look specifically for the "name" column as the name_column function can
+	# find look-alike names, like geneName, leading to disastrous consequences
+	my $idx = $Data->find_column('^name$');
 	if ( defined $idx ) {
 		printf " Replacing name contents in column %d, '%s'\n", $idx, $Data->name($idx);
 	}
