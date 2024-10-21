@@ -33,7 +33,7 @@ eval {
 # served by separate database queries for each window.
 use constant DATASET_HASH_LIMIT => 4999;
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 print
 	"\n A script to collect windowed data flanking a relative position of a feature\n\n";
@@ -109,7 +109,7 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script map_data.pl, version $VERSION\n";
+	print " Biotoolbox script get_relative_data.pl, version $VERSION\n";
 	eval {
 		require Bio::ToolBox;
 		my $v = Bio::ToolBox->VERSION;
@@ -316,7 +316,7 @@ else {
 # write the column group file
 if ($groupcol) {
 	my $groupfile = $written_file;
-	$groupfile =~ s/\.txt (?:\.gz)? $/.groups.txt/x;
+	$groupfile =~ s/\.txt (?:\.gz)? $/.col_groups.txt/x;
 	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
 	$fh->print("Name\tDataset\n");
 	for ( my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++ ) {
@@ -1075,7 +1075,7 @@ from neighboring values. The default is false (nosmooth).
 Optionally write a secondary file with the list of column group names and 
 their corresponding dataset group. This can be used to assist in designating 
 the metadata when plotting files, for example in R with pheatmap. The 
-file is named the output basename appended with F<.groups.txt>.
+file is named the output basename appended with F<.col_groups.txt>.
 
 =item --gz
 

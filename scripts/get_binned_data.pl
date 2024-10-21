@@ -24,7 +24,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -258,7 +258,7 @@ else {
 # write the column group file
 if ($groupcol) {
 	my $groupfile = $written_file;
-	$groupfile =~ s/\.txt (?:\.gz)? $/.groups.txt/x;
+	$groupfile =~ s/\.txt (?:\.gz)? $/.col_groups.txt/x;
 	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
 	$fh->print("Name\tDataset\n");
 	for my $i ( $beginningcolumn .. $Data->last_column ) {
@@ -1170,7 +1170,7 @@ from neighboring values. The default is false.
 Optionally write a secondary file with the list of column group names and 
 their corresponding dataset group. This can be used to assist in designating 
 the metadata when plotting files, for example in R with pheatmap. The 
-file is named the output basename appended with F<.groups.txt>.
+file is named the output basename appended with F<.col_groups.txt>.
 
 =item --gz
 
