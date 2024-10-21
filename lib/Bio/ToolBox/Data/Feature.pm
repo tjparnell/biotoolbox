@@ -1807,9 +1807,9 @@ back to text. Returns a hash reference of key =E<gt> value pairs.
 =item vcf_attributes
 
 Parses the C<INFO> (8th column) and all sample columns (10th and higher 
-columns) in a version 4 VCF file. The Sample columns use the C<FORMAT> 
+columns) in a VCF file. The Sample columns use the C<FORMAT> 
 column (9th column) as keys. The returned hash reference has two levels:
-The first level keys are both the column names and index (0-based). The 
+The first level keys are both the column names and index (1-based). The 
 second level keys are the individual attribute keys to each value. 
 For example:
 
@@ -1819,9 +1819,9 @@ For example:
    my $genotype = $attr->{sample1}{GT};
    my $depth    = $attr->{INFO}{ADP};
    
-   # access by 0-based column index 
-   my $genotype = $attr->{9}{GT};
-   my $depth    = $attr->{7}{ADP}
+   # access by 1-based column index 
+   my $genotype = $attr->{10}{GT};
+   my $depth    = $attr->{8}{ADP}
 
 =item rewrite_attributes
 

@@ -677,7 +677,7 @@ Information about the columns may be accessed. This includes the
 names of the column and shortcuts to specific identifiable columns, 
 such as name and coordinates. In addition, each column may have 
 additional metadata. Each metadata is a series of key =E<gt> 
-value pairs. The minimum keys are 'index' (the 0-based index 
+value pairs. The minimum keys are 'index' (the 1-based index 
 of the column) and 'name' (the column header name). Additional 
 keys and values may be queried or set as appropriate. When the 
 file is written, these are stored as commented metadata lines at 

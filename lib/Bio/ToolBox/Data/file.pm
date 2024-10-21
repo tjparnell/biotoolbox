@@ -8,7 +8,7 @@ use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 # List of acceptable filename extensions
 our $SUFFIX =
@@ -1731,7 +1731,8 @@ Rare file format of chromosome, position, score. File extension F<.sgr>.
 
 =item TEXT
 
-Almost any tab-delimited text file with a F<.txt> extension can be loaded.
+Almost any tab-delimited text file with a F<.txt> or F<.tsv> extension
+can be loaded.
 
 =item Compressed files
 
@@ -1779,7 +1780,7 @@ includes the whole path of the executable.
 
 The next header lines include column specific metadata. Each column 
 will have a separate header line, specified initially by the word 
-'Column', followed by an underscore and the column number (0-based). 
+'Column', followed by the column number (1-based). 
 Following this is a series of 'key=value' pairs separated by ';'. 
 Spaces are generally not allowed. Obviously '=' or ';' are not 
 allowed or they will interfere with the parsing. The metadata 

@@ -15,7 +15,7 @@ use Bio::ToolBox::db_helper qw(
 use Bio::ToolBox::utility qw(simplify_dataset_name sane_chromo_sort);
 use Module::Load;
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 ### Initialize
 
@@ -1688,13 +1688,15 @@ or else you will lose your changed VCF header metadata.
 
 =head2 The Data table
 
-The Data table is the array of arrays containing all of the 
-actual information. Rows and columns are indexed using 0-based 
-indexing as with all Perl arrays. Row 0 is always the column 
-header row containing the column names, regardless whether an 
-actual header name existed in the original file format (e.g. 
-BED or GFF formats). Any individual table "cell" can be 
-specified as C<[$row][$column]>. 
+The Data table is an array of arrays containing all of the actual
+information. Rows and columns are indexed using essentially 1-based
+indexing. Row 0 is always the column header row containing the column
+names, regardless whether an actual header row existed in the original
+file format (e.g. BED or GFF formats do not have a header row). A fake
+hidden column is prepended to the data table to act as column index 0.
+Therefore, for all practical purposes, data values form any individual
+table "cell" can be accessed using their 1-base indexes and specified
+as C<[$row][$column]>. See the C<value()> method below.
 
 =over 4
 
@@ -1713,15 +1715,12 @@ Returns the number of rows in the Data table.
 
 =item last_column
 
-Returns the array index number for the last (right most) 
-column. This number is always 1 less than the value 
-returned by number_columns() due to 0-based indexing.
+Returns the array index number for the last (right most) column. 
 
 =item last_row
 
 Returns the array index number of the last row. 
-Since the header row is index 0, this is also the 
-number of actual content rows.
+
 
 =item column_values
 
@@ -1823,14 +1822,14 @@ Data table; Use the L</value> method below instead.
   $Data->value($row, $column, $new_value);
 
 Returns or sets the value at a specific row or column index.
-Index positions are 0-based (header row is index 0). 
+Index positions are 1-based (header row is index 0). 
 
 =back
 
 =head2 Column Metadata
 
 Each column has metadata. Each metadata is a series of key =E<gt> 
-value pairs. The minimum keys are 'index' (the 0-based index 
+value pairs. The minimum keys are 'index' (the 1-based index 
 of the column) and 'name' (the column header name). Additional 
 keys and values may be queried or set as appropriate. When the 
 file is written, these are stored as commented metadata lines at 
@@ -2025,14 +2024,26 @@ This method is automatically called prior to writing the Data table to file.
 
   $Data->sort_data($index, 'i'); # increasing sort
 
-This method will sort the Data table by the values in the indicated column. 
-It will automatically determine whether the contents of the column are 
-numbers or alphanumeric, and will sort accordingly, either numerically or 
-asciibetically. The first non-null value in the column is used to determine. 
-The sort may fail if the values are not consistent. Pass a second optional 
-value to indicate the direction of the sort. The value should be either 
-'i' for 'increasing' or 'd' for 'decreasing'. The default order is 
-increasing. 
+This method will sort the Data table by the values in the indicated column.
+Values are automatically sorted based on their value type in the
+following order. Not all types are expected (in most cases only one).
+
+=over 4
+
+=item numeric-only items
+
+=item mixed text with an integer at the end
+
+=item mixed text with an integer anywhere
+
+=item text only
+
+=back
+
+Pass the function one or two values. The first value is the index of the
+column upon which the contents are to be sorted. The second (optional) 
+value is the direction of the sort, and may be one of two accepted values:
+c<i> (default) is for increasing sort, and C<d> is for decreasing sort.
 
 =item gsort_data
 
@@ -2040,9 +2051,12 @@ This method will sort the Data table by increasing genomic coordinates. It
 requires the presence of chromosome and start (or position) columns, 
 identified by their column names. These are automatically identified. 
 Failure to find these columns mean a failure to sort the table. Chromosome 
-names are sorted first by their digits (e.g. chr2 before chr10), and then 
-alphanumerically. Base coordinates are sorted by increasing value. 
-Identical positions are kept in their original order.
+names are sorted in a sane fashion; see L<Bio::ToolBox::utility::sane_chromo_sort>,
+for details. For most tables, features are sorted by increasing start position
+and increasing length, except for GFF-based file formats. These are sorted
+by increasing start position and decreasing length, which is an attempt at
+ensuring parental features occur first in line order over child features to
+improve parsing, avoid orphan features, and maintain tabix compatibility.
 
 =item splice_data
 
@@ -2211,8 +2225,7 @@ and append "_<method>_summary" to it.
 
 Provide the starting and ending columns to summarize. The default 
 start is the leftmost column without a recognized standard name. 
-The default ending column is the last rightmost column. Indexes are 
-0-based.
+The default ending column is the last rightmost column.
 
 =item dataset
 
