@@ -6,7 +6,7 @@ use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 my %TYPECOUNTS = ();
 
@@ -477,6 +477,7 @@ sub _gtf_to_seqf {
 	my %att;
 	foreach ( split /;\s?/, $fields->[8] ) {
 		my ( $k, $v ) = split /\s/, $_, 2;
+		next unless ($k and $v);
 		$v =~ s/"//g;
 
 		# attribute keys should be unique, but Ensembl re-uses 'tag' key, so tolerate
