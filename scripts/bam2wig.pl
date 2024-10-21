@@ -38,7 +38,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 print "\n This program will convert bam alignments to wig data\n";
 
@@ -64,7 +64,7 @@ my (
 	$nosupplementary, $max_isize,       $min_isize,    $first_read,
 	$second_read,     $multi_hit_scale, $splice_scale, $rpm,
 	$do_mean,         $chrnorm,         $chrapply,     $chr_exclude,
-	$black_list,      $bin_size,        $dec_precison, $bigwig,
+	$exclude_file,    $bin_size,        $dec_precison, $bigwig,
 	$no_zero,         $bwapp,           $cpu,          $max_intron,
 	$window,          $verbose,         $gz,           $tempdir,
 	$help,            $print_version,
@@ -127,7 +127,7 @@ GetOptions(
 	'chrnorm=f'         => \$chrnorm,        # chromosome-specific normalization
 	'chrapply=s'        => \$chrapply,       # chromosome-specific normalization regex
 	'K|chrskip=s'       => \$chr_exclude,    # regex for skipping chromosomes
-	'B|blacklist=s'     => \$black_list,     # file for skipping regions
+	'exclude|blacklist=s' => \$exclude_file, # file for skipping regions
 	'bin=i'             => \$bin_size,       # size for binning the data
 	'format=i'          => \$dec_precison,   # format to number of decimal positions
 	'b|bw!'             => \$bigwig,         # generate bigwig file
@@ -222,8 +222,8 @@ if ( $splice or $use_smartpe ) {
 printf " Using the %s Bam adapter and align wrapper $wrapper_ref\n", ref( $sams[0] )
 	if $verbose;
 
-### Process user provided black lists
-my $black_list_hash = process_black_list();
+### Process user provided exclusion lists
+my $exclude_hash = process_exclusion_list();
 
 ### Calculate shift value
 if ( $shift or $use_extend ) {
@@ -938,28 +938,35 @@ sub check_defaults {
 	}
 }
 
-sub process_black_list {
-	if ( $black_list and -e $black_list ) {
+sub process_exclusion_list {
+	if ( $exclude_file and -e $exclude_file ) {
 		my $i = 0;
 		eval { require Set::IntervalTree; $i = 1; };
 		unless ($i) {
-			print " WARNING! Please install Set::IntervalTree to use black lists\n";
-			undef $black_list;
+			print " WARNING! Please install Set::IntervalTree to use exclusion lists\n";
+			undef $exclude_file;
 			return;
 		}
-		my %black_list_hash = map { $_ => [] } @seq_list;
-		my $Data            = Bio::ToolBox->load_file($black_list)
-			or die "unable to read black list file '$black_list'\n";
+		my %list_hash = map { $_ => [] } @seq_list;
+		my $Data      = Bio::ToolBox->load_file($exclude_file)
+			or die "unable to read exclusion list file '$exclude_file'\n";
+		unless ( $Data->feature_type eq 'coordinate' ) {
+			printf
+			" WARNING! Exclusion list file '%s' does not have coordinates! Ignoring.\n",
+				$exclude_file;
+			return \%list_hash;
+		}
 		$Data->iterate(
 			sub {
 				my $row = shift;
-				push @{ $black_list_hash{ $row->seq_id } },
+				push @{ $list_hash{ $row->seq_id } },
 					[ $row->start - 1, $row->end ]
-					if exists $black_list_hash{ $row->seq_id };
+					if exists $list_hash{ $row->seq_id };
 			}
 		);
-		printf " Loaded %s blacklist regions\n", format_with_commas( $Data->last_row );
-		return \%black_list_hash;
+		printf " Loaded %s exclusion list regions\n",
+			format_with_commas( $Data->number_rows );
+		return \%list_hash;
 	}
 	return;
 }
@@ -1973,7 +1980,7 @@ sub process_alignments_on_chromosome {
 		f_offset   => 0,
 		r_offset   => 0,
 		pair       => {},
-		black_list => undef,
+		exclusion  => undef,
 		f_count    => 0,
 		r_count    => 0,
 		sam        => $sam,
@@ -1985,17 +1992,17 @@ sub process_alignments_on_chromosome {
 		$data->{score} = $chrnorm;
 	}
 
-	# process black lists for this chromosome
+	# process exclusion lists for this chromosome
 	# since we're using external interval tree module that is not fork-safe, must
 	# recreate interval tree each time
-	if ( $black_list_hash and scalar @{ $black_list_hash->{$seq_id} } ) {
+	if ( $exclude_hash and scalar @{ $exclude_hash->{$seq_id} } ) {
 		my $tree = Set::IntervalTree->new;
-		foreach ( @{ $black_list_hash->{$seq_id} } ) {
+		foreach ( @{ $exclude_hash->{$seq_id} } ) {
 
 			# don't need to insert any particular value, just want the interval
 			$tree->insert( 1, $_->[0], $_->[1] );
 		}
-		$data->{black_list} = $tree;
+		$data->{exclusion} = $tree;
 	}
 
 	# Process alignments on this chromosome
@@ -2454,9 +2461,9 @@ sub se_callback {
 	return if ( $first_read      and not $flag & 0x40 );    # first read in pair
 	return if ( $second_read     and not $flag & 0x80 );    # second read in pair
 
-	# filter black listed regions
-	if ( defined $data->{black_list} ) {
-		my $results = $data->{black_list}->fetch( $a->pos, $a->calend );
+	# filter excluded regions
+	if ( defined $data->{exclusion} ) {
+		my $results = $data->{exclusion}->fetch( $a->pos, $a->calend );
 		return if scalar @{$results};
 	}
 
@@ -2519,9 +2526,9 @@ sub fast_pe_callback {
 	return if $isize > $max_isize;
 	return if $isize < $min_isize;
 
-	# filter black listed regions
-	if ( $data->{black_list} ) {
-		my $results = $data->{black_list}->fetch( $a->pos, $a->pos + $isize );
+	# filter excluded regions
+	if ( $data->{exclusion} ) {
+		my $results = $data->{exclusion}->fetch( $a->pos, $a->pos + $isize );
 		return if scalar @{$results};
 	}
 
@@ -2586,14 +2593,14 @@ sub pe_callback {
 	return if $isize > $max_isize;
 	return if $isize < $min_isize;
 
-	# filter black listed regions
-	if ( $data->{black_list} ) {
+	# filter excluded regions
+	if ( $data->{exclusion} ) {
 		my $results;
 		if ( $a->reversed ) {
-			$results = $data->{black_list}->fetch( $a->calend - $isize, $a->calend );
+			$results = $data->{exclusion}->fetch( $a->calend - $isize, $a->calend );
 		}
 		else {
-			$results = $data->{black_list}->fetch( $a->pos, $a->pos + $isize );
+			$results = $data->{exclusion}->fetch( $a->pos, $a->pos + $isize );
 		}
 		return if scalar @{$results};
 	}
@@ -3371,7 +3378,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   
  Alignment filtering options:
   -K --chrskip <regex>          regular expression to skip chromosomes
-  -B --blacklist <file>         interval file of regions to skip (bed, gff, txt)
+  -B --exclude <file>           interval file of regions to skip (bed, gff, txt)
   -q --qual <integer>           minimum mapping quality (0)          
   -S --nosecondary              ignore secondary (0x100) alignments (false)
   -D --noduplicate              ignore duplicate (0x400) alignments (false)
@@ -3605,7 +3612,7 @@ properly escaped on the command line. Examples might be
     'scaffold.+'
     'chr.+alt|chrUn.+|chr.+_random'
 
-=item --blacklist E<lt>fileE<gt>
+=item --exclude E<lt>fileE<gt>
 
 Provide a file of genomic intervals from which to exclude alignments. 
 Examples might include repeats, ribosomal RNA, or heterochromatic regions.
