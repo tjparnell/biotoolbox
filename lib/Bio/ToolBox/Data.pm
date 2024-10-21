@@ -1215,7 +1215,7 @@ sub summary_file {
 	# Write summed data
 	$outfile =~ s/\.txt (\.gz)?$//xi;    # strip any .txt or .gz extensions if present
 	my $written_file = $summed_data->write_file(
-		'filename' => sprintf( "%s_%s_summary.txt", $outfile, $args{method} ),
+		'filename' => sprintf( "%s_summary.txt", $outfile ),
 		'gz'       => 0,
 	);
 	return $written_file;
