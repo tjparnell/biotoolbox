@@ -12,7 +12,7 @@ our $VERSION = '2.01';
 
 # List of acceptable filename extensions
 our $SUFFIX =
-qr/\.(?: txt | gff3? | gtf | bed | bg | bdg | bedgraph | sgr | kgg | cdt | vcf | narrowpeak | broadpeak | gappedpeak | reff?lat | genepred | ucsc | maf) (?: \.gz | \.bz2 )?/xi;
+qr/\.(?: txt | tsv | gff3? | gtf | bed | bg | bdg | bedgraph | sgr | kgg | cdt | vcf | narrowpeak | broadpeak | gappedpeak | reff?lat | genepred | ucsc | maf) (?: \.gz | \.bz2 )?/xi;
 
 # gzip application
 my $gzip_app;
