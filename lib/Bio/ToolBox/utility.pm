@@ -7,7 +7,7 @@ use File::Spec;
 use IO::Prompt::Tiny qw(prompt);
 require Exporter;
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 ### Variables
 # Export
@@ -222,6 +222,15 @@ sub sane_chromo_sort {
 			# mitochondrial
 			push @mito, [ $name, $c ];
 		}
+		elsif ( $name =~ m/^ \d+ $/x and length($name) > 2 ) {
+
+			# I'm going to go out on a limb here and presume this is some weird scaffold
+			# since it's unlikely or at least rare for organisms to have over 100
+			# numbered chromosomes. For example, Drosophila BDGP6 has a whole bunch of
+			# scaffolds with just numbers. 
+			# Push these to mixed and hope for the best
+			push @mixed, [ q( ), $name, $name, $c ];
+		} 
 		elsif ( $name =~ m/^ (?:chr)? (\d+) $/xi ) {
 
 			# standard numeric chromosome
@@ -231,6 +240,25 @@ sub sane_chromo_sort {
 
 			# Roman numerals - silly Saccharomyces cerevisiae
 			push @romanic, [ $1, $c ];
+		}
+		elsif ( $name =~ m/^ (?:chr)? ( \d+ ) ( [lrpq] ) $/xi ) {
+
+			# chromosome arms
+			my $i = $1;
+			my $a = lc $2;
+			if ($a eq 'l') {
+				$i += 0.1;
+			}
+			elsif ($a eq 'r') {
+				$i += 0.2;
+			}
+			elsif ($a eq 'p') {
+				$i += 0.3;
+			}
+			elsif ($a eq 'q') {
+				$i += 0.4;
+			}
+			push @numeric, [ $i, $c ];
 		}
 		elsif ( $name =~ m/^ ( [a-zA-Z_\-\.]+ ) (\d+)/x ) {
 
@@ -378,11 +406,14 @@ them into a reasonably sane order: standard numeric identifiers first (numeric
 order), sex chromosomes (alphabetical), mitochondrial, names with text and
 numbers (text first alphabetically, then numbers numerically) for contigs and
 such, and finally anything else (aciibetically). Any 'chr' prefix is ignored.
-Roman numerals are properly handled numerically. 
+Roman numerals are properly handled numerically. Chromosome arms with a L, R, p,
+or q suffix, such as with Drosophila chromosomes, are handled appropriately. 
+Any chromosome name consisting entirely of more than 2 digits is considered
+a scaffold. 
 
 The provided list may be a list of SCALAR values (chromosome names) or ARRAY 
 references, with the first element assumed to be the name, e.g. 
-C<[$name, $length]>. 
+C<[$name, $length]>. Length is not considered here.
 
 =back
 
