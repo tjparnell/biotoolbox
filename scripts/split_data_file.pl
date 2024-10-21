@@ -9,7 +9,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -109,8 +109,8 @@ if ($tag) {
 	if ( $Input->vcf and not defined $index ) {
 		print STDERR
 			" FATAL: Please provide a column index for accessing VCF attributes.\n"
-			. " The INFO column is 0-based index 7, and sample columns begin\n"
-			. " at index 9.\n";
+			. " The INFO column is index 8, and sample columns begin\n"
+			. " at index 10.\n";
 		exit 1;
 	}
 	elsif ( $Input->gff ) {
