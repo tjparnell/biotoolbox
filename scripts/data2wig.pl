@@ -16,7 +16,7 @@ use Bio::ToolBox::big_helper qw(
 	generate_chromosome_file
 );
 
-our $VERSION = '2.00';
+our $VERSION = '2.01';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -275,15 +275,31 @@ sub check_indices {
 		# in case returned from interactive
 		@score_indices = @{$score_index};
 	}
+	if (@score_indices) {
+		foreach my $i (@score_indices) {
+			unless ( $Input->name($i) ) {
+				print " FATAL: Score column $i does not exist!\n";
+				exit 1;
+			}
+		}
+	}
+	else {
+		unless ( $Input->name($score_index) ) {
+			print " FATAL: Score column $score_index does not exist!\n";
+			exit 1;
+		}
+	}
 }
 
 sub check_track_name {
 
 	# determine what the track name will be
+	return if $track_name;
 	if (@score_indices) {
 		$track_name = join( '_', map { $Input->name($_) } @score_indices );
 	}
 	elsif ($score_index) {
+
 		$track_name = $Input->name($score_index);
 		if ( $track_name =~ /^score$/i ) {
 
