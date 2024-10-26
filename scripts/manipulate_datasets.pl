@@ -3054,16 +3054,17 @@ sub rewrite_function {
 
 sub view_function {
 
-	my $start_row = 0;
-	my $stop_row  = 10;
+	# print header
+	printf "%s\n", join( q(  ), $Data->list_columns );
 
 	# print the contents
+	my $start_row = 1;
+	my $stop_row  = 10;
 	while ($stop_row) {
 
 		# print the table contents
 		$stop_row = $Data->last_row if $stop_row > $Data->last_row;
 		for my $i ( $start_row .. $stop_row ) {
-			last if $i >= $Data->number_rows;
 			printf "%s\n", join( q(  ), $Data->row_values($i) );
 		}
 
