@@ -48,9 +48,9 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     installed. 
 
         curl -O -L https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
-        curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
+        curl -o bio-db-big-master.tar.gz -L https://github.com/Ensembl/Bio-DB-Big/tarball/master
         cpanm Minimal-BioPerl-1.7.8.tar.gz
-        cpanm bio-db-big-master.zip
+        cpanm Template::Tiny bio-db-big-master.tar.gz
         cpanm Bio::DB::HTS
         cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
 
@@ -156,13 +156,18 @@ installed.
     
     Note that the `htslib` package is also included with the `samtools` and `bcftools`
     packages and is compiled therein, but is not installed by default (although it
-    could be).
+    could be). In this case, use the commands `make all all-htslib` and
+    `make install all all-htslib` to install both.
+	
+	See above for example code.
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
     Follow the directions within for installation. By default, it installs into 
     `/usr/local`. To change to a different location, manually edit the `Makefile`
     to change `prefix` to your desired location, and run `make && make install`.
+    
+    See above for example code.
     
     Note that the Perl module
     [Alien::LibBigWig](https://metacpan.org/pod/Alien::LibBigWig) is available
@@ -182,12 +187,6 @@ The following Perl packages should be explicitly installed. Most of these will
 bring along a number of dependencies (which in turn bring along more dependencies). In 
 the end you will have installed dozens of packages. 
 
-- [Module::Build](https://metacpan.org/pod/Module::Build)
-
-    This may or may not need to be installed, depending on the age of your Perl 
-    installation and how much else has been installed. It was part of the standard 
-    Perl distribution up until version 5.21. 
-
 - [BioPerl](https://metacpan.org/pod/BioPerl)
 
     The BioPerl package is a large bundle consisting of hundreds of modules and 
@@ -200,7 +199,7 @@ the end you will have installed dozens of packages.
 	one-third the size of the full distribution; use this 
 	[file](https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz)
 	to install.
-    
+
 - [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS)
 
     This provides a perl interface to the [HTSlib](https://github.com/samtools/htslib) 
@@ -218,7 +217,10 @@ the end you will have installed dozens of packages.
     
     **NOTE**: The distribution from CPAN will install dozens of unnecessary modules
     for remote URL testing. You may be better off installing directly from
-    [source](https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master).
+    [source](https://codeload.github.com/Ensembl/Bio-DB-Big/tarball/master).
+    
+    **NOTE**: This requires Template::Tiny to be installed, which appears to be
+    missing from the manifest. Install it first before Bio::DB::Big.
     
 - [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
 
@@ -246,11 +248,12 @@ the end you will have installed dozens of packages.
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
 
-    cpanm Module::Build https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
-    cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
-	curl -o bio-db-big-master.zip -L https://codeload.github.com/Ensembl/Bio-DB-Big/zip/master
-	cpanm --configure-args="--libbigwig $HOME" bio-db-big-master.zip
-    cpanm --notest Data::Swap
+    curl -O -L https://github.com/tjparnell/bioperl-live/releases/download/minimal-v1.7.8/Minimal-BioPerl-1.7.8.tar.gz
+    cpanm Minimal-BioPerl-1.7.8.tar.gz
+    cpanm --configure-args="--htslib /usr/local" Bio::DB::HTS
+	cpanm Template::Tiny
+	curl -o bio-db-big-master.tar.gz -L https://github.com/Ensembl/Bio-DB-Big/tarball/master
+	cpanm --configure-args="--libbigwig /usr/local" bio-db-big-master.tar.gz
     cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast Bio::ToolBox
 
 ## External applications
