@@ -1,6 +1,18 @@
 ######## Bio::ToolBox revision history #############
 
 
+v2.01
+	- Update chromosome sorting to properly handle chromosomal arms, for
+	  example with Drosophila
+	- Change '.groups.txt' group file name to '.col_groups.txt' when writing
+	  column metadata file for scripts get_binned_data.pl and get_relative_data.pl
+	- Change back to '_summary.txt' file name when writing a summary file
+	- Change "--blacklist" option to "--exclude" in bam2wig.pl
+	- Improve error handling scenarios in data2wig.pl, including invalid indexes
+	- Fix bugs in manipulate_datasets.pl, including missing lines in the view function
+	  and restricting the addname function to only update a proper "Name" column
+	- Update any remaining POD text references about 0-base indexing to 1-base
+
 v2.0
 	- Version number change, no code changes
 
