@@ -1,4 +1,4 @@
-# Bio::ToolBox
+# Bio::ToolBox - manipulate_wig
 
 |[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
 

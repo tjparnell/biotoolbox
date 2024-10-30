@@ -1,4 +1,4 @@
-# Bio::ToolBox
+# Bio::ToolBox - get\_feature\_info
 
 |[Home](ReadMe.md)|[Install](AdvancedInstallation.md)|[Libraries](Libraries.md)|[Applications](Applications.md)|[Examples](Examples.md)|[FAQ](FAQ.md)|
 
