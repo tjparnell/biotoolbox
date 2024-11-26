@@ -32,8 +32,11 @@ Installation is simple with the Perl Module::Build incantation.
 Released versions may be obtained though the CPAN repository using 
 your favorite package manager. 
 
+Advanced installation notes are provided at
+https://tjparnell.github.io/biotoolbox/AdvancedInstallation.html.
 
-ADDITIONAL MODULES
+
+ADDITIONAL REQUIREMENTS
 
 To make the installation as lean and simple as possible, only the minimal 
 additional Perl modules are required, while the remainder are only 
@@ -44,12 +47,14 @@ separately. See the respective modules for installation instructions.
 
 Most scripts should fail gently with warnings about missing modules.
 
-Advanced installation notes are provided at the project repository.
 
 PROJECT WEBSITE
 
 The BioToolBox project repository may be found at
 https://github.com/tjparnell/biotoolbox. 
+
+Full documentation, including common usage scenarios with the included
+applications, may be found at https://tjparnell.github.io/biotoolbox.
 
 
 LICENSE

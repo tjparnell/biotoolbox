@@ -39,7 +39,7 @@ Manual installation is simple with the standard `Module::Build` incantation.
 In either case, this will get you a minimal installation that will work with 
 text files (BED, GFF, GTF, etc), but not binary files. To work with binary files,
 including Bam and BigWig files, see the details in the
-[Installation Guide](https://tjparnell.github.io/biotoolbox/docs/AdvancedInstallation.md).
+[Installation Guide](https://tjparnell.github.io/biotoolbox/AdvancedInstallation.html).
 
 # AUTHOR
 
