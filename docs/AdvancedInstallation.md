@@ -178,10 +178,12 @@ installed.
 
 ## Perl modules
 
-Using a simple CPAN package installer such as [CPAN Minus](https://metacpan.org/pod/App::cpanminus), 
-i.e. `cpanm`, is highly recommended for ease and simplicity in installing modules 
-from [CPAN](https://metacpan.org). It can install directly from CPAN or take a URL 
-or downloaded archive file. Other CPAN package managers are available too.
+Using a simple CPAN package installer such as [CPAN
+Minus](https://metacpan.org/pod/App::cpanminus), i.e. `cpanm`, is highly recommended
+for ease and simplicity in installing modules from [CPAN](https://metacpan.org). It
+can install directly from CPAN or take a URL or downloaded archive file. Follow the
+link to find out how to install `cpanm`. Other CPAN package managers are available
+too, if that's your preference. 
 
 The following Perl packages should be explicitly installed. Most of these will 
 bring along a number of dependencies (which in turn bring along more dependencies). In 
@@ -265,7 +267,7 @@ are preferred because they're more efficient and spread the load on modern
 multi-CPU environments. You may download these from the UCSC Genome Browser
 utilities section for either
 [Linux](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/) or
-[macOS](http://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/). Copy them to
+[macOS](http://hgdownload.soe.ucsc.edu/admin/exe/macOSX.arm64/). Copy them to
 your `bin` directory in your `PATH`, for example `$HOME/bin`, `$HOME/perl5/bin`,
 or `/usr/local/bin`. Be sure to make them executable by running `chmod +x` on
 each file.
@@ -277,7 +279,7 @@ each file.
 
 An example for downloading on Linux:
 
-    for name in wigToBigWig bedGraphToBigWig bigWigToWig bedToBigBed; \
+    for name in wigToBigWig bedGraphToBigWig bigWigToWig bigWigToBedGraph bedToBigBed bigBedToBed; \
     do curl -o $HOME/bin/$name http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name \
     && chmod +x $HOME/bin/$name; done;
 
