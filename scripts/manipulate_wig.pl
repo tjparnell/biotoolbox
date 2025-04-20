@@ -353,7 +353,7 @@ if (    $outfile
 my $statMessage;
 if ($doStats) {
 	my $basecount = $stats->{count}  || 0;
-	my $min       = $stats->{minVal} || q();
+	my $min       = $stats->{minVal} || 0;
 	my $max       = $stats->{maxVal} || q();
 	my $mean =
 		$stats->{count} ? sprintf( "%.05f", $stats->{sumData} / $stats->{count} ) : 0;
