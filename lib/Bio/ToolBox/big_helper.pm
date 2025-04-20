@@ -487,6 +487,28 @@ simple text file, where each line is comprised of two columns, "C<chromosome_nam
 given a C<Bio::DB> database name (preferred to ensure genome version 
 compatibility).
 
+=head3 Note regarding compatibility
+
+Some of these methods open a pipe to these external utilities, either
+for reading (L</open_wig_to_bigwig_fh>) or writing (L<open_bigwig_to_wig_fh>). 
+Newer (current) versions of these utilities, for
+example C<wigToBigWig> or C<bedGraphToBigWig>, no longer support reading from 
+standard input, resulting in failure with L<open_bigwig_to_wig_fh>. This change
+occurred with version release 439 of the UCSC UserApps, released circa 2022-11-14.
+
+Being able to write to the utility directly has its advantages, namely avoiding 
+writing an intermediate text file and speed. 
+
+To check whether your version of C<wigToBigWig> supports reading from C<stdin>,
+use the L</check_wigToBigWig_version> method. If it does not, simply write to a
+text wig file and use the L</wig_to_bigwig_conversion> function. 
+
+Otherwise, you can always try compiling an older version.
+
+The C<bedToBigBed> and C<bedGraphtoBigWig> utilities do not support reading from
+C<stdin>, primarily because they perform read seek on the input file.
+
+
 =head1 USAGE
 
 Load the module at the beginning of your program and include the name or 
@@ -494,66 +516,53 @@ names of the subroutines to export. None are automatically exported.
 
 	use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 
-There are are five available exported subroutines.
+There are are nine available exported subroutines.
+
+=head2 Find and check applications
+
+These functions look for UCSC utility applications in your environment C<PATH>
+or defined in your F<.biotoolbox.cfg> config file (if present) and returns
+the path or undefined.
 
 =over 4
 
-=item wig_to_bigwig_conversion
+=item get_bed_to_bigbed_app
 
-This subroutine will convert a wig file to a bigWig file. 
+Looks for the C<bedToBigBed> application for converting text bed files to
+binary bigBed.
 
-For bedGraph format wig files, the utility I<bedGraphToBigWig> may be substituted 
-if desired, but I<wigToBigWig> can sufficiently handle all wig formats. When 
-no utility is available but L<Bio::DB::BigFile> is installed, then the module 
-may be used for generating the bigWig file.
+=item get_bigwig_to_bdg_app
 
-After running the utility, the existence of a non-zero byte bigWig file 
-is checked. If it does, then the name of the file is returned. If not, 
-an error is printed and nothing is returned. 
+Looks for the C<bigWigToBedGraph> application for converting binary bigWig
+to text bedGraph.
 
-Pass the function an array of key =E<gt> value arguments, including the 
-following:
+=item get_bigwig_to_wig_app
 
-=over 4
+Looks for the C<bigWigToWig> application for converting binary bigWig to
+the original text wig format (fixedStep, varStep, or bedGraph).
 
-=item wig
+=item get_wig_to_bigwig_app
 
-Pass the name of the wig source file. This is required.
+Looks for the C<wigToBigWig> application for converting text wig (fixedStep,
+varStep, or bedGraph) to binary bigWig.
 
-=item chromo
+=item check_wigToBigWig_version
 
-Pass the path to a chromosome sizes text file, described as above. This is 
-required. Alternatively, a database object may provided.
-
-=item db
-
-Provide an opened database object from which to generate the chromosome 
-sizes information. This will be passed to L<generate_chromosome_file> to 
-generate a chromosome file. This is a convenience option and alternative to 
-providing an existing chromosome file.
-
-=item bwapppath
-
-Provide the full path to the UCSC F<wigToBigWig> utility. If not provided, the 
-default C<PATH> will be searched for the utility. The path may also 
-be defined in the configuration file F<.biotoolbox.cfg>. 
+This function checks the version of the C<wigToBigWig> application and
+whether it supports a direct pipe to C<stdin>. Pass the path of the utility.
+Returns a boolean 1 or 0.
 
 =back
 
-Example:
 
-	my $wig_file = 'example_wig';
-	my $bw_file = wig_to_bigwig_conversion(
-		'wig'   => $wig_file,
-		'db'    => $database,
-	);
-	if (-e $bw_file) {
-		print " success! wrote bigwig file $bw_file\n";
-		unlink $wig_file; # no longer necessary
-	}
-	else {
-		print " failure! see STDERR for errors\n";
-	};
+=head2 Open file handles
+
+These functions will open a either a read or write filehandle to a C<bigWig>
+file through an appropriate external utility. The respective input or output
+should be properly formatted formatted C<wig> text, including C<fixedStep>,
+C<variableStep>, or C<bedGraph>.
+
+=over 4
 
 =item open_wig_to_bigwig_fh
 
@@ -572,6 +581,9 @@ and the wig lines are properly formatted and in order!
 Pass the function an array of key =E<gt> value arguments. An L<IO::File> 
 object will be returned. Upon the closing the file handle, the 
 F<wigToBigWig> utility will generate the bigWig file.
+
+B<NOTE>: Recent versions of F<wigToBigWig> no longer support C<stdin> as
+a file handle and cannot be used here.
 
 =over 4
 
@@ -668,6 +680,72 @@ Example:
 	}
 	$bwfh->close;
 
+=back
+
+=head2 Convert files
+
+These functions easily handle the conversion of a text file to a binary 
+bigWig or bigBed file.
+
+=over 4
+
+=item wig_to_bigwig_conversion
+
+This subroutine will convert a wig file to a bigWig file. 
+
+For bedGraph format wig files, the utility I<bedGraphToBigWig> may be substituted 
+if desired, but I<wigToBigWig> can sufficiently handle all wig formats. When 
+no utility is available but L<Bio::DB::BigFile> is installed, then the module 
+may be used for generating the bigWig file.
+
+After running the utility, the existence of a non-zero byte bigWig file 
+is checked. If it does, then the name of the file is returned. If not, 
+an error is printed and nothing is returned. 
+
+Pass the function an array of key =E<gt> value arguments, including the 
+following:
+
+=over 4
+
+=item wig
+
+Pass the name of the wig source file. This is required.
+
+=item chromo
+
+Pass the path to a chromosome sizes text file, described as above. This is 
+required. Alternatively, a database object may provided.
+
+=item db
+
+Provide an opened database object from which to generate the chromosome 
+sizes information. This will be passed to L<generate_chromosome_file> to 
+generate a chromosome file. This is a convenience option and alternative to 
+providing an existing chromosome file.
+
+=item bwapppath
+
+Provide the full path to the UCSC F<wigToBigWig> utility. If not provided, the 
+default C<PATH> will be searched for the utility. The path may also 
+be defined in the configuration file F<.biotoolbox.cfg>. 
+
+=back
+
+Example:
+
+	my $wig_file = 'example_wig';
+	my $bw_file = wig_to_bigwig_conversion(
+		'wig'   => $wig_file,
+		'db'    => $database,
+	);
+	if (-e $bw_file) {
+		print " success! wrote bigwig file $bw_file\n";
+		unlink $wig_file; # no longer necessary
+	}
+	else {
+		print " failure! see STDERR for errors\n";
+	};
+
 =item bed_to_bigbed_conversion
 
 This subroutine will convert a bed file to a bigBed file. 
@@ -675,6 +753,9 @@ This subroutine will convert a bed file to a bigBed file.
 After running the utility, the existence of a non-zero byte bigBed file 
 is checked. If it does, then the name of the file is returned. If not, 
 an error is printed and nothing is returned. 
+
+Note that this utility requires chromosomes to be sorted in ASCIbetical
+order, and not necessarily numeric order.
 
 Pass the function an array of key =E<gt> value arguments, including the 
 following:
