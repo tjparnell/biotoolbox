@@ -12,7 +12,7 @@ use Bio::ToolBox::Data;
 use Bio::ToolBox::utility    qw( ask_user_for_index format_with_commas );
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 print "\n This program will write a BED file\n";
 
@@ -341,6 +341,11 @@ $Input->close_fh;
 if ($sort_data) {
 	print " Sorting data...\n";
 	$Output->gsort_data;
+	if ($bigbed) {
+		# re-sort again by chromosome in ascibetical order
+		# because that is what bedToBigBed requires
+		$Output->sort_data(1, 'i');
+	}
 }
 unless ($outfile) {
 	$outfile = sprintf "%s%s.bed", $Input->path, $Input->basename;
