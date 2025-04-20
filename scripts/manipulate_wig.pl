@@ -9,12 +9,15 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use IO::Handle;
 use Bio::ToolBox;
 use Bio::ToolBox::big_helper qw(
+	get_wig_to_bigwig_app
+	check_wigToBigWig_version
+	generate_chromosome_file
 	open_wig_to_bigwig_fh
 	open_bigwig_to_wig_fh
-	generate_chromosome_file
+	wig_to_bigwig_conversion
 );
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 ### Quick help
 unless (@ARGV) {    # when no command line options are present
@@ -123,7 +126,9 @@ if ($apply) {
 	$apply_regex = qr($apply);
 }
 
+
 ### Open file handles
+
 # Input
 my ( $infh, $outfh );
 if ( $infile =~ /^stdin$/i ) {
@@ -145,29 +150,57 @@ else {
 }
 
 # Output
+my $bw_post_convert;
 if ($outfile) {
 	if ( $outfile =~ /^stdout$/i ) {
 		$outfh = IO::Handle->new;
 		$outfh->fdopen( fileno(STDOUT), 'w' );
 	}
-	elsif ( $outfile =~ m/(?: bw | bigwig )$/xi ) {
+	elsif ( $outfile =~ m/(?: bw | bigwig ) $/xi ) {
 
-		# check for chromosome file
-		if ( $chromofile and -e $chromofile ) {
-
-			# user provided a chromosome file
-			$outfh = open_wig_to_bigwig_fh(
-				bw        => $outfile,
-				chromo    => $chromofile,
-				bwapppath => $wig2bw_app,
-			) or die "unable to open output bigWig file '$outfile'!\n";
+		# find external app
+		my $do_bw;
+		unless ($wig2bw_app) {
+			$wig2bw_app = get_wig_to_bigwig_app();
 		}
-		elsif ( $infile =~ m/(?: bw | bigwig )$/xi or $database ) {
-
-			# we can use the input bigWig as a database source if one isn't provided
-			$database ||= $infile;
-			$chromofile = generate_chromosome_file( $database, $skip )
-				or die "unable to generate chromosome file from '$database'!\n";
+		if ($wig2bw_app) {
+			if ( check_wigToBigWig_version($wig2bw_app) ) {
+				# this supports direct pipe
+				$bw_post_convert = 0;
+				$do_bw = 1;
+			}
+			else {
+				# must write wig file and convert afterwards
+				$bw_post_convert = 1;
+				$do_bw = 0;
+			}
+		}
+		else {
+			print "external wigToBigWig utility not available, writing to wig\n";
+			$bw_post_convert = 0;
+			$do_bw = 0;
+		}
+		
+		# check for chromosome file
+		if ( $do_bw or $bw_post_convert ) {
+			unless ($chromofile) {
+				if ($database) {
+					# this is ok
+				}
+				elsif ( not $database and $infile =~  m/(?: bw | bigwig )$/xi ) {
+					# use input bigwig as database
+					$database = $infile;
+				}
+				else {
+					die "unable to write output bigWig without chromosome information!\n";
+				}
+				$chromofile = generate_chromosome_file( $database, $skip )
+					or die "unable to generate chromosome file from '$database'!\n";
+			}
+		}
+		
+		# open file handle appropriately
+		if ($do_bw) {
 			$outfh = open_wig_to_bigwig_fh(
 				bw        => $outfile,
 				chromo    => $chromofile,
@@ -175,10 +208,10 @@ if ($outfile) {
 			) or die "unable to open output bigWig file '$outfile'!\n";
 		}
 		else {
-			die
-"unable to open output bigWig file handle without chromosome information!\n";
+			$outfile =~ s/(?: bw | bigwig ) $/wig/xi;
+			$outfh = Bio::ToolBox->write_file($outfile)
+				or die "can't open $outfile!";
 		}
-
 	}
 	else {
 		$outfh = Bio::ToolBox->write_file($outfile)
@@ -293,6 +326,19 @@ while ( my $line = $infh->getline ) {
 ### close filehandles
 $infh->close;
 $outfh->close if $outfh;
+
+# convert as necessary
+if ($bw_post_convert) {
+	my $final_bw = wig_to_bigwig_conversion(
+		wig       => $outfile,
+		chromo    => $chromofile,
+		bwapppath => $wig2bw_app,
+	);
+	if ($final_bw) {
+		unlink $outfile;
+		$outfile = $final_bw;
+	}
+}
 
 # remove chromosome file if we generated it
 if (    $outfile

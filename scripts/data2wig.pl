@@ -12,11 +12,14 @@ use Statistics::Lite qw(median);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility    qw(parse_list ask_user_for_index);
 use Bio::ToolBox::big_helper qw(
+	get_wig_to_bigwig_app
+	check_wigToBigWig_version
 	open_wig_to_bigwig_fh
 	generate_chromosome_file
+	wig_to_bigwig_conversion
 );
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -127,7 +130,10 @@ check_track_name();
 
 check_step();
 
-set_bigwig_options() if $bigwig;
+my $post_bw_convert;
+if ($bigwig) {
+	set_bigwig_options();
+}
 
 my $method_sub = set_method_sub();
 
@@ -158,7 +164,7 @@ unless ($outfile) {
 	$outfile =~ s/\(\) /_/g;    # strip parentheses and spaces from column name
 }
 my $out_fh;
-if ($bigwig) {
+if ($bigwig and not $post_bw_convert) {
 
 	# we will write directly to a bigWig file
 	unless ($chromo_file) {
@@ -167,8 +173,9 @@ if ($bigwig) {
 	}
 	$outfile .= '.bw' unless $outfile =~ /\.bw$/;
 	$out_fh = open_wig_to_bigwig_fh(
-		file   => $outfile,
-		chromo => $chromo_file,
+		file      => $outfile,
+		chromo    => $chromo_file,
+		bwapppath => $bw_app_path		
 	) or die "unable to open a wigToBigWig file handle!\n";
 }
 else {
@@ -211,12 +218,39 @@ elsif ( $step eq 'variable' ) {
 	convert_to_variableStep();
 }
 
-# close files
+# close
 $out_fh->close;
+
+# convert as necessary
+if ( $bigwig and $post_bw_convert ) {
+
+	unless ($chromo_file) {
+		$chromo_file = generate_chromosome_file($database)
+			or die "unable to generate chromosome file needed for bigWig conversion!\n";
+	}
+	my $final_bw = wig_to_bigwig_conversion(
+		wig       => $outfile,
+		chromo    => $chromo_file,
+		bwapppath => $bw_app_path,
+	);
+	if ($final_bw) {
+		print " Wrote file $final_bw\n";
+		unlink $outfile;
+	}
+	# error message already printed if conversion had failed
+}
+else {
+	printf " Wrote file %s\n", $outfile;
+}
+
+# clean up chromosome file
 if ( $bigwig and $database and $chromo_file =~ /^chr_sizes_\w{5}$/x ) {
 	unlink $chromo_file;
 }
-printf " Finished in %.0f seconds! wrote file '%s'\n", ( time - $start_time ), $outfile;
+
+
+# finished
+printf " Finished in %.0f seconds\n", ( time - $start_time );
 
 ############ Subroutines ###############
 
@@ -423,17 +457,35 @@ sub check_step {
 
 sub set_bigwig_options {
 
-	# if we're generating bigwig file, no track is needed
-	$use_track = 0;
+	# find external utility
+	unless ($bw_app_path) {
+		$bw_app_path = get_wig_to_bigwig_app();
+	}
 
-	# force no compression
-	$gz = 0;
-
-	# check that we have a source for chromosome info
-	unless ( $database or $chromo_file ) {
-		$database = $Input->database
-			or die
+	# check the utility and options
+	if ($bw_app_path) {
+		if ( check_wigToBigWig_version($bw_app_path) ) {
+			# we can write directly to utility
+			# print " $bw_app_path supports stdin, can write directly\n";
+			$post_bw_convert = 0;
+		}
+		else {
+			# we cannot write directly to utility
+			# print " $bw_app_path does not support stdin, will write temp wig file\n";
+			$post_bw_convert = 1;
+			$gz = 0;
+		}
+		# if we're generating bigwig file, no track is needed
+		$use_track = 0;
+		# check that we have a source for chromosome info
+		unless ( $database or $chromo_file ) {
+			$database = $Input->database or die
 			" No database name or chromosome file provided for generating bigwig file!\n";
+		}
+	}
+	else {
+		print " No external bigWig utility available, writing wig format\n";
+		$bigwig = 0;
 	}
 }
 
