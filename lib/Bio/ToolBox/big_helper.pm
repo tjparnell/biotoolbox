@@ -11,17 +11,98 @@ use Bio::ToolBox::db_helper         qw(get_chromosome_list);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG);
 require Exporter;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 ### Export
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(
-	wig_to_bigwig_conversion
+	get_bed_to_bigbed_app
+	get_bigwig_to_bdg_app
+	get_bigwig_to_wig_app
+	get_wig_to_bigwig_app
+	check_wigToBigWig_version
 	open_wig_to_bigwig_fh
 	open_bigwig_to_wig_fh
 	bed_to_bigbed_conversion
 	generate_chromosome_file
+	wig_to_bigwig_conversion
 );
+
+### Find Converter external applications
+sub get_wig_to_bigwig_app {
+
+	# we prefer the wigToBigWig convertor
+
+	# first check for an entry in the configuration file then environment path
+	my $app = $BTB_CONFIG->param('applications.wigToBigWig') ||
+		which('wigToBigWig') || undef;
+
+	unless ( $app ) {
+
+		# last attempt is to use the older Bio::DB::BigFile module
+		# this may not be installed and will be slower since it runs in same process
+		eval {
+			require Bio::DB::BigFile;
+			if ( Bio::DB::BigFile->can('createBigWig') ) {
+				$app = 'BioDBBigFile';
+			}
+		};
+	}
+	return $app;
+}
+
+sub get_bigwig_to_wig_app {
+	
+	# first check for an entry in the configuration file then environment path
+	return $BTB_CONFIG->param('applications.bigWigToWig') ||
+		which('bigWigToWig') || which('bigWigToBedGraph') || undef;
+}
+
+sub get_bigwig_to_bdg_app {
+	
+	# first check for an entry in the configuration file then environment path
+	return $BTB_CONFIG->param('applications.bigWigToBedGraph') || 
+		which('bigWigToBedGraph') || undef;
+}
+
+sub get_bed_to_bigbed_app {
+	
+	# first check for an entry in the configuration file then environment path
+	return $BTB_CONFIG->param('applications.bedToBigBed') || 
+		which('bedToBigBed') || undef;
+}
+
+### Check the version of wigToBigWig
+# older versions support reading from stdin while newer versions do not
+sub check_wigToBigWig_version {
+	my $app = shift;
+	return unless $app;
+	return 0 if $app eq 'BioDBBigFile';
+	if ( not -e $app ) {
+		carp " '$app' does not exist!";
+		exit 1;
+	}
+	if ( not -x _ ) {
+		carp " '$app' is not executable!";
+		exit 1;
+	}
+	if ( $app =~ /bedGraphToBigWig$/x ) {
+		# this app is not always reliable
+		# generally does not accept stdin pipes, but even if it's old enough to do so
+		# it may still complain about line seeking and/or chromosome sort order
+		# best just not support it
+		return 0;
+	}
+	my $result = qx($app 2>&1);
+	if ( $result =~ /wigToBigWig \s v \s ([\d\.]+)/x ) {
+		return 1 if $1 eq '2.8'; # older acceptable version
+		return 0 if $1 eq '2.9'; # newer unsupported version
+		return 1 if $1 eq '4';   # very old, this is actually the bbi version I think
+		return 0;                # do not trust anything else unfortunately
+	}
+	return 0;
+}
+
 
 ### Wig to BigWig file conversion
 sub wig_to_bigwig_conversion {
@@ -41,40 +122,19 @@ sub wig_to_bigwig_conversion {
 	}
 
 	# Identify bigwig conversion utility
-	$args{bwapppath} ||= undef;
-	unless ( $args{bwapppath} ) {
-
-		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param('applications.wigToBigWig')
-			|| undef;
+	my $bwapp = $args{bwapppath} || undef;
+	unless ($bwapp) {
+		$bwapp = get_wig_to_bigwig_app();
 	}
-	unless ( $args{bwapppath} ) {
-
-		# try checking the system path
-		$args{bwapppath} = which('wigToBigWig');
-	}
-	unless ( $args{bwapppath} ) {
-
-		# last attempt to use Bio::DB::BigFile
-		# this is not a recommended method, and produces different sized
-		# bw files, I think because of different internal settings
-		# this may be deprecated
-		eval {
-			require Bio::DB::BigFile;
-			if ( Bio::DB::BigFile->can('createBigWig') ) {
-				$args{bwapppath} = 'BioDBBigFile';
-			}
-		};
-	}
-	unless ( $args{bwapppath} ) {
+	unless ( $bwapp ) {
 		carp
 q(Utility 'wigToBigWig' not specified and can not be found! Conversion failed!);
 		return;
 	}
 
 	# Generate list of chromosome sizes if necessary
-	$args{chromo} ||= undef;
-	unless ( $args{chromo} ) {
+	my $chromfile = $args{chromo} ||= undef;
+	unless ( $chromfile ) {
 
 		# a pre-generated list of chromosome sizes was not provided
 		# need to generate one from the database
@@ -84,8 +144,8 @@ q(Utility 'wigToBigWig' not specified and can not be found! Conversion failed!);
 'No requisite database or chromosome info file provided! Conversion failed';
 			return;
 		}
-		$args{chromo} = generate_chromosome_file( $args{db} );
-		unless ( $args{chromo} ) {
+		$chromfile = generate_chromosome_file( $args{db} );
+		unless ( $chromfile ) {
 			carp 'Cannot generate chromosome info file! Conversion failed';
 			return;
 		}
@@ -97,31 +157,41 @@ q(Utility 'wigToBigWig' not specified and can not be found! Conversion failed!);
 	$bw_file =~ s/\.(?: bed | bdg | bedgraph | wig) $/.bw/x;
 
 	# Generate the bigwig file
-	printf " converting %s to bigWig....\n", $args{wig};
-	if ( $args{bwapppath} =~ /wigToBigWig$/x ) {
+	printf " Converting %s to %s...\n", $args{wig}, $bw_file;
+	if ( $bwapp =~ /wigToBigWig$/x ) {
 
 		# include the -clip option in case there are any positions
-		# out of bounds of the chromosome
-		# it will just warn instead of fail
-		system $args{bwapppath}, '-clip', $args{wig}, $args{chromo}, $bw_file;
+		# out of bounds of the chromosome it will just warn instead of fail
+		if ( system ( $bwapp, '-clip', $args{wig}, $chromfile, $bw_file ) ) {
+			my $c = join q( ),  $bwapp, '-clip', $args{wig}, $chromfile, $bw_file;
+			print STDERR "conversion command '$c' failed - check error";
+			return;
+		}
+		
 	}
-	elsif ( $args{bwapppath} =~ /bedGraphToBigWig$/x ) {
+	elsif ( $bwapp =~ /bedGraphToBigWig$/x ) {
 
-		# this doesn't have the -clip option, too bad
-		system $args{bwapppath}, $args{wig}, $args{chromo}, $bw_file;
+		# this doesn't have the -clip option
+		if ( system ( $bwapp, $args{wig}, $chromfile, $bw_file ) ) {
+			my $c = join q( ),  $bwapp, $args{wig}, $chromfile, $bw_file;
+			print STDERR "conversion command '$c' failed - check error";
+			return;
+		}
 	}
-	elsif ( $args{bwapppath} eq 'BioDBBigFile' ) {
-		Bio::DB::BigFile->createBigWig( $args{wig}, $args{chromo}, $bw_file );
+	elsif ( $bwapp eq 'BioDBBigFile' ) {
+		# this cannot be caught if it fails, it will terminate the perl process
+		print " Converting with Bio::DB::BigFile - this will terminate if errors\n";
+		Bio::DB::BigFile->createBigWig( $args{wig}, $chromfile, $bw_file );
 	}
 
 	# check the result
 	if ( -e $bw_file and -s $bw_file ) {
 
-		# conversion successful
-		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
+		# conversion assumed successful
+		if ( not $args{chromo} ) {
 
 			# we no longer need our temp chromosome file
-			unlink $args{chromo};
+			unlink $chromfile;
 		}
 		return $bw_file;
 	}
@@ -129,11 +199,11 @@ q(Utility 'wigToBigWig' not specified and can not be found! Conversion failed!);
 		if ( -e $bw_file ) {
 			unlink $bw_file;    # remove any partial file
 		}
-		if ( $args{chromo} =~ /^chr_sizes_\w{5}/x ) {
+		if ( not $args{chromo} ) {
 
 			# leave the temp chromosome file as a courtesy
 			carp
-" Conversion failed. You should try manually and watch for errors\n Leaving temporary chromosome file '$args{chromo}'.";
+" Conversion failed. You should try manually and watch for errors\n Leaving temporary chromosome file '$chromfile'.";
 		}
 		else {
 			carp 'Conversion failed. You should try manually and watch for errors.';
@@ -163,21 +233,20 @@ sub open_wig_to_bigwig_fh {
 	}
 
 	# Identify bigwig conversion utility
-	$args{bwapppath} ||= undef;
-	unless ( $args{bwapppath} ) {
-
-		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param('applications.wigToBigWig') || undef;
+	my $bwapp = $args{bwapppath} || get_wig_to_bigwig_app() || undef;
+	if ( $bwapp ) {
+		# check the version of the utility
+		if ( not check_wigToBigWig_version( $bwapp ) ) {
+			carp 
+" $bwapp does not support stdin file handles. Either downgrade or use wig_to_bigwig_conversion()\n";
+			return;
+		}
 	}
-	unless ( $args{bwapppath} ) {
-
-		# try checking the system path
-		$args{bwapppath} = which('wigToBigWig');
-	}
-	unless ( $args{bwapppath} =~ /ToBigWig$/ ) {
-		carp q(Utility 'wigToBigWig' not specified and can not be found!);
+	else {
+		print STDERR q( Utility 'wigToBigWig' not specified and can not be found!);
 		return;
 	}
+	
 
 	# Generate list of chromosome sizes if necessary
 	$args{chromo} ||= undef;
@@ -200,7 +269,7 @@ sub open_wig_to_bigwig_fh {
 	}
 
 	# open the filehandle
-	my $command = sprintf "%s stdin %s %s", $args{bwapppath}, $args{chromo}, $args{bw};
+	my $command = sprintf "%s stdin %s %s", $bwapp, $args{chromo}, $args{bw};
 	my $bwfh    = IO::File->new("| $command")
 		or croak sprintf( "cannot open %s! $OS_ERROR", $args{bwapppath} );
 
@@ -230,13 +299,10 @@ sub open_bigwig_to_wig_fh {
 		carp 'no input bw file name passed!';
 		return;
 	}
-	unless ( $args{bw} =~ /\.bw$/i ) {
-		$args{bw} .= '.bw';
-	}
 
 	# Identify bigwig conversion utility
-	$args{bwapppath} ||= undef;
-	unless ( $args{bwapppath} ) {
+	my $bwapp = $args{bwapppath} || get_bigwig_to_wig_app() || undef;
+	unless ( $bwapp ) {
 
 		# check for an entry in the configuration file
 		$args{bwapppath} = $BTB_CONFIG->param('applications.bigWigToWig') || undef;
@@ -325,7 +391,7 @@ sub bed_to_bigbed_conversion {
 
 	# Generate the bigBed file using Jim Kent's utility
 	printf " converting %s to BigBed....\n", $args{bed};
-	system $args{bbapppath}, $args{bed}, $args{chromo}, $bb_file;
+	system ( $args{bbapppath}, $args{bed}, $args{chromo}, $bb_file );
 
 	# Check the result
 	if ( -e $bb_file and -s $bb_file ) {
