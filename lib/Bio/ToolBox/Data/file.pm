@@ -8,7 +8,7 @@ use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 # List of acceptable filename extensions
 our $SUFFIX =
@@ -1361,7 +1361,7 @@ sub add_bed_metadata {
 	{
 		$self->{'bed'} = $column_count;
 		$self->format('bedGraph');
-		$names = $self->standard_column_names('bedGraph');
+		$names = $self->standard_column_names('bdg');
 	}
 	elsif ( $self->format =~ /bedpe/i or $self->extension =~ m/bedpe/i ) {
 		$self->{'bed'} = 0;    # this will bypass verification checks which would fail
