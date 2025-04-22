@@ -7,7 +7,7 @@ use File::Spec;
 use IO::Prompt::Tiny qw(prompt);
 require Exporter;
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 ### Variables
 # Export
@@ -38,8 +38,9 @@ sub parse_list {
 		carp 'ERROR: the string contains characters that cannot be parsed';
 		return;
 	}
+	$string =~ s/\s+//g;
 	my @list;
-	foreach ( split /[,\s+]/, $string ) {
+	foreach ( split /,/, $string ) {
 
 		# check for a range
 		if (/\-/) {
