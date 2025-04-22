@@ -1022,7 +1022,7 @@ sub write_file {
 			# convert any non-value '.' to empty
 			# and print using a tab-delimited format
 			my @linedata =
-				map { q() if $_ eq '.' } @{ $self->{'data_table'}[$i] }[ 1 .. $n ];
+				map { $_ eq '.' ? q() : $_ } @{ $self->{'data_table'}[$i] }[ 1 .. $n ];
 			$fh->printf( "%s\n", join( "\t", @linedata ) );
 		}
 	}
