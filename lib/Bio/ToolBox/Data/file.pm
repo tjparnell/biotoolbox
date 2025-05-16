@@ -1210,7 +1210,7 @@ sub check_file {
 	else {
 		# file name is either incomplete or non-existent
 		# try adding some common file extensions in case those are missing
-		foreach my $ext (qw(.gz .txt .txt.gz .bed .bed.gz)) {
+		foreach my $ext (qw(gz txt txt.gz bed bed.gz)) {
 			my $new_filename = sprintf "%s.%s", $filename, $ext;
 			if ( -e $new_filename and -f _ and -r _ and -s _ ) {
 				return $new_filename;
