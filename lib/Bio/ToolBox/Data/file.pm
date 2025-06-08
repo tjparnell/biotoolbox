@@ -26,17 +26,18 @@ sub load_file {
 	my $noheader = shift || 0;    # may not be present
 
 	# check that we have an empty table
-	if ( $self->last_row != 0 or $self->number_columns != 0 or $self->filename ) {
+	if ( $self->last_row != 0 or $self->number_columns != 0 ) {
 		confess 'FATAL: Cannot load file onto an existing data table!';
 	}
 
 	# open the file and load metadata
-	my $filename = $self->check_file($file);
-	unless ($filename) {
+	unless ( $self->filename ) {
+		$self->add_file_metadata($file);
+	}
+	unless ( $self->check_file ) {
 		carp "ERROR: file '$file' cannot be read or is empty!";
 		return;
 	}
-	$self->add_file_metadata($filename);
 	$self->open_to_read_fh or return;
 	$self->parse_headers($noheader);
 
@@ -69,11 +70,10 @@ sub load_file {
 }
 
 sub taste_file {
-	my $self     = shift;
-	my $file     = shift;
-	my $filename = $self->check_file($file) or return;
-	my $Taste    = $self->new;
-	$Taste->add_file_metadata($filename);
+	my ($self, $file) = @_;
+	my $Taste = $self->new;
+	$Taste->add_file_metadata($file);
+	$Taste->check_file or return;
 	$Taste->open_to_read_fh or return;
 	$Taste->parse_headers;
 

@@ -210,6 +210,10 @@ sub parse_table {
 	}
 
 	# taste the file and open parser object
+	unless ( $self->filename ) {
+		$self->add_file_metadata($file);
+	}	
+	$file = $self->check_file($file);
 	my ( $flavor, $format ) = $self->taste_file($file);
 	my $parser;
 	if ( defined $flavor ) {
