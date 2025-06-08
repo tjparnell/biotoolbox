@@ -1233,6 +1233,14 @@ sub delete_comment {
 	}
 }
 
+sub headers {
+	my $self = shift;
+	if (@_) {
+		$self->{headers} = $_[0];
+	}
+	return $self->{headers};
+}
+
 sub vcf_headers {
 	my $self = shift;
 	return unless $self->vcf;
@@ -1837,6 +1845,10 @@ Adds a string to the list of comments to be included in the metadata.
 =item delete_comment
 
 Deletes the indicated array index from the metadata comments array.
+
+=item headers
+
+Sets and returns a boolean value (0 or 1) on whether file has column headers.
 
 =item vcf_headers
 

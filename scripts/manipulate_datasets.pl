@@ -523,7 +523,7 @@ sub rename_function {
 
 	# reset the noheader flag if it was originally specified in command line options
 	if ($noheader) {
-		$Data->{'headers'} = 1;    # there is no explicit function for this
+		$Data->headers(1);
 	}
 
 	return $count;
