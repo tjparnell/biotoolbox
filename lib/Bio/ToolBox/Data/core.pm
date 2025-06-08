@@ -1641,21 +1641,22 @@ sub score_column {
 	return $self->{column_indices}{score};
 }
 
-*zero_start = \&interbase;
-*zero_start if 0;    # avoid once warning
-
 sub interbase {
 	my $self = shift;
 	if (@_) {
 		my $i = $self->start_column;
 		my $n = $self->name($i);
-		if ( $_[0] eq '1' and lc $n eq 'start' ) {
+		if ( $_[0] == 1 ) {
 			$self->{zerostart} = 1;
-			$self->name( $i, 'Start0' );
+			if ( lc $n eq 'start' ) {
+				$self->name( $i, 'Start0' );
+			}
 		}
-		elsif ( $_[0] eq '0' and $n eq 'start0' ) {
+		elsif ( $_[0] == 0 ) {
 			$self->{zerostart} = 0;
-			$self->name( $i, 'Start' );
+			if ( lc $n eq 'start0' ) {
+				$self->name( $i, 'Start' );
+			}
 		}
 	}
 	return $self->{zerostart};
@@ -1910,8 +1911,6 @@ column used in databases.
 
 Returns the index of the column that represents the Score 
 column in certain formats, such as GFF, BED, bedGraph, etc.
-
-=item zero_start
 
 =item interbase
 
