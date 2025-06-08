@@ -164,7 +164,7 @@ unless ($outfile) {
 	$outfile =~ s/\(\) /_/g;    # strip parentheses and spaces from column name
 }
 my $out_fh;
-if ($bigwig and not $post_bw_convert) {
+if ( $bigwig and not $post_bw_convert ) {
 
 	# we will write directly to a bigWig file
 	unless ($chromo_file) {
@@ -175,7 +175,7 @@ if ($bigwig and not $post_bw_convert) {
 	$out_fh = open_wig_to_bigwig_fh(
 		file      => $outfile,
 		chromo    => $chromo_file,
-		bwapppath => $bw_app_path		
+		bwapppath => $bw_app_path
 	) or die "unable to open a wigToBigWig file handle!\n";
 }
 else {
@@ -237,6 +237,7 @@ if ( $bigwig and $post_bw_convert ) {
 		print " Wrote file $final_bw\n";
 		unlink $outfile;
 	}
+
 	# error message already printed if conversion had failed
 }
 else {
@@ -247,7 +248,6 @@ else {
 if ( $bigwig and $database and $chromo_file =~ /^chr_sizes_\w{5}$/x ) {
 	unlink $chromo_file;
 }
-
 
 # finished
 printf " Finished in %.0f seconds\n", ( time - $start_time );
@@ -465,6 +465,7 @@ sub set_bigwig_options {
 	# check the utility and options
 	if ($bw_app_path) {
 		if ( check_wigToBigWig_version($bw_app_path) ) {
+
 			# we can write directly to utility
 			# print " $bw_app_path supports stdin, can write directly\n";
 			$post_bw_convert = 0;
@@ -473,14 +474,17 @@ sub set_bigwig_options {
 			# we cannot write directly to utility
 			# print " $bw_app_path does not support stdin, will write temp wig file\n";
 			$post_bw_convert = 1;
-			$gz = 0;
+			$gz              = 0;
 		}
+
 		# if we're generating bigwig file, no track is needed
 		$use_track = 0;
+
 		# check that we have a source for chromosome info
 		unless ( $database or $chromo_file ) {
-			$database = $Input->database or die
-			" No database name or chromosome file provided for generating bigwig file!\n";
+			$database = $Input->database
+				or die
+" No database name or chromosome file provided for generating bigwig file!\n";
 		}
 	}
 	else {

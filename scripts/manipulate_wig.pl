@@ -126,7 +126,6 @@ if ($apply) {
 	$apply_regex = qr($apply);
 }
 
-
 ### Open file handles
 
 # Input
@@ -165,29 +164,32 @@ if ($outfile) {
 		}
 		if ($wig2bw_app) {
 			if ( check_wigToBigWig_version($wig2bw_app) ) {
+
 				# this supports direct pipe
 				$bw_post_convert = 0;
-				$do_bw = 1;
+				$do_bw           = 1;
 			}
 			else {
 				# must write wig file and convert afterwards
 				$bw_post_convert = 1;
-				$do_bw = 0;
+				$do_bw           = 0;
 			}
 		}
 		else {
 			print "external wigToBigWig utility not available, writing to wig\n";
 			$bw_post_convert = 0;
-			$do_bw = 0;
+			$do_bw           = 0;
 		}
-		
+
 		# check for chromosome file
 		if ( $do_bw or $bw_post_convert ) {
 			unless ($chromofile) {
 				if ($database) {
+
 					# this is ok
 				}
-				elsif ( not $database and $infile =~  m/(?: bw | bigwig )$/xi ) {
+				elsif ( not $database and $infile =~ m/(?: bw | bigwig )$/xi ) {
+
 					# use input bigwig as database
 					$database = $infile;
 				}
@@ -198,7 +200,7 @@ if ($outfile) {
 					or die "unable to generate chromosome file from '$database'!\n";
 			}
 		}
-		
+
 		# open file handle appropriately
 		if ($do_bw) {
 			$outfh = open_wig_to_bigwig_fh(

@@ -342,9 +342,10 @@ if ($sort_data) {
 	print " Sorting data...\n";
 	$Output->gsort_data;
 	if ($bigbed) {
+
 		# re-sort again by chromosome in ascibetical order
 		# because that is what bedToBigBed requires
-		$Output->sort_data(1, 'i');
+		$Output->sort_data( 1, 'i' );
 	}
 }
 unless ($outfile) {
