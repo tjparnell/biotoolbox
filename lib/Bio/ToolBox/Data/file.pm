@@ -1544,11 +1544,6 @@ sub add_sgr_metadata {
 sub add_standard_metadata {
 	my ( $self, $namelist, $force ) = @_;
 
-	# add first data table row of names
-	# the first column will always be blank to fake base 1 column indexing
-	$self->{'data_table'}->[0] ||= [];
-	$self->{'data_table'}->[0]->[0] = 'BLANK';
-
 	# we will define the columns based on
 	for my $i ( 0 .. $#{$namelist} ) {
 

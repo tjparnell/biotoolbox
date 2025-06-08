@@ -43,7 +43,7 @@ sub new {
 		'extension'         => q(),
 		'path'              => q(),
 		'comments'          => [],
-		'data_table'        => [],
+		'data_table'        => [ ['BLANK'] ],
 		'header_line_count' => 0,
 		'zerostart'         => 0,
 	);
@@ -1071,7 +1071,7 @@ sub feature_type {
 	if ( $self->chromo_column and $self->start_column ) {
 		$feature_type = 'coordinate';
 	}
-	elsif ($self->id_column
+	elsif ( $self->id_column
 		or ( $self->type_column and $self->name_column )
 		or ( $self->feature     and $self->name_column ) )
 	{

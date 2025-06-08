@@ -392,7 +392,6 @@ sub add_column {
 	my ( $self, $name ) = @_;
 	return unless $name;
 	my $column = $self->number_columns + 1;
-	$self->{'data_table'}->[0] ||= ['BLANK'];    # make sure we have a header row
 
 	# check for array of column data
 	my $name_ref = ref $name;
