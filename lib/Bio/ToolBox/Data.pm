@@ -3,7 +3,7 @@ package Bio::ToolBox::Data;
 use warnings;
 use strict;
 use Carp         qw(carp cluck croak confess);
-use List::Util   qw(sum0);
+use List::Util   qw(sum0 uniqint);
 use Scalar::Util qw(looks_like_number);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Iterator;
@@ -212,7 +212,7 @@ sub parse_table {
 	# taste the file and open parser object
 	unless ( $self->filename ) {
 		$self->add_file_metadata($file);
-	}	
+	}
 	$file = $self->check_file($file);
 	my ( $flavor, $format ) = $self->taste_file($file);
 	my $parser;
@@ -522,15 +522,44 @@ sub get_row {
 }
 
 sub delete_row {
-	my $self    = shift;
-	my @deleted = sort { $b <=> $a } @_;
-	while (@deleted) {
-		my $d = shift @deleted;
-		splice( @{ $self->{data_table} }, $d, 1 );
-		$self->{last_row}--;
-		if ( exists $self->{SeqFeatureObjects} ) {
-			splice( @{ $self->{SeqFeatureObjects} }, $d, 1 );
+	my $self = shift;
+	return unless @_;
+
+	# select best method based on how many rows are requested
+	# empirical testing shows mostly equivalent with splice slightly faster
+	# but with large data tables and massive deletions splicing is increasingly slower
+	# 10M table: 1K deletion +8% comparatively, 5K -13%, 50K -230%, 500K -2000%
+	if ( scalar(@_) < 1000 ) {
+		my @deleted = uniqint( sort { $b <=> $a } @_ );
+		while (@deleted) {
+			my $d = shift @deleted;
+			splice( @{ $self->{data_table} }, $d, 1 );
+			$self->{last_row}--;
+			if ( exists $self->{SeqFeatureObjects} ) {
+				splice( @{ $self->{SeqFeatureObjects} }, $d, 1 );
+			}
 		}
+	}
+	else {
+		my %del = map { $_ => 1 } @_;
+		my @new_table;
+		if ( exists $self->{SeqFeatureObjects} ) {
+			my @new_seqf;
+			for my $i ( 0 .. $self->{last_row} ) {
+				next if exists $del{$i};
+				push @new_table, $self->{data_table}->[$i];
+				push @new_seqf,  $self->{SeqFeatureObjects}->[$i];
+			}
+			$self->{SeqFeatureObjects} = \@new_seqf;
+		}
+		else {
+			for my $i ( 0 .. $self->last_row ) {
+				next if exists $del{$i};
+				push @new_table, $self->{data_table}->[$i];
+			}
+		}
+		$self->{data_table} = \@new_table;
+		$self->{last_row}   = scalar(@new_table) - 1;
 	}
 	return 1;
 }
