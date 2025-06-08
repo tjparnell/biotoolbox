@@ -222,7 +222,7 @@ sub parse_table {
 			$parser = Bio::ToolBox::Parser->new(
 				file     => $file,
 				flavor   => $flavor,
-				'format' => $format,
+				filetype => $format,
 			);
 		};
 		unless ($parser) {

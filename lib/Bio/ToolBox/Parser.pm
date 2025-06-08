@@ -8,7 +8,7 @@ use Module::Load;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::SeqFeature;    # alternative to Bio::SeqFeature::Lite
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 sub new {
 	my $class = shift;
@@ -25,7 +25,7 @@ sub new {
 	# determine file, format, and parser subclass
 	my $file     = $args{file}     || $args{table} || undef;
 	my $flavor   = $args{flavor}   || undef;
-	my $filetype = $args{filetype} || undef;
+	my $filetype = $args{filetype} || $args{'format'} || undef;
 	if ( not $flavor or not $filetype ) {
 		if ( $class =~ m/Bio::ToolBox::Parser::(\w+)/x ) {
 
