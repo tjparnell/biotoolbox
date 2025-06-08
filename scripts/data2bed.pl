@@ -157,7 +157,7 @@ if ($ask) {
 
 	# request chromosome index
 	unless ($chr_index) {
-		my $suggestion = $Input->chromo_column;
+		my $suggestion = $Input->chromo_column || q();
 		$chr_index = ask_user_for_index( $Input,
 			" Enter the index for the chromosome column [$suggestion]  " );
 		$chr_index = $chr_index ? $chr_index : $suggestion;
