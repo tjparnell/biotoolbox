@@ -526,7 +526,7 @@ sub parse_headers {
 
 		# adjust metadata
 		$header_line_count -= 1;
-		$self->{'headers'} = -1;    # special case, we never write headers here
+		$self->headers(0);
 	}
 
 	# Header sanity check
@@ -789,12 +789,6 @@ sub write_file {
 			}
 		}
 	}
-	elsif ( $extension =~ /txt/i ) {
-
-		# plain old text file, sounds good to me
-		# make sure headers are enabled
-		$self->{'headers'} = 1 unless $self->{'headers'} == -1;    # original noheader
-	}
 
 	# determine format
 	# this is an arcane specification of whether we want a "simple" no metadata
@@ -1001,7 +995,7 @@ sub write_file {
 	}
 
 	# Write the table column headers, skipping the first column
-	if ( $self->{'headers'} == 1 ) {
+	if ( $self->headers ) {
 		$fh->printf(
 			"%s\n",
 			join( "\t",
