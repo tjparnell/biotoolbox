@@ -423,12 +423,11 @@ sub add_column {
 				'index' => $column,
 			};
 			for my $r ( 0 .. $#{$name} ) {
-				$self->{data_table}->[$r][$column] = $name->[$r];
 
 				# this may auto-vivify an undefined value as first element
+				$self->{data_table}->[$r][$column] = $name->[$r];
 			}
 			$self->{last_row} = $#{$name};
-			$self->{headers}  = 1;
 		}
 	}
 	elsif ( $name_ref eq 'Bio::DB::GFF::Typename' ) {
@@ -439,7 +438,6 @@ sub add_column {
 			'index' => $column,
 		};
 		$self->{data_table}->[0][$column] = $name->asString;
-		$self->{headers} = 1;
 	}
 	elsif ( $name_ref eq q() ) {
 

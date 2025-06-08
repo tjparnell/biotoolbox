@@ -1590,9 +1590,6 @@ sub add_standard_metadata {
 		$self->{'number_columns'} = scalar @{$namelist};
 	}
 
-	# set headers flag to true - this may be reversed for specific file formats
-	$self->{'headers'} = 1;
-
 	return 1;
 }
 
