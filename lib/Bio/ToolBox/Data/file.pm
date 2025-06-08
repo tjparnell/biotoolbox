@@ -1199,7 +1199,19 @@ sub open_to_write_fh {
 
 ### Subroutine to check for file existance
 sub check_file {
-	my ( $self, $filename ) = @_;
+	my $self = shift;
+	my $filename;
+	my $md; # need to remember if filename came from arguments or metadata
+	if (@_) {
+		$filename = shift @_;
+		$md = 0;
+	}
+	elsif ( $filename = $self->filename ) {
+		$md = 1;
+	}
+	else {
+		return;
+	}
 
 	# check for file existance
 	if ( -e $filename and -f _ and -r _ and -s _ ) {
@@ -1213,6 +1225,12 @@ sub check_file {
 		foreach my $ext (qw(gz txt txt.gz bed bed.gz)) {
 			my $new_filename = sprintf "%s.%s", $filename, $ext;
 			if ( -e $new_filename and -f _ and -r _ and -s _ ) {
+				printf " WARNING: File '%s' does not exist, using '%s' instead\n",
+					$filename, $new_filename;
+				if ($md) {
+					# update metadata
+					$self->add_file_metadata($new_filename);
+				}
 				return $new_filename;
 			}
 		}
