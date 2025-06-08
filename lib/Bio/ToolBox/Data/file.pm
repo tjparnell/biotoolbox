@@ -70,10 +70,10 @@ sub load_file {
 }
 
 sub taste_file {
-	my ($self, $file) = @_;
+	my ( $self, $file ) = @_;
 	my $Taste = $self->new;
 	$Taste->add_file_metadata($file);
-	$Taste->check_file or return;
+	$Taste->check_file      or return;
 	$Taste->open_to_read_fh or return;
 	$Taste->parse_headers;
 
@@ -1201,10 +1201,10 @@ sub open_to_write_fh {
 sub check_file {
 	my $self = shift;
 	my $filename;
-	my $md; # need to remember if filename came from arguments or metadata
+	my $md;    # need to remember if filename came from arguments or metadata
 	if (@_) {
 		$filename = shift @_;
-		$md = 0;
+		$md       = 0;
 	}
 	elsif ( $filename = $self->filename ) {
 		$md = 1;
@@ -1228,6 +1228,7 @@ sub check_file {
 				printf " WARNING: File '%s' does not exist, using '%s' instead\n",
 					$filename, $new_filename;
 				if ($md) {
+
 					# update metadata
 					$self->add_file_metadata($new_filename);
 				}
