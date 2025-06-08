@@ -412,8 +412,8 @@ sub parse_headers {
 
 						# assume interbase and region
 						$self->interbase(1);
-						unless ( defined $self->{'feature'} ) {
-							$self->{'feature'} = 'region';
+						unless ( $self->feature ) {
+							$self->feature('region');
 						}
 					}
 					else {
@@ -433,7 +433,7 @@ sub parse_headers {
 			### a Bed file
 			elsif ( $format =~ m/bed/i ) {
 
-				# check for a commented header line
+				# check for a commented header line first since these may be common
 				if ( $self->_commented_header_line($line) ) {
 					my @header_names = split /\t/, pop @{ $self->{'comments'} };
 					chomp $header_names[-1];
@@ -442,8 +442,8 @@ sub parse_headers {
 					# we will not enforce bed structure by setting the bed flag
 					# but will assume 0-based formatting
 					$self->interbase(1);
-					unless ( defined $self->{'feature'} ) {
-						$self->{'feature'} = 'region';
+					unless ( $self->feature ) {
+						$self->feature('region');
 					}
 				}
 				else {
@@ -477,7 +477,8 @@ sub parse_headers {
 				$self->add_sgr_metadata;
 			}
 
-			### standard text file with headers, i.e. everything else
+			### standard text file with assumed headers, i.e. everything else
+			# we know this because no columns have been set yet
 			unless ( $self->number_columns ) {
 
 				# check for a commented header line
@@ -491,7 +492,7 @@ sub parse_headers {
 					# we will do so now
 					chomp $line;
 					my @header_names = split /\t/, $line;
-					$self->add_standard_metadata( \@header_names, 0 );    # do not force
+					$self->add_standard_metadata( \@header_names );
 
 					# count as a header line
 					$header_line_count++;
@@ -1341,12 +1342,10 @@ sub add_gff_metadata {
 
 	# set the metadata
 	$self->add_standard_metadata( $self->standard_column_names('gff'), $force );
-	$self->{'zerostart'} = 0;
-	unless ( $self->{1}{'name'} =~ /^#/ ) {
-		$self->{'headers'} = 0;
-	}
-	unless ( defined $self->{'feature'} ) {
-		$self->{'feature'} = 'region';
+	$self->interbase(0);
+	$self->headers(0);
+	unless ( $self->feature ) {
+		$self->feature('region');
 	}
 
 	return 1;
@@ -1414,13 +1413,9 @@ sub add_bed_metadata {
 	$self->add_standard_metadata( $column_names, $force );
 
 	# add additional metadata
-	$self->{'zerostart'} = 1;
-	unless ( $self->{1}{'name'} =~ /^#/ ) {
-		$self->{'headers'} = 0;
-	}
-	unless ( defined $self->{'feature'} ) {
-		$self->{'feature'} = 'region';
-	}
+	$self->interbase(1);
+	$self->headers(0);
+	$self->feature('region');
 
 	return 1;
 }
@@ -1437,12 +1432,10 @@ sub add_peak_metadata {
 	my $column_names;
 	if ( $self->format =~ /narrow/i or $self->extension =~ /narrow/i ) {
 		$self->format('narrowPeak');
-		$self->bed($column_count);
 		$column_names = $self->standard_column_names('narrowpeak');
 	}
 	elsif ( $self->format =~ /broad/i or $self->extension =~ /broad/i ) {
 		$self->format('broadPeak');    # possibly redundant
-		$self->bed($column_count);
 		$column_names = $self->standard_column_names('broadpeak');
 	}
 	elsif ( $self->format =~ /gapped/i or $self->extension =~ /gapped/i ) {
@@ -1450,19 +1443,17 @@ sub add_peak_metadata {
 		$column_names = $self->standard_column_names('gappedpeak');
 	}
 	else {
+
+		# unrecognized peak format
 		return 0;
 	}
 	$self->add_standard_metadata( $column_names, $force );
 
 	# add additional metadata
-	$self->{'bed'}       = $column_count;
-	$self->{'zerostart'} = 1;
-	unless ( $self->{1}{'name'} =~ /^#/ ) {
-		$self->{'headers'} = 0;
-	}
-	unless ( defined $self->{'feature'} ) {
-		$self->{'feature'} = 'region';
-	}
+	$self->bed($column_count);
+	$self->interbase(1);
+	$self->headers(0);
+	$self->{'feature'} = 'region';
 
 	return 1;
 }
@@ -1500,18 +1491,18 @@ sub add_ucsc_metadata {
 		$column_names = $self->standard_column_names('ucsc10');
 	}
 	else {
+
+		# unrecognized format
 		return 0;
 	}
 	$self->add_standard_metadata( $column_names, $force );
 
 	# set additional metadata
-	$self->{'ucsc'}      = $column_count;
-	$self->{'zerostart'} = 1;
-	unless ( $self->{1}{'name'} =~ /^#/ ) {
-		$self->{'headers'} = 0;
-	}
-	unless ( defined $self->{'feature'} ) {
-		$self->{'feature'} = 'gene';
+	$self->ucsc($column_count);
+	$self->{'zerostart'} = 1;    # cannot use interbase method
+	$self->headers(0);
+	unless ( $self->feature ) {
+		$self->feature('gene');
 	}
 
 	return 1;
@@ -1530,12 +1521,8 @@ sub add_sgr_metadata {
 
 	# set additional metadata
 	$self->format('sgr');
-	unless ( $self->{1}{'name'} =~ /^#/ ) {
-		$self->{'headers'} = 0;
-	}
-	unless ( defined $self->{'feature'} ) {
-		$self->{'feature'} = 'region';
-	}
+	$self->headers(0);
+	$self->{'feature'} = 'region';
 
 	return 1;
 }
