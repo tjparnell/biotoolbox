@@ -7,7 +7,7 @@ use Carp    qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Feature;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 #### Initialize ####
 
@@ -77,6 +77,9 @@ sub new {
 		if (@columns) {
 			foreach my $c (@columns) {
 				$self->add_column($c);
+			}
+			if ( exists $args{noheader} and defined $args{noheader} ) {
+				$self->headers( $args{noheader} );
 			}
 		}
 		elsif ( exists $args{gff} and $args{gff} ) {
@@ -462,7 +465,7 @@ object is prepared, therefore column names must be provided.
 Boolean option indicating that the input file does not have file headers, 
 in which case dummy headers are provided. This is not necessary for 
 defined file types that don't normally have file headers, such as 
-BED, GFF, or UCSC files. Ignored for output files.
+BED, GFF, or UCSC files.
 
 =item columns
 
