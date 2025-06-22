@@ -192,11 +192,20 @@ my $startcolumn;    # this is now calculated separately for each dataset
 
 # Check output file name
 unless ($outfile) {
-	if ( $Data->basename ) {
-		$outfile = $Data->path . $Data->basename;
+	if ( $Data->filename ) {
+
+		# reuse the input filename and overwrite
+		$outfile = $Data->filename;
+	}
+	elsif ( $Data->basename ) {
+
+		# no filename but a basename is indicative of a parsed file
+		# so stick a txt extension on it, and write in current directory
+		$outfile = sprintf "%s.txt", $Data->basename;
 	}
 	else {
-		die " No output file provided!\n";
+		print STDERR " FATAL: No output file provided!\n";
+		exit 1;
 	}
 }
 
