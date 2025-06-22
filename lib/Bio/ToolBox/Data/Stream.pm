@@ -138,22 +138,26 @@ sub new {
 }
 
 sub duplicate {
-	my ( $self, $filename ) = @_;
-	unless ($filename) {
-		carp 'ERROR: a new filename must be provided!';
-		return;
-	}
-	if ( $filename eq $self->filename ) {
+	my $self     = shift;
+	my $filename = shift || undef;
+	if ( $filename and $filename eq $self->filename ) {
 		carp 'ERROR: provided filename is not unique from that in metadata!';
 		return;
 	}
 
 	# duplicate the data structure
 	my $columns = $self->list_columns;
-	my $Dup     = $self->new(
-		'out'     => $filename,
-		'columns' => $columns,
-	) or return;
+	my $Dup;
+	if ($filename) {
+		$Dup = $self->new(
+			'out'     => $filename,
+			'columns' => $columns,
+		) or return;
+	}
+	else {
+		$Dup = Bio::ToolBox::Data->new( 'columns' => $columns )
+			or return;
+	}
 
 	# copy the metadata
 	for my $i ( 1 .. $self->number_columns ) {
@@ -519,10 +523,15 @@ compatibility.
 =item duplicate
 
    my $Out_Stream = $Stream->duplicate($new_filename);
+   my $Data       = $Stream->duplicate;
 
-For an opened-to-read Stream object, you may duplicate the object as a new 
-opened-to_write Stream object that maintains the same columns and metadata. 
-A new different filename must be provided. 
+For an opened-to-read Stream object, you may duplicate the object as a new
+object. If a file name is provided, then a opened-to-write Stream object will be
+returned; the file name must be different from the existing read object. If no
+file name is provided, then an empty L<Bio::ToolBox::Data> object will be
+returned. The same number of columns, column names, and metadata will be
+assigned to the new object. 
+
 
 =back
 
