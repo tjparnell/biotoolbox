@@ -24,7 +24,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -150,6 +150,12 @@ if ($infile) {
 		and defined $feature )
 	{
 		$Data->feature($feature);
+	}
+
+	# set headers to true if file was explicitly not parsed
+	# since warnings will occur when we add columns and write to a file
+	if ($parse == 0) {
+		$Data->headers(1);
 	}
 }
 else {
