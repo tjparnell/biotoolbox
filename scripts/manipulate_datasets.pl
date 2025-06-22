@@ -13,7 +13,7 @@ use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -755,6 +755,7 @@ INDEX_LOOP: foreach my $index (@indices) {
 		my $correction_value = $target / $median;
 
 		# Replace values
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, '_scaled' ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -770,7 +771,7 @@ INDEX_LOOP: foreach my $index (@indices) {
 		$Data->metadata( $index, 'median_scaled', $target );
 
 		# results
-		push @datasets_modified, $Data->name($index);
+		push @datasets_modified, $name;
 	}
 
 	# report results
@@ -830,6 +831,7 @@ sub percentile_rank_function {
 		}
 
 		# Replace the contents with the calculated percent rank
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, '_pr' ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -844,7 +846,7 @@ sub percentile_rank_function {
 		$Data->metadata( $index, 'converted', 'percent_rank' );
 
 		# done
-		push @datasets_modified, $Data->name($index);
+		push @datasets_modified, $name;
 	}
 
 	# report results
@@ -896,6 +898,7 @@ sub zscore_function {
 		printf "   Column %d is %.6f ± %.6f\n", $index, $mean, $std;
 
 		# Replace the current values
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, '_Zscore' ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -911,7 +914,7 @@ sub zscore_function {
 		$Data->metadata( $index, 'converted', 'Z-score' );
 
 		# done
-		push @datasets_modified, $Data->name($index);
+		push @datasets_modified, $name;
 	}
 
 	# report results
@@ -1442,6 +1445,7 @@ sub convert_nulls_function {
 		my $count = 0;
 
 		# reset values
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, '_convert_nulls' )
 			if $placement =~ /^n/i;
 		$Data->iterate(
@@ -1496,7 +1500,7 @@ sub convert_nulls_function {
 			$Data->metadata( $index, 'null_value', $new_value )
 				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
-			push @datasets_modified, $Data->name($index);
+			push @datasets_modified, $name;
 		}
 	}
 
@@ -1543,6 +1547,7 @@ sub convert_absolute_function {
 		my $failed = 0;
 
 		# reset minimum values
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, '_absolute' ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -1564,7 +1569,7 @@ sub convert_absolute_function {
 			$Data->metadata( $index, 'convert', 'absolute' )
 				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
-			push @datasets_modified, $Data->name($index);
+			push @datasets_modified, $name;
 		}
 		else {
 			$total_failed += $failed;
@@ -1619,6 +1624,7 @@ sub minimum_function {
 		my $count = 0;
 
 		# reset minimum values
+		my $name = $Data->name($index);
 		if ( $placement =~ /^n/i ) {
 			$index = _prepare_new_destination( $index, '_minimum_reset' );
 		}
@@ -1639,7 +1645,7 @@ sub minimum_function {
 			$Data->metadata( $index, 'minimum_value', $value )
 				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
-			push @datasets_modified, $Data->name($index);
+			push @datasets_modified, $name;
 		}
 	}
 
@@ -1688,6 +1694,7 @@ sub maximum_function {
 		my $count = 0;
 
 		# reset minimum values
+		my $name = $Data->name($index);
 		if ( $placement =~ /^n/i ) {
 			$index = _prepare_new_destination( $index, '_maximum_reset' );
 		}
@@ -1708,7 +1715,7 @@ sub maximum_function {
 			$Data->metadata( $index, 'maximum_value', $value )
 				unless $Data->metadata( $index, 'AUTO' );
 			$total_count += $count;
-			push @datasets_modified, $Data->name($index);
+			push @datasets_modified, $name;
 		}
 	}
 
@@ -1783,6 +1790,7 @@ sub log_function {
 		my $failed = 0;
 
 		# perform log conversions
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, "_log$base" ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -1816,7 +1824,7 @@ sub log_function {
 		# results
 		if ($count) {
 			$total_count += $count;
-			push @datasets_modified, $Data->name($index);
+			push @datasets_modified, $name;
 		}
 		$total_failed += $failed;
 	}
@@ -1886,6 +1894,7 @@ sub delog_function {
 		# Placement dictates method
 		my $count  = 0;    # conversion count
 		my $failed = 0;
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, "_delog$base" ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -1912,7 +1921,7 @@ sub delog_function {
 		# results
 		if ($count) {
 			$total_count += $count;
-			push @datasets_modified, $Data->name($index);
+			push @datasets_modified, $name;
 		}
 		$total_failed += $failed;
 	}
@@ -1973,6 +1982,7 @@ sub format_function {
 	# format each index request
 	my @datasets_modified;    # a list of which datasets were modified
 	foreach my $index (@indices) {
+		my $name = $Data->name($index);
 		$index = _prepare_new_destination( $index, '_formatted' ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -1986,7 +1996,7 @@ sub format_function {
 
 		$Data->metadata( $index, 'formatted', $positions )
 			unless $Data->metadata( $index, 'AUTO' );
-		push @datasets_modified, $Data->name($index);
+		push @datasets_modified, $name;
 	}
 
 	# report results
@@ -2498,6 +2508,7 @@ sub math_function {
 
 		# generate subtraction product
 		my $failed_count = 0;    # failed count
+		my $name = $Data->name($index);
 		if ( $placement =~ /^n/i ) {
 			$index = _prepare_new_destination( $index, "_$mathed\_$value" );
 		}
@@ -2515,9 +2526,9 @@ sub math_function {
 		);
 
 		# print conclusion
-		printf " dataset %s  was $mathed by $value\n", $Data->name($index);
+		printf " dataset %s  was %s by %s\n", $name, $mathed, $value;
 		if ($failed_count) {
-			print " $failed_count datapoints could not be $mathed\n";
+			printf " %d datapoints could not be %s\n", $failed_count, $mathed;
 		}
 		$dataset_modification_count++;
 	}
