@@ -722,7 +722,19 @@ sub write_file {
 	}
 
 	# Verify and adjust filename extension if necessary for specific formats
-	if ( $extension =~ /(g[tf]f)/i ) {
+	if ( $extension =~ /(?: txt | tsv )/xi ) {
+		if ( not $self->headers ) {
+
+			# set headers to true for ordinary text or tsv files
+			# unless they appear to be self-named generic names
+			# this is a hack around preserving no column names when noheader was used
+			# only checking the first column, which may not be sufficient in some cases
+			unless ( $self->name(1) =~ /^Column\d+ \s \(.+/x ) {
+				$self->headers(1);
+			}
+		}
+	}
+	elsif ( $extension =~ /(?: g[tf]f )/xi ) {
 		if ( not $self->gff ) {
 
 			# let's set it to true and see if it passes verification
