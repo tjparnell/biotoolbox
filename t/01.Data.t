@@ -9,7 +9,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 228;
+	plan tests => 248;
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
@@ -37,6 +37,7 @@ is( $Data->database,     undef,        'database' );
 is( $Data->filename,     $infile,      'filename' );
 is( $Data->basename,     'chrI',       'basename' );
 is( $Data->extension,    '.gff3',      'extension' );
+is( $Data->headers,      0,            'includes headers' );
 
 # is($Data->path, File::Spec->catfile($Bin, "Data", ''), 'path');
 # 	the path is hard to test, because the returned value includes a trailing slash
@@ -281,6 +282,7 @@ is( $Data->start_column,   2,            'start column' );
 is( $Data->stop_column,    3,            'stop column' );
 is( $Data->strand_column,  undef,        'strand column' );
 is( $Data->type_column,    undef,        'type column' );
+is( $Data->headers,        0,            'includes headers' );
 
 # stream tests and row feature
 $stream = $Data->row_stream;
@@ -468,6 +470,7 @@ is( $Data->start_column,          2,             'start column' );
 is( $Data->stop_column,           3,             'stop column' );
 is( $Data->find_column('pValue'), 8,             'find column pValue' );
 is( $Data->find_column('peak'),   10,            'find column peak' );
+is( $Data->headers,               0,             'include_headers' );
 $row = $Data->get_row(1);
 isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'first peak interval Feature object' );
 is( $row->peak,     11908866, 'peak interval peak coordinate' );
@@ -490,4 +493,43 @@ is( $Data->number_columns,        15,           'number of columns' );
 is( $Data->start_column,          2,            'start column' );
 is( $Data->stop_column,           3,            'stop column' );
 is( $Data->find_column('pValue'), 14,           'find column pValue' );
+is( $Data->headers,               0,            'include_headers' );
+
+### test Stream object duplication to Data object
+undef $Data;
+undef $Stream;
+undef $row;
+$infile = File::Spec->catfile( $Bin, "Data", "H3K4me3.narrowPeak" );
+$Stream = Bio::ToolBox::Data::Stream->new( in => $infile );
+$Data   = $Stream->duplicate;
+isa_ok( $Data, 'Bio::ToolBox::Data', 'duplicate Stream object to Data object' );
+is( $Data->number_columns, 10,           'number columns' );
+is( $Data->bed,            10,           'bed value' );
+is( $Data->feature,        'region',     'feature' );
+is( $Data->feature_type,   'coordinate', 'feature_type' );
+is( $Data->extension,      q(),          'extension' );
+is( $Data->filename,       q(),          'filename' );
+
+while ( $row = $Stream->next_row ) {
+	if ( $row->score > 2000 ) {
+		$Data->add_row($row);
+	}
+}
+is( $Data->number_rows,      3,            'number of added rows' );
+is( $Data->headers(1),       1,            'change include headers' );
+is( $Data->save('test.txt'), './test.txt', 'save file' );
+$Stream->close_fh;
+undef $Data;
+
+# reopen and check
+my $fh = Bio::ToolBox::Data->open_to_read_fh('test.txt');
+isa_ok( $fh, 'IO::File', 'opened filehandle' );
+is( $fh->getline, "# example Me3 narrowPeak\n", 'first line' );
+my @headers = split( /\t/, $fh->getline );
+is( scalar(@headers), 10,            'number of header items' );
+is( $headers[0],      'Chromosome',  'first column header name' );
+is( $headers[1],      'Start0',      'second column header name' );
+is( $headers[6],      'signalValue', 'third column header name' );
+$fh->close;
+unlink('test.txt');
 
