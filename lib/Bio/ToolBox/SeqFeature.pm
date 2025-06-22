@@ -18,7 +18,7 @@ use constant {
 	SUBF  => 11,
 };
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 #### Aliases ####
 # to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we
@@ -81,7 +81,12 @@ sub new {
 	{
 		# flip the coordinates around
 		( $self->[START], $self->[STOP] ) = ( $self->[STOP], $self->[START] );
-		$self->[STRND] *= -1;
+		if ( defined $self->[STRND] ) {
+			$self->[STRND] *= -1;
+		}
+		else {
+			$self->[STRND] = -1;
+		}
 	}
 
 	# additional options
