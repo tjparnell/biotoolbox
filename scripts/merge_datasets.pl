@@ -9,7 +9,7 @@ use Pod::Usage;
 use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -134,11 +134,8 @@ else {
 	}
 }
 
-# clean up coordinate column
-if ($use_coordinate) {
-
-	# delete the coordinate metadata that we created
-	my $c = $output_data->find_column('MergeDatasetCoordinate');
+# clean up coordinate column if it was generated
+if (my $c = $output_data->find_column('MergeDatasetCoordinate')) {
 	$output_data->delete_column($c);
 }
 
