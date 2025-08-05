@@ -654,7 +654,7 @@ returned per position, regardless of the number of dataset features
 passed. Usually this isn't a problem as only one dataset is examined at a 
 time.
 
-=item collect_bigwigset_position_score
+=item collect_bigwigset_position_scores
 
 Similar to L</collect_bigwig_position_scores> but using a BigWigSet database 
 of BigWig files. Unlike individual BigWig files, BigWigSet features support 

@@ -1675,6 +1675,23 @@ the sum of its exon lengths. B<Warning!> If you pass a gene object, you
 will get the maximum of all transcript exon lengths, which may not be 
 what you anticipate!
 
+=item get_transcript_utr_length
+
+	my $length = get_transcript_utr_length($transcript);
+
+Calculates and returns the sum of the lengths of the untranslated regions
+for a transcript, including both C<5'> and C<3'> UTRs, which may cross
+more than one exon.
+
+=item get_transcript_5p_utr_length
+
+=item get_transcript_3p_utr_length
+
+	my $length = get_transcript_5p_utr_length($transcript);
+
+Calculates and returns the length of either the C<5'> or C<3'> untranslated
+regions, respectively. UTRs may cross multiple exons.
+
 =back
 
 =head2 CDS methods

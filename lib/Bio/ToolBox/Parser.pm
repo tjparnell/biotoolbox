@@ -502,25 +502,44 @@ is L<Bio::SeqFeature::Lite>.
 
 These methods can be used to get or set values that modify the parser 
 behavior. These are Boolean methods; it sets and returns either 1 or 0.
-These are not always used by all subclasses.
+These are not always used by all subclasses. Check the documentation of
+the subclasses for specific information.
 
 =over 4
 
 =item do_gene
 
+Assemble multiple transcripts with the same gene ID into a gene object.
+
 =item do_exon
+
+Parse and include exons as subfeatures of transcript objects.
 
 =item do_cds
 
+Parse and include CDS features as subfeatures of transcript objects.
+
 =item do_utr
+
+Parse and include UTR features as subfeatures of transcript objects.
 
 =item do_codon
 
+Parse and include start and stop features as subfeatures of transcript objects.
+
 =item do_name
 
-=item do_share
+Automatically assign names to subfeatures.
+
+=item share
+
+Share subfeature objects between parent objects. If false, new objects will be
+generated, increasing memory requirements.
 
 =item simplify
+
+Simplify and parse only a subset of required attributes, and not all feature
+attributes.
 
 =back
 

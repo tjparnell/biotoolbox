@@ -2056,6 +2056,14 @@ Pass a value representing the file format. Values include gff, bed12,
 bed6, bdg, narrowpeak, broadpeak, sgr, ucsc16, ucsc15, genepredext, 
 ucsc12, knowngene, ucsc11, genepred, ucsc10, refflat.
 
+=item fh
+
+Returns the underlying L<IO::File> file handle object.
+
+=item close_fh
+
+Closes the open file handle associated with the Data object.
+
 =back
 
 =head1 SEE ALSO

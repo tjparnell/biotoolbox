@@ -1902,6 +1902,11 @@ or transcription start column.
 Returns the index of the column that best represents the stop or end 
 column. 
 
+=item coord_column
+
+Returns the index of the column named "coordinate", if present, that
+contains the coordinate string, usually C<chromosome:start-end>.
+
 =item strand_column
 
 Returns the index of the column that best represents the strand.

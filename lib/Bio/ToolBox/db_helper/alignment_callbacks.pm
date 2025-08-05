@@ -747,9 +747,27 @@ adapter objects.
 
 It's not meant to be used by individuals. 
 
+=head2 Methods
+
+=over 4
+
+=item assign_callback
+
+The only public subroutine used to assign the appropriate callback subroutine based
+on the parameters requested, such as alignment filtering what and how to score 
+found alignments. This will return a string for the name of the appropriate private
+subroutine to be used as a callback function code in the low level iterator for the
+Bam file adapter. 
+
+Pass this function the paramater hash as described in either
+L<Bio::ToolBox::db_helper::bam> or L<Bio::ToolBox::db_helper::hts>.
+
+=back
+
 =head1 SEE ALSO
 
-L<Bio::ToolBox::Data>, L<Bio::ToolBox::Data::Feature>
+L<Bio::ToolBox::Data>, L<Bio::ToolBox::db_helper>, L<Bio::ToolBox::db_helper::bam>,
+L<Bio::ToolBox::db_helper::hts>
 
 =head1 AUTHOR
 

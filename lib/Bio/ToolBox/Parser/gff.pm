@@ -982,17 +982,6 @@ create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>
 which is lighter-weight and consumes less memory. A suitable BioPerl alternative
 is L<Bio::SeqFeature::Lite>.
 
-=back
-
-=back
-
-=head2 Other methods
-
-See L<Bio::ToolBox::Parser> for generic methods for accessing the 
-features. Below are some specific methods to this subclass.
-
-=over 4
-
 =item simplify
 
 Pass a boolean true value to simplify the attributes of GFF3 and GTF files 
@@ -1000,6 +989,45 @@ that may have considerable numbers of tags, e.g. Ensembl files. Only
 essential information, including name, ID, and parentage, is retained. 
 Useful if you're trying to quickly parse annotation files for basic 
 information.
+
+=back
+
+=back
+
+=head2 Access methods
+
+See L<Bio::ToolBox::Parser> for generic methods for accessing the 
+features. Below are specific methods to this subclass.
+
+=over 4
+
+=item open_file
+
+Opens a new annotation file in a new object. Normally, this is automatically
+done when a Parser object is instantiated with the L<new> method and a file
+path was provided. Do not attempt to open a subsequent file with a
+pre-existing Parser object; it will fail. 
+
+Pass the path to a GFF annotation file. It may be compressed with gzip.
+Success returns 1.
+
+=item next_feature
+
+This will parse the opened file one line at a time, returning the SeqFeature
+object for each line of the GFF file. Parent-E<gt>child relationships are
+not built. This should only be used for simple files or when
+Parent-E<gt>child relationships are not needed.
+
+=item parse_file
+=item parse_table
+
+This will parse the opened file entirely into memory, parsing each feature
+into SeqFeature objects and assembling into parent-E<gt>child features.
+B<NOTE> that for vertebrate genome annotation, this may consume considerable
+amount of memory and take a while.
+
+The L<check_orphanage> method is automatically run upon parsing the entire
+file.
 
 =item orphans
 
@@ -1010,6 +1038,13 @@ This method will return an array of orphan SeqFeature objects that indicated
 they had a parent but said parent could not be found. Typically, this is an 
 indication of an incomplete or malformed GFF3 file. Nevertheless, it might 
 be a good idea to check this after retrieving all top features.
+
+=item check_orphanage
+
+Method to go through the list of orphan sub features (if any) and attempt to
+reunite them with their indicated Parent object if it has been loaded
+into memory. This is automatically run when L<parse_file> is called and all
+features have been loaded.
 
 =item typelist
 

@@ -502,12 +502,41 @@ is L<Bio::SeqFeature::Lite>.
 
 =back
 
-=head2 Other methods
+=head2 Access methods
 
 See L<Bio::ToolBox::Parser> for generic methods for accessing the 
 features. Below are some specific methods to this subclass.
 
 =over 4
+
+=item open_file
+
+Opens a new annotation file in a new object. Normally, this is automatically
+done when a Parser object is instantiated with the L<new> method and a file
+path was provided. Do not attempt to open a subsequent file with a
+pre-existing Parser object; it will fail. 
+
+Pass the path to a UCSC annotation file. It may be compressed with gzip.
+Success returns 1.
+
+=item next_feature
+
+This will parse the opened file one line at a time, returning the SeqFeature
+object for each line of the annotation file. Depending on how the object was set
+up and the type of file provided, this will assemble the parent SeqFeature object
+(C<transcript> or C<gene>) and subfeatures (C<exon>, C<CDS>, and/or C<UTR>). 
+This is best used when only parsing transcripts. If genes are being built, then
+the returned object will be a gene, and may include any transcripts that have
+already been seen in the file, but not those not seen yet. To ensure that all
+transcripts are found, it's best to use L<parse_file>.
+
+=item parse_file
+=item parse_table
+
+This will parse the opened file entirely into memory, parsing each feature
+into SeqFeature objects and assembling into parent-E<gt>child features as
+requested. B<NOTE> that for vertebrate genome annotation, this may consume
+considerable amount of memory and take a while.
 
 =item load_extra_data($file, $type)
 

@@ -84,6 +84,11 @@ then they are automatically associated with the row object. (Previous
 versions required separately calling the seqfeature() row method to
 perform this.)
 
+=item row_index
+
+Returns the index position of the current data row within the data
+table. Useful for knowing where you are at within the data table.
+
 =back
 
 =head1 AUTHOR

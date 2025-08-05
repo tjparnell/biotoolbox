@@ -583,12 +583,40 @@ is L<Bio::SeqFeature::Lite>.
 
 =back
 
-=head2 Other methods
+=head2 Access methods
 
 Additional methods for working with the parser object and the parsed 
 SeqFeature objects.
 
 =over 4
+
+=item open_file
+
+Opens a new annotation file in a new object. Normally, this is automatically
+done when a Parser object is instantiated with the L<new> method and a file
+path was provided. Do not attempt to open a subsequent file with a
+pre-existing Parser object; it will fail. 
+
+Pass the path to a bed annotation file. It may be compressed with gzip.
+Success returns 1.
+
+=item next_feature
+
+This will parse the opened file one line at a time, returning the SeqFeature
+object for each line of the Bed file. 
+
+If the annotation file is a 12-column Bed file (C<BED12>) representing
+transcripts with C<exon>, C<CDS>, and/or C<UTR>, these will be parsed into
+subfeature SeqFeature objects in a parent-E<gt>child manner, as indicated by
+the parameters when the object was instantiated.
+
+=item parse_file
+=item parse_table
+
+This will parse the opened file entirely into memory, parsing each feature into
+SeqFeature objects. If the annotation file is a 12-column Bed file (C<BED12>)
+representing transcripts with C<exon>, C<CDS>, and/or C<UTR>, these will be
+parsed into subfeature SeqFeature objects in a parent-E<gt>child manner.
 
 =item typelist
 

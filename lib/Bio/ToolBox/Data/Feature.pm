@@ -1634,7 +1634,25 @@ Example of working with a stream object.
 
 =head1 METHODS
 
+=head2 Initialization
+
+Data Feature objects should only be initialized from a L<Bio::ToolBox::Data>
+or L<Bio::ToolBox::Data::Stream> object.
+
+=over 4
+
+=item new
+
+Data Feature objects should only be initialized from a data table object. See
+the example above in L<DESCRIPTION> as a practical approach. Also refer to
+L<Bio::ToolBox::Data/get_row>, L<Bio::ToolBox::Data/row_stream>,
+L<Bio::ToolBox::Data/iterate>, and L<Bio::ToolBox::Data::Stream/next_row>.
+
+=back
+
 =head2 General information methods
+
+These are all read only methods.
 
 =over 4
 
@@ -1643,6 +1661,12 @@ Example of working with a stream object.
 Returns the index position of the current data row within the 
 data table. Useful for knowing where you are at within the data 
 table.
+
+=item line_number
+
+Returns the line number from the loaded data file from which the
+Feature object derives. Since this is calculated, it is only
+accurate if data table rows have not been inserted or deleted.
 
 =item feature_type
 
