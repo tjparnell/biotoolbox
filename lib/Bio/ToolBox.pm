@@ -47,12 +47,6 @@ sub new_data {
 	}
 }
 
-sub open_file {
-	my $self = shift;
-	cluck('Bio::ToolBox->open_file has been replaced by read_file');
-	return Bio::ToolBox::Data->open_to_read_fh(@_);
-}
-
 sub read_file {
 	my $self = shift;
 	return Bio::ToolBox::Data->open_to_read_fh(@_);
@@ -66,16 +60,6 @@ sub write_file {
 sub open_database {
 	my $self = shift;
 	return Bio::ToolBox::Data->open_new_database(@_);
-}
-
-sub bam_adapter {
-	my $self = shift;
-	return Bio::ToolBox::Data->bam_adapter(@_);
-}
-
-sub big_adapter {
-	my $self = shift;
-	return Bio::ToolBox::Data->big_adapter(@_);
 }
 
 1;

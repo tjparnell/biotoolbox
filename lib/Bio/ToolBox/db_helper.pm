@@ -1623,13 +1623,6 @@ sub get_genomic_sequence {
 	}
 }
 
-### deprecated methods
-# just in case
-sub validate_included_feature {
-	confess 'validate_included_feature() is no longer a valid method. '
-		. 'Please update your script to the current API.';
-}
-
 ### Internal subroutine to retrieve the scores from an established region object
 sub _lookup_db_method {
 

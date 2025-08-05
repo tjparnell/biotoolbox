@@ -260,12 +260,6 @@ sub filetype {
 	return shift->{filetype};
 }
 
-sub version {
-
-	# old method no longer used
-	return shift->filetype;
-}
-
 sub number_loaded {
 	my $self = shift;
 	return scalar keys %{ $self->{loaded} };
@@ -339,9 +333,6 @@ sub top_features {
 	return wantarray ? @features : \@features;
 }
 
-*get_feature_by_id = \&fetch;
-*get_feature_by_id if 0;    # avoid once warning
-
 sub fetch {
 	my ( $self, $id ) = @_;
 	return unless $id;
@@ -349,10 +340,6 @@ sub fetch {
 		$self->parse_file;
 	}
 	return $self->{loaded}{$id} || undef;
-}
-
-sub find_gene {
-	confess 'FATAL: The find_gene() method is deprecated. Please use fetch().';
 }
 
 1;
