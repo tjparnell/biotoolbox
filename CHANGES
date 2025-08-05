@@ -1,6 +1,32 @@
 ######## Bio::ToolBox revision history #############
 
 
+v2.02
+	- Add support for newer versions of UCSC utilities that no longer
+	  allow reading from standard input, particularly 'wigToBigWig'.
+	  Temporary wig files are written first and then the utility is
+	  called. Updates made to bam2wig.pl, data2wig.pl, and manipulate_wig.pl.
+	- Add public headers() boolean method for Data objects.
+	- Changed duplicate() method for Stream objects to allow generating
+	  a duplicate Data object if no output file name is provided.
+	- Various library bug fixes and improvements, including reading bedGraph
+	  files, writing simple text files, handling spaces in numeric index lists,
+	  automatic checking of extensions, parsing annotation files into tables,
+	  and speeding up row deletion in large data tables.
+	- Fix issues with default output filenames in data collection scripts
+	  get_datasets.pl, get_binned_data.pl, and get_relative_data.pl. Default is
+	  to reuse input filename unless it was parsed, in which case the basename
+	  plus txt is used. Also fix bugs regarding mismatched column names when
+	  explicitly not parsing input annotation files.
+	- Fix bug with leaving behind MergeDatasetCoordinate column in merge_datasets.pl.
+	- Fix bug with using new column name instead of original column name in
+	  message statements when manipulating columns in manipulate_datasets.pl.
+	- Fix possible bug with undefined strand when automatically flipping coordinates
+	  of reversed intervals in SeqFeature objects.
+	- Remove deprecated and unused functions.
+	- Add missing POD method sections for complete coverage.
+	  
+
 v2.01
 	- Update chromosome sorting to properly handle chromosomal arms, for
 	  example with Drosophila
