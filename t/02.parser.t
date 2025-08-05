@@ -85,7 +85,7 @@ sub test_gff {
 	is( $gff->do_exon, 0, 'gff do_exon' );
 	my $fh = $gff->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
-	is( $gff->version, 'gff3', 'GFF version' );
+	is( $gff->filetype, 'gff3', 'GFF version' );
 	my $list = $gff->typelist;
 
 # print "gff type list is $list\n";
@@ -170,7 +170,7 @@ sub test_gtf {
 	isa_ok( $gtf, 'Bio::ToolBox::Parser::gff', 'gff Parser' );
 	my $fh = $gtf->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
-	is( $gtf->version,  'gtf', 'GFF version' );
+	is( $gtf->filetype, 'gtf', 'GFF version' );
 	is( $gtf->do_gene,  1,     'gtf do_gene' );
 	is( $gtf->do_cds,   0,     'gtf do_cds' );
 	is( $gtf->do_exon,  1,     'gtf do_exon' );
@@ -416,7 +416,7 @@ sub test_bed6 {
 	is( $bed->do_cds,   0,      'ucsc do_cds' );
 	is( $bed->do_exon,  0,      'ucsc do_exon' );
 	is( $bed->do_codon, 0,      'ucsc do_codon' );
-	is( $bed->version,  'bed6', 'bed version string' );
+	is( $bed->filetype, 'bed6', 'bed version string' );
 
 	# parse first feature line
 	my $f = $bed->next_feature;
@@ -473,7 +473,7 @@ sub test_bed12 {
 	is( $bed->do_cds,   0,       'ucsc do_cds' );
 	is( $bed->do_exon,  1,       'ucsc do_exon' );
 	is( $bed->do_codon, 0,       'ucsc do_codon' );
-	is( $bed->version,  'bed12', 'bed version string' );
+	is( $bed->filetype, 'bed12', 'bed version string' );
 
 	# parse first feature line
 	my $f = $bed->next_feature;
@@ -545,7 +545,7 @@ sub test_narrowPeak {
 	isa_ok( $bed, 'Bio::ToolBox::Parser::bed', 'Bed Parser' );
 	my $fh = $bed->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
-	is( $bed->version, 'narrowPeak', 'bed version string' );
+	is( $bed->filetype, 'narrowPeak', 'bed version string' );
 
 	# parse first feature line
 	my $f = $bed->next_feature;
@@ -594,7 +594,7 @@ sub test_gappedPeak {
 	isa_ok( $bed, 'Bio::ToolBox::Parser::bed', 'Bed Parser' );
 	my $fh = $bed->fh;
 	isa_ok( $fh, 'IO::File', 'IO filehandle' );
-	is( $bed->version, 'gappedPeak', 'bed version string' );
+	is( $bed->filetype, 'gappedPeak', 'bed version string' );
 
 	# parse first feature line
 	my $f = $bed->next_feature;
