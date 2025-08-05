@@ -30,11 +30,12 @@ my $wigfile  = File::Spec->catfile( $Bin, "Data", "sample2.wib" );
 unless ( -e $database ) {
 	my $fh = IO::File->new( $database, "w" )
 		or die "unable to write temporary GFF file!";
-	$fh->print <<GFF;
+	my $gff = <<OUT;
 ##gff-version 3
 chrI	SGD	chromosome	1	230218	.	.	.	ID=chrI;dbxref=NCBI:NC_001133;Name=chrI
 chrI	tim	sample2	1	230218	.	.	.	Name=sample2;wigfile=$wigfile
-GFF
+OUT
+	$fh->print($gff);
 	$fh->close;
 }
 
