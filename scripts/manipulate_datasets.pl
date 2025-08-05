@@ -1892,9 +1892,9 @@ sub delog_function {
 		}
 
 		# Placement dictates method
-		my $count  = 0;    # conversion count
+		my $count  = 0;                     # conversion count
 		my $failed = 0;
-		my $name = $Data->name($index);
+		my $name   = $Data->name($index);
 		$index = _prepare_new_destination( $index, "_delog$base" ) if $placement =~ /^n/i;
 		$Data->iterate(
 			sub {
@@ -2507,8 +2507,8 @@ sub math_function {
 		}
 
 		# generate subtraction product
-		my $failed_count = 0;    # failed count
-		my $name = $Data->name($index);
+		my $failed_count = 0;                     # failed count
+		my $name         = $Data->name($index);
 		if ( $placement =~ /^n/i ) {
 			$index = _prepare_new_destination( $index, "_$mathed\_$value" );
 		}

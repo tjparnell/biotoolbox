@@ -228,10 +228,10 @@ sub sane_chromo_sort {
 			# I'm going to go out on a limb here and presume this is some weird scaffold
 			# since it's unlikely or at least rare for organisms to have over 100
 			# numbered chromosomes. For example, Drosophila BDGP6 has a whole bunch of
-			# scaffolds with just numbers. 
+			# scaffolds with just numbers.
 			# Push these to mixed and hope for the best
 			push @mixed, [ q( ), $name, $name, $c ];
-		} 
+		}
 		elsif ( $name =~ m/^ (?:chr)? (\d+) $/xi ) {
 
 			# standard numeric chromosome
@@ -247,16 +247,16 @@ sub sane_chromo_sort {
 			# chromosome arms
 			my $i = $1;
 			my $a = lc $2;
-			if ($a eq 'l') {
+			if ( $a eq 'l' ) {
 				$i += 0.1;
 			}
-			elsif ($a eq 'r') {
+			elsif ( $a eq 'r' ) {
 				$i += 0.2;
 			}
-			elsif ($a eq 'p') {
+			elsif ( $a eq 'p' ) {
 				$i += 0.3;
 			}
-			elsif ($a eq 'q') {
+			elsif ( $a eq 'q' ) {
 				$i += 0.4;
 			}
 			push @numeric, [ $i, $c ];

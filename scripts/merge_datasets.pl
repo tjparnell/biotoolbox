@@ -135,7 +135,7 @@ else {
 }
 
 # clean up coordinate column if it was generated
-if (my $c = $output_data->find_column('MergeDatasetCoordinate')) {
+if ( my $c = $output_data->find_column('MergeDatasetCoordinate') ) {
 	$output_data->delete_column($c);
 }
 

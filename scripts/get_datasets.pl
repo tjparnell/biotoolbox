@@ -170,7 +170,7 @@ if ($infile) {
 
 	# set headers to true if file was explicitly not parsed
 	# since warnings will occur when we add columns and write to a file
-	if ($parse == 0) {
+	if ( $parse == 0 ) {
 		$Data->headers(1);
 	}
 }
