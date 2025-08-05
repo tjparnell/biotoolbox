@@ -84,3 +84,6 @@
 # Avoid Docker
 \bDocker/
 
+# Perl development files
+.perltidyrc
+.perlcriticrc
