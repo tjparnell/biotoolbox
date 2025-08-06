@@ -5,7 +5,7 @@ use strict;
 use Carp;
 use Bio::ToolBox::Data::Feature;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 sub new {
 	my ( $class, $data ) = @_;

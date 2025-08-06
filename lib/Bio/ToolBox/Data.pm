@@ -15,7 +15,7 @@ use Bio::ToolBox::db_helper qw(
 use Bio::ToolBox::utility qw(simplify_dataset_name sane_chromo_sort);
 use Module::Load;
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 ### Initialize
 

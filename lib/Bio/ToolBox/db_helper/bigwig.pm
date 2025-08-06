@@ -10,7 +10,7 @@ use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
 require Exporter;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 # Exported names
 our @ISA = qw(Exporter);

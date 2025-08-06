@@ -6,7 +6,7 @@ use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 my %TYPECOUNTS = ();
 

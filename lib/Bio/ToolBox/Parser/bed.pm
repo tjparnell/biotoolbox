@@ -7,7 +7,7 @@ use base 'Bio::ToolBox::Parser';
 use Bio::ToolBox::Data;
 use Module::Load;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 sub new {
 	my $class = shift;

@@ -5,7 +5,7 @@ use strict;
 use Carp qw(carp cluck croak confess);
 require Exporter;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 ### Export
 our @ISA       = qw(Exporter);

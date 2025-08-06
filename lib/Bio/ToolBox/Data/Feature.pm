@@ -14,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::constants;
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 my $GENETOOL_LOADED = 0;
 
