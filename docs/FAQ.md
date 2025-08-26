@@ -7,6 +7,35 @@
 These may or may not have actually been asked, but it's a collection of hints that the 
 programmer understands but a casual user might not, as well as rationale.
 
+- Certain UCSC utilities no longer support `stdin`.
+
+	Several of the UCSC command line utilities for big files (bigWig and bigBed in
+	particular) used to support a barely documented feature of using `stdin` or
+	`stdout` as filenames, but more recent versions do not. This feature was used
+	extensively by
+	[Bio::ToolBox::big_helper](https://metacpan.org/pod/Bio::ToolBox::big_helper)
+	when reading and/or writing big files as a way of offloading computational
+	processing, avoiding intermediate disk writes, and for the very practical reason
+	that the Perl adapters did not support direct writing of files. Version 2.02 of
+	Bio::ToolBox (finally) now checks the version of these utilities, and adjusts
+	behavior as necessary to either writing directly to the utility or intermediate
+	text files and then calling the utility.
+
+	If you find you would like to use the older utilities that support  `stdin`, at
+	least for `wigToBigWig` (`bedToBigBed` hasn't supported this for a very, very
+	long time), then you will need to compile your own. The change occurs in
+	`userApps.v439` release (October 2022), so you will need an earlier version. See
+	the section on UCSC library in the [Advanced Install](AdvancedInstallation.md)
+	document for hints on compiling the utilities (you don't need to install the
+	library).
+	
+- Do you support `CSV` files?
+
+	CSV files appear perfectly benign, but are in fact a can of worms: mandatory or
+	optional quoting, empty or undefined values, spaces, character escaping, text
+	encoding, and so on. This mostly affects reading files. Most (all?) bioinformatic
+	text formats are tab-delimited, so CSV support is intentionally absent.
+	
 - Programs don't recognize a UCSC gene table (refFlat, knownGene, genePred, etc)
 
 	UCSC doesn't have official file extensions, and their downloads page just 
@@ -128,11 +157,6 @@ programmer understands but a casual user might not, as well as rationale.
 	(BED and refFlat are fastest), or import them into an annotation SQLite database
 	file (see above).
 	
-	There is an (unofficial) [effort](http://perl11.org) to make Perl faster by tweaking 
-	the internals. BioToolBox will install under [cperl](http://perl11.org/cperl/), 
-	although getting the prerequisites installed is not a trivial task. The speed gain 
-	is modest.
-
 - Why do you fork instead of using threads?
 
 	It's easier? Forking a child process is less complicated, as memory is automatically 

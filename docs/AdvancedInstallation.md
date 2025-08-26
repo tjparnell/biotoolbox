@@ -20,9 +20,9 @@ accordingly for their system. If that doesn't describe you, skip ahead to the
     information. 
 
     Install [HTSlib](https://github.com/samtools/htslib) for Bam file support. You may 
-    already have it; later versions may (usually) work just as well, but version 1.9 
-    is officially recommended. It defaults to installing in `/usr/local` but doesn't 
-    have to be; see below. 
+    already have it; version 1.9 is officially recommended, but later versions appear
+    to work just fine and are preferred, as it includes Cram support. It defaults to 
+    installing in `/usr/local`. 
 
         curl -o htslib-1.19.tar.bz2 -L https://github.com/samtools/htslib/releases/download/1.19/htslib-1.19.tar.bz2 
         tar -xf htslib-1.19.tar.bz2
@@ -118,10 +118,7 @@ switch between releases with a simple command. It also manages multiple `local::
 installations, in case you want to isolate packages. 
 
 BioToolBox does not utilize threading (it uses forks for parallel execution), so if you 
-have a choice, compile a non-threaded Perl for a (very) slight performance gain. For 
-those adventurous to try, BioToolBox does work under [cperl](https://github.com/perl11/cperl), 
-although installing some prerequisite modules is a trying experience (many failed 
-tests and partial functionality).
+have a choice, compile a non-threaded Perl for a slight performance gain. 
 
 ### System installation
 
@@ -283,6 +280,10 @@ An example for downloading on Linux:
     do curl -o $HOME/bin/$name http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name \
     && chmod +x $HOME/bin/$name; done;
 
+**NOTE** Current versions of these utilities do not support directly piping data into
+the utility using the `stdin` file name. You will need to either find an older binary
+version, compile your own from older source code (see below), or update BioToolBox;
+version 2.02 now supports a work-around.
 
 ## Legacy Perl modules
 
@@ -314,14 +315,16 @@ multi-user installations).
 The Bio::DB::Sam library _only_ works with the legacy Samtools version, which
 included both the C libraries, headers, and executables; use version
 [0.1.19](https://github.com/samtools/samtools/archive/0.1.19.tar.gz) for best
-results. You will need to compile the Samtools code, but you do not have to
-install it (the library is not linked). Before compiling, edit the Makefile to
-include the cflags `-fPIC` and (most likely) `-m64` for 64 bit OS. Export the
-`SAMTOOLS` environment variable to the path of the Samtools build directory, and
-then you can proceed to build the Perl module; it should find the necessary
-files using the `SAMTOOLS` environment variable. You may obtain the latest
-source from
-[here](https://github.com/GMOD/GBrowse-Adaptors/tree/master/Bio-SamTools).
+results. You will need to compile the Samtools code, but you do not have to install
+it (the library is not linked). Before compiling, edit the Makefile to include the
+cflags `-fPIC` and (most likely) `-m64` for 64 bit OS. Export the `SAMTOOLS`
+environment variable to the path of the Samtools build directory, and then you can
+proceed to build the Perl module; it should find the necessary files using the
+`SAMTOOLS` environment variable. You may obtain the latest source from
+[Github](https://github.com/GMOD/GBrowse-Adaptors/tree/master/Bio-SamTools) or by
+downloading a [tarball](https://github.com/GMOD/GBrowse-Adaptors/tarball/master).
+**Note** that this project and file contains multiple Perl adapters and cannot be
+used directly with `cpanm`, for example.
 
 ### UCSC BigFile library
 
@@ -330,40 +333,91 @@ The Bio::DB::BigWig and Bio::DB::BigBed modules are part of the same distributio
 use the code from the GitHub repository, as it should be compatible with recent UCSC 
 libraries, whereas the distribution on CPAN is out of date. 
 
+**NOTE** The UCSC library, when it encounters an error, will immediately terminate
+the Perl process, with no chance of trapping the error. The newer `libBigWig` C
+library used with Bio::DB::Big (detailed above) does not exhibit this behavior, plus
+it's considerably easier to install. Encountering errors rarely happens, however,
+because all bioinformatic data is always perfectly formatted and well behaved, right?
+
 You will need the UCSC source code; the
 [userApps](http://hgdownload.soe.ucsc.edu/admin/exe/) source code is sufficient, rather
-than the entire browser code. Version 375, at the time of this writing, works. This
-requires at least `OpenSSL` and `libpng` libraries to compile the required library; on
-MacOS, these need to be installed independently (see [Homebrew](https://brew.sh) for
-example). There are other requirements, such as MySQL client libraries, that are needed if
-you want to compile the actual command line utilities, if so desired. 
+than the entire browser code. Versions 375 and 398, at the time of this writing, works
+successfully, but more recent versions appear to have increasing problems with
+successful compilation – YMMV. 
 
-For purposes here, only the library needs to be compiled. It does not need to be 
-installed, as nothing is linked. Therefore, you can safely ignore the main `Makefile` 
-commands. Below are the steps for compiling just the requisite C library for installing 
-the Perl module.
+**NOTE** If you are compiling the command line utilities, such as `wigToBigWig`, be
+aware that in version 439 and later, these utilities no longer accept `stdin` as a
+file input. The Bio::ToolBox::big_helper module uses this feature for convenience in
+applications such [bam2wig](apps/bam2wig.md). You can compile your own following
+these steps, but you do not need to install Bio::DB::BigWig.
 
-Edit the file `kent/src/inc/common.mk`, and insert `-fPIC` into the `CFLAGS` variable. If 
-you have installed any libraries in non-standard locations, e.g. `openssl` installed via 
-HomeBrew on MacOS, then add these paths to the `HG_INC` variable. Save the file. 
+This requires at least `OpenSSL` and `libpng` libraries to compile the required
+library. For the command line utilities, if desired, you will also need MySQL
+libraries; MariaDB, for now, seems adequate as far as I can tell.
 
-To simplify compilation, you can skip the main Makefile and simply compile only the 
-libraries that you need. First, export the `MACHTYPE` environment variable to an 
-acceptable simple value, usually `x86_64`.
+On Linux, this is mostly not a problem as these libraries and development files are
+readily available through the package manager. If you're building on macOS, see the
+notes in the [macOS notes page](MacOSNotes.md).
 
-Next, move to the included `kent/src/htslib` directory, and compile this library by
-issuing the `make` command.
+For purposes of installing the Perl adapter, only the library needs to be compiled.
+It does not need to be installed, as nothing is linked. So, you do not need to run
+the full `make` command. In the `userApps` folder, run
 
-Move to the `kent/src/lib` directory, and compile the library by issuing the `make` 
-command. If it compiles successfully, you should get a `jkweb.a` file in the `lib/x86_64` 
-directory.
+	cd path/to/userApps
+	make installEnvironment
 
-Finally, you can return to the Perl module. First, set the `KENT_SRC` environment 
-variable to the full path of the `kent/src` build directory (otherwise you will need to 
-interactively provide the Perl module Build script this path). Then issue the standard 
-`Build.PL` commands to build, test, and install the Perl modules.
+This will generate `kent/src/inc/localEnvironment.mk` for your local machine. Edit this
+file to add at the end
 
+	CFLAGS = -fPIC
 
+If you have odd or non-standard locations for some libraries, for example in a
+computing cluster where the development files are brought in using environment
+[modules](https://modules.readthedocs.io/), you may be able to set additional paths
+in this `localEnvironment.mk` file or by directly hacking `kent/src/inc/common.mk`.
+**NOTE** Be careful about setting a generic path to the libraries, particularly if
+you also have `htslib` installed, since the UCSC userApp provides its own (presumably
+modified) `htslib` library, which will conflict with a system available library.
+
+To proceed with library compilation, follow the following steps. Note exporting
+environment variables which aid in building the Perl adapter.
+
+	cd path/to/kent/src
+	export KENT_SRC=$(PWD)
+	cd htslib
+	make
+	cd ../lib
+	make
+	cd
+
+To install the Perl adapter, download the tarball from Github (same source as
+Bio::DB::Sam above) and follow the steps below.
+
+	curl -o GBrowse-Adaptors.tar.gz -L https://github.com/GMOD/GBrowse-Adaptors/tarball/master
+	tar -xf GBrowse-Adaptors.tar.gz
+	cd GBrowse-Adaptors-master-85c29de/Bio-BigFile
+	export MACHTYPE=local
+	perl Build.PL
+	./Build
+	./Build test
+	./Build install
+
+If the environment variables have been set correctly and the library compiled
+successfully, then the Perl build process should proceed smoothly. There may be
+various warnings emitted during the build process, which can usually be ignored.
+
+Once you have compiled the main `kent/src/lib` library, you can proceed with
+compiling the command line utilities, if you desire. You can build just the ones you
+want by going into each utility subdirectory within `kent/src/utils/` and issuing
+`make`. For example:
+
+	cd /path/to/userApps
+	mkdir bin
+	cd kent/src/utils/wigToBigWig
+	make
+
+The compiled executable should be copied into `userApps/bin`, and you can move it from
+there to wherever.
 
 
 
