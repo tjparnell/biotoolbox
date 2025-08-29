@@ -7,7 +7,7 @@
 These may or may not have actually been asked, but it's a collection of hints that the 
 programmer understands but a casual user might not, as well as rationale.
 
-- Certain UCSC utilities no longer support `stdin`.
+- My `wigToBigWig` no longer support `stdin`.
 
 	Several of the UCSC command line utilities for big files (bigWig and bigBed in
 	particular) used to support a barely documented feature of using `stdin` or
@@ -27,16 +27,29 @@ programmer understands but a casual user might not, as well as rationale.
 	`userApps.v439` release (October 2022), so you will need an earlier version. See
 	the section on UCSC library in the [Advanced Install](AdvancedInstallation.md)
 	document for hints on compiling the utilities (you don't need to install the
-	library).
+	Perl library in this case).
 	
-- Do you support `CSV` files?
+- Does BioToolBox support Cram files?
+
+	Reading Cram files is supported through the
+	[Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS) Perl adapter, which in turn
+	is dependent on the linked [HTSlib](https://github.com/samtools/htslib) library.
+	However, the only Cram files that can be used must either have a valid reference
+	`UR` tag in the `@SQ` header, i.e. the original local reference fasta file is
+	still available, or have an embedded reference sequence in the Cram file itself,
+	i.e. generated with output option `embed_ref=1`). Using an external reference
+	fasta file is not supported, a limitation unfortunately imposed by Bio::DB::HTS,
+	not by Bio::ToolBox. Lacking these, you are best to simply back-convert the Cram
+	file to Bam format using `samtools` prior to usage. 
+
+- Does BioToolBox support CSV files?
 
 	CSV files appear perfectly benign, but are in fact a can of worms: mandatory or
 	optional quoting, empty or undefined values, spaces, character escaping, text
 	encoding, and so on. This mostly affects reading files. Most (all?) bioinformatic
 	text formats are tab-delimited, so CSV support is intentionally absent.
 	
-- Programs don't recognize a UCSC gene table (refFlat, knownGene, genePred, etc)
+- How do I get my UCSC gene table (refFlat, knownGene, genePred, etc) recognized?
 
 	UCSC doesn't have official file extensions, and their downloads page just 
 	have `.txt.gz` extensions. Furthermore, they don't have proper column headers. Downloads 
