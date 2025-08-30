@@ -18,7 +18,7 @@ use constant {
 	SUBF  => 11,
 };
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 #### Aliases ####
 # to maintain compatibility with Bio::SeqFeature::Lite and Bio::SeqFeatureI we
@@ -321,7 +321,7 @@ sub delete_SeqFeature {
 
 sub add_tag_value {
 	my ( $self, $key, $value ) = @_;
-	return unless ( $key and $value );
+	return unless ( defined $key and defined $value );
 	$self->[ATTRB] ||= {};
 	if ( exists $self->[ATTRB]->{$key} ) {
 		if ( ref( $self->[ATTRB]->{$key} ) eq 'ARRAY' ) {
