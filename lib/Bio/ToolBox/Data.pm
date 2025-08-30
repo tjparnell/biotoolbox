@@ -15,7 +15,7 @@ use Bio::ToolBox::db_helper qw(
 use Bio::ToolBox::utility qw(simplify_dataset_name sane_chromo_sort);
 use Module::Load;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 ### Initialize
 
@@ -752,26 +752,34 @@ sub sort_data {
 
 	# put items into appropriate bins for sorting
 	my @numeric_items;
-	my @mixed_items_end;
 	my @mixed_items;
-	my @asci_items;
 	for my $row_i ( 1 .. $self->last_row ) {
 		my $v = $self->value( $row_i, $index );
-		if ( looks_like_number($v) ) {
+		if ( $v =~ /\d/ && looks_like_number($v) ) {
 			push @numeric_items, [ $v, $row_i ];
 		}
-		elsif ( $v =~ /(\d+)$/x ) {
+		elsif ( $v =~ /^ (\d+) (\D+) (\d+) $/x ) {
+
+			# integer at both ends of string
+			push @mixed_items, [ $1, $2, $3, $row_i ];
+		}
+		elsif ( $v =~ /^ (\d+) (\D.*) $/x ) {
+
+			# integer at beginning of string
+			# use identical integer at the end
+			push @mixed_items, [ $1, $2, 1, $row_i ];
+		}
+		elsif ( $v =~ /^ (.*\D) (\d+) $/x ) {
 
 			# integer at end of string
-			push @mixed_items_end, [ $1, $v, $row_i ];
-		}
-		elsif ( $v =~ /(\d+)/ ) {
-
-			# integer someplace else
-			push @mixed_items, [ $1, $v, $row_i ];
+			# use identical integer at the beginning
+			push @mixed_items, [ 1, $1, $2, $row_i ];
 		}
 		else {
-			push @asci_items, [ $v, $row_i ];
+
+			# no discernable integer in string
+			# use identical integer at the beginning and end
+			push @mixed_items, [ 1, $v, 1, $row_i ];
 		}
 	}
 
@@ -784,16 +792,9 @@ sub sort_data {
 				sort { $a->[0] <=> $b->[0] } @numeric_items;
 		}
 		if (@mixed_items) {
-			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] } @mixed_items;
-		}
-		if (@mixed_items_end) {
-			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] } @mixed_items_end;
-		}
-		if (@asci_items) {
-			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
-				sort { $a->[0] cmp $b->[0] } @asci_items;
+			push @new_table, map { $self->{data_table}->[ $_->[3] ] }
+				sort { $a->[0] <=> $b->[0] or $a->[1] cmp $b->[1] or $a->[2] <=> $b->[2] }
+				@mixed_items;
 		}
 	}
 	if ( $direction eq 'd' ) {
@@ -802,16 +803,9 @@ sub sort_data {
 				sort { $b->[0] <=> $a->[0] } @numeric_items;
 		}
 		if (@mixed_items) {
-			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] } @mixed_items;
-		}
-		if (@mixed_items_end) {
-			push @new_table, map { $self->{data_table}->[ $_->[2] ] }
-				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] } @mixed_items_end;
-		}
-		if (@asci_items) {
-			push @new_table, map { $self->{data_table}->[ $_->[1] ] }
-				sort { $b->[0] cmp $a->[0] } @asci_items;
+			push @new_table, map { $self->{data_table}->[ $_->[3] ] }
+				sort { $b->[0] <=> $a->[0] or $b->[1] cmp $a->[1] or $b->[2] <=> $a->[2] }
+				@mixed_items;
 		}
 	}
 	$self->{data_table} = \@new_table;
@@ -2055,20 +2049,11 @@ This method is automatically called prior to writing the Data table to file.
   $Data->sort_data($index, 'i'); # increasing sort
 
 This method will sort the Data table by the values in the indicated column.
-Values are automatically sorted based on their value type in the
-following order. Not all types are expected (in most cases only one).
-
-=over 4
-
-=item numeric-only items
-
-=item mixed text with an integer at the end
-
-=item mixed text with an integer anywhere
-
-=item text only
-
-=back
+Sorting is attempted logically by the content and/or sub-content of the
+values, looking for numeric only items (sorted first) and then potentially
+mixed strings with integers at the beginning, end, or both. This should
+smartly handle most scenarios, such as scores, gene names, IDs, or numbered
+items with a prefix or suffix.
 
 Pass the function one or two values. The first value is the index of the
 column upon which the contents are to be sorted. The second (optional) 
