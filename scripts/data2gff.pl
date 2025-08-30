@@ -10,7 +10,7 @@ use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(parse_list ask_user_for_index format_with_commas);
 
-our $VERSION = '2.00';
+our $VERSION = '2.03';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -350,7 +350,7 @@ while ( my $row = $Input->next_row ) {
 		push @args, 'name', $name;
 	}
 	elsif ($name_base) {
-		push @args, 'name', sprintf( "%s_%07d", $name_base, $count );
+		push @args, 'name', sprintf( "%s_%d", $name_base, $count );
 	}
 	if ($id_index) {
 		my $id = $row->value($id_index);

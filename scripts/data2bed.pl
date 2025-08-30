@@ -12,7 +12,7 @@ use Bio::ToolBox::Data;
 use Bio::ToolBox::utility    qw( ask_user_for_index format_with_commas );
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print "\n This program will write a BED file\n";
 
@@ -321,7 +321,7 @@ while ( my $row = $Input->next_row ) {
 
 	# extras
 	if ($name_base) {
-		$args{name} = sprintf( "%s_%07d", $name_base, $count );
+		$args{name} = sprintf( "%s_%d", $name_base, $count );
 	}
 	if ( $zero_based and $start_index ) {
 		$args{start} += 1;
