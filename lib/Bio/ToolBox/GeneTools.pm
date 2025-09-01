@@ -5,7 +5,7 @@ use strict;
 use Carp qw(carp cluck croak confess);
 require Exporter;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 ### Export
 our @ISA       = qw(Exporter);
@@ -1275,13 +1275,13 @@ sub filter_transcript_gencode_basic {
 		my $tag = $t->get_tag_values('tag');
 		if ( ref($tag) eq 'ARRAY' ) {
 			foreach ( @{$tag} ) {
-				if ( $_ eq 'basic' ) {
+				if ( $_ eq 'basic' or $_ eq 'gencode_basic' ) {
 					push @keepers, $t;
 					last;
 				}
 			}
 		}
-		elsif ( $tag and $tag eq 'basic' ) {
+		elsif ( $tag and $tag eq 'basic' or $_ eq 'gencode_basic' ) {
 			push @keepers, $t;
 		}
 	}
@@ -1911,8 +1911,8 @@ transcripts is returned.
 	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts);
 
 This will filter a gene object for transcripts for the Ensembl GENCODE 
-tag "basic", which indicates that a transcript is tagged as GENCODE Basic 
-transcript. 
+tag "basic" or "gencode_basic", which indicates that a transcript is tagged
+as GENCODE Basic transcript. 
 
 If a gene object was provided, a new gene object will be returned with 
 only the retained transcripts as subfeatures. If an array reference of 
