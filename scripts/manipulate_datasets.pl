@@ -13,7 +13,7 @@ use Statistics::Lite qw(median range stddevp mode);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -186,12 +186,10 @@ Mathematical manipulation
   Z  Generate (Z)-score values of a column
   r  Generate a (r)atio between two columns
   d  Generate a (d)ifference between two columns
-  z  Generate a normali(z)ed difference between two columns
   e  Median c(e)nter row values
 File
   W  Re(W)rite the file
   x  E(x)port into a simple tab-delimited text file
-  i  Export a .cdt file for Treev(i)ew or Cluster analysis
   Y  Write out a mean summar(Y) profile of the data
 Other
   t  Print S(t)atistics on a column
@@ -202,7 +200,7 @@ Other
 MENU
 
 	# unlisted option: print this (m)enu
-	# unused letters: E F H jJ k
+	# unused letters: E F H i jJ k z
 	return 0;    # return 0, nothing done
 }
 
@@ -2243,11 +2241,6 @@ sub difference_function {
 
 	# Generate a new difference between two datasets
 
-	# Determine whether the difference should be normalized
-	# normalization divides the difference by the square root of the sum, an
-	# estimation of standard deviation
-	my $normalization = shift;    # pass a true value to normalize
-
 	# Request datasets
 	my ( $experiment_index, $control_index );
 	if ( defined $opt_numerator and defined $opt_denominator ) {
@@ -2264,16 +2257,8 @@ sub difference_function {
 	}
 	else {
 		# request from user
-		my $line;
-		if ($normalization) {
-			$line =
-				" Enter two dataset index numbers to generate the normalized difference\n"
+		my $line = " Enter two dataset index numbers to generate the difference\n"
 				. " as 'experiment, control'\n  ";
-		}
-		else {
-			$line = " Enter two dataset index numbers to generate the difference\n"
-				. " as 'experiment, control'\n  ";
-		}
 		( $experiment_index, $control_index ) = _request_indices($line);
 		unless ( defined $experiment_index and defined $control_index ) {
 			print " WARNING: unknown index number(s); nothing done\n";
@@ -2288,12 +2273,6 @@ sub difference_function {
 		# this was an automatically executed function
 		# and a new name was specified on the command line
 		$new_name = $opt_name;
-	}
-	elsif ($normalization) {
-		$new_name =
-			  $Data->name($experiment_index) . '_'
-			. $Data->name($control_index)
-			. '_normdiff';
 	}
 	else {
 		$new_name =
@@ -2311,24 +2290,7 @@ sub difference_function {
 
 			# calculate difference
 			if ( looks_like_number($e) and looks_like_number($c) ) {
-				my $diff = $e - $c;
-				if ($normalization) {
-
-					# determine a normalized difference value
-					my $sum = $e + $c;
-					if ( $sum == 0 ) {
-
-						# avoid pesky divide-by-0 errors, the difference is also 0
-						$row->value( $new_position, 0 );
-					}
-					else {
-						$row->value( $new_position, ( $diff / sqrt($sum) ) );
-					}
-				}
-				else {
-					# determine a straight difference value
-					$row->value( $new_position, $diff );
-				}
+				$row->value( $new_position, $e - $c );
 			}
 			else {
 				# can't do anything with non-numbers, new value will be null
@@ -2339,35 +2301,18 @@ sub difference_function {
 	);
 
 	# Annotate the new medadata hash
-	$Data->metadata( $new_position, 'method',
-		$normalization ? 'normalized_difference' : 'difference' );
+	$Data->metadata( $new_position, 'method', 'difference' );
 	$Data->metadata( $new_position, 'experiment', $Data->name($experiment_index) );
 	$Data->metadata( $new_position, 'control',    $Data->name($control_index) );
 
 	# Print conclusion
-	printf "%s difference between %s and %s\n generated as new column\n",
-		$normalization ? ' normalized' : q(), $Data->name($experiment_index),
-		$Data->name($control_index);
+	printf " difference between %s and %s\n generated as new column\n",
+		$Data->name($experiment_index), $Data->name($control_index);
 	if ($failure_count) {
 		print " $failure_count rows could not generate ratios\n";
 	}
 
 	return 1;
-}
-
-sub normalized_difference_function {
-
-	# Generate a normalized difference between two datasets
-
-	# this actually calls the difference_function subroutine
-	# pass a true value to force normalization
-	if ( difference_function(1) ) {
-		return 1;
-	}
-	else {
-		print " WARNING: unable to generate a normalized difference\n";
-		return 0;
-	}
 }
 
 sub add_function {
@@ -2702,176 +2647,6 @@ sub export_function {
 	return 0;
 }
 
-sub export_treeview_function {
-
-	# this is a specialized function to export a datafile into a format
-	# compatible with the Treeview program
-
-	print " Exporting CDT file for Treeview and Cluster analysis\n";
-
-	# First check for previous modifications
-	if ( $modification and not $function ) {
-		print " There are existing unsaved changes to the data. Do you want to\n";
-		my $p = ' save these first before making required, irreversible changes? y/n:  ';
-		my $answer = prompt($p);
-		if ( lc $answer eq 'y' ) {
-			rewrite_function();
-		}
-	}
-
-	# Set options for placement for subsequent manipulations
-	$opt_placement = 'r';
-
-	### Get user information for processing
-	# Identify the dataset columns
-	# we need one unique name column, and a range of data columns
-	# the rest will be deleted
-	my @datasets = _request_indices(
-		" Enter one unique name column, followed by a range of data columns  ");
-	unless (@datasets) {
-		print " WARNING: Unknown datasets. Nothing done.\n";
-		return 0;
-	}
-
-	# Identify the manipulations requested
-	my @manipulations;
-	if ($function) {
-
-		# automatic function, use the command line target option
-		@manipulations = split /,/, $opt_target;
-	}
-	else {
-		# ask the user
-		print <<LIST;
-Available dataset manipulations
-  su - decreasing sort by sum of row values
-  sm - decreasing sort by mean of row values
-  cg - median center features (genes)
-  cd - median center datasets
-  zd - convert dataset to Z-scores
-  pd - convert dataset to percentile rank
-  L2 - convert dataset to log2
-  L10 - convert dataset to log10
-  n0 - convert null values to 0 
-LIST
-		my $p      = 'Enter the manipulation(s) in order of desired execution: ';
-		my $answer = prompt($p);
-		@manipulations = split /[,\s]+/, $answer;
-	}
-
-	### First, delete extraneous datasets or columns
-	# the CDT format for Treeview expects a unique ID and NAME column
-	# we will duplicate the first column
-	unshift @datasets, $datasets[0];
-
-	# perform a reordering of the columns
-	$Data->reorder_column(@datasets);
-
-	# rename the first two columns
-	$Data->name( 0, 'ID' );
-	$Data->name( 1, 'NAME' );
-
-	# we now have just the columns we want
-	# reset the dataset indices to what we currently have
-	# name and ID should be index 0 and 1
-	@datasets = ( 2 .. $Data->last_column );
-
-	### Second, perform dataset manipulations
-	foreach (@manipulations) {
-		if (/^su$/i) {
-
-			# decreasing sort by sum of row values
-			$opt_target = 'sum';
-			combine_function(@datasets);
-			my $i = $Data->last_column;
-			$opt_direction = 'd';
-			sort_function($i);
-			$Data->delete_column($i);
-		}
-		elsif (/^sm$/i) {
-
-			# decreasing sort by sum of row values
-			$opt_target = 'mean';
-			combine_function(@datasets);
-			my $i = $Data->last_column;
-			$opt_direction = 'd';
-			sort_function($i);
-			$Data->delete_column($i);
-		}
-		elsif (/^cg$/i) {
-
-			# Median center features
-			print " median centering features....\n";
-			center_function(@datasets);
-		}
-		elsif (/^cd$/i) {
-
-			# Median center datasets
-			print " median centering datasets....\n";
-			$opt_target = 'median';
-			$opt_zero   = 1;
-			subtract_function(@datasets);
-		}
-		elsif (/^zd$/i) {
-
-			# Z-score convert dataset
-			print " converting datasets to Z-scores....\n";
-			zscore_function(@datasets);
-		}
-		elsif (/^pd$/i) {
-
-			# convert dataset to percentile rank
-			print " converting datasets to percentile ranks....\n";
-			percentile_rank_function(@datasets);
-		}
-		elsif (/^l2$/i) {
-
-			# convert dataset to log2 values
-			print " converting datasets to log2 values....\n";
-			log_function( 2, @datasets );
-		}
-		elsif (/^l10$/i) {
-
-			# convert dataset to log10 values
-			print " converting datasets to log10 values....\n";
-			log_function( 10, @datasets );
-		}
-		elsif (/^n0$/i) {
-
-			# convert nulls to 0
-			print " converting null values to 0.0....\n";
-			$opt_target = '0.0';
-			$opt_zero   = 1 unless defined $opt_zero;    # convert 0s too
-			convert_nulls_function(@datasets);
-		}
-		else {
-			print " WARNING: unknown manipulation '$_'!\n";
-		}
-	}
-
-	### Third, export a simple file
-	if ($outfile) {
-		unless ( $outfile =~ /\.cdt$/i ) {
-
-			# make sure it has .cdt extension
-			$outfile .= '.cdt';
-		}
-	}
-	else {
-		# generate file name
-		$outfile = $Data->path . $Data->basename . '.cdt';
-	}
-	$gz = 0;
-	export_function();
-
-	### Finally, reset the modification status
-	# We don't to record these changes upon exit as they are specific to
-	# exporting for treeview, any pre-existing changes should have been
-	# saved earlier
-	$modification = 0;
-	return 0;
-}
-
 sub center_function {
 
 	# this will center the datapoints in each row
@@ -3145,13 +2920,11 @@ sub _get_letter_to_function_hash {
 		'c' => "combine",
 		'r' => "ratio",
 		'd' => "diff",
-		'z' => "normdiff",
 		'e' => "center",
 		'w' => "new",
 		'Y' => "summary",
 		'x' => "export",
 		'W' => "rewrite",
-		'i' => "treeview",
 		'h' => "help",
 		'V' => "view",
 		'q' => "write_quit",
@@ -3202,13 +2975,11 @@ sub _get_function_to_subroutine_hash {
 		'combine'     => \&combine_function,
 		'ratio'       => \&ratio_function,
 		'diff'        => \&difference_function,
-		'normdiff'    => \&normalized_difference_function,
 		'center'      => \&center_function,
 		'new'         => \&new_column_function,
 		'summary'     => \&write_summary_function,
 		'export'      => \&export_function,
 		'rewrite'     => \&rewrite_function,
-		'treeview'    => \&export_treeview_function,
 		'view'        => \&view_function,
 		'help'        => \&print_online_help,
 		'menu'        => \&print_menu,
@@ -3426,8 +3197,8 @@ manipulate_datasets.pl [--options ...] <filename>
               above | below | specific | keep | addname | cnull | 
               absolute | minimum | maximum | log | delog | format | pr | 
               add | subtract | multiply | divide | combine | scale | 
-              zscore | ratio | diff | normdiff | center | rewrite | 
-              export | treeview | summary | stat ]
+              zscore | ratio | diff | center | rewrite | 
+              export | summary | stat ]
   -x --index <integers>             column index to work on
   
   Operation options:
@@ -3499,7 +3270,7 @@ B<split> B<coordinate> B<sort> B<gsort> B<null> B<duplicate> B<above>
 B<below> B<specific> B<keep> B<cnull> B<absolute> B<minimum>
 B<maximum> B<log> B<delog> B<format> B<pr> B<add> B<subtract>
 B<multiply> B<divide> B<combine> B<scale> B<zscore> B<ratio> B<diff>
-B<normdiff> B<center> B<rewrite> B<export> B<treeview> B<summary> B<stat>
+B<center> B<rewrite> B<export> B<summary> B<stat>
   
 Refer to the FUNCTIONS section for details.
 
@@ -3884,19 +3655,6 @@ of the two columns. The indices for the experimental and control columns
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
-=item B<normdiff> (menu option B<z>)
-
-A normalized difference is generated between two existing columns. 
-The difference between 'control' and 'experimental' column values 
-is divided by the square root of the sum (an approximation of the 
-standard deviation). This is supposed to yield fewer false positives
-than a simple difference (see Nix et al, BMC Bioinformatics, 2008).
-For enumerated datasets (e.g. tag counts from Next Generation 
-Sequencing), the datasets should be subsampled to equalize the sums 
-of the two datasets. The indices for the experimental and control columns 
-may either requested from the user or supplied by the --exp and 
---con command line options. 
-
 =item B<center> (menu option B<e>)
 
 Center normalize the datapoints in a row by subtracting the mean or
@@ -3942,30 +3700,6 @@ made to the data structure, a normal data file will still be written.
 Note that this could overwrite the exported file if the output file name
 was specified on the command line, as both file write subroutines will 
 use the same name!
-
-=item B<treeview> (menu option B<i>)
-
-Export the data to the CDT format compatible with both Treeview and 
-Cluster programs for visualizing and/or generating clusters. Specify the 
-columns containing a unique name and the columns to be analyzed (e.g. 
---index <name>,<start-stop>). Extraneous columns are removed. 
-Additional manipulations on the columns may be performed prior to 
-exporting. These may be chosen interactively or using the codes 
-listed below and specified using the --target option.
-  
-  su - decreasing sort by sum of row values
-  sm - decreasing sort by mean of row values
-  cg - median center features (rows)
-  cd - median center datasets (columns)
-  zd - convert columns to Z-scores
-  pd - convert columns to percentile ranks
-  L2 - convert values to log2
-  L10 - convert values to log10
-  n0 - convert nulls to 0.0
-
-A simple Cluster data text file is written (default file name 
-"<basename>.cdt"), but without the GWEIGHT column or EWEIGHT row. The 
-original file will not be rewritten.
 
 =item B<rewrite> (menu option B<W>)
 
