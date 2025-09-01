@@ -8,7 +8,7 @@ use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 # List of acceptable filename extensions
 our $SUFFIX =
@@ -722,7 +722,7 @@ sub write_file {
 	}
 
 	# Verify and adjust filename extension if necessary for specific formats
-	if ( $extension =~ /(?: txt | tsv )/xi ) {
+	if ( $extension =~ /txt/i ) {
 		if ( not $self->headers ) {
 
 			# set headers to true for ordinary text or tsv files
@@ -816,9 +816,9 @@ sub write_file {
 		elsif ($extension) {
 
 			# check extension from the parsed filename, if present
-			if ( $extension =~ /sgr|cdt/i ) {
+			if ( $extension =~ /tsv|csv|sgr|cdt/xi ) {
 
-				# sgr is simple format, no headers
+				# these are simple formats, no headers
 				$args{'format'} = 'simple';
 			}
 			else {
@@ -1020,6 +1020,10 @@ sub write_file {
 	if ( $args{'format'} eq 'simple' ) {
 
 		# the simple format will strip the non-value '.' from the table
+		my $sep = "\t";
+		if ($extension =~ /csv/i) {
+			$sep = ',';
+		}
 		my $n = $self->{'number_columns'};
 		for my $i ( 1 .. $self->last_row ) {
 			no warnings "uninitialized";
@@ -1030,7 +1034,7 @@ sub write_file {
 			# and print using a tab-delimited format
 			my @linedata =
 				map { $_ eq '.' ? q() : $_ } @{ $self->{'data_table'}[$i] }[ 1 .. $n ];
-			$fh->printf( "%s\n", join( "\t", @linedata ) );
+			$fh->printf( "%s\n", join( $sep, @linedata ) );
 		}
 	}
 
