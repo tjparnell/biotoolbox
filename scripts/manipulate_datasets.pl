@@ -193,6 +193,7 @@ File
   Y  Write out a mean summar(Y) profile of the data
 Other
   t  Print S(t)atistics on a column
+  k  Print length statistics of intervals
   V  (V)iew table contents
   h  (h)elp
   q  (q)uit, saving changes if necessary
@@ -200,7 +201,7 @@ Other
 MENU
 
 	# unlisted option: print this (m)enu
-	# unused letters: E F H i jJ k z
+	# unused letters: E F H i jJ z
 	return 0;    # return 0, nothing done
 }
 
@@ -2806,6 +2807,31 @@ sub addname_function {
 	return 1;
 }
 
+sub print_length_statistics_function {
+
+	unless ( $Data->feature_type eq 'coordinate' ) {
+		print " Data table does not have coordinates to calculate lengths\n";
+		return 0;
+	}
+	my @lengths;
+	$Data->iterate( sub {
+		push @lengths, shift->length;
+	} );
+	
+	# calculate and print the statistics
+	print " Statistics on intervals lengths:\n";
+	my $sum = sum0(@lengths);
+	printf "   count    = %d\n", scalar(@lengths);
+	printf "   mean     = %.1f\n", $sum / ( scalar(@lengths) || 1 );
+	printf "   median   = %.1f\n", median(@lengths);
+	printf "   std dev  = %.1f\n", stddevp(@lengths);
+	printf "   min      = %d\n", min(@lengths);
+	printf "   max      = %d\n", max(@lengths);
+	printf "   mode     = %d\n", mode(@lengths);
+	printf "   sum      = %d\n", $sum;
+	return 0;
+}
+
 sub rewrite_function {
 
 	# check output file name
@@ -2886,50 +2912,51 @@ sub _get_letter_to_function_hash {
 	# the key is the menu letter
 	# the value is the function name
 	return (
-		't' => "stat",
-		'R' => "reorder",
-		'D' => "delete",
-		'n' => "rename",
-		'b' => "number",
-		'C' => "concatenate",
-		'T' => "split",
-		'O' => "coordinate",
-		'o' => "sort",
-		'g' => "gsort",
-		'N' => "null",
-		'P' => "duplicate",
-		'A' => "above",
-		'B' => "below",
-		'S' => "specific",
-		'K' => "keep",
-		'M' => "addname",
-		'U' => "cnull",
-		'G' => "absolute",
-		'I' => "minimum",
-		'X' => "maximum",
-		'a' => "add",
-		'u' => "subtract",
-		'y' => "multiply",
-		'v' => "divide",
-		's' => "scale",
-		'p' => "pr",
-		'Z' => "zscore",
-		'l' => "log",
-		'L' => "delog",
-		'f' => "format",
-		'c' => "combine",
-		'r' => "ratio",
-		'd' => "diff",
-		'e' => "center",
-		'w' => "new",
-		'Y' => "summary",
-		'x' => "export",
-		'W' => "rewrite",
-		'h' => "help",
-		'V' => "view",
-		'q' => "write_quit",
-		'Q' => "quit",
-		'm' => "menu",
+		't' => 'stat',
+		'k' => 'lengthstat',
+		'R' => 'reorder',
+		'D' => 'delete',
+		'n' => 'rename',
+		'b' => 'number',
+		'C' => 'concatenate',
+		'T' => 'split',
+		'O' => 'coordinate',
+		'o' => 'sort',
+		'g' => 'gsort',
+		'N' => 'null',
+		'P' => 'duplicate',
+		'A' => 'above',
+		'B' => 'below',
+		'S' => 'specific',
+		'K' => 'keep',
+		'M' => 'addname',
+		'U' => 'cnull',
+		'G' => 'absolute',
+		'I' => 'minimum',
+		'X' => 'maximum',
+		'a' => 'add',
+		'u' => 'subtract',
+		'y' => 'multiply',
+		'v' => 'divide',
+		's' => 'scale',
+		'p' => 'pr',
+		'Z' => 'zscore',
+		'l' => 'log',
+		'L' => 'delog',
+		'f' => 'format',
+		'c' => 'combine',
+		'r' => 'ratio',
+		'd' => 'diff',
+		'e' => 'center',
+		'w' => 'new',
+		'Y' => 'summary',
+		'x' => 'export',
+		'W' => 'rewrite',
+		'h' => 'help',
+		'V' => 'view',
+		'q' => 'write_quit',
+		'Q' => 'quit',
+		'm' => 'menu',
 	);
 }
 
@@ -2940,6 +2967,7 @@ sub _get_function_to_subroutine_hash {
 	# the value is a scalar reference to the subroutine
 	return (
 		'stat'        => \&print_statistics_function,
+		'lengthstat'  => \&print_length_statistics_function,
 		'reorder'     => \&reorder_function,
 		'delete'      => \&delete_function,
 		'rename'      => \&rename_function,
@@ -3198,7 +3226,7 @@ manipulate_datasets.pl [--options ...] <filename>
               absolute | minimum | maximum | log | delog | format | pr | 
               add | subtract | multiply | divide | combine | scale | 
               zscore | ratio | diff | center | rewrite | 
-              export | summary | stat ]
+              export | summary | stat | lengthstat ]
   -x --index <integers>             column index to work on
   
   Operation options:
@@ -3410,6 +3438,11 @@ or specified on the command line using the --func option.
 Print some basic statistics for a column, including mean, 
 median, standard deviation, min, and max. If 0 values are present,
 indicate whether to include them (y or n)
+
+=item B<lengthstat> (menu option B<k>)
+
+Print basic statistics on interval lengths represented by the
+data table, which must include coordinate information.
 
 =item B<reorder> (menu option B<R>)
 
