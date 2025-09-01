@@ -36,9 +36,11 @@ sub parse_file {
 
 sub new_data {
 	my $self = shift;
-	if ( scalar(@_) and $_[0] =~ m/^(?: columns | datasets )$/x ) {
+	if ( scalar(@_) and scalar(@_) % 2 == 0 and $_[0] =~
+		/^(?: columns | datasets | file | in | parse | stream | db | bed | gff | ucsc)$/xi
+	) {
 
-		# looks like a correctly formatted list
+		# looks like an argument list for new() function
 		return Bio::ToolBox::Data->new(@_);
 	}
 	else {
@@ -61,6 +63,13 @@ sub open_database {
 	my $self = shift;
 	return Bio::ToolBox::Data->open_new_database(@_);
 }
+
+sub new_bed {
+	my $self   = shift;
+	my $number = shift || 6;
+	return Bio::ToolBox::Data->new( bed => $number );
+}
+
 
 1;
 
@@ -245,11 +254,22 @@ simple GFF attributes.
     
 =item new_data
 
-Generate a new, empty L<Bio::ToolBox::Data> table with the given column 
-names. Pass the names of the columns in the new table.
+Generate a new, empty L<Bio::ToolBox::Data> table with the given
+column names. Pass an array of names of the columns for the new table.
 
   $Data = Bio::ToolBox->new_data( qw(Name ID Score) );
+
+Alternatively, you can pass an array of key =E<gt> value arguments
+to be passed on to C<new()> function for explicit control.
     
+=item new_bed
+
+Generate a new, empty L<Bio::ToolBox::Data> table formatted
+as a BED format. Pass the number of columns desired (integer
+in range 3..12 inclusive). Default is 6 (standard BED format).
+
+  $Data = Bio::ToolBox->new_bed(4);
+
 =item read_file
 
 Open a generic file handle for reading. It transparently handles 
