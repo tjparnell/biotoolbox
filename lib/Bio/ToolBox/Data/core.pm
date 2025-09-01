@@ -12,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Module::Load;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 #### Initialization and verification ###############################################
 
@@ -1125,6 +1125,12 @@ sub gff {
 	my $self = shift;
 	if ( defined $_[0] and $_[0] =~ m/^(?: 0 | 1 | 2 | 2\.[2|5] | 3 )$/x ) {
 		$self->{gff} = $_[0];
+		if ($_[0] > 0) {
+			$self->{headers} = 0;
+		}
+		else {
+			$self->{headers} = 1;
+		}
 	}
 	return $self->{gff};
 }
@@ -1133,6 +1139,12 @@ sub bed {
 	my $self = shift;
 	if ( defined $_[0] and $_[0] =~ /^\d+$/ ) {
 		$self->{bed} = $_[0];
+		if ($_[0] > 0) {
+			$self->{headers} = 0;
+		}
+		else {
+			$self->{headers} = 1;
+		}
 	}
 	return $self->{bed};
 }
