@@ -110,7 +110,10 @@ The libraries provide a unified and integrated approach to analyses.
 In many cases, they provide an abstraction layer over a variety of 
 different specialized BioPerl and related modules. Instead of 
 writing numerous scripts specialized for each data format (wig, 
-bigWig, Bam), one script can now work with any data format. 
+bigWig, Bam), one script can now work with any data format.
+
+See online documentation at L<https://tjparnell.github.io/biotoolbox/>
+for more information.
 
 =head1 LIBRARIES
 
@@ -221,6 +224,132 @@ a synopsis of available options, or add C<--help> to print the full documentatio
 
 =back
 
+=head2 Data conversion
+
+Convert from generic tables to specific bioinformatic file types.
+
+=over 4
+
+item L<bam2wig.pl>
+
+Generate read or fragment coverage or point data representations of alignments.
+
+=item L<data2bed.pl>
+
+Convert a table containing coordinates into a properly formatted BED file.
+
+=item L<data2wig.pl>
+
+Convert a table of coordinates and values into a properly formatted WIG file,
+including bigWig.
+
+=item L<data2fasta.pl>
+
+Convert a data table of coordinates and/or sequences into multi-fasta file.
+
+=item L<data2gff.pl>
+
+Convert a table of coordinates into a properly formatted GFF file.
+
+=back
+
+=head Feature annotation
+
+Work with large genomic annotation feature files.
+
+=over 4
+
+=item L<get_features.pl>
+
+Collect, filter, and/or convert features from a genomic feature annotation file
+into another (simpler) file for use.
+
+=item L<get_gene_regions.pl>
+
+Collect specific gene regions that may not be explicitly annotated but inferred
+from an annotation file, including introns, UTRs, alternate or common exons, etc.
+
+=item L<get_feature_info.pl>
+
+Collect additional information from a genomic feature annotation file for a list
+of features, such as items embedded as key=value attributes in a GFF file.
+
+=back
+
+=header2 Data collection
+
+Collect data, usually some sort of scores, from genomic data, including bigWig
+and Bam data files among others, for a list of genomic intervals for annotation
+features.
+
+=over 4
+
+=item L<get_datasets.pl>
+
+General purpose single data collection of scores in a variety of methods.
+
+=item L<get_binned_data.pl>
+
+Collect data in a subset of bins across genomic intervals or features in a
+variety of methods.
+
+=item L<get_relative_data.pl>
+
+Collect data in bins flanking a specific reference point, such as the 
+5-prime end or middle point of a genomic feature.
+
+=item L<correlate_position_data.pl>
+
+Calculates a correlation between two datasets along the length of a genomic
+feature to determine a shift of position for two signal tracks.
+
+=back
+
+=head2 Data manipulation
+
+Work with data columns and/or rows in data tables.
+
+=over 4
+
+=item L<manipulate_datasets.pl>
+
+An interactive, menu-driven application for quickly and easily performing all
+sorts of common functions on columns, rows, and values.
+
+=item L<manipulate_wig.pl>
+
+Performs various numeric transformations on scores of text WIG, bedGraph,
+and bigWig files.
+
+=back
+
+=head2 File manipulation
+
+Work on columns or rows of one or more data tables.
+
+=over 4
+
+=item L<merge_datasets.pl>
+
+Join columns from two or more data files into one file, with or without using
+a lookup value.
+
+=item L<split_data_file.pl>
+
+Split a data file by rows into multiple files.
+
+=item L<join_data_file.pl>
+
+Joins two or data files by rows into one file.
+
+=item L<pull_features.pl>
+
+Take a list of identifiers and pull the corresponding rows from a source file
+into a separate table of wanted features.
+
+=back
+
+
 =head1 USAGE
 
 This module provides a handful of commonly used convenience methods 
@@ -241,14 +370,18 @@ L<Bio::ToolBox::Data> C<new> method for more details or options.
 
   $Data = Bio::ToolBox->load_file('myfile.txt');
 
+For advanced options, pass key =E<gt> value pairs as arguments as
+defined for L<Bio::ToolBox::Data> C<new()>.
+
 =item parse_file
 
-Parse an annotation file, such as BED, GTF, GFF3, UCSC genePred or 
-refFlat file, into a L<Bio::ToolBox::Data> table. Each row in the 
-resulting table is linked to a parsed SeqFeature gene object. See 
-the L<Bio::ToolBox::Data> C<new> method for more details or options.
-Default options include parsing subfeatures (exon, cds, and utr) and 
-simple GFF attributes.
+Parse an annotation file, such as BED, GTF, GFF3, UCSC genePred or
+refFlat file, into a L<Bio::ToolBox::Data> table with two columns:
+PrimaryID (geneID, transcriptID, or coordinate string) and Name. Each
+row in the resulting table is linked to a parsed, top-level SeqFeature
+object. See the L<Bio::ToolBox::Data> C<new> method for more details
+or options. Default options include parsing subfeatures (exon, cds,
+and utr) and simple GFF attributes.
 
   $Data = Bio::ToolBox->parse_file('genes.gtf.gz');
     
