@@ -1464,9 +1464,10 @@ L<Bio::SeqFeatureI> convention with nested SeqFeature objects representing the
 gene, transcript, and exons. For example, 
 
     gene
-      transcript
-        exon
-        CDS
+       |--> transcript
+                     |--> exon
+                     |--> CDS
+                     |--> UTRs
 
 Depending upon how the SeqFeatures were generated or defined, subfeatures 
 may or may not be defined or be obvious. For example, UTRs or introns may 
@@ -1540,7 +1541,7 @@ Functions to get a list of exons from a gene or transcript
 This will return an array or array reference of all the exon subfeatures in 
 the SeqFeature object, either gene or transcript. No discrimination whether 
 they are used once or more than once. Non-defined exons can be assembled from 
-CDS and/or UTR subfeatures. Exons are sorted by start coordinate.
+CDS and/or UTR subfeatures if available. Exons are sorted by start coordinate.
 
 =item get_alt_exons
 
@@ -1673,7 +1674,8 @@ Pass either a gene or a list of transcripts to collapse.
 Calculates and returns the transcribed length of a transcript, i.e 
 the sum of its exon lengths. B<Warning!> If you pass a gene object, you 
 will get the maximum of all transcript exon lengths, which may not be 
-what you anticipate!
+what you anticipate! Try collapsing the transcripts for a gene first,
+then collecting the length.
 
 =item get_transcript_utr_length
 
@@ -1835,7 +1837,9 @@ This method will automatically recurse through all subfeatures.
 This will export a gene or transcript model as a refFlat formatted Gene 
 Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
 for details. Multiple transcript genes are exported as multiple text lines 
-concatenated together.
+concatenated together. By default, the C<display_name>, C<gene_name>, or
+C<transcript_name> is used preferentially if available, or alternatively
+the C<primary_id>, C<gene_id>, or <transcript_id>, as appropriate.
 
 =item bed12_string
 
@@ -1845,7 +1849,9 @@ This will export a gene or transcript model as a UCSC Bed formatted transcript
 line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1>
 for details. Multiple transcript genes are exported as multiple text lines 
 concatenated together. Note that gene information is not preserved with Bed12 
-files; only the transcript name is used. The C<RGB> value is set to 0.
+files; only the transcript name is used. The C<RGB> value is set to 0. The
+C<transcript_name> or C<display_name> is used preferentially over the
+C<transcript_id> or C<primary_id>.
 
 =back
 
