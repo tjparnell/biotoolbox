@@ -6,10 +6,11 @@ use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
+use List::Util qw(uniqstr);
 use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::Data;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -153,6 +154,17 @@ unless ( $automatic or $user_list ) {
 # this was put in here for remembering original file names for renaming purposes
 for my $i ( 1 .. $output_data->number_columns ) {
 	$output_data->delete_metadata( $i, 'original_file' );
+}
+
+# remove duplicate comments
+{
+	my @comments = $output_data->comments;
+	if (@comments) {
+		$output_data->delete_comment();     # should delete all
+		foreach my $c ( uniqstr @comments ) {
+			$output_data->add_comment($c);
+		}
+	}
 }
 
 ### Print the output
