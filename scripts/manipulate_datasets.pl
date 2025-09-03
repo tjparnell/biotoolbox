@@ -2606,7 +2606,7 @@ sub export_function {
 	# this will export the file into an even simpler text format
 
 	# generate a possible new name based on the input name
-	my $possible_name = $Data->path . $Data->basename . '_out.txt';
+	my $possible_name = $Data->path . $Data->basename . '.tsv';
 
 	# determine the export file name
 	my $outfilename;
@@ -3724,9 +3724,9 @@ a filename may be specified using the --out option.
 
 =item B<export> (menu option B<x>)
 
-Export the data into a simple tab-delimited text file that contains no 
-metadata or header information. Non-values '.' are converted to  
-true nulls. If an output file name is specified using the --outfile 
+Export the data into a simple tab-delimited F<.tsv> text file that contains
+no metadata or header information. Non-values '.' are converted to  
+true nulls. If an output file name is specified using the C<--outfile> 
 option, it will be used. Otherwise, a possible filename will be 
 suggested based on the input file name. If any modifications are 
 made to the data structure, a normal data file will still be written. 
