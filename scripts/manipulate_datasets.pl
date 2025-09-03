@@ -3475,7 +3475,7 @@ made!).
 
 This is a list of the functions available for manipulating columns. These may 
 be selected interactively from the main menu (note the case sensitivity!), 
-or specified on the command line using the --func option.
+or specified on the command line using the C<--func> option.
 
 =over 4
 
@@ -3503,9 +3503,9 @@ One or more column may be selected for deletion.
 
 =item B<rename> (menu option B<n>)
 
-Assign a new name to a column. For automatic execution, use the --name 
+Assign a new name to a column. For automatic execution, use the C<--name> 
 option to specify the new name. Also, for any automatically executed 
-function (using the --func option) that generates a new column, the 
+function (using the C<--func> option) that generates a new column, the 
 column's new name may be explicitly defined with this option.
 
 =item B<number> (menu option B<b>)
@@ -3518,14 +3518,14 @@ column index.
 
 Concatenate the values from two or more columns into a single new 
 column. The character used to join the values may be specified 
-interactively or by the command line option --target (default is '_' 
+interactively or by the command line option C<--target> (default is '_' 
 in automatic execution mode). The new column is appended at the end.
 
 =item B<split> (menu option B<T>)
 
 Split a column into two or more new columns using a specified character 
 as the delimiter. The character may be specified interactively or 
-with the --target command line option (default is '_' in automatic 
+with the C<--target> command line option (default is '_' in automatic 
 execution mode). The new columns are appended at the end. If the 
 number of split items are not equal amongst the rows, absent values 
 are appended with null values.
@@ -3557,7 +3557,7 @@ Delete rows that contain a null value in one or more
 columns. Some of the other functions may not work properly if
 a non-value is present. If 0 values are present, indicate whether
 to toss them (y or n). This may also be specified as a command line 
-option using the --except flag.
+option using the C<--except> flag.
 
 =item B<duplicate> (menu option B<P>)
 
@@ -3571,21 +3571,21 @@ deleted, always leaving the first row.
 Delete rows with values that are above a certain threshold value. 
 One or more columns may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
-specified with the --target option.
+specified with the C<--target> option.
 
 =item B<below> (menu option B<B>)
 
 Delete rows with values that are below a certain threshold value. 
 One or more columns may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
-specified with the --target option.
+specified with the C<--target> option.
 
 =item B<specific> (menu option B<S>)
 
 Delete rows with values that contain a specific value, either text 
 or number. One or more columns may be selected to check for values. 
 The specific values may be selected interactively from a list or 
-specified with the --target option.
+specified with the C<--target> option.
 
 =item B<keep> (menu option B<K>)
 
@@ -3609,14 +3609,14 @@ Add or update the name of each feature or row. If the data table
 already has a Name column, the value will be updated. Otherwise a 
 new column will be added. The name will be a text prefix followed 
 by an integer (row index). The prefix may be defined by setting the 
---target option, interactively provided by the user, or taken from 
+C<--target> option, interactively provided by the user, or taken from 
 the general table feature metadata.
 
 =item B<cnull> (menu option B<U>)
 
 Convert null values to a specific value. One or more columns may 
 be selected to convert null values. The new value may be requested 
-interactively or defined with the --target option.  
+interactively or defined with the C<--target> option.  
 
 =item B<absolute> (menu option B<G>)
 
@@ -3628,14 +3628,14 @@ more columns may be selected to convert.
 Reset datapoints whose values are less than a specified minimum 
 value to the minimum value. One or more columns may be selected 
 to reset values to the minimum. The minimum value may be requested 
-interactively or specified with the --target option. 
+interactively or specified with the C<--target> option. 
 
 =item B<maximum> (menu option B<X>)
 
 Reset datapoints whose values are greater than a specified maximum 
 value to the maximum value. One or more columns may be selected 
 to reset values to the maximum. The maximum value may be requested 
-interactively or specified with the --target option. 
+interactively or specified with the C<--target> option. 
 
 =item B<add> (menu option B<a>)
 
@@ -3643,7 +3643,7 @@ Add a value to a column. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
 values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
---target option.
+C<--target> option.
 
 =item B<subtract> (menu option B<u>)
 
@@ -3651,7 +3651,7 @@ Subtract a value from a column. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
 values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
---target option.
+C<--target> option.
 
 =item B<multiply> (menu option B<y>)
 
@@ -3659,7 +3659,7 @@ Multiply a column by a value. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
 values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
---target option.
+C<--target> option.
 
 =item B<divide> (menu option B<v>)
 
@@ -3667,7 +3667,7 @@ Divide a column by a value. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
 values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
---target option.
+C<--target> option.
 
 =item B<scale> (menu option B<s>)
 
@@ -3676,7 +3676,7 @@ with other columns. The current median of the column requested is
 presented, and a new median target is requested. The column may 
 either be replaced with the median scaled values or added as a new 
 column. For automatic execution, specify the new median target 
-with the --target option.
+with the C<--target> option.
 
 =item B<pr> (menu option B<p>)
 
@@ -3698,13 +3698,13 @@ with disparate dynamic ranges.
 
 A column may be converted to log values. The column may either 
 be replaced with the log values or added as a new column. Use 
-the --target option to specify the base (usually 2 or 10).
+the C<--target> option to specify the base (usually 2 or 10).
 
 =item B<delog> (menu option B<L>)
 
 A column that is currently in log space may be converted back to
 normal numbers. The column may either be replaced with the 
-new values or added as a new column. Use the --target option to 
+new values or added as a new column. Use the C<--target> option to 
 specify the base (usually 2 or 10). The base may be obtained from the 
 metadata.
 
@@ -3712,7 +3712,7 @@ metadata.
 
 Format the numbers of a column to a given number of decimal places. 
 An integer must be provided. The column may either be replaced or 
-added as a new column. For automatic execution, use the --target 
+added as a new column. For automatic execution, use the C<--target> 
 option to specify the number decimal places.
 
 =item B<combine> (menu option B<c>)
@@ -3720,7 +3720,7 @@ option to specify the number decimal places.
 Mathematically combine the data values in two or more columns. The 
 methods for combining the values include mean, median, min, max, 
 stdev, or sum. The method may be specified on the command line 
-using the --target option. The combined data values are added as a 
+using the C<--target> option. The combined data values are added as a 
 new column.
 
 =item B<ratio> (menu option B<r>)
@@ -3740,21 +3740,21 @@ values in the 'experimental' column and recorded as a new column.
 For enumerated columns (e.g. tag counts from Next Generation 
 Sequencing), the columns should be subsampled to equalize the sums 
 of the two columns. The indices for the experimental and control columns 
-may either requested from the user or supplied by the --exp and 
---con command line options. 
+may either requested from the user or supplied by the C<--exp> and 
+C<--con> command line options. 
 
 =item B<center> (menu option B<e>)
 
 Center normalize the datapoints in a row by subtracting the mean or
 median of the datapoints. The range of columns is requested or 
-provided by the --index option. Old values are replaced by new 
+provided by the C<--index> option. Old values are replaced by new 
 values. This is useful for visualizing data as a heat map, for example.
 
 =item B<new> (menu option B<w>)
 
 Generate a new column which contains an identical value for 
 each datapoint (row). The value may be either requested interactively or 
-supplied using the --target option. This function may be useful for 
+supplied using the C<--target> option. This function may be useful for 
 assigning a common value to all of the data points before joining the 
 data file with another.
 
@@ -3769,13 +3769,13 @@ column has start and stop metadata. The program will automatically
 identify available columns to summarize based on their name. In 
 interactive mode, it will request the contiguous range of start and 
 ending columns to summarize. The contiguous columns may also be 
-indicated using the --index option. The method of summarizing the 
-data can be specified interactively or with the --target option. 
+indicated using the C<--index> option. The method of summarizing the 
+data can be specified interactively or with the C<--target> option. 
 Methods include 'mean' (default), 'median', or 'trimmean', where
 the top and bottom 1% of values are discarded and a mean determined
 from the remaining 98% of values. By default, a new file using the 
 input file base name appended with '_<method>_summary' is written, or
-a filename may be specified using the --out option.
+a filename may be specified using the C<--out> option.
 
 =item B<export> (menu option B<x>)
 
