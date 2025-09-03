@@ -166,6 +166,7 @@ Row manipulation
   B  Delete rows with values (B)elow threshold
   S  Delete rows with (S)pecific values
   K  (K)eep only rows with specific values
+  E  Filter rows by feature l(E)ngth
   M  Add new unique na(M)e to each row
 Conversions
   U  Convert n(U)ll values to a specific value
@@ -193,7 +194,7 @@ File
   Y  Write out a mean summar(Y) profile of the data
 Other
   t  Print S(t)atistics on a column
-  k  Print length statistics of intervals
+  k  Print length statistics of feature intervals
   V  (V)iew table contents
   h  (h)elp
   q  (q)uit, saving changes if necessary
@@ -201,7 +202,7 @@ Other
 MENU
 
 	# unlisted option: print this (m)enu
-	# unused letters: E F H i jJ z
+	# unused letters: F H i jJ z
 	return 0;    # return 0, nothing done
 }
 
@@ -2542,6 +2543,49 @@ sub number_function {
 	return 1;
 }
 
+sub filter_length_function {
+
+	unless ( $Data->feature_type eq 'coordinate' ) {
+		print " Data table does not have coordinates to filter! Nothing done\n";
+		return 0;
+	}
+
+	# identify the thresholds
+	my ($min, $max);
+	if ( defined $opt_target ) {
+
+		# specified on the command line
+		($min, $max) = split /,|\-/, $opt_target, 2;
+	}
+	else {
+		# interactively ask the user
+		my $p = ' Enter the minimum,maximum range of lengths to keep:  ';
+		my $threshold = prompt($p);
+		($min, $max) = split /,|\-/, $threshold, 2;
+	}
+	unless ( defined $min and defined $max ) {
+		print " Both minimum and maximum lengths must be defined. Nothing done.\n";
+		return 0;
+	}
+
+	# identify features to delete
+	my @to_delete;
+	$Data->iterate( sub {
+		my $row    = shift;
+		my $length = $row->length;
+		if ( $length < $min or $length > $max ) {
+			push @to_delete, $row->row_index;
+		}
+	} );
+	if (@to_delete) {
+		$Data->delete_row(@to_delete);
+	}
+	printf " %d rows were deleted\n", scalar(@to_delete);
+	printf " %d rows with size %d-%d bp inclusive were retained\n", $Data->number_rows,
+		$min, $max;
+	return 1;
+}
+
 sub write_summary_function {
 
 	# this will write out a summary file of the data
@@ -2929,6 +2973,7 @@ sub _get_letter_to_function_hash {
 		'B' => 'below',
 		'S' => 'specific',
 		'K' => 'keep',
+		'E' => 'lengthfilt',
 		'M' => 'addname',
 		'U' => 'cnull',
 		'G' => 'absolute',
@@ -2983,6 +3028,7 @@ sub _get_function_to_subroutine_hash {
 		'below'       => \&toss_below_threshold_function,
 		'specific'    => \&toss_specific_values_function,
 		'keep'        => \&keep_specific_values_function,
+		'lengthfilt'  => \&filter_length_function,
 		'addname'     => \&addname_function,
 		'cnull'       => \&convert_nulls_function,
 		'absolute'    => \&convert_absolute_function,
@@ -3222,11 +3268,11 @@ manipulate_datasets.pl [--options ...] <filename>
   Non-interactive functions:
   -f --func [ reorder | delete | rename | new | number | concatenate | 
               split | coordinate | sort | gsort | null | duplicate | 
-              above | below | specific | keep | addname | cnull | 
-              absolute | minimum | maximum | log | delog | format | pr | 
-              add | subtract | multiply | divide | combine | scale | 
-              zscore | ratio | diff | center | rewrite | 
-              export | summary | stat | lengthstat ]
+              above | below | specific | keep | lengthfilt | addname | 
+              cnull | absolute | minimum | maximum | log | delog | format | 
+              pr | add | subtract | multiply | divide | combine | scale | 
+              zscore | ratio | diff | center | rewrite | export | 
+              summary | stat | lengthstat ]
   -x --index <integers>             column index to work on
   
   Operation options:
@@ -3547,6 +3593,15 @@ Keep only those rows with values that contain a specific value,
 either text or number. One or more columns may be selected to check 
 for values. The specific values may be selected interactively from a 
 list or specified with the --target option.
+
+=item B<lengthfilt> (menu option B<E>)
+
+Filter rows by their interval length. Input files must have coordinate
+columns (start and stop). Only rows with a length
+between specified minimum and maximum (inclusive) are retained;
+everything else is removed. The threshold values may specified
+interactively or specified as C<[minimum],[maxmimum]> with the
+C<--target> option.
 
 =item B<addname> (menu option B<M>)
 
