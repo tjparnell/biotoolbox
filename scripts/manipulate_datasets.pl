@@ -2545,8 +2545,8 @@ sub number_function {
 
 sub filter_length_function {
 
-	unless ( $Data->feature_type eq 'coordinate' ) {
-		print " Data table does not have coordinates to filter! Nothing done\n";
+	unless ( $Data->feature_type eq 'coordinate' or $Data->coord_column ) {
+		print " Data table does not have coordinates to filter! Nothing done.\n";
 		return 0;
 	}
 
@@ -2853,7 +2853,7 @@ sub addname_function {
 
 sub print_length_statistics_function {
 
-	unless ( $Data->feature_type eq 'coordinate' ) {
+	unless ( $Data->feature_type eq 'coordinate' or $Data->coord_column ) {
 		print " Data table does not have coordinates to calculate lengths\n";
 		return 0;
 	}
