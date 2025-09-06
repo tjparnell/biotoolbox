@@ -817,25 +817,43 @@ sub gsort_data {
 	my $self = shift;
 
 	# identify indices
-	unless ( $self->feature_type eq 'coordinate' ) {
-		carp 'ERROR: no chromosome and start/position columns to sort!';
-		return;
-	}
 	my $chromo_i = $self->chromo_column;
 	my $start_i  = $self->start_column;
 	my $stop_i   = $self->stop_column || $start_i;
+	my $coord_i  = $self->coord_column;
 
 	# collect the data by chromosome: start and end
 	my %chrom2row;
-	for my $row ( 1 .. $self->last_row ) {
-		my $c = $self->{data_table}->[$row]->[$chromo_i];
-		$chrom2row{$c} ||= [];
-		push @{ $chrom2row{$c} },
-			[
-				$self->{data_table}->[$row]->[$start_i],
-				$self->{data_table}->[$row]->[$stop_i],
-				$self->{data_table}->[$row]
-			];
+	if ( $chromo_i and $start_i ) {
+		for my $row ( 1 .. $self->last_row ) {
+			my $c = $self->{data_table}->[$row]->[$chromo_i];
+			$chrom2row{$c} ||= [];
+			push @{ $chrom2row{$c} },
+				[
+					$self->{data_table}->[$row]->[$start_i],
+					$self->{data_table}->[$row]->[$stop_i],
+					$self->{data_table}->[$row]
+				];
+		}
+	}
+	elsif ($coord_i) {
+		my $dt = $self->{data_table};
+		$self->iterate( sub {
+			my $row = shift;
+			my $c   = $row->seq_id;
+			$chrom2row{$c} ||= [];
+			push @{ $chrom2row{$c} },
+				[
+					$row->start,
+					$row->end || $row->start,
+					$dt->[ $row->row_index ]
+				];
+			
+		} );
+	}
+	else {
+		carp 'ERROR: no chromosome and start/position columns to sort!';
+		return;
 	}
 
 	# get sane chromosome order
@@ -2062,16 +2080,17 @@ c<i> (default) is for increasing sort, and C<d> is for decreasing sort.
 
 =item gsort_data
 
-This method will sort the Data table by increasing genomic coordinates. It 
-requires the presence of chromosome and start (or position) columns, 
-identified by their column names. These are automatically identified. 
-Failure to find these columns mean a failure to sort the table. Chromosome 
-names are sorted in a sane fashion; see L<Bio::ToolBox::utility::sane_chromo_sort>,
-for details. For most tables, features are sorted by increasing start position
-and increasing length, except for GFF-based file formats. These are sorted
-by increasing start position and decreasing length, which is an attempt at
-ensuring parental features occur first in line order over child features to
-improve parsing, avoid orphan features, and maintain tabix compatibility.
+This method will sort the Data table by increasing genomic coordinates. It
+requires the presence of chromosome and start (or position) columns or a
+coordinate string column, identified by their column names. These are
+automatically identified. Failure to find these columns mean a failure to
+sort the table. Chromosome names are sorted in a sane fashion; see
+L<Bio::ToolBox::utility::sane_chromo_sort>, for details. For most tables,
+features are sorted by increasing start position and increasing length,
+except for GFF-based file formats. These are sorted by increasing start
+position and decreasing length, which is an attempt at ensuring parental
+features occur first in line order over child features to improve parsing,
+avoid orphan features, and maintain tabix compatibility.
 
 =item splice_data
 
