@@ -14,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::constants;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 my $GENETOOL_LOADED = 0;
 
@@ -321,18 +321,25 @@ sub _strand {
 
 sub _extract_coordinate_string {
 	my ( $self, $i ) = @_;
-	if ( $self->value($i) =~ /^ ([\w\.\-]+) : (\d+) (?: \.\. | \-) (\d+) $/x ) {
-
-		# chromosome:start-end or chromosome:start..end
-		$self->{seqid} = $1 unless exists $self->{seqid};
-		$self->{start} = $2 unless exists $self->{start};
-		$self->{end}   = $3 unless exists $self->{end};
-	}
-	elsif ( $self->value($i) =~ /^([\w\.\-]+) : (\d+) $/x ) {
-
-		# chromosome:start
-		$self->{seqid} = $1 unless exists $self->{seqid};
-		$self->{start} = $2 unless exists $self->{start};
+	my $v = $self->value($i);
+	$v =~ s/,//g;
+	if ( $v =~ /^ ([\w\.\-]+) : (\d+) (?: (?: \- | \.\. ) (\d+))? (?: : (\-|\+) )? $/x ) {
+		$self->{seqid} = $1;
+		$self->{start} = $2;
+		if (defined $3) {
+			$self->{end} = $3;
+		}
+		else {
+			$self->{end} = $2;
+		}
+		if (defined $4) {
+			if ($4 eq '+') {
+				$self->{strand} = 1;
+			}
+			else {
+				$self->{strand} = -1;
+			}
+		}
 	}
 }
 
