@@ -3339,12 +3339,11 @@ The program is designed to be run interactively. However, single manipulations
 may be performed on single datasets by specifying a function name and any 
 other required options. These functions include the following.
   
-B<reorder> B<delete> B<rename> B<new> B<number> B<concatenate>
-B<split> B<coordinate> B<sort> B<gsort> B<null> B<duplicate> B<above>
-B<below> B<specific> B<keep> B<cnull> B<absolute> B<minimum>
-B<maximum> B<log> B<delog> B<format> B<pr> B<add> B<subtract>
-B<multiply> B<divide> B<combine> B<scale> B<zscore> B<ratio> B<diff>
-B<center> B<rewrite> B<export> B<summary> B<stat>
+B<reorder delete rename new number concatenate split coordinate>
+B<sort gsort null duplicate above below specific keep lengthfilt addname>
+B<cnull absolute minimum maximum log delog format pr>
+B<add subtract multiply divide combine scale zscore ratio diff center>
+B<rewrite export summary stat lengthstat>
   
 Refer to the FUNCTIONS section for details.
 
@@ -3392,7 +3391,7 @@ or 'n'):
   - (r)eplace the original column with new values
   - add as a (n)ew column
 
-Defaults to new placement when executed automatically using the --func 
+Defaults to new placement when executed automatically using the C<--func> 
 option, or prompts the user when executed interactively.
 
 =item --(no)zero
@@ -3413,7 +3412,7 @@ Specify the direction of a sort:
 
 Specify a new column name when re-naming a column using the rename function 
 from the command line. Also, when generating a new column using a defined 
-function (--func <function>) from the command line, the new column will use 
+function C<--func [function]> from the command line, the new column will use 
 this name.
 
 =item --log 
@@ -3459,12 +3458,6 @@ to be operated primarily as an interactive program, allowing for multiple
 manipulations to be performed. Alternatively, single manipulations may be
 performed as specified using command line options. As such, the program can
 be called in shell scripts.
-
-Note that the datafile is loaded entirely in memory. For extremely large 
-datafiles, e.g. binned genomic data, it may be best to first split the 
-file into chunks (use C<split_data_file.pl>), perform the manipulations, 
-and recombine the file (use C<join_data_file.pl>). This could be done 
-through a simple shell script.
 
 The program keeps track of the number of manipulations performed, and if 
 any are performed, will write out to file the changed data. Unless an 
@@ -3540,16 +3533,20 @@ in making unique identifiers or working with genome browsers.
 =item B<sort> (menu option B<o>)
 
 The entire data table is sorted by a specific column, or by the 
-mean of a list of columns if more than one is provided. The first
-datapoint is checked for the presence of letters, and the data 
-table is then sorted either asciibetically or numerically. The 
-direction of sort, (i)ncreasing or (d)ecreasing, is requested. 
+mean of a list of (numeric only) columns if more than one is provided.
+A natural sort is employed, such that embedded numbers in a string
+are taken into account during sorting. The direction of sort,
+(i)ncreasing or (d)ecreasing, is requested. 
 
 =item B<gsort> (menu option B<g>)
 
 The entire data table is sorted by increasing genomic position, 
-first by chromosome then by start position. These columns must exist 
-and have recognizable names (e.g. 'chromo', 'chromosome', 'start').
+first by chromosome then by start position, then by end position
+(shortest length first). For GFF flavored files, however, features
+are sorted by decreasing length to accomodate parent features and
+tabix indexing. A sane chromosome sort order is employed that
+recognizes numeric values (including Roman numerals). Coordinate
+columns must exist.
 
 =item B<null> (menu option B<N>)
 
@@ -3597,11 +3594,10 @@ list or specified with the --target option.
 =item B<lengthfilt> (menu option B<E>)
 
 Filter rows by their interval length. Input files must have coordinate
-columns (start and stop). Only rows with a length
-between specified minimum and maximum (inclusive) are retained;
-everything else is removed. The threshold values may specified
-interactively or specified as C<[minimum],[maxmimum]> with the
-C<--target> option.
+columns (start and stop). Only rows with a length between specified
+minimum and maximum (inclusive) are retained; everything else is
+removed. The threshold values may specified interactively or specified
+as C<[minimum],[maxmimum]> with the C<--target> option.
 
 =item B<addname> (menu option B<M>)
 
