@@ -1718,8 +1718,15 @@ object, for example a start column and a parsed SeqFeature object, the
 table value takes precedence and is returned. You can always obtain the 
 SeqFeature's value separately and directly.
 
-These methods do not set attribute values. If you need to change the 
-values in a table, use the L</value> method below.
+If there is a coordinate string column, or an ID column in the form of
+a coordinate string, with values such as "chr1:123-456", then coordinates
+will be automatically extracted from the string as necessary. Commas,
+missing end, and strand (+ or -) appended to the end are all handled
+appropriately.
+
+These methods can reset the value, but only if it an explicit column.
+To change a linked SeqFeature object, use the appropriate methods on the
+SeqFeature object itself.
 
 =over 4
 
