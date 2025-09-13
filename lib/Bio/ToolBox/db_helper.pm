@@ -5,7 +5,7 @@ use strict;
 use Carp    qw(carp cluck croak confess);
 use English qw(-no_match_vars);
 use Module::Load;    # for dynamic loading during runtime
-use List::Util       qw(min max sum0 uniq);
+use List::Util       qw(min max sum0 uniqstr);
 use Statistics::Lite qw(median range stddevp);
 use IO::Prompt::Tiny qw(prompt);
 use Bio::ToolBox::db_helper::constants;
@@ -16,7 +16,7 @@ use Bio::ToolBox::utility qw(
 );
 require Exporter;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources
@@ -72,20 +72,16 @@ my %SCORE_CALCULATOR_SUB = (
 
 		# Convert names into unique counts
 		my $s = shift;
-		my %name2count;
-		foreach my $n ( @{$s} ) {
-			if ( ref($n) eq 'ARRAY' ) {
+		if ( ref( $s->[0] ) eq 'ARRAY' ) {
 
-				# this is likely from a ncount indexed hash
-				foreach ( @{$n} ) {
-					$name2count{$_} += 1;
-				}
-			}
-			else {
-				$name2count{$n} += 1;
-			}
+			# array of arrays, as may be collected from a positioned hash
+			# convert to a single array then count
+			my @scores = map { @{$_} } @{$s};
+			return scalar( uniqstr(@scores) );
 		}
-		return scalar( keys %name2count );
+		else {
+			return scalar( uniqstr( @{$s} ) );
+		}
 	},
 	'range' => sub {
 
@@ -613,7 +609,7 @@ sub get_dataset_list {
 
 		# sort the types in alphabetical order
 		# and discard duplicate types - which may occur with stranded entries
-		@types = uniq( sort { $a cmp $b } @types );
+		@types = uniqstr( sort { $a cmp $b } @types );
 	}
 
 	# some other database
