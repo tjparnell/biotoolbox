@@ -40,6 +40,9 @@ our @EXPORT = qw(
 # Lookup hash for caching callback methods
 my %CALLBACKS;
 
+# skip all unwanted flags: SECONDARY,QCFAIL,DUP,SUPPLEMENTARY
+my $UNWANTED_FLAGS = 0xf00;    # 0x100 + 0x200 + 0x400 + 0x800
+
 ### Generate callback subroutine for walking through Bam alignments
 sub assign_callback {
 
@@ -307,9 +310,7 @@ sub assign_callback {
 sub _all_count_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;    # secondary alignment
-	return if $flag & 0x0400;    # marked duplicate
-	return if $flag & 0x0800;    # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -330,9 +331,7 @@ sub _all_count_indexed {
 sub _all_precise_count_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;    # secondary alignment
-	return if $flag & 0x0400;    # marked duplicate
-	return if $flag & 0x0800;    # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $s = $a->pos + 1;
 	return unless ( $s >= $data->{start} and $a->calend <= $data->{stop} );
@@ -349,9 +348,7 @@ sub _all_precise_count_indexed {
 sub _all_name_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;    # secondary alignment
-	return if $flag & 0x0400;    # marked duplicate
-	return if $flag & 0x0800;    # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -379,9 +376,7 @@ sub _all_name_indexed {
 sub _all_count_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;    # secondary alignment
-	return if $flag & 0x0400;    # marked duplicate
-	return if $flag & 0x0800;    # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -394,9 +389,7 @@ sub _all_count_array {
 sub _all_precise_count_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;    # secondary alignment
-	return if $flag & 0x0400;    # marked duplicate
-	return if $flag & 0x0800;    # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	return unless ( $a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{ $data->{scores} }, 1;
@@ -405,9 +398,7 @@ sub _all_precise_count_array {
 sub _all_name_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;    # secondary alignment
-	return if $flag & 0x0400;    # marked duplicate
-	return if $flag & 0x0800;    # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -420,9 +411,7 @@ sub _all_name_array {
 sub _forward_count_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed
 	if ( $flag & 0x1 ) {
@@ -451,9 +440,7 @@ sub _forward_count_indexed {
 sub _forward_precise_count_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -479,9 +466,7 @@ sub _forward_precise_count_indexed {
 sub _forward_name_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -512,9 +497,7 @@ sub _forward_name_indexed {
 sub _forward_count_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -538,9 +521,7 @@ sub _forward_count_array {
 sub _forward_precise_count_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -560,9 +541,7 @@ sub _forward_precise_count_array {
 sub _forward_name_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -586,9 +565,7 @@ sub _forward_name_array {
 sub _reverse_count_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -617,9 +594,7 @@ sub _reverse_count_indexed {
 sub _reverse_precise_count_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -645,9 +620,7 @@ sub _reverse_precise_count_indexed {
 sub _reverse_name_indexed {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -678,9 +651,7 @@ sub _reverse_name_indexed {
 sub _reverse_count_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -704,9 +675,7 @@ sub _reverse_count_array {
 sub _reverse_precise_count_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
@@ -726,9 +695,7 @@ sub _reverse_precise_count_array {
 sub _reverse_name_array {
 	my ( $a, $data ) = @_;
 	my $flag = $a->flag;
-	return if $flag & 0x0100;       # secondary alignment
-	return if $flag & 0x0400;       # marked duplicate
-	return if $flag & 0x0800;       # supplementary hit
+	return if $flag & $UNWANTED_FLAGS;
 	return if $a->qual < $MAPQ;
 	my $reversed = $flag & 0x10;    # reversed;
 	if ( $flag & 0x1 ) {
