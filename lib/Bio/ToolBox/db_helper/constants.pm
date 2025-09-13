@@ -3,7 +3,7 @@ package Bio::ToolBox::db_helper::constants;
 use strict;
 require Exporter;
 
-our $VERSION = '2.00';
+our $VERSION = '2.03';
 
 use constant {
 	CHR  => 0,    # chromosome
@@ -17,12 +17,15 @@ use constant {
 	DATA => 8,    # first dataset, additional may be present
 };
 
+# Global Alignment Mapping Quality for db_helper data collection
+our $MAPQ = 0;
+
 our @ISA = qw(Exporter);
 
 ## no critic
 ## this is never intended to be used directly by end users
 ## and exporting everything is required
-our @EXPORT = qw(CHR STRT STOP STR STND METH RETT DB DATA);
+our @EXPORT = qw(CHR STRT STOP STR STND METH RETT DB DATA $MAPQ);
 ## use critic
 
 # The true statement

@@ -119,6 +119,7 @@ our @EXPORT_OK = qw(
 	$BIG_ADAPTER
 	use_bam_adapter
 	use_big_adapter
+	use_minimum_mapq
 	open_db_connection
 	get_dataset_list
 	verify_or_request_feature_types
@@ -147,6 +148,19 @@ sub use_big_adapter {
 	my $a = shift || undef;
 	$BIG_ADAPTER = $a if $a;
 	return $BIG_ADAPTER;
+}
+
+sub use_minimum_mapq {
+	my $m = shift || undef;
+	if ( defined $m ) {
+		$m = int $m;
+		unless ( 0 <= $m <= 255 ) {
+			carp " ERROR: requested mapping quality '$m' out of bounds (0..255).";
+			return;
+		}
+		$MAPQ = $m;
+	}
+	return $MAPQ;
 }
 
 sub open_db_connection {
@@ -2143,6 +2157,17 @@ Values include the following:
    * none    no adapters allowed
 
 =back
+
+=item use_minimum_mapq
+
+Pass an integer (0..255 inclusive) representing the minimum alignment
+mapping quality to be counted in data collection methods using a Bam
+file. Alignments with a C<MAPQ> value below the indicated value are
+skipped and not counted. Higher values indicate increased confidence
+in mapping placement in the genome; 0 indicates no confidence (usually
+multi-mapping). Default is 0.
+
+This always return the current value (default 0).
 
 =item open_db_connection
 
