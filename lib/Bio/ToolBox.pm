@@ -36,12 +36,30 @@ sub parse_file {
 
 sub new_data {
 	my $self = shift;
-	if ( scalar(@_) and scalar(@_) % 2 == 0 and $_[0] =~
-		/^(?: columns | datasets | file | in | parse | stream | db | bed | gff | ucsc)$/xi
-	) {
 
-		# looks like an argument list for new() function
-		return Bio::ToolBox::Data->new(@_);
+	# check for possible option keys to the new() function
+	if ( scalar(@_) and scalar(@_) % 2 == 0 ) {
+		my $check = 0;
+		for ( my $i = 0; $i < scalar(@_); $i += 2 ) {
+			if ( $_[$i] =~
+/^( columns | datasets | file | in | parse | [sS]tream | db | feature s? | bed | gff | ucsc | noheader )$/nx
+				)
+			{
+				$check++;
+			}
+			else {
+				$check--;
+			}
+		}
+		if ( $check > 0 ) {
+
+			# looks like an argument list for new() function
+			return Bio::ToolBox::Data->new(@_);
+		}
+		else {
+			# put provided list into an array
+			return Bio::ToolBox::Data->new( columns => [@_] );
+		}
 	}
 	else {
 		# put provided list into an array
@@ -69,7 +87,6 @@ sub new_bed {
 	my $number = shift || 6;
 	return Bio::ToolBox::Data->new( bed => $number );
 }
-
 
 1;
 
