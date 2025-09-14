@@ -41,7 +41,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print "\n This program will convert bam alignments to wig data\n";
 
@@ -173,9 +173,9 @@ if ($print_version) {
 ### Check for requirements and set defaults
 # more global variables
 my (
-	$main_callback, $callback, $wig_writer, $outbase,
-	$chromo_file,   $binpack,  $buflength,  $coverage_dump,
-	$coverage_sub,  $post_bw_convert
+	$unwanted_flags, $main_callback, $callback, $wig_writer,
+	$outbase,        $chromo_file,   $binpack,  $buflength,
+	$coverage_dump,  $coverage_sub,  $post_bw_convert
 );
 check_defaults();
 print " Writing temp files to $tempdir\n" if $verbose;
@@ -791,6 +791,19 @@ sub check_defaults {
 			print " No external bigWig utility available, writing wig\n";
 			$bigwig = 0;
 		}
+	}
+
+	# calculate flags for filtering out unwanted alignments
+	$unwanted_flags = 0x200;                                   # always skip QCFAIL
+	$unwanted_flags += 0x100 if $nosecondary;
+	$unwanted_flags += 0x400 if $noduplicate;
+	$unwanted_flags += 0x800 if $nosupplementary;
+	$unwanted_flags += 0x8   if ( $paired or $fastpaired );    # skip if mate unmapped
+	$unwanted_flags += 0x80  if $first_read;                   # skip second read
+	$unwanted_flags += 0x40  if $second_read;                  # skip first read
+
+	if ($verbose) {
+		printf " skipping alignments with calculated flag %s\n", $unwanted_flags;
 	}
 
 	# set the initial main callback for processing alignments
@@ -2514,15 +2527,10 @@ sub merge_wig_files {
 sub se_callback {
 	my ( $a, $data ) = @_;
 
-	# check alignment quality and flags
-	return if ( $min_mapq and $a->qual < $min_mapq );       # mapping quality
+	# check alignment flags and quality
 	my $flag = $a->flag;
-	return if ( $nosecondary and $flag & 0x100 );           # secondary alignment
-	return if ( $noduplicate and $flag & 0x400 );           # marked duplicate
-	return if ( $flag & 0x200 );    # QC failed but still aligned? is this necessary?
-	return if ( $nosupplementary and $flag & 0x800 );       # supplementary hit
-	return if ( $first_read      and not $flag & 0x40 );    # first read in pair
-	return if ( $second_read     and not $flag & 0x80 );    # second read in pair
+	return if ( $flag & $unwanted_flags );
+	return if ( $min_mapq and $a->qual < $min_mapq );
 
 	# filter excluded regions
 	if ( defined $data->{exclusion} ) {
@@ -2571,18 +2579,15 @@ sub se_callback {
 sub fast_pe_callback {
 	my ( $a, $data ) = @_;
 
-	# check paired status
-	return unless $a->proper_pair; # both alignments are mapped
-	return if $a->reversed;        # only look at forward alignments, that's why it's fast
-	return unless $a->tid == $a->mtid;    # same chromosome?
-
-	# check alignment quality and flags
-	return if ( $min_mapq and $a->qual < $min_mapq );    # mapping quality
+	# check alignment flags and quality
 	my $flag = $a->flag;
-	return if ( $nosecondary and $flag & 0x100 );        # secondary alignment
-	return if ( $noduplicate and $flag & 0x400 );        # marked duplicate
-	return if ( $flag & 0x200 );    # QC failed but still aligned? is this necessary?
-	return if ( $nosupplementary and $flag & 0x800 );    # supplementary hit
+	return if ( $flag & $unwanted_flags );
+	return if ( $min_mapq and $a->qual < $min_mapq );
+
+	# check paired status
+	return unless $a->proper_pair;    # both alignments are mapped
+	return if $a->reversed;        # only look at forward alignments, that's why it's fast
+	return if $a->tid != $a->mtid; # same chromosome
 
 	# check insertion size
 	my $isize = abs( $a->isize );
@@ -2633,17 +2638,14 @@ sub fast_pe_callback {
 sub pe_callback {
 	my ( $a, $data ) = @_;
 
-	# check paired status
-	return unless $a->proper_pair;        # both alignments are mapped
-	return unless $a->tid == $a->mtid;    # same chromosome?
-
-	# check alignment quality and flags
-	return if ( $min_mapq and $a->qual < $min_mapq );    # mapping quality
+	# check alignment flags and quality
 	my $flag = $a->flag;
-	return if ( $nosecondary and $flag & 0x100 );        # secondary alignment
-	return if ( $noduplicate and $flag & 0x400 );        # marked duplicate
-	return if ( $flag & 0x200 );    # QC failed but still aligned? is this necessary?
-	return if ( $nosupplementary and $flag & 0x800 );    # supplementary hit
+	return if ( $flag & $unwanted_flags );
+	return if ( $min_mapq and $a->qual < $min_mapq );
+
+	# check paired status
+	return unless $a->proper_pair;    # both alignments are mapped
+	return if $a->tid != $a->mtid;    # same chromosome
 
 	# check insertion size
 	my $isize = $a->isize;
