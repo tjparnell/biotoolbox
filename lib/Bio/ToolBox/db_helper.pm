@@ -2161,11 +2161,14 @@ Values include the following:
 =item use_minimum_mapq
 
 Pass an integer (0..255 inclusive) representing the minimum alignment
-mapping quality to be counted in data collection methods using a Bam
+mapping quality to be counted in counting collection methods using a Bam
 file. Alignments with a C<MAPQ> value below the indicated value are
 skipped and not counted. Higher values indicate increased confidence
 in mapping placement in the genome; 0 indicates no confidence (usually
 multi-mapping). Default is 0.
+
+NOTE: This only affects alignment counting methods (C<count>, C<ncount>,
+and C<pcount>), not coverage methods, e.g. C<mean>.
 
 This always return the current value (default 0).
 
