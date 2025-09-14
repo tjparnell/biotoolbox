@@ -882,7 +882,7 @@ sub gsort_data {
 	return 1;
 }
 
-sub splice_data {
+sub split_data {
 	my ( $self, $part, $total_parts ) = @_;
 
 	unless ( $part and $total_parts ) {
@@ -2092,14 +2092,14 @@ position and decreasing length, which is an attempt at ensuring parental
 features occur first in line order over child features to improve parsing,
 avoid orphan features, and maintain tabix compatibility.
 
-=item splice_data
+=item split_data
 
 	my $Data = Bio::ToolBox::Data->new(file => $file);
 	my $pm = Parallel::ForkManager->new(4);
 	for my $i (1..4) {
 		$pm->start and next;
 		### in child ###
-		$Data->splice_data($i, 4);
+		$Data->split_data($i, 4);
 		# do something with this portion
 		# then save to a temporary unique file
 		$Data->save("$file_$i");
@@ -2131,7 +2131,7 @@ into the current Data object using the L</reload_children> method.
 Remember that if you fork your script into child processes, any database 
 connections must be re-opened; they are typically not clone safe. If you 
 have an existing database connection by using the L</open_database> method, 
-it should be automatically re-opened for you when you use the L</splice_data> 
+it should be automatically re-opened for you when you use the L</split_data> 
 method, but you will need to call L</open_database> again in the child 
 process to obtain the new database object.
 

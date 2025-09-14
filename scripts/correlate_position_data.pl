@@ -37,7 +37,7 @@ my $ORDINAL      = 0;
 
 use constant LOG10 => log(10);
 
-our $VERSION = '2.00';
+our $VERSION = '2.03';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -314,7 +314,7 @@ sub parallel_execution {
 		#### In child ####
 
 		# splice the data structure
-		$Data->splice_data( $i, $cpu );
+		$Data->split_data( $i, $cpu );
 
 		# re-open database objects to make them clone safe
 		my $db = $Data->open_database(1);

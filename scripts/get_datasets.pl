@@ -561,7 +561,7 @@ sub parallel_execution {
 		#### In child ####
 
 		# splice the data structure
-		$Data->splice_data( $i, $cpu );
+		$Data->split_data( $i, $cpu );
 
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects

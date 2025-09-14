@@ -240,7 +240,7 @@ is( $Data->value( 1, $start_i ), 0, 'data table value after iteration' );
 is( $Data->interbase(1),         1, 'interbase value of 1' );
 
 # test splice function
-$Data->splice_data( 2, 2 );    # second half of the data table
+$Data->split_data( 2, 2 );    # second half of the data table
 is( $Data->last_row,       39,          'last row index after splicing' );
 is( $Data->value( 39, 4 ), 'Feature77', 'data table value after splicing' );
 
