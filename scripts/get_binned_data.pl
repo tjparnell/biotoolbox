@@ -13,6 +13,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	calculate_score
+	use_minimum_mapq
 	$BAM_ADAPTER
 	$BIG_ADAPTER
 );
@@ -24,7 +25,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -44,12 +45,12 @@ unless (@ARGV) {    # when no command line options are present
 
 ## Initialize values
 my (
-	$infile,         $parse,      $outfile,    $main_database,
-	$data_database,  $feature,    $subfeature, $exon_subfeature,
-	$method,         $stranded,   $bins,       $extension,
-	$extension_size, $min_length, $long_data,  $smooth,
-	$sum,            $format,     $groupcol,   $gz,
-	$cpu,            $help,       $print_version,
+	$infile,         $parse,      $outfile,       $main_database,
+	$data_database,  $feature,    $subfeature,    $exon_subfeature,
+	$method,         $stranded,   $bins,          $extension,
+	$extension_size, $min_length, $long_data,     $smooth,
+	$sum,            $format,     $groupcol,      $gz,
+	$cpu,            $help,       $print_version, $mapq
 );    # command line variables
 my @datasets;
 
@@ -74,6 +75,7 @@ GetOptions(
 	'smooth!'        => \$smooth,         # do not interpolate over missing values
 	'U|sum!'         => \$sum,            # determine a final average for all the features
 	'r|format=i'     => \$format,         # decimal formatting
+	'mapq=i'         => \$mapq,           # minimum map quality
 	'g|groups'       => \$groupcol,       # write group column file
 	'z|gz!'          => \$gz,             # compress the output file
 	'c|cpu=i'        => \$cpu,            # number of execution threads
@@ -402,6 +404,11 @@ sub check_defaults {
 		# disable cores
 		print " disabling parallel CPU execution, no support present\n" if $cpu;
 		$cpu = 1;
+	}
+
+	# set minimum alignment mapping quality
+	if ( $method =~ /count/ and $mapq ) {
+		use_minimum_mapq($mapq);
 	}
 }
 
@@ -925,6 +932,10 @@ sub _set_metadata {
 	if ($data_database) {
 		$Data->metadata( $new_index, 'db', $data_database );
 	}
+
+	if ( $dataset =~ / \. (b|cr) am $/xni and $method =~ /count/ ) {
+		$Data->metadata( $index, 'mapq', $mapq );
+	}
 }
 
 __END__
@@ -960,6 +971,7 @@ A program to collect data in bins across a list of features.
         5p_utr|3p_utr] 
   --long                              collect each window independently
   -r --format <integer>               number of decimal places for numbers
+  --mapq <integer>                    minimum map quality of counted alignments
   
   Bin specification:
   -b --bins <integer>                 number of bins feature is divided (10)
@@ -1123,6 +1135,15 @@ when subfeatures are enabled.
 Specify the number of decimal positions to format the collected scores. 
 Default is not to format, often leading to more than the intended 
 significant digits.
+
+=item --mapq E<lt>integer<gt>
+
+Specify the minimum mapping quality of alignments to be considered when
+counting from a Bam file. Default is 0, which will include all alignments,
+including multi-mapping (typically MAPQ of 0). Set to an integer in range
+of 0..255. Only affects count methods, including C<count>, C<ncount>, and
+C<pcount>. Other methods involving coverage, e.g. C<mean>, do not filter
+alignments.
 
 =back
 

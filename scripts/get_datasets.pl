@@ -14,6 +14,7 @@ use Bio::ToolBox::db_helper qw(
 	verify_or_request_feature_types
 	check_dataset_for_rpm_support
 	calculate_score
+	use_minimum_mapq
 	$BAM_ADAPTER
 	$BIG_ADAPTER
 );
@@ -26,7 +27,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print "\n A program to collect data for a list of features\n\n";
 
@@ -54,6 +55,7 @@ my (
 	$format,        $win,           $step,            $exclusion_file,
 	$chrskip,       $prefix_text,   $set_strand,      $discard,
 	$gz,            $cpu,           $help,            $print_version,
+	$mapq
 );
 my @datasets;    # an array of names of dataset values to be retrieved
 
@@ -81,6 +83,7 @@ GetOptions(
 	'fpkm|rpkm=s'     => \$fpkm_method,        # set the fpkm method
 	'tpm!'            => \$tpm,                # calculate a tpm
 	'r|format=i'      => \$format,             # decimal formatting
+	'mapq=i'          => \$mapq,               # minimum map quality
 	'win=i'           => \$win,                # indicate the size of genomic intervals
 	'step=i'          => \$step,               # step size for genomic intervals
 	'blacklist=s'     => \$exclusion_file,     # exclusion intervals for genomic intervals
@@ -538,6 +541,11 @@ m/^ (?: median | mean | stddev | min | max | range | sum | count | pcount | ncou
 	if ( $discard and $method !~ /count/ ) {
 		print " discard features best intended for count data, not $method data\n";
 	}
+
+	# set minimum alignment mapping quality
+	if ( $method =~ /count/ and $mapq ) {
+		use_minimum_mapq($mapq);
+	}
 }
 
 sub parallel_execution {
@@ -893,6 +901,11 @@ sub add_new_dataset {
 		$Data->metadata( $index, 'relative_position', 'summit' );
 	}
 
+	# add map quality as appropriate
+	if ( $dataset =~ / \. (b|cr) am $/xni and $method =~ /count/ ) {
+		$Data->metadata( $index, 'mapq', $mapq );
+	}
+
 	# add database name if different
 	if ( defined $data_database ) {
 		$Data->metadata( $index, 'db', $data_database );
@@ -1129,6 +1142,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --tpm                               calculate TPM values
   -r --format <integer>               number of decimal places for numbers
   --discard <number>                  discard features whose sum below threshold
+  --mapq <integer>                    minimum map quality of counted alignments
   
   Adjustments to features:
   -x --extend <integer>               extend the feature in both directions
@@ -1375,12 +1389,12 @@ more global normalization is needed.
 
 =back
 
-The region method is best used with RNASeq data and a complete gene 
-annotation table. The genome method is best used with partial annotation 
-tables or other Seq types, such as ChIPSeq. This option can only be used 
-with one of the count methods (count, ncount, pcount). A sum method may be 
-cautiously allowed if, for example, using bigWig point data. The FPKM values 
-are appended as additional columns in the output table.
+The region method is best used with RNASeq data and a complete gene
+annotation table. The genome method is best used with partial annotation
+tables or other Seq types, such as ChIPSeq. This option can only be used
+with one of the count methods (C<count>, C<ncount>, C<pcount>). A sum
+method may be cautiously allowed if, for example, using bigWig point data.
+The FPKM values are appended as additional columns in the output table.
 
 =item --tpm
 
@@ -1402,6 +1416,15 @@ alignment counts over features or genomic windows, where some features are
 expected to return a zero count. Note that this only checks the datasets 
 that were newly collected. For more advanced filtering, see 
 L<manipulate_datasets.pl>.
+
+=item --mapq E<lt>integer<gt>
+
+Specify the minimum mapping quality of alignments to be considered when
+counting from a Bam file. Default is 0, which will include all alignments,
+including multi-mapping (typically MAPQ of 0). Set to an integer in range
+of 0..255. Only affects count methods, including C<count>, C<ncount>, and
+C<pcount>. Other methods involving coverage, e.g. C<mean>, do not filter
+alignments.
 
 =back
 

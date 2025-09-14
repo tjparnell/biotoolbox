@@ -13,6 +13,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	calculate_score
+	use_minimum_mapq
 	$BAM_ADAPTER
 	$BIG_ADAPTER
 );
@@ -33,7 +34,7 @@ eval {
 # served by separate database queries for each window.
 use constant DATASET_HASH_LIMIT => 4999;
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 print
 	"\n A script to collect windowed data flanking a relative position of a feature\n\n";
@@ -59,6 +60,7 @@ my (
 	$down_number, $position,  $strand_sense, $set_strand,    $avoid,
 	$avoidtype,   $long_data, $smooth,       $sum,           $format,
 	$groupcol,    $gz,        $cpu,          $help,          $print_version,
+	$mapq
 );    # command line variables
 my @datasets;
 
@@ -86,6 +88,7 @@ GetOptions(
 	'smooth!'    => \$smooth,           # smooth by interpolation
 	'U|sum!'     => \$sum,              # generate average profile
 	'r|format=i' => \$format,           # decimal formatting
+	'mapq=i'     => \$mapq,             # minimum map quality
 	'g|groups'   => \$groupcol,         # write group column file
 	'z|gz!'      => \$gz,               # compress the output file
 	'c|cpu=i'    => \$cpu,              # number of execution threads
@@ -474,6 +477,11 @@ sub check_defaults {
 		print " disabling parallel CPU execution, no support present\n" if $cpu;
 		$cpu = 1;
 	}
+
+	# set minimum alignment mapping quality
+	if ( $method =~ /count/ and $mapq ) {
+		use_minimum_mapq($mapq);
+	}
 }
 
 ## Run in parallel
@@ -668,6 +676,9 @@ sub prepare_window_datasets {
 			$Data->metadata( $new_index, 'avoid',
 				ref($avoid) eq 'ARRAY' ? join( ',', @{$avoid} ) : $avoid );
 		}
+		if ( $dataset =~ / \. (b|cr) am $/xni and $method =~ /count/ ) {
+			$Data->metadata( $index, 'mapq', $mapq );
+		}
 	}
 }
 
@@ -845,6 +856,7 @@ get_relative_data.pl [--options] -i <filename> <data1> <data2...>
   --avtype [type,type,...]            alternative types of feature to avoid
   --long                              collect each window independently
   -r --format <integer>               number of decimal places for numbers
+  --mapq <integer>                    minimum map quality of counted alignments
   
   Bin specification:
   -w --win <integer>                  size of windows, default 50 bp
@@ -1028,6 +1040,15 @@ than once in long mode when they span multiple windows.
 Specify the number of decimal positions to format the collected scores. 
 Default is not to format, often leading to more than the intended 
 significant digits.
+
+=item --mapq E<lt>integer<gt>
+
+Specify the minimum mapping quality of alignments to be considered when
+counting from a Bam file. Default is 0, which will include all alignments,
+including multi-mapping (typically MAPQ of 0). Set to an integer in range
+of 0..255. Only affects count methods, including C<count>, C<ncount>, and
+C<pcount>. Other methods involving coverage, e.g. C<mean>, do not filter
+alignments.
 
 =back
 
