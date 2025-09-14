@@ -247,7 +247,7 @@ Convert from generic tables to specific bioinformatic file types.
 
 =over 4
 
-item L<bam2wig.pl>
+=item L<bam2wig.pl>
 
 Generate read or fragment coverage or point data representations of alignments.
 
@@ -270,7 +270,7 @@ Convert a table of coordinates into a properly formatted GFF file.
 
 =back
 
-=head Feature annotation
+=head2 Feature annotation
 
 Work with large genomic annotation feature files.
 
@@ -293,7 +293,7 @@ of features, such as items embedded as key=value attributes in a GFF file.
 
 =back
 
-=header2 Data collection
+=head2 Data collection
 
 Collect data, usually some sort of scores, from genomic data, including bigWig
 and Bam data files among others, for a list of genomic intervals for annotation
