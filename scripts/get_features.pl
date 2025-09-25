@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(
 );
 use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
 
-our $VERSION = '2.00';
+our $VERSION = '2.03';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -34,11 +34,13 @@ unless (@ARGV) {
 
 ### Get command line options and initialize values
 my (
-	$input,               $database,  $id_list,   $get_subfeatures,
-	$include_coordinates, $start_adj, $stop_adj,  $position,
-	$tsl,                 $gencode,   $tbiotype,  $collapse,
-	$chromosome_exclude,  $outfile,   $sort_data, $gz,
-	$bgz,                 $help,      $print_version,
+	$input,           $database,            $id_list,
+	$get_subfeatures, $include_coordinates, $start_adj,
+	$stop_adj,        $position,            $use_id_for_bed,
+	$tsl,             $gencode,             $tbiotype,
+	$collapse,        $chromosome_exclude,  $outfile,
+	$sort_data,       $gz,                  $bgz,
+	$help,            $print_version,
 );
 my $convert_to_bed     = 0;
 my $convert_to_gff     = 0;
@@ -74,6 +76,7 @@ GetOptions(
 	'G|gff|gff3!' => \$convert_to_gff,         # convert to GFF3 format
 	'g|gtf!'      => \$convert_to_gtf,         # convert to gtf format
 	'r|refflat!'  => \$convert_to_refflat,     # convert to refFlat format
+	'useid!'      => \$use_id_for_bed,         # use ID for bed name
 	'o|out=s'     => \$outfile,                # name of output file
 	'sort!'       => \$sort_data,              # sort the output file
 	'z|gz!'       => \$gz,                     # compress output
@@ -161,7 +164,7 @@ sub check_requirements {
 " FATAL: Must provide an input file or database name! use --help for more information\n";
 		exit 1;
 	}
-	if ( $input =~ /\. (?: sqlite | db )$/xi ) {
+	if ( $input and $input =~ /\. (?: sqlite | db )$/xi ) {
 
 		# whoops! specifiying a database file as input
 		$database = $input;
@@ -538,6 +541,8 @@ sub export_to_bed {
 				my $string = $row->bed_string(
 					start => $start,
 					end   => $stop,
+					name  => $use_id_for_bed ? $f->primary_id : $f->display_name
+						|| $f->primary_id,
 				);
 				$outData->add_row($string);
 				$Data->delete_seqfeature( $row->row_index );
@@ -554,7 +559,7 @@ sub export_to_bed {
 			sub {
 				my $row    = shift;
 				my $f      = $row->seqfeature(1);    # make sure we get the seqfeature
-				my $string = bed12_string($f);
+				my $string = bed12_string( $f, $use_id_for_bed );
 				foreach ( split /\n/, $string ) {
 					$outData->add_row($_);
 				}
@@ -568,7 +573,9 @@ sub export_to_bed {
 			sub {
 				my $row    = shift;
 				my $f      = $row->seqfeature(1);    # make sure we get the seqfeature
-				my $string = $row->bed_string;
+				my $string = $row->bed_string(
+					name => $use_id_for_bed ? $f->primary_id : $f->display_name
+						|| $f->primary_id );
 				$outData->add_row($string);
 				$Data->delete_seqfeature( $row->row_index );
 			}
@@ -816,7 +823,7 @@ sub export_to_ucsc {
 		$Data->iterate(
 			sub {
 				my $row    = shift;
-				my $string = ucsc_string( $row->seqfeature(1) );
+				my $string = ucsc_string( $row->seqfeature(1), $use_id_for_bed );
 				foreach ( split /\n/, $string ) {
 					$outData->add_row($_);
 				}
@@ -841,7 +848,7 @@ sub export_to_ucsc {
 		$Data->iterate(
 			sub {
 				my $row    = shift;
-				my $string = ucsc_string( $row->seqfeature(1) );
+				my $string = ucsc_string( $row->seqfeature(1), $use_id_for_bed );
 				$fh->print($string);
 			}
 		);
@@ -1076,12 +1083,11 @@ get_features.pl --in E<lt>filenameE<gt> --out E<lt>filenameE<gt>
 get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   
   Source data:
-  -d --db <name | filename>     database: name, file.db, or file.sqlite
   -i --in <filename>            input annotation: GFF3, GTF, genePred, etc
+  -d --db <name | filename>     database: name, file.db, or file.sqlite
   
   Selection:
   -f --feature <type>           feature: gene, mRNA, transcript, etc
-  -u --sub                      include subfeatures (true if gff, gtf, refFlat)
   
   Filter features:
   -l --list <filename>          file of feature IDs to keep
@@ -1102,11 +1108,13 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   
   Report format options:
   -B --bed                      write BED6 (no --sub) or BED12 (--sub) format
+  -u --sub                      include subfeatures when writing bed format
   -G --gff                      write GFF3 format
   -g --gtf                      write GTF format
   -r --refflat                  write UCSC refFlat format
   -t --tag <text>               include specific GFF attributes in text output
   --coord                       include coordinates in text output
+  --useid                       use ID as the BED name instead of default Name
   
   General options:
   -o --out <filename>           output file name
@@ -1150,14 +1158,6 @@ GFF type, or 3rd column in a GFF3 or GTF file. Examples include
 C<gene>, C<mRNA>, or C<transcript>. The default value for input files 
 is 'C<gene>'. For databases, an interactive list will be presented 
 from which one or more may be chosen.
-
-=item --sub
-
-Optionally include all child subfeatures in the output. For example, 
-transcript, CDS, and/or exon subfeatures of a gene. This option is 
-automatically enabled with GFF, GTF, or refFlat output; it may be 
-turned off with C<--nosub>. With BED output, it will force a BED12 
-file to be written. It has no effect with standard text. 
 
 =back
 
@@ -1284,6 +1284,13 @@ collapsed.
 With subfeatures enabled, write a BED12 (12-column BED) file. 
 Otherwise, write a standard 6-column BED format file. 
 
+=item --sub
+
+Optionally include all child subfeatures (exons) in the output when
+writing a BED format; this forces a BED12 output. This option is 
+automatically enabled with GFF, GTF, or refFlat output. It has no
+effect with standard text. 
+
 =item --gff
 
 Write a GFF version 3 (GFF3) format output file. Subfeatures are 
@@ -1313,6 +1320,15 @@ When writing a standard text file, optionally include the chromosome,
 start, stop, and strand coordinates. These are automatically included 
 in other formats. This is automatically included when adjusting 
 coordinate positions.
+
+=item --useid
+
+Use the feature's Primary ID tag instead of the Display Name tag for use in
+the output Name column when writing to either a BED or UCSC (refFlat)
+format. By default the Display Name is used when available. From GTF files,
+this corresponds to the C<gene_id> or C<transcript_id> tags, rather than
+C<gene_name> or C<transcript_name>. For GFF3 files, this would be C<ID> and
+C<Name> tags.
 
 =back
 
