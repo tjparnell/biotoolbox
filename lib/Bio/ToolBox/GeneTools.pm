@@ -1062,6 +1062,7 @@ sub gtf_string {
 
 sub ucsc_string {
 	my $feature = shift;
+	my $use_id  = shift || 0;
 	confess 'FATAL: not a SeqFeature object!' unless ref($feature) =~ /seqfeature/i;
 	my @ucsc_list;
 
@@ -1070,14 +1071,14 @@ sub ucsc_string {
 
 		# a gene object, we will need to process it's transcript subfeatures
 		foreach my $transcript ( get_transcripts($feature) ) {
-			my $ucsc = _process_ucsc_transcript( $transcript, $feature );
+			my $ucsc = _process_ucsc_transcript( $transcript, $feature, $use_id );
 			push @ucsc_list, $ucsc if $ucsc;
 		}
 	}
 	elsif ( $feature->primary_tag =~ m/rna | transcript/xi ) {
 
 		# some sort of RNA transcript
-		my $ucsc = _process_ucsc_transcript($feature);
+		my $ucsc = _process_ucsc_transcript( $feature, undef, $use_id );
 		push @ucsc_list, $ucsc if $ucsc;
 	}
 	else {
@@ -1107,6 +1108,7 @@ sub ucsc_string {
 
 sub bed12_string {
 	my $feature = shift;
+	my $use_id  = shift || 0;
 	confess 'FATAL: not a SeqFeature object!' unless ref($feature) =~ /seqfeature/i;
 	my @ucsc_list;
 
@@ -1115,14 +1117,14 @@ sub bed12_string {
 
 		# a gene object, we will need to process it's transcript subfeatures
 		foreach my $transcript ( get_transcripts($feature) ) {
-			my $ucsc = _process_ucsc_transcript( $transcript, $feature );
+			my $ucsc = _process_ucsc_transcript( $transcript, $feature, $use_id );
 			push @ucsc_list, $ucsc if $ucsc;
 		}
 	}
 	elsif ( $feature->primary_tag =~ m/rna | transcript/xi ) {
 
 		# some sort of RNA transcript
-		my $ucsc = _process_ucsc_transcript($feature);
+		my $ucsc = _process_ucsc_transcript( $feature, undef, $use_id );
 		push @ucsc_list, $ucsc if $ucsc;
 	}
 	else {
@@ -1329,10 +1331,12 @@ sub filter_transcript_biotype {
 sub _process_ucsc_transcript {
 	my $transcript = shift;
 	my $gene       = shift || undef;
+	my $use_id     = shift || 0;
 
 	# initialize ucsc hash
 	my $ucsc = {
-		'name'       => $transcript->display_name || $transcript->primary_id,
+		'name' => $use_id ? $transcript->primary_id : $transcript->display_name
+			|| $transcript->primary_id,
 		'name2'      => undef,
 		'chr'        => $transcript->seq_id,
 		'strand'     => $transcript->strand < 0 ? '-' : '+',
@@ -1350,7 +1354,8 @@ sub _process_ucsc_transcript {
 	if ($gene) {
 
 		# use provided gene name
-		$ucsc->{'name2'} = $gene->display_name || $gene->primary_id;
+		$ucsc->{'name2'} =
+			$use_id ? $gene->primary_id : $gene->display_name || $gene->primary_id;
 	}
 	else {
 		# reuse the name
@@ -1833,25 +1838,32 @@ This method will automatically recurse through all subfeatures.
 =item ucsc_string
 
 	my $string = ucsc_string($gene);
+	my $string = ucsc_string($gene, $use_id);
 
-This will export a gene or transcript model as a refFlat formatted Gene 
-Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
-for details. Multiple transcript genes are exported as multiple text lines 
-concatenated together. By default, the C<display_name>, C<gene_name>, or
-C<transcript_name> is used preferentially if available, or alternatively
-the C<primary_id>, C<gene_id>, or <transcript_id>, as appropriate.
+This will export a gene or transcript model as a refFlat formatted Gene
+Prediction line (11 columns). See
+L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9> for details. Multiple
+transcript genes are exported as multiple text lines concatenated together.
+Optionally pass a boolean value as to whether the feature's C<primary_id>
+(derived from C<gene_id> or <transcript_id>) is used or not in the output Name
+column. By default, the C<display_name> (derived from C<gene_name> or
+C<transcript_name>) is used preferentially if available.
+
 
 =item bed12_string
 
 	my $string = bed12_string($gene);
+	my $string = bed12_string($gene, $use_id);
 
-This will export a gene or transcript model as a UCSC Bed formatted transcript 
-line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1>
-for details. Multiple transcript genes are exported as multiple text lines 
-concatenated together. Note that gene information is not preserved with Bed12 
-files; only the transcript name is used. The C<RGB> value is set to 0. The
-C<transcript_name> or C<display_name> is used preferentially over the
-C<transcript_id> or C<primary_id>.
+This will export a gene or transcript model as a UCSC Bed formatted transcript
+line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1> for
+details. Multiple transcript genes are exported as multiple text lines
+concatenated together. Note that gene information is not preserved with Bed12
+files; only the transcripts are output. The C<RGB> value is set to 0. Optionally
+pass a boolean value as to whether the feature's C<primary_id> (derived from
+C<gene_id> or <transcript_id>) is used or not in the output Name column. By
+default, the C<display_name> (derived from C<gene_name> or C<transcript_name>)
+is used preferentially if available.
 
 =back
 
