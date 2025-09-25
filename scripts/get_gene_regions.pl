@@ -17,7 +17,7 @@ use Bio::ToolBox::Parser;
 use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::utility   qw(parse_list format_with_commas);
 
-our $VERSION = '2.00';
+our $VERSION = '2.03';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -39,8 +39,8 @@ my (
 	$infile,             $outfile,  $database, $request,
 	$transcript_type,    $tsl,      $gencode,  $tbiotype,
 	$start_adj,          $stop_adj, $unique,   $slop,
-	$chromosome_exclude, $bed,      $gz,       $help,
-	$print_version,
+	$chromosome_exclude, $bed,      $gz,       $bed_name,
+	$help,               $print_version,
 );
 my @feature_types;
 
@@ -61,6 +61,7 @@ GetOptions(
 	'l|slop=i'        => \$slop,                # slop factor in bp to identify uniqueness
 	'K|chrskip=s'     => \$chromosome_exclude,  # skip chromosomes
 	'bed!'            => \$bed,                 # convert the output to bed format
+	'bedname=s'       => \$bed_name,            # what to use for bed name
 	'z|gz!'           => \$gz,                  # compress output
 	'h|help'          => \$help,                # request help
 	'v|version'       => \$print_version,       # print the version
@@ -156,15 +157,47 @@ $outdata->gsort_data;
 ### Write the file
 my $success;
 if ($bed) {
+
+	# output stream
 	my $Stream = Bio::ToolBox::Data->new(
 		stream => 1,
 		out    => $outfile,
 		bed    => 6,
 	) or die "unable to write output file '$outfile'!";
+
+	# determine what to use for bed name column
+	my $name_i;
+	if ($bed_name) {
+		if ( $bed_name =~ /geneid/i ) {
+			$name_i = 1;
+		}
+		elsif ( $bed_name =~ /genename/i ) {
+			$name_i = 2;
+		}
+		elsif ( $bed_name =~ /transcriptid/i ) {
+			$name_i = 3;
+		}
+		elsif ( $bed_name =~ /transcriptname/i ) {
+			$name_i = 4;
+		}
+		elsif ( $bed_name =~ /featurename/i ) {
+			$name_i = 5;
+		}
+		else {
+			printf " ERROR: unrecognized bed name '%s'! Using default feature name\n";
+			$name_i = 5;
+		}
+	}
+	else {
+		$name_i = 5;
+	}
+
+	# generate bed
 	$outdata->iterate(
 		sub {
-			my $row       = shift;
-			my $bedstring = $row->bed_string( bed => 6 );
+			my $row = shift;
+			my $bedstring =
+				$row->bed_string( bed => 6, name => $row->value($name_i) );
 			$Stream->write_row($bedstring);
 		}
 	);
@@ -1431,14 +1464,20 @@ get_gene_regions.pl [--options...] --db <text> --out E<lt>filenameE<gt>
   -K --chrskip <regex>          skip features from certain chromosomes
   
   Adjustments:
-  -b --begin --start integer     specify adjustment to start coordinate
-  -e --end --stop integer        specify adjustment to stop coordinate
+  -b --begin --start integer    specify adjustment to start coordinate
+  -e --end --stop integer       specify adjustment to stop coordinate
   
-  General options:
+  Output options:
+  -o --out <filename>           specify output name
   --bed                         output as a bed6 format
-  -o --out <filename>              specify output name
-  -z --gz                          compress output
-  -v --version                     print version and exit
+  --bedname                     specify what to use for bed name column
+       [genename|geneid|            default is 'featurename'
+       transcriptname|transcriptid
+       featurename]
+  -z --gz                       compress output
+
+  General options:
+  -v --version                  print version and exit
   -h --help
 
 =head1 OPTIONS
@@ -1607,21 +1646,38 @@ the feature startpoint or endpoint, depending on its orientation.
 
 =back
 
-=head2 General options
+=head2 Output options
 
 =over 4
-
-=item --bed
-
-Automatically convert the output file to a BED file.
 
 =item --out E<lt>filenameE<gt>
 
 Specify the output filename.
 
+=item --bed
+
+Automatically convert the output file to a BED file.
+
+=item --bedname E<lt>name<gt>
+
+Specify what to use for the Name column in the output BED file.
+Several options are available, including:
+
+    geneid          - The Primary ID of the parent Gene feature
+    genename        - The Display Name of the parent Gene feature
+    transcriptid    - The Primary ID of the parent Transcript feature
+    transcriptname  - The Display Name of the parent Transcript feature
+    featurename     - The generated name of the feature (default)
+
 =item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
+
+=back
+
+=head2 General options
+
+=over 4
 
 =item --version
 
