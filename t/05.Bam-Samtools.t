@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if ( eval { require Bio::DB::Sam; 1 } ) {
-		plan tests => 57;
+		plan tests => 71;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::Sam not available';
@@ -24,7 +24,8 @@ require_ok 'Bio::ToolBox::Data'
 	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
 use_ok(
 	'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support',
-	'get_chromosome_list',     'get_genomic_sequence'
+	'get_chromosome_list',     'get_genomic_sequence',
+	'use_minimum_mapq'
 );
 
 my $dataset = File::Spec->catfile( $Bin, "Data", "sample1.bam" );
@@ -44,13 +45,22 @@ isa_ok( $db, 'Bio::DB::Sam', 'connected database' );
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
-is( scalar @chromos, 1,      'number of chromosomes' );
-is( $chromos[0][0],  'chrI', 'name of first chromosome' );
-is( $chromos[0][1],  230208, 'length of first chromosome' );
+is( scalar @chromos, 1,      'bam number of chromosomes' );
+is( $chromos[0][0],  'chrI', 'bam name of first chromosome' );
+is( $chromos[0][1],  230208, 'bam length of first chromosome' );
 
 # check total mapped alignments
 my $total = check_dataset_for_rpm_support($dataset);
 is( $total, 1414, "number of mapped alignments in bam" );
+
+# check mapping quality
+is( use_minimum_mapq(),    0,   'default minimum mapq' );
+is( use_minimum_mapq(100), 100, 'update minimum mapq' );
+$total = check_dataset_for_rpm_support($dataset);
+
+# this does not change because the value is cached
+is( $total,              1414, "number of total alignments with high mapq" );
+is( use_minimum_mapq(0), 0,    'reset minimum mapq' );    # reset for below
 
 # check fasta
 my $fdb = $Data->open_new_database($fasta);
@@ -72,15 +82,23 @@ my $segment = $row->segment;
 isa_ok( $segment, 'Bio::DB::Sam::Segment', 'row segment' );
 is( $segment->start, 54989, 'segment start' );
 
-# read count sum
+# read count sum with default mapq
 my $score = $row->get_score(
 	'db'      => $dataset,
 	'dataset' => $dataset,
 	'method'  => 'count',
 );
+is( $score, 453, 'row sum of read count score with low mapq' );
 
-# print "count sum for ", $row->name, " is $score\n";
-is( $score, 453, 'row sum of read count score' );
+# check with high mapq
+use_minimum_mapq(100);
+$score = $row->get_score(
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'count',
+);
+is( $score, 429, 'read count score with high mapq' );
+use_minimum_mapq(0);    # reset again
 
 # mean coverage
 $score = $row->get_score(
@@ -88,9 +106,17 @@ $score = $row->get_score(
 	'dataset' => $dataset,
 	'method'  => 'mean',
 );
+is( sprintf( "%.2f", $score ), 16.33, 'row mean coverage with low mapq' );
 
-# print "mean coverage for ", $row->name, " is $score\n";
-is( sprintf( "%.2f", $score ), 16.33, 'row mean coverage' );
+# check mean coverage with high mapq – should not change
+use_minimum_mapq(100);
+$score = $row->get_score(
+	'db'      => $db,
+	'dataset' => $dataset,
+	'method'  => 'mean',
+);
+is( sprintf( "%.2f", $score ), 16.33, 'row mean coverage with high mapq' );
+use_minimum_mapq(0);
 
 # read precise count sum
 $score = $row->get_score(
@@ -98,9 +124,17 @@ $score = $row->get_score(
 	'dataset' => $dataset,
 	'method'  => 'pcount',
 );
+is( $score, 414, 'row sum of read precise count score with low mapq' );
 
-# print "count sum for ", $row->name, " is $score\n";
-is( $score, 414, 'row sum of read precise count score' );
+# read precise count sum with high mapq
+use_minimum_mapq(100);
+$score = $row->get_score(
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'pcount',
+);
+is( $score, 398, 'row sum of read precise count with high mapq' );
+use_minimum_mapq(0);
 
 # read ncount sum
 $score = $row->get_score(
@@ -108,23 +142,29 @@ $score = $row->get_score(
 	'dataset' => $dataset,
 	'method'  => 'ncount',
 );
+is( $score, 453, 'row read name count score with low mapq' );
 
-# print "ncount sum for ", $row->name, " is $score\n";
-is( $score, 453, 'row read name count score' );
+# read ncount sum with high mapq
+use_minimum_mapq(100);
+$score = $row->get_score(
+	'db'      => $dataset,
+	'dataset' => $dataset,
+	'method'  => 'ncount',
+);
+is( $score, 429, 'row read name count score with high mapq' );
+use_minimum_mapq(0);
 
 ### Move to the next row
 $row = $stream->next_row;
 is( $row->start,  57029, 'row start position' );
 is( $row->strand, -1,    'row strand' );
 
-# try stranded data collection
+# stranded alignment count
 $score = $row->get_score(
 	'dataset'  => $dataset,
 	'method'   => 'count',
 	'stranded' => 'all',
 );
-
-# print "all read count sum for ", $row->name, " is $score\n";
 is( $score, 183, 'row sum of count score for all strands' );
 
 $score = $row->get_score(
@@ -132,8 +172,6 @@ $score = $row->get_score(
 	'method'   => 'count',
 	'stranded' => 'sense',
 );
-
-# print "sense read count sum for ", $row->name, " is $score\n";
 is( $score, 86, 'row sum of count score for sense strand' );
 
 $score = $row->get_score(
@@ -141,17 +179,15 @@ $score = $row->get_score(
 	'method'   => 'count',
 	'stranded' => 'antisense',
 );
-
-# print "antisense read count sum for ", $row->name, " is $score\n";
 is( $score, 97, 'row sum of count score for antisense strand' );
 
+# stranded coverage
+# low level coverage does not support stranded collection so values should be identical
 $score = $row->get_score(
 	'dataset'  => $dataset,
 	'method'   => 'mean',
 	'stranded' => 'sense',
 );
-
-# print "sense mean coverage for ", $row->name, " is $score\n";
 is( sprintf( "%.2f", $score ), 29.38, 'row mean coverage for sense strand' );
 
 $score = $row->get_score(
@@ -160,68 +196,105 @@ $score = $row->get_score(
 	'method'   => 'mean',
 	'stranded' => 'antisense',
 );
-
-# print "antisense mean coverage for ", $row->name, " is $score\n";
-is( sprintf( "%.2f", $score ), 29.38, 'row mean coverage for sense strand' );
+is( sprintf( "%.2f", $score ), 29.38, 'row mean coverage for antisense strand' );
 
 ### Move to third row
 # test row positioned score using bam file
 $row = $stream->next_row;
 is( $row->name, 'YAL044W-A', 'row name' );
 
+# positioned scores using standard count
 my %pos2scores = $row->get_region_position_scores(
 	'dataset' => $dataset,
 	'method'  => 'count',
 );
-is( scalar keys %pos2scores, 150, 'number of positioned scores' );
 
-# print "found ", scalar keys %pos2scores, " positions with reads\n";
+# print " > found ", scalar keys %pos2scores, " positions with reads at MAPQ 0\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
-# 	print "  $_ => $pos2scores{$_}\n";
+# 	print "  > $_ => $pos2scores{$_}\n";
 # }
-is( $pos2scores{6},   1, 'positioned count at 6' );
-is( $pos2scores{-21}, 2, 'positioned count at -21' );
+is( scalar keys %pos2scores, 150, 'number of positioned scores' );
+is( $pos2scores{101},        2,   'positioned count at 101' );
+is( $pos2scores{-21},        2,   'positioned count at -21' );
 
+# repeat with high mapping quality
+use_minimum_mapq(100);
+%pos2scores = $row->get_region_position_scores(
+	'dataset' => $dataset,
+	'method'  => 'count',
+);
+
+# print " > found ", scalar keys %pos2scores, " positions with reads at MAPQ 30\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  > $_ => $pos2scores{$_}\n";
+# }
+is( scalar keys %pos2scores, 145, 'number of positioned scores with high mapq' );
+is( $pos2scores{101},        1,   'positioned count at 101 with high mapq' );
+is( $pos2scores{-21},        2,   'positioned count at -21 with high mapq' );
+use_minimum_mapq(0);
+
+# positioned count with precise count
 %pos2scores = $row->get_region_position_scores(
 	'dataset' => $dataset,
 	'method'  => 'pcount',
 );
 
-# print "found ", scalar keys %pos2scores, " positions with precise reads\n";
+# print " > found ", scalar keys %pos2scores, " positions with precise reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
-# 	print "  $_ => $pos2scores{$_}\n";
+# 	print "  > $_ => $pos2scores{$_}\n";
 # }
 is( scalar keys %pos2scores, 89, 'number of precise positioned scores' );
-is( $pos2scores{37},         1,  'precise positioned count at 37' );
-is( $pos2scores{72},         2,  'precise positioned count at 72' );
+is( $pos2scores{72},         2,  'pcount at position 72' );
+is( $pos2scores{118},        1,  'pcount at position 118' );
 
+# repeat pcount positioned data with high mapping quality
+use_minimum_mapq(100);
+%pos2scores = $row->get_region_position_scores(
+	'dataset' => $dataset,
+	'method'  => 'pcount',
+);
+
+# print " > found ", scalar keys %pos2scores, " positions with precise reads at high mapq\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  > $_ => $pos2scores{$_}\n";
+# }
+is( scalar keys %pos2scores, 87, 'number of precise positioned scores with high mapq' );
+is( $pos2scores{72},         1,  'pcount at pos 72 with high mapq' );
+is( ( exists $pos2scores{118} ), q(), 'pcount missing at pos 118 with high mapq' );
+use_minimum_mapq(0);
+
+# positioned count data with names
 %pos2scores = $row->get_region_position_scores(
 	'dataset' => $dataset,
 	'method'  => 'ncount',
 );
 
-# print "found ", scalar keys %pos2scores, " positions of named reads\n";
+# print " > found ", scalar keys %pos2scores, " positions of named reads at MAPQ 0\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
-# 	printf "  $_ => %s\n", join(',', @{$pos2scores{$_}});
+# 	printf "  > $_ => %s\n", join(',', @{$pos2scores{$_}});
 # }
 is( scalar keys %pos2scores, 150, 'number of named positioned scores' );
 is( $pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1', 'positioned named at 6' );
-is( scalar @{ $pos2scores{56} }, 2, 'positioned name count at 56' );
+is( scalar @{ $pos2scores{101} }, 2, 'positioned name count at 101' );
 
+# repeat ncount positioned data with high mapping quality
+use_minimum_mapq(100);
 %pos2scores = $row->get_region_position_scores(
-	'dataset'  => $dataset,
-	'absolute' => 1,
-	'stranded' => 'antisense',
-	'method'   => 'count',
+	'dataset' => $dataset,
+	'method'  => 'ncount',
 );
 
-# print "found ", scalar keys %pos2scores, " positions with reads\n";
+# print " > found ", scalar keys %pos2scores, " positions of named reads at MAPQ 100\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
-# 	print "  $_ => $pos2scores{$_}\n";
+# 	printf "  > $_ => %s\n", join(',', @{$pos2scores{$_}});
 # }
-is( scalar keys %pos2scores, 79, 'number of positioned scores' );
-is( $pos2scores{57593},      2,  'positioned score at 57593' );
-is( $pos2scores{57613},      1,  'positioned score at 57613' );
+is( scalar keys %pos2scores, 145, 'number of named positioned scores with high MAPQ' );
+is(
+	$pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1',
+	'positioned named at 6 with high MAPQ'
+);
+is( scalar @{ $pos2scores{101} }, 1, 'positioned name count at 101 with high MAPQ' );
+use_minimum_mapq(0);
 
 # Fetch alignments
 my $alignment_data = { mapq => [] };
