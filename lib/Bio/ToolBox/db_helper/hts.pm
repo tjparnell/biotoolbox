@@ -16,7 +16,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.00';
+our $VERSION = '2.03';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -228,8 +228,6 @@ sub sum_total_bam_alignments {
 
 	# Passed arguments;
 	my $sam_file = shift;
-	my $min_mapq = shift || 0;    # by default we take all alignments
-	my $paired   = shift || 0;    # by default we assume all alignments are single-end
 	my $cpu      = shift || 2;    # number of forks to execute in parallel
 	$cpu = 1 unless ($parallel);
 	unless ($sam_file) {
@@ -251,64 +249,32 @@ sub sum_total_bam_alignments {
 		return unless ($bam);
 	}
 
+	# prepare the alignment iterator callback
+	my $callback = sub {
+		my ( $a, $n ) = @_;
+
+		# check alignment flags
+		my $flag = $a->flag;
+		return if $flag & 0xf04;    # UNMAP,SECONDARY,QCFAIL,DUP,SUPPLEMENTARY
+
+		# check mapping quality based on global variable
+		return if $a->qual < $MAPQ;
+
+		# count properly paired alignments only once by skipping reverse alignment
+		if ( $flag & 0x01 and $flag & 0x2 ) {
+			return if ( $flag & 0x10 );
+		}
+
+		# count this fragment
+		${$n}++;
+	};
+
 	# prepare the counting subroutine
 	my $counter = sub {
 		my $tid    = shift;
 		my $number = 0;
-
-		# process the reads according to single or paired-end
-		# paired end alignments
-		if ($paired) {
-			$bam->hts_index->fetch(
-				$bam->hts_file,
-				$tid, 0,
-				$bam->target_len($tid),
-				sub {
-					my ( $a, $n ) = @_;
-
-					# check alignment
-					my $flag = $a->flag;
-					return if $flag & 0x4;       # unmapped
-					return if $flag & 0x0100;    # secondary alignment
-					return if $flag & 0x0400;    # marked duplicate
-					return if $flag & 0x0800;    # supplementary hit
-
-					# check paired alignment
-					return unless $flag & 0x2;      # proper_pair;
-					return if $flag & 0x8;          # mate unmapped
-					return if $flag & 0x10;         # reversed, only count left alignments
-					return if $a->qual < $min_mapq;
-
-					# count this fragment
-					${$n}++;
-				},
-				\$number
-			);
-		}
-
-		# single end alignments
-		else {
-			$bam->hts_index->fetch(
-				$bam->hts_file,
-				$tid, 0,
-				$bam->target_len($tid),
-				sub {
-					my ( $a, $n ) = @_;
-
-					# check alignment
-					my $flag = $a->flag;
-					return if $flag & 0x4;            # unmapped
-					return if $flag & 0x0100;         # secondary alignment
-					return if $flag & 0x0400;         # marked duplicate
-					return if $flag & 0x0800;         # supplementary hit
-					return if $a->qual < $min_mapq;
-
-					# count this fragment
-					${$n}++;
-				},
-				\$number
-			);
-		}
+		$bam->hts_index->fetch( $bam->hts_file, $tid, 0, $bam->target_len($tid),
+			$callback, \$number );
 		return $number;
 	};
 
@@ -483,9 +449,14 @@ with positioned scores.
 
 =item sum_total_bam_alignments
 
-This subroutine will sum the total number of properly mapped alignments 
-in a bam file. Pass the subroutine one to four arguments in the following 
-order. 
+This subroutine will sum the total number of mapped fragments 
+in a bam file. Properly paired alignments are counted once, and
+supplemental, secondary, and marked duplicate alignments are ignored.
+Alignments may be filtered by mapping quality. Use the
+L<Bio::ToolBox::db_helper> C<use_minimum_mapq()> function to set
+the minimum allowed mapping quality.
+ 
+Pass the subroutine one or optionally two arguments in the following order. 
 
 =over 4
 
@@ -494,20 +465,7 @@ order.
 The name of the Bam file which should be counted. Alternatively, an 
 opened L<Bio::DB::HTS> object may also be given. Required.
 
-=item 2. Minimum mapping quality (integer)
-
-Optionally pass the minimum mapping quality of the reads to be 
-counted. The default is 0, where all alignments are counted.
-Maximum is 255. See the SAM specification for details.
-
-=item 3. Paired-end (boolean)
-
-Optionally pass a boolean value (1 or 0) indicating whether 
-the Bam file represents paired-end alignments. Only proper 
-alignment pairs are counted. The default is to treat all 
-alignments as single-end.
-
-=item 4. Number of forks (integer)
+=item 2. Number of forks (integer)
 
 Optionally pass the number of parallel processes to execute 
 when counting alignments. Walking through a Bam file is 
