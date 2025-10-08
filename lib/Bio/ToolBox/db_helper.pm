@@ -151,7 +151,7 @@ sub use_big_adapter {
 }
 
 sub use_minimum_mapq {
-	my $m = shift || undef;
+	my $m = shift;
 	if ( defined $m ) {
 		$m = int $m;
 		unless ( 0 <= $m <= 255 ) {
@@ -922,14 +922,13 @@ sub check_dataset_for_rpm_support {
 	my $cpu     = shift;
 
 	# Calculate the total number of reads
-	# this uses the global variable $rpkm_read_sum
 	my $rpm_read_sum;
 
 	if ( exists $TOTAL_READ_NUMBER{$dataset} ) {
 
 		# this dataset has already been summed
 		# no need to do it again
-		$rpm_read_sum = $TOTAL_READ_NUMBER{$dataset};
+		return $TOTAL_READ_NUMBER{$dataset};
 	}
 
 	elsif ( $dataset =~ /\.bam$/ ) {
@@ -939,13 +938,30 @@ sub check_dataset_for_rpm_support {
 		_load_bam_helper_module() unless $BAM_OK;
 		if ($BAM_OK) {
 
-			# Bio::ToolBox::db_helper::bam was loaded ok
+			# adapter was loaded ok
 			# sum the number of reads in the dataset
-			$rpm_read_sum = sum_total_bam_alignments( $dataset, 0, 0, $cpu );
+			$rpm_read_sum = sum_total_bam_alignments( $dataset, $cpu );
 		}
 		else {
 			carp
 'ERROR: Bam support is not available! Is Bio::DB::Sam or Bio::DB::HTS installed?';
+			return;
+		}
+	}
+
+	elsif ( $dataset =~ /\.cram$/ ) {
+
+		# a cram file dataset
+
+		_load_bam_helper_module() unless $BAM_OK;
+		if ( $BAM_OK and lc $BAM_ADAPTER eq 'hts' ) {
+
+			# adapter was loaded ok
+			# sum the number of reads in the dataset
+			$rpm_read_sum = sum_total_bam_alignments( $dataset, $cpu );
+		}
+		else {
+			carp 'ERROR: Cram support requires Bio::DB::HTS to be installed';
 			return;
 		}
 	}
@@ -2401,13 +2417,6 @@ types.
 
 =item check_dataset_for_rpm_support($dataset, [$cpu])
 
-   # count the total number of alignments
-   my $dataset = '/path/to/file.bam';
-   my $total_count = check_dataset_for_rpm_support($dataset);
-   
-   # use multithreading
-   my $total_count = check_dataset_for_rpm_support($dataset, $cpu);
-
 This subroutine will check a dataset for RPM, or Reads Per Million mapped, 
 support. Only two types of database files support this, Bam files and 
 BigBed files. If the dataset is either one of these, or the name of a 
@@ -2417,14 +2426,22 @@ calculate the total number of mapped alignments (Bam file) or features
 not support RPM (because it is not a Bam or BigBed file, for example), 
 then it will return undefined.
 
-Pass this subroutine one or two values. The first is the name of the 
-dataset. Ideally it should be validated using verify_or_request_feature_types() 
-and have an appropriate prefix (file, http, or ftp). 
+Pass this subroutine one or two values. The first is the name of the
+dataset. Ideally it should be validated using
+L<verify_or_request_feature_types> and have an appropriate prefix (file,
+http, or ftp). For multi-threaded execution, optionally pass a second value
+for the number of CPU cores to use to count Bam files. This will speed up
+counting bam files considerably. The default is 2 for environments where
+L<Parallel::ForkManager> is installed, or 1 where it is not.
 
-For multi-threaded execution pass a second value, the number of CPU cores 
-available to count Bam files. This will speed up counting bam files 
-considerably. The default is 2 for environments where L<Parallel::ForkManager> 
-is installed, or 1 where it is not.
+The mapping quality of alignments may be filtered by setting a global
+filter using L</use_minimum_mapq> function. Example:
+
+   # count the total number of alignments
+   my $dataset = '/path/to/file.bam';
+   my $cpu = 4;
+   use_minimum_mapq(13);
+   my $total_count = check_dataset_for_rpm_support($dataset, $cpu);
 
 =item get_new_feature_list
 
