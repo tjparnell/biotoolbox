@@ -9,7 +9,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 248;
+	plan tests => 261;
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
@@ -187,8 +187,10 @@ for my $i ( 1 .. $Data->last_row ) {
 }
 my $index = $Data->add_column( \@new_column );
 is( $index, 9, 'added column index' );
-is( $Data->value( 78, 9 ),
-	'Feature78', 'checked column value after adding new column values' );
+is(
+	$Data->value( 78, 9 ),
+	'Feature78', 'checked column value after adding new column values'
+);
 
 # copy a column
 $index = $Data->copy_column(9);
@@ -350,8 +352,10 @@ my $args = {
 	practical_start => 1001,
 	practical_stop  => 2000
 };
-is( $row->calculate_reference($args),
-	1501, 'midpoint reference position of given positions' );
+is(
+	$row->calculate_reference($args),
+	1501, 'midpoint reference position of given positions'
+);
 
 undef $row;
 undef $stream;
@@ -532,4 +536,38 @@ is( $headers[1],      'Start0',      'second column header name' );
 is( $headers[6],      'signalValue', 'third column header name' );
 $fh->close;
 unlink('test.txt');
+
+# test coordinate strings
+undef $Data;
+$infile = File::Spec->catfile( $Bin, 'Data', 'sample.bed' );
+$Data   = Bio::ToolBox::Data->new( in => $infile );
+isa_ok( $Data, 'Bio::ToolBox::Data', 'new sample bed file object' );
+my $Data1 = Bio::ToolBox::Data->new( columns => [qw(Coordinate Name)] );
+isa_ok( $Data1, 'Bio::ToolBox::Data', 'new empty Data object with columns' );
+$iterate_success = $Data->iterate(
+	sub {
+		my $r = shift;
+		my $c = $r->coordinate;
+		$Data1->add_row( [ $c, $r->display_name ] );
+	}
+);
+is( $Data1->number_rows, $Data->number_rows, 'number of new rows' );
+
+# check extraction of coordinates from string, start is transformed
+$row = $Data1->get_row(1);
+isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'first feature' );
+is( $row->seq_id, 'chrI', 'extracted seq_id from coordinate string' );
+is( $row->start,  54989,  'extracted start from coordinate string' );
+is( $row->end,    56857,  'extracted end from coordinate string' );
+
+# test resorting by genomic string
+# but need to remove the oddball chromosome "I"
+is( $Data1->delete_row(2), 1, 'delete abnormal chromosome' );
+
+# sort data first by name, then by genomic coordinate from coordinate string
+is( $Data1->sort_data( 2, 'i' ), 1,         'resort data by name' );
+is( $Data1->value( 1, 2 ),       'YAL043C', 'check resorted first row name' );
+is( $Data1->gsort_data,          1,         'resort data by coordinate' );
+is( $Data1->value( 1, 2 ),       'YAL047C', 'check resorted first row name' );
+is( $Data1->value( 4, 2 ),       'YAL043C', 'check resorted last row name' );
 
