@@ -778,6 +778,8 @@ sub sort_data {
 		else {
 
 			# no discernable integer in string
+			# we intentionally avoid integers in middle of string cus it's not clear
+			# those should be used in sorting, so just do the string asciibetically
 			# use identical integer at the beginning and end
 			push @mixed_items, [ 1, $v, 1, $row_i ];
 		}
