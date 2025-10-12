@@ -51,7 +51,7 @@ sub get_base_options {
 			'File::Which'             => 1.17,
 			'Getopt::Long'            => 2.24,
 			'IO::Prompt::Tiny'        => 0.003,
-			'List::Util'              => 1.45,
+			'List::Util'              => 1.55,
 			'List::MoreUtils'         => 0.400,
 			'Module::Load'            => 0.32,
 			'Scalar::Util'            => 1.45,
