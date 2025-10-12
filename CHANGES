@@ -1,6 +1,43 @@
 ######## Bio::ToolBox revision history #############
 
 
+v2.03
+	- Improve Data table sorting (again) to handle natural sorting by
+	  using embedded numeric values, regardless at beginning, middle,
+	  or end of string – useful for genes or numbered items with prefix/suffix.
+	- Add new functions to report statistics on feature length and filter
+	  features by length (minimum - maximum range) in manipulate_datasets.pl.
+	- Add new option to filter alignments based on mapping quality when
+	  counting using data collection apps get_datasets.pl, get_binned_data.pl
+	  and get_relative_data.pl. 
+	- Add new options for specifying what to use for the output Bed Name
+	  column from apps get_features.pl and get_gene_regions.pl, including
+	  feature Name or ID.
+	- Optimize alignment filtering based on flags for a very slight, but
+	  measurable, improvement in execution time when collecting alignment
+	  counts or generating wig files with bam2wig.pl.
+	- Avoid writing duplicate comment lines when merging files in merge_datasets.pl.
+	- Remove silly multiple-zero prefix when naming features in data2bed.pl
+	  and data2gff.pl.
+	- The new_data() method now properly recognizes options in Bio::ToolBox.
+	- Added new new_bed() shortcut method to Bio::ToolBox.
+	- Avoid writing any metadata or comment lines to TSV files. Presumption
+	  is that these are primarily for data export and sharing. Add rudimentary
+	  support for writing CSV files.
+	- Improve coordinate extraction from coordinate strings, allowing to extract
+	  for example from "chr1:123,456-789,000:-".
+	- Allow genomic coordinate sorting by coordinate string.
+	- Handle new Ensembl gencode tags when filtering in Bio::ToolBox::GeneTools.
+	- Implement map quality filtering in low level alignment callbacks used by
+	  HTS and Sam adapters. Add new use_minimum_mapq() function in 
+	  Bio::ToolBox::db_helper to set the map quality level on global scale.
+	- Optimize name counting 'ncount' method in Bio::ToolBox::db_helper.
+	- Optimize and update API for counting all alignments in a bam file with
+	  sum_total_bam_alignments() functions.
+	- Remove outdated functions in manipulate_datasets.pl.
+	- Fix bug with setting tag values of zero in SeqFeature objects.
+	- Rename splice_data() to split_data() in Bio::ToolBox::Data.
+
 v2.02
 	- Add support for newer versions of UCSC utilities that no longer
 	  allow reading from standard input, particularly 'wigToBigWig'.
