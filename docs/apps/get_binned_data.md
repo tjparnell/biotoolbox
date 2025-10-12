@@ -31,6 +31,7 @@ A program to collect data in bins across a list of features.
            5p_utr|3p_utr] 
      --long                              collect each window independently
      -r --format <integer>               number of decimal places for numbers
+     --mapq <integer>                    minimum map quality of counted alignments
      
      Bin specification:
      -b --bins <integer>                 number of bins feature is divided (10)
@@ -173,6 +174,15 @@ The command line flags and descriptions:
     Specify the number of decimal positions to format the collected scores. 
     Default is not to format, often leading to more than the intended 
     significant digits.
+
+- --mapq &lt;integer>
+
+	Specify the minimum mapping quality of alignments to be considered when
+	counting from a Bam file. Default is 0, which will include all alignments,
+	including multi-mapping (typically MAPQ of 0). Set to an integer in range
+	of 0..255. Only affects count methods, including `count`, `ncount`, and
+	`pcount`. Other methods involving coverage, e.g. `mean`, do not filter
+	alignments.
 
 ### Bin specification
 

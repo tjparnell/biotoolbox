@@ -16,13 +16,13 @@ manipulate\_datasets.pl \[--options ...\] &lt;filename>
     -H --noheader                     input file has no header row
     
     Non-interactive functions:
-    -f --func [ reorder | delete | rename | new | number | concatenate | 
-                split | coordinate | sort | gsort | null | duplicate | 
-                above | below | specific | keep | addname | cnull | 
-                absolute | minimum | maximum | log | delog | format | pr | 
-                add | subtract | multiply | divide | combine | scale | 
-                zscore | ratio | diff | normdiff | center | rewrite | 
-                export | treeview | summary | stat ]
+	-f --func [ reorder | delete | rename | new | number | concatenate | 
+				split | coordinate | sort | gsort | null | duplicate | 
+				above | below | specific | keep | lengthfilt | addname | 
+				cnull | absolute | minimum | maximum | log | delog | format | 
+				pr | add | subtract | multiply | divide | combine | scale | 
+				zscore | ratio | diff | center | rewrite | export | 
+				summary | stat | lengthstat ]
     -x --index <integers>             column index to work on
     
     Operation options:
@@ -83,12 +83,11 @@ The command line flags and descriptions:
     may be performed on single datasets by specifying a function name and any 
     other required options. These functions include the following.
 
-    **reorder** **delete** **rename** **new** **number** **concatenate**
-    **split** **coordinate** **sort** **gsort** **null** **duplicate** **above**
-    **below** **specific** **keep** **cnull** **absolute** **minimum**
-    **maximum** **log** **delog** **format** **pr** **add** **subtract**
-    **multiply** **divide** **combine** **scale** **zscore** **ratio** **diff**
-    **normdiff** **center** **rewrite** **export** **treeview** **summary** **stat**
+	**reorder delete rename new number concatenate split coordinate**
+	**sort gsort null duplicate above below specific keep lengthfilt addname**
+	**cnull absolute minimum maximum log delog format pr**
+	**add subtract multiply divide combine scale zscore ratio diff center**
+	**rewrite export summary stat lengthstat**
 
     Refer to the FUNCTIONS section for details.
 
@@ -130,7 +129,7 @@ The command line flags and descriptions:
         - (r)eplace the original column with new values
         - add as a (n)ew column
 
-    Defaults to new placement when executed automatically using the --func 
+    Defaults to new placement when executed automatically using the `--func` 
     option, or prompts the user when executed interactively.
 
 - --(no)zero
@@ -146,13 +145,12 @@ The command line flags and descriptions:
 
         - (i)ncreasing
         - (d)ecreasing
-        
 
 - --name &lt;string>
 
     Specify a new column name when re-naming a column using the rename function 
     from the command line. Also, when generating a new column using a defined 
-    function (--func &lt;function>) from the command line, the new column will use 
+    function (`--func <function>`) from the command line, the new column will use 
     this name.
 
 - --log 
@@ -193,12 +191,6 @@ manipulations to be performed. Alternatively, single manipulations may be
 performed as specified using command line options. As such, the program can
 be called in shell scripts.
 
-Note that the datafile is loaded entirely in memory. For extremely large 
-datafiles, e.g. binned genomic data, it may be best to first split the 
-file into chunks (use `split_data_file.pl`), perform the manipulations, 
-and recombine the file (use `join_data_file.pl`). This could be done 
-through a simple shell script.
-
 The program keeps track of the number of manipulations performed, and if 
 any are performed, will write out to file the changed data. Unless an 
 output file name is provided, it will overwrite the input file (NO backup is
@@ -208,13 +200,18 @@ made!).
 
 This is a list of the functions available for manipulating columns. These may 
 be selected interactively from the main menu (note the case sensitivity!), 
-or specified on the command line using the --func option.
+or specified on the command line using the `--func` option.
 
 - **stat** (menu option **t**)
 
     Print some basic statistics for a column, including mean, 
     median, standard deviation, min, and max. If 0 values are present,
     indicate whether to include them (y or n)
+
+- **lengthstat** (menu option **k**)
+
+	Print basic statistics on interval lengths represented by the
+	data table, which must include coordinate information.
 
 - **reorder** (menu option **R**)
 
@@ -229,9 +226,9 @@ or specified on the command line using the --func option.
 
 - **rename** (menu option **n**)
 
-    Assign a new name to a column. For automatic execution, use the --name 
+    Assign a new name to a column. For automatic execution, use the `--name` 
     option to specify the new name. Also, for any automatically executed 
-    function (using the --func option) that generates a new column, the 
+    function (using the `--func` option) that generates a new column, the 
     column's new name may be explicitly defined with this option.
 
 - **number** (menu option **b**)
@@ -244,14 +241,14 @@ or specified on the command line using the --func option.
 
     Concatenate the values from two or more columns into a single new 
     column. The character used to join the values may be specified 
-    interactively or by the command line option --target (default is '\_' 
+    interactively or by the command line option `--target` (default is '\_' 
     in automatic execution mode). The new column is appended at the end.
 
 - **split** (menu option **T**)
 
     Split a column into two or more new columns using a specified character 
     as the delimiter. The character may be specified interactively or 
-    with the --target command line option (default is '\_' in automatic 
+    with the `--target` command line option (default is '\_' in automatic 
     execution mode). The new columns are appended at the end. If the 
     number of split items are not equal amongst the rows, absent values 
     are appended with null values.
@@ -273,9 +270,13 @@ or specified on the command line using the --func option.
 
 - **gsort** (menu option **g**)
 
-    The entire data table is sorted by increasing genomic position, 
-    first by chromosome then by start position. These columns must exist 
-    and have recognizable names (e.g. 'chromo', 'chromosome', 'start').
+	The entire data table is sorted by increasing genomic position, 
+	first by chromosome then by start position, then by end position
+	(shortest length first). For GFF flavored files, however, features
+	are sorted by decreasing length to accomodate parent features and
+	tabix indexing. A sane chromosome sort order is employed that
+	recognizes numeric values (including Roman numerals). Coordinate
+	columns must exist.
 
 - **null** (menu option **N**)
 
@@ -283,7 +284,7 @@ or specified on the command line using the --func option.
     columns. Some of the other functions may not work properly if
     a non-value is present. If 0 values are present, indicate whether
     to toss them (y or n). This may also be specified as a command line 
-    option using the --except flag.
+    option using the `--except` flag.
 
 - **duplicate** (menu option **P**)
 
@@ -297,28 +298,37 @@ or specified on the command line using the --func option.
     Delete rows with values that are above a certain threshold value. 
     One or more columns may be selected to test values for the 
     threshold. The threshold value may be requested interactively or 
-    specified with the --target option.
+    specified with the `--target` option.
 
 - **below** (menu option **B**)
 
     Delete rows with values that are below a certain threshold value. 
     One or more columns may be selected to test values for the 
     threshold. The threshold value may be requested interactively or 
-    specified with the --target option.
+    specified with the `--target` option.
 
 - **specific** (menu option **S**)
 
     Delete rows with values that contain a specific value, either text 
     or number. One or more columns may be selected to check for values. 
     The specific values may be selected interactively from a list or 
-    specified with the --target option.
+    specified with the `--target` option.
 
 - **keep** (menu option **K**)
 
     Keep only those rows with values that contain a specific value, 
     either text or number. One or more columns may be selected to check 
     for values. The specific values may be selected interactively from a 
-    list or specified with the --target option.
+    list or specified with the `--target` option.
+
+- **lengthfilt** (menu option **E**)
+
+	Filter rows by their interval length. Input files must have coordinate
+	columns (start and stop). Only rows with a length
+	between specified minimum and maximum (inclusive) are retained;
+	everything else is removed. The threshold values may specified
+	interactively or specified as `[minimum],[maxmimum]` with the
+	`--target` option.
 
 - **addname** (menu option **M**)
 
@@ -326,14 +336,14 @@ or specified on the command line using the --func option.
     already has a Name column, the value will be updated. Otherwise a 
     new column will be added. The name will be a text prefix followed 
     by an integer (row index). The prefix may be defined by setting the 
-    \--target option, interactively provided by the user, or taken from 
+    `--target` option, interactively provided by the user, or taken from 
     the general table feature metadata.
 
 - **cnull** (menu option **U**)
 
     Convert null values to a specific value. One or more columns may 
     be selected to convert null values. The new value may be requested 
-    interactively or defined with the --target option.  
+    interactively or defined with the `--target` option.  
 
 - **absolute** (menu option **G**)
 
@@ -345,14 +355,14 @@ or specified on the command line using the --func option.
     Reset datapoints whose values are less than a specified minimum 
     value to the minimum value. One or more columns may be selected 
     to reset values to the minimum. The minimum value may be requested 
-    interactively or specified with the --target option. 
+    interactively or specified with the `--target` option. 
 
 - **maximum** (menu option **X**)
 
     Reset datapoints whose values are greater than a specified maximum 
     value to the maximum value. One or more columns may be selected 
     to reset values to the maximum. The maximum value may be requested 
-    interactively or specified with the --target option. 
+    interactively or specified with the `--target` option. 
 
 - **add** (menu option **a**)
 
@@ -360,7 +370,7 @@ or specified on the command line using the --func option.
     'mean', 'median', or 'sum' may be entered as a proxy for those statistical
     values of the column. The column may either be replaced or added
     as a new one. For automatic execution, specify the number using the
-    \--target option.
+    `--target` option.
 
 - **subtract** (menu option **u**)
 
@@ -368,7 +378,7 @@ or specified on the command line using the --func option.
     'mean', 'median', or 'sum' may be entered as a proxy for those statistical
     values of the column. The column may either be replaced or added
     as a new one. For automatic execution, specify the number using the
-    \--target option.
+    `--target` option.
 
 - **multiply** (menu option **y**)
 
@@ -376,7 +386,7 @@ or specified on the command line using the --func option.
     'mean', 'median', or 'sum' may be entered as a proxy for those statistical
     values of the column. The column may either be replaced or added
     as a new one. For automatic execution, specify the number using the
-    \--target option.
+    `--target` option.
 
 - **divide** (menu option **v**)
 
@@ -384,7 +394,7 @@ or specified on the command line using the --func option.
     'mean', 'median', or 'sum' may be entered as a proxy for those statistical
     values of the column. The column may either be replaced or added
     as a new one. For automatic execution, specify the number using the
-    \--target option.
+    `--target` option.
 
 - **scale** (menu option **s**)
 
@@ -393,7 +403,7 @@ or specified on the command line using the --func option.
     presented, and a new median target is requested. The column may 
     either be replaced with the median scaled values or added as a new 
     column. For automatic execution, specify the new median target 
-    with the --target option.
+    with the `--target` option.
 
 - **pr** (menu option **p**)
 
@@ -415,13 +425,13 @@ or specified on the command line using the --func option.
 
     A column may be converted to log values. The column may either 
     be replaced with the log values or added as a new column. Use 
-    the --target option to specify the base (usually 2 or 10).
+    the `--target` option to specify the base (usually 2 or 10).
 
 - **delog** (menu option **L**)
 
     A column that is currently in log space may be converted back to
     normal numbers. The column may either be replaced with the 
-    new values or added as a new column. Use the --target option to 
+    new values or added as a new column. Use the `--target` option to 
     specify the base (usually 2 or 10). The base may be obtained from the 
     metadata.
 
@@ -429,7 +439,7 @@ or specified on the command line using the --func option.
 
     Format the numbers of a column to a given number of decimal places. 
     An integer must be provided. The column may either be replaced or 
-    added as a new column. For automatic execution, use the --target 
+    added as a new column. For automatic execution, use the `--target` 
     option to specify the number decimal places.
 
 - **combine** (menu option **c**)
@@ -437,7 +447,7 @@ or specified on the command line using the --func option.
     Mathematically combine the data values in two or more columns. The 
     methods for combining the values include mean, median, min, max, 
     stdev, or sum. The method may be specified on the command line 
-    using the --target option. The combined data values are added as a 
+    using the `--target` option. The combined data values are added as a 
     new column.
 
 - **ratio** (menu option **r**)
@@ -457,34 +467,21 @@ or specified on the command line using the --func option.
     For enumerated columns (e.g. tag counts from Next Generation 
     Sequencing), the columns should be subsampled to equalize the sums 
     of the two columns. The indices for the experimental and control columns 
-    may either requested from the user or supplied by the --exp and 
-    \--con command line options. 
-
-- **normdiff** (menu option **z**)
-
-    A normalized difference is generated between two existing columns. 
-    The difference between 'control' and 'experimental' column values 
-    is divided by the square root of the sum (an approximation of the 
-    standard deviation). This is supposed to yield fewer false positives
-    than a simple difference (see Nix et al, BMC Bioinformatics, 2008).
-    For enumerated datasets (e.g. tag counts from Next Generation 
-    Sequencing), the datasets should be subsampled to equalize the sums 
-    of the two datasets. The indices for the experimental and control columns 
-    may either requested from the user or supplied by the --exp and 
-    \--con command line options. 
+    may either requested from the user or supplied by the `--exp` and 
+    `--con` command line options. 
 
 - **center** (menu option **e**)
 
     Center normalize the datapoints in a row by subtracting the mean or
     median of the datapoints. The range of columns is requested or 
-    provided by the --index option. Old values are replaced by new 
+    provided by the `--index` option. Old values are replaced by new 
     values. This is useful for visualizing data as a heat map, for example.
 
 - **new** (menu option **w**)
 
     Generate a new column which contains an identical value for 
     each datapoint (row). The value may be either requested interactively or 
-    supplied using the --target option. This function may be useful for 
+    supplied using the `--target` option. This function may be useful for 
     assigning a common value to all of the data points before joining the 
     data file with another.
 
@@ -494,54 +491,30 @@ or specified on the command line using the --func option.
     for each of the data columns is calculated, transposed (columns become 
     rows), and written to a new data file. This is essentially identical to 
     the summary function from the biotoolbox analysis scripts 
-    [map\_relative\_data.pl](https://metacpan.org/pod/map_relative_data.pl) and [pull\_features.pl](https://metacpan.org/pod/pull_features.pl). It assumes that each 
+    [get_relative_data](apps/get_relative_data.md) and [pull_features](apps/pull_features.md). It assumes that each 
     column has start and stop metadata. The program will automatically 
     identify available columns to summarize based on their name. In 
     interactive mode, it will request the contiguous range of start and 
     ending columns to summarize. The contiguous columns may also be 
-    indicated using the --index option. The method of summarizing the 
-    data can be specified interactively or with the --target option. 
+    indicated using the `--index` option. The method of summarizing the 
+    data can be specified interactively or with the `--target` option. 
     Methods include 'mean' (default), 'median', or 'trimmean', where
     the top and bottom 1% of values are discarded and a mean determined
     from the remaining 98% of values. By default, a new file using the 
     input file base name appended with '\_&lt;method>\_summary' is written, or
-    a filename may be specified using the --out option.
+    a filename may be specified using the `--out` option.
 
 - **export** (menu option **x**)
 
     Export the data into a simple tab-delimited text file that contains no 
     metadata or header information. Non-values '.' are converted to  
-    true nulls. If an output file name is specified using the --outfile 
+    true nulls. If an output file name is specified using the `--outfile` 
     option, it will be used. Otherwise, a possible filename will be 
     suggested based on the input file name. If any modifications are 
     made to the data structure, a normal data file will still be written. 
     Note that this could overwrite the exported file if the output file name
     was specified on the command line, as both file write subroutines will 
     use the same name!
-
-- **treeview** (menu option **i**)
-
-    Export the data to the CDT format compatible with both Treeview and 
-    Cluster programs for visualizing and/or generating clusters. Specify the 
-    columns containing a unique name and the columns to be analyzed (e.g. 
-    \--index &lt;name>,&lt;start-stop>). Extraneous columns are removed. 
-    Additional manipulations on the columns may be performed prior to 
-    exporting. These may be chosen interactively or using the codes 
-    listed below and specified using the --target option.
-
-        su - decreasing sort by sum of row values
-        sm - decreasing sort by mean of row values
-        cg - median center features (rows)
-        cd - median center datasets (columns)
-        zd - convert columns to Z-scores
-        pd - convert columns to percentile ranks
-        L2 - convert values to log2
-        L10 - convert values to log10
-        n0 - convert nulls to 0.0
-
-    A simple Cluster data text file is written (default file name 
-    "&lt;basename>.cdt"), but without the GWEIGHT column or EWEIGHT row. The 
-    original file will not be rewritten.
 
 - **rewrite** (menu option **W**)
 

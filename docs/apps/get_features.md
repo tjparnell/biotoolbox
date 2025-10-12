@@ -18,7 +18,6 @@ get\_features.pl --db &lt;name> --out &lt;filename>
     
     Selection:
     -f --feature <type>           feature: gene, mRNA, transcript, etc
-    -u --sub                      include subfeatures (true if gff, gtf, refFlat)
     
     Filter features:
     -l --list <filename>          file of feature IDs to keep
@@ -39,11 +38,13 @@ get\_features.pl --db &lt;name> --out &lt;filename>
     
     Report format options:
     -B --bed                      write BED6 (no --sub) or BED12 (--sub) format
+    -u --sub                      include subfeatures when writing bed format
     -G --gff                      write GFF3 format
     -g --gtf                      write GTF format
     -r --refflat                  write UCSC refFlat format
     -t --tag <text>               include specific GFF attributes in text output
     --coord                       include coordinates in text output
+    --useid                       use ID as the BED name instead of default Name
     
     General options:
     -o --out <filename>           output file name
@@ -81,14 +82,6 @@ The command line flags and descriptions:
     `gene`, `mRNA`, or `transcript`. The default value for input files 
     is '`gene`'. For databases, an interactive list will be presented 
     from which one or more may be chosen.
-
-- --sub
-
-    Optionally include all child subfeatures in the output. For example, 
-    transcript, CDS, and/or exon subfeatures of a gene. This option is 
-    automatically enabled with GFF, GTF, or refFlat output; it may be 
-    turned off with `--nosub`. With BED output, it will force a BED12 
-    file to be written. It has no effect with standard text. 
 
 ### Filter features
 
@@ -202,6 +195,13 @@ The command line flags and descriptions:
     With subfeatures enabled, write a BED12 (12-column BED) file. 
     Otherwise, write a standard 6-column BED format file. 
 
+- --sub
+
+    Optionally include all child subfeatures (exons) in the output when
+    writing a BED format; this forces a BED12 output. This option is 
+    automatically enabled with GFF, GTF, or refFlat output. It has no
+    effect with standard text. 
+
 - --gff
 
     Write a GFF version 3 (GFF3) format output file. Subfeatures are 
@@ -230,6 +230,16 @@ The command line flags and descriptions:
     start, stop, and strand coordinates. These are automatically included 
     in other formats. This is automatically included when adjusting 
     coordinate positions.
+
+- --useid
+
+    Use the feature's Primary ID tag instead of the Display Name tag for use in
+    the output Name column when writing to either a BED or UCSC (refFlat)
+    format. By default the Display Name is used when available. From GTF files,
+    this corresponds to the `gene_id` or `transcript_id` tags, rather than
+    `gene_name` or `transcript_name`. For GFF3 files, this would be `ID` and
+    `Name` tags.
+
 
 ### General options
 

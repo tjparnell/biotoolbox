@@ -37,7 +37,7 @@ programmer understands but a casual user might not, as well as rationale.
 	However, the only Cram files that can be used must either have a valid reference
 	`UR` tag in the `@SQ` header, i.e. the original local reference fasta file is
 	still available, or have an embedded reference sequence in the Cram file itself,
-	i.e. generated with output option `embed_ref=1`). Using an external reference
+	i.e. generated with output option `embed_ref=1`. Using an external reference
 	fasta file is not supported, a limitation unfortunately imposed by Bio::DB::HTS,
 	not by Bio::ToolBox. Lacking these, you are best to simply back-convert the Cram
 	file to Bam format using `samtools` prior to usage. 
@@ -47,15 +47,28 @@ programmer understands but a casual user might not, as well as rationale.
 	CSV files appear perfectly benign, but are in fact a can of worms: mandatory or
 	optional quoting, empty or undefined values, spaces, character escaping, text
 	encoding, and so on. This mostly affects reading files. Most (all?) bioinformatic
-	text formats are tab-delimited, so CSV support is intentionally absent.
+	text formats are tab-delimited, so CSV support is intentionally absent. With that
+	said, if you provide an output file name with a `.csv` extension, it will write
+	a (crude) CSV file. There are (currently) no attempts at quoting or escaping
+	characters, so if your content contains commas you can expect errors. Your best
+	bet is to write a TSV file.
+
+- How do I get a plain table without all that metadata junk in TXT files?
+
+	BioToolBox applications write tab-delimited text files with a header row.
+	Additional metadata and comments may be written at the beginning of the file,
+	prefixed with `#` symbol. This is a (mostly) universal comment symbol indicating
+	that the line can safely be ignored. But sometimes you just want a plain table to
+	import into a spreadsheet program, for example. Provide an output file name with
+	a `.tsv` extension and it will write a plain TSV file sans metadata.
 	
 - How do I get my UCSC gene table (refFlat, knownGene, genePred, etc) recognized?
 
-	UCSC doesn't have official file extensions, and their downloads page just 
-	have `.txt.gz` extensions. Furthermore, they don't have proper column headers. Downloads 
-	from the table browser will stick a header line, prefixed with a `#` but no space
-	between it and the first word. I have work arounds to detect those headers, but 
-	what about the files from the download page?
+	UCSC doesn't have official file extensions, and their downloads page just have
+	`.txt.gz` extensions. Furthermore, they don't have proper column headers.
+	Downloads from the table browser will stick a header line, prefixed with a `#`
+	but no space between it and the first word. I have work arounds to detect those
+	headers, but what about the files from the download page?
 	
 	Programs that are designed to potentially interpret a gene table, such as
 	[get_datasets](apps/get_datasets.md), will "taste" a file for potential UCSC
@@ -65,9 +78,9 @@ programmer understands but a casual user might not, as well as rationale.
 	
 	Some programs accept a `--noheader` flag, and it will insert dummy column headers.
 	
-	Otherwise, you can help yourself by changing the extension from `.txt` to something 
-	more descriptive, like `.refflat`, `.genepred`, `.knowngene`, or even the most 
-	generic `.ucsc`. Don't forget the `.gz` if it's compressed.
+	Otherwise, you can help yourself by changing the extension from `.txt` to
+	something more descriptive, like `.refflat`, `.genepred`, `.knowngene`, or even
+	the most generic `.ucsc`. Don't forget the `.gz` if it's compressed.
 
 - What is the difference between Start and Start0?
 
@@ -76,25 +89,26 @@ programmer understands but a casual user might not, as well as rationale.
 	between the two.
 	
 	Many annotation formats come in two flavors of coordinate system: 1-base system
-	(counting each nucleotide in a sequence starting at 1) or 0-base (or interbase) system
-	(counting between bases, hence starting at 0). The GFF family of annotation file
-	formats (including GTF and GFF3) use 1-base. The UCSC family of annotation formats
-	(BED, refFlat, genePred, etc) use 0-base. SAM files are 1-based, but binary BAM files
-	are internally 0-based, while VCF files are 1-based. In other words, every format is
-	different. The [BioPerl](https://bioperl.org) libraries, of which much of BioToolBox
-	was initially based on, uses 1-base for everything. BioToolBox inherently transforms
-	0-based coordinates to 1-base formats internally, at least when it is aware of what
-	the file is using, hence the purpose of naming columns differently.
+	(counting each nucleotide in a sequence starting at 1) or 0-base (or interbase)
+	system (counting between bases, hence starting at 0). The GFF family of
+	annotation file formats (including GTF and GFF3) use 1-base. The UCSC family of
+	annotation formats (BED, refFlat, genePred, etc) use 0-base. SAM files are
+	1-based, but binary BAM files are internally 0-based, while VCF files are
+	1-based. In other words, every format is different. The
+	[BioPerl](https://bioperl.org) libraries, of which much of BioToolBox was
+	initially based on, uses 1-base for everything. BioToolBox inherently transforms
+	0-based coordinates to 1-base formats internally, at least when it is aware of
+	what the file format is using, hence the purpose of naming columns differently.
 
 - Why do so many programs reference a database and how do I use one?
 
 	In the early days of BioToolBox, much of the analysis was based on
 	[BioPerl](https://bioperl.org) databases, notably
-	[Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store),
-	where annotation as well as datasets (microarray values) were stored. These were SQL
-	databases, backed by either MySQL or SQLite. These are still supported, although less
-	so as annotation files can now be parsed on the fly or datasets stored in bigWig or
-	Bam databases. 
+	[Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store)
+	, where annotation as well as datasets (microarray values) were stored. These
+	were SQL databases, backed by either MySQL or SQLite. These are still supported,
+	although less so as annotation files can now be parsed on the fly or datasets
+	stored in bigWig or Bam databases. 
 	
 	For annotation, working with a database can be arguably faster, especially when 
 	working with an annotation set over and over again. Use the BioPerl script, 

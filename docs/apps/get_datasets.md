@@ -41,6 +41,7 @@ get\_datasets.pl \[--options...\] --in &lt;filename> &lt;data1> &lt;data2...>
     --tpm                               calculate TPM values
     -r --format <integer>               number of decimal places for numbers
     --discard <number>                  discard features whose sum below threshold
+    --mapq <integer>                    minimum map quality of counted alignments
     
     Adjustments to features:
     -x --extend <integer>               extend the feature in both directions
@@ -256,12 +257,12 @@ The command line flags and descriptions:
         it was counted in an input region or not. This might be used when a 
         more global normalization is needed.
 
-    The region method is best used with RNASeq data and a complete gene 
-    annotation table. The genome method is best used with partial annotation 
-    tables or other Seq types, such as ChIPSeq. This option can only be used 
-    with one of the count methods (count, ncount, pcount). A sum method may be 
-    cautiously allowed if, for example, using bigWig point data. The FPKM values 
-    are appended as additional columns in the output table.
+    The region method is best used with RNASeq data and a complete gene
+    annotation table. The genome method is best used with partial annotation
+    tables or other Seq types, such as ChIPSeq. This option can only be used
+    with one of the count methods (`count`, `ncount`, `pcount`). A sum method
+    may be cautiously allowed if, for example, using bigWig point data. The FPKM
+    values are appended as additional columns in the output table.
 
 - --tpm
 
@@ -283,6 +284,15 @@ The command line flags and descriptions:
     expected to return a zero count. Note that this only checks the datasets 
     that were newly collected. For more advanced filtering, see 
     [manipulate\_datasets.pl](https://metacpan.org/pod/manipulate_datasets.pl).
+
+- --mapq &lt;integer>
+
+	Specify the minimum mapping quality of alignments to be considered when
+	counting from a Bam file. Default is 0, which will include all alignments,
+	including multi-mapping (typically MAPQ of 0). Set to an integer in range
+	of 0..255. Only affects count methods, including `count`, `ncount`, and
+	`pcount`. Other methods involving coverage, e.g. `mean`, do not filter
+	alignments.
 
 ### Adjustments to features
 

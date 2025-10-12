@@ -41,14 +41,20 @@ get\_gene\_regions.pl \[--options...\] --db &lt;text> --out &lt;filename>
     -K --chrskip <regex>          skip features from certain chromosomes
     
     Adjustments:
-    -b --begin --start integer     specify adjustment to start coordinate
-    -e --end --stop integer        specify adjustment to stop coordinate
+    -b --begin --start integer    specify adjustment to start coordinate
+    -e --end --stop integer       specify adjustment to stop coordinate
     
-    General options:
+    Output options:
+    -o --out <filename>           specify output name
     --bed                         output as a bed6 format
-    -o --out <filename>              specify output name
-    -z --gz                          compress output
-    -v --version                     print version and exit
+    --bedname                     specify what to use for bed name column
+       [genename|geneid|            default is 'featurename'
+       transcriptname|transcriptid
+       featurename]
+    -z --gz                       compress output
+
+    General options:
+    -v --version                  print version and exit
     -h --help
 
 ## OPTIONS
@@ -203,7 +209,11 @@ The command line flags and descriptions:
     a start adjustment will always modify the feature's 5'end, either 
     the feature startpoint or endpoint, depending on its orientation. 
 
-### General options
+### Output options
+
+- --out &lt;filename>
+
+    Specify the output filename.
 
 - --bed
 
@@ -213,9 +223,22 @@ The command line flags and descriptions:
 
     Specify the output filename.
 
+- --bedname E<lt>name<gt>
+
+    Specify what to use for the Name column in the output BED file.
+    Several options are available, including:
+    
+        geneid          - The Primary ID of the parent Gene feature
+        genename        - The Display Name of the parent Gene feature
+        transcriptid    - The Primary ID of the parent Transcript feature
+        transcriptname  - The Display Name of the parent Transcript feature
+        featurename     - The generated name of the feature (default)
+
 - --gz
 
     Specify whether (or not) the output file should be compressed with gzip.
+
+### General options
 
 - --version
 
