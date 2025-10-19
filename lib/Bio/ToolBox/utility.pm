@@ -7,7 +7,7 @@ use File::Spec;
 use IO::Prompt::Tiny qw(prompt);
 require Exporter;
 
-our $VERSION = '2.02';
+our $VERSION = '2.04';
 
 ### Variables
 # Export
@@ -99,11 +99,14 @@ sub format_with_commas {
 		}
 	}
 
-	# finished
-	my $final = $sign ? $sign : q();
-	$final .= join( q(), @formatted );
-	$final .= '.' . $decimals if defined $decimals;
-	return $final;
+	# finish
+	if ($sign) {
+		unshift @formatted, $sign;
+	}
+	if ( defined $decimals ) {
+		push @formatted, q(.), $decimals;
+	}
+	return join( q(), @formatted );
 }
 
 sub ask_user_for_index {
