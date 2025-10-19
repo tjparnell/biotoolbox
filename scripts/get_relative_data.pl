@@ -34,7 +34,7 @@ eval {
 # served by separate database queries for each window.
 use constant DATASET_HASH_LIMIT => 4999;
 
-our $VERSION = '2.03';
+our $VERSION = '2.04';
 
 print
 	"\n A script to collect windowed data flanking a relative position of a feature\n\n";
@@ -677,7 +677,7 @@ sub prepare_window_datasets {
 				ref($avoid) eq 'ARRAY' ? join( ',', @{$avoid} ) : $avoid );
 		}
 		if ( $dataset =~ / \. (b|cr) am $/xni and $method =~ /count/ ) {
-			$Data->metadata( $index, 'mapq', $mapq );
+			$Data->metadata( $new_index, 'mapq', $mapq );
 		}
 	}
 }

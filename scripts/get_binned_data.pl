@@ -25,7 +25,7 @@ eval {
 	$parallel = 1;
 };
 
-our $VERSION = '2.03';
+our $VERSION = '2.04';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -934,7 +934,7 @@ sub _set_metadata {
 	}
 
 	if ( $dataset =~ / \. (b|cr) am $/xni and $method =~ /count/ ) {
-		$Data->metadata( $index, 'mapq', $mapq );
+		$Data->metadata( $new_index, 'mapq', $mapq );
 	}
 }
 
