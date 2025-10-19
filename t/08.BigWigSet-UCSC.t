@@ -13,7 +13,7 @@ BEGIN {
 		plan tests => 43;
 	}
 	else {
-		plan skip_all => 'Optional module Bio::DB::BigWigSet not available';
+		plan skip_all => 'Alternate module Bio::DB::BigWigSet not available';
 	}
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
