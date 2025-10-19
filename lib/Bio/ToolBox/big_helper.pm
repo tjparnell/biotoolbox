@@ -11,7 +11,7 @@ use Bio::ToolBox::db_helper         qw(get_chromosome_list);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG);
 require Exporter;
 
-our $VERSION = '2.02';
+our $VERSION = '2.04';
 
 ### Export
 our @ISA       = qw(Exporter);
@@ -281,7 +281,7 @@ sub open_wig_to_bigwig_fh {
 	# open the filehandle
 	my $command = sprintf "%s stdin %s %s", $bwapp, $args{chromo}, $args{bw};
 	my $bwfh    = IO::File->new("| $command")
-		or croak sprintf( "cannot open %s! $OS_ERROR", $args{bwapppath} );
+		or croak sprintf( "cannot open %s! $OS_ERROR", $bwapp );
 
 	# wigToBigWig will always die anyway if something is wrong
 	# cannot trap it with an eval, since it doesn't just error out
@@ -312,25 +312,15 @@ sub open_bigwig_to_wig_fh {
 
 	# Identify bigwig conversion utility
 	my $bwapp = $args{bwapppath} || get_bigwig_to_wig_app() || undef;
-	unless ($bwapp) {
-
-		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param('applications.bigWigToWig') || undef;
-	}
-	unless ( $args{bwapppath} ) {
-
-		# try checking the system path
-		$args{bwapppath} = which('bigWigToWig') || which('bigWigToBedGraph');
-	}
-	unless ( $args{bwapppath} =~ /bigWigTo(?: Wig | BedGraph)$/x ) {
+	unless ( defined $bwapp and $bwapp =~ /bigWigTo(?: Wig | BedGraph)$/x ) {
 		carp q(Utility 'bigWigToWig' not specified and can not be found!);
 		return;
 	}
 
 	# open the filehandle
-	my $command = sprintf "%s %s stdout", $args{bwapppath}, $args{bw};
+	my $command = sprintf "%s %s stdout", $bwapp, $args{bw};
 	my $bwfh    = IO::File->new("$command |")
-		or croak sprintf( "cannot open %s! $OS_ERROR", $args{bwapppath} );
+		or croak sprintf( "cannot open %s! $OS_ERROR", $bwapp );
 
 	# bigWigToWig will always die anyway if something is wrong
 	# cannot trap it with an eval, since it doesn't just error out
@@ -360,19 +350,8 @@ sub bed_to_bigbed_conversion {
 	}
 
 	# identify bigbed conversion utility
-	$args{bbapppath} ||= undef;
-	unless ( $args{bbapppath} ) {
-
-		# check for an entry in the configuration file
-		$args{bbapppath} = $BTB_CONFIG->param('applications.bedToBigBed')
-			|| undef;
-	}
-	unless ( $args{bbapppath} ) {
-
-		# try checking the system path
-		$args{bbapppath} = which('bedToBigBed');
-	}
-	unless ( $args{bbapppath} ) {
+	my $bbapp = $args{bbapppath} ||= get_bed_to_bigbed_app() || undef;
+	unless ( defined $bbapp and $bbapp =~ / bedToBigBed $/x ) {
 		carp q(Utility 'bedToBigBed' not specified and can not be found!);
 		return;
 	}
@@ -401,7 +380,7 @@ sub bed_to_bigbed_conversion {
 
 	# Generate the bigBed file using Jim Kent's utility
 	printf " converting %s to BigBed....\n", $args{bed};
-	system( $args{bbapppath}, $args{bed}, $args{chromo}, $bb_file );
+	system( $bbapp, $args{bed}, $args{chromo}, $bb_file );
 
 	# Check the result
 	if ( -e $bb_file and -s $bb_file ) {
