@@ -478,12 +478,12 @@ compatibility).
 
 =head3 Note regarding compatibility
 
-Some of these methods open a pipe to these external utilities, either
-for reading (L</open_wig_to_bigwig_fh>) or writing (L<open_bigwig_to_wig_fh>). 
-Newer (current) versions of these utilities, for
-example C<wigToBigWig> or C<bedGraphToBigWig>, no longer support reading from 
-standard input, resulting in failure with L<open_bigwig_to_wig_fh>. This change
-occurred with version release 439 of the UCSC UserApps, released circa 2022-11-14.
+Some of these methods open a pipe to these external utilities, either for
+reading (L<open_bigwig_to_wig_fh>) or writing (L</open_wig_to_bigwig_fh>). Newer
+(current) versions of the C<wigToBigWig> utility no longer support reading from
+standard input, resulting in failure with L<open_wig_to_bigwig_fh>. This change
+occurred with version release 439 of the UCSC UserApps, released circa
+2022-11-14.
 
 Being able to write to the utility directly has its advantages, namely avoiding 
 writing an intermediate text file and speed. 
@@ -505,7 +505,7 @@ names of the subroutines to export. None are automatically exported.
 
 	use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 
-There are are nine available exported subroutines.
+There are are nine available exportable subroutines.
 
 =head2 Find and check applications
 
