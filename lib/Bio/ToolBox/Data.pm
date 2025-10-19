@@ -1352,7 +1352,7 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
 
 =head1 DESCRIPTION
 
-This module works with the primary Bio::ToolBox Data structure. Simply, it 
+This module works with the primary L<Bio::ToolBox> Data structure. Simply, it 
 is a complex data structure representing a tabbed-delimited table (array 
 of arrays), with plenty of options for metadata. Many common bioinformatic 
 file formats are simply tabbed-delimited text files (think BED, GFF, VCF). 
@@ -1389,7 +1389,7 @@ These are the options available.
 
 Provide the path and name to an existing tabbed-delimited text 
 file from which to load the contents. This is a shortcut to the 
-load_file() method. See that method for more details.
+L</load_file> method. See that method for more details.
 
 =item stream
 
@@ -1442,12 +1442,12 @@ in the background.
   my $Data = Bio::ToolBox::Data->new(file => $filename, feature => 'gene');
 
 For de novo lists from an annotation database, provide the GFF 
-type or type:source (columns 3 and 2) for collection. A comma 
+C<type> or C<type:source> (columns 3 and 2) for collection. A comma 
 delimited string may be accepted for databases. For parsed files, 
 only a simple string is accepted.
 
 For a list of genomic intervals across the genome, specify a 
-feature of 'genome' with a database object.
+feature of C<genome> with a database object.
 
 =item subfeature
 
@@ -1502,13 +1502,13 @@ Pass the number of BED columns (3-12).
 =item ucsc 
 
 Pass the number of columns to indicate the type of UCSC format. These 
-include 10 (refFlat without gene names), 11 (refFlat with gene names), 
-12 (knownGene gene prediction table), and 15 
-(an extended gene prediction or genePredExt table).
+include 10 (C<refFlat> without gene names), 11 (C<refFlat> with gene names), 
+12 (C<knownGene> gene prediction table), and 15 
+(an extended gene prediction or C<genePredExt> table).
 
 =back
 
-If successful, the method will return a Bio::ToolBox::Data object.
+If successful, the method will return a L<Bio::ToolBox::Data> object.
 
 =item duplicate
 
@@ -1546,13 +1546,13 @@ one or more argument options. Possible options include:
 
 The file name of the gene table to be parsed. This may 
 be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
-These will be parsed using Bio::ToolBox::Parser::* adapters.
+These will be parsed using C<Bio::ToolBox::Parser::*> adapters.
 
 =item feature
 
 A regular expression compatible string or C<qr> string to match 
 the top features C<primary_tag> to keep. The C<source_tag> is not 
-checked. The default is 'gene', although a transcript type could 
+checked. The default is C<gene>, although a transcript type could 
 alternatively be specified (in which case transcripts are not 
 parsed in gene features).
 
@@ -1560,7 +1560,7 @@ parsed in gene features).
 
 A regular expression compatible string or C<qr> string to match 
 any sub features C<primary_tag> to parse. The C<source_tag> is not checked.
-Typically these include exon, CDS, or UTR. The default is nothing.
+Typically these include C<exon>, C<CDS>, or C<UTR>. The default is nothing.
 
 =item chrskip
 
@@ -1681,7 +1681,7 @@ set the appropriate metadata attributes.
 =head2 Metadata comments
 
 Comments are any other commented lines from a text file (lines 
-beginning with a #) that were not parsed as general metadata.
+beginning with a C<#>) that were not parsed as general metadata.
 
 =over 4
 
@@ -1704,7 +1704,7 @@ delete. If an index is not provided, ALL comments will be deleted!
 For VCF files, this will partially parse the VCF headers into a 
 hash structure that can be queried or manipulated. Each header 
 line is parsed for the primary key, being the first word after the 
-## prefix, e.g. INFO, FORMAT, FILTER, contig, etc. For the simple 
+C<##> prefix, e.g. INFO, FORMAT, FILTER, contig, etc. For the simple 
 values, they are stored as the value. For complex entries, such as 
 with INFO and FORMAT, a second level hash is created with the ID 
 extracted and used as the second level key. The value is always the 
@@ -1723,7 +1723,7 @@ code representation.
 
 =item rewrite_vcf_headers
 
-If you have altered the vcf headers exported by the vcf_headers() 
+If you have altered the vcf headers exported by the L<vcf_headers> 
 method, then this method will rewrite the hash structure as new 
 comment lines. Do this prior to writing or saving the Data sturcture
 or else you will lose your changed VCF header metadata.
@@ -1740,7 +1740,7 @@ file format (e.g. BED or GFF formats do not have a header row). A fake
 hidden column is prepended to the data table to act as column index 0.
 Therefore, for all practical purposes, data values form any individual
 table "cell" can be accessed using their 1-base indexes and specified
-as C<[$row][$column]>. See the C<value()> method below.
+as C<[$row][$column]>. See the L<value> method below.
 
 =over 4
 
@@ -1806,7 +1806,7 @@ position.
 
 =item delete_column
 
-  $Data->delete_column($i, $j);
+  $Data->delete_column($i, $j, ...);
 
 Deletes one or more specified columns. Any remaining 
 columns rightwards will have their indices shifted 
@@ -1873,8 +1873,8 @@ Index positions are 1-based (header row is index 0).
 =head2 Column Metadata
 
 Each column has metadata. Each metadata is a series of key =E<gt> 
-value pairs. The minimum keys are 'index' (the 1-based index 
-of the column) and 'name' (the column header name). Additional 
+value pairs. The minimum keys are C<index> (the 1-based index 
+of the column) and C<name> (the column header name). Additional 
 keys and values may be queried or set as appropriate. When the 
 file is written, these are stored as commented metadata lines at 
 the beginning of the file.
@@ -1894,11 +1894,11 @@ index number. A column may also be renamed by passing a new name.
   $Data->metadata($index, $key, $new_value);
   my $value = $Data->metadata($index, $key)
 
-Returns or sets the metadata value for a specific $key for a 
-specific column $index.
+Returns or sets the metadata value for a specific C<$key> for a 
+specific column C<$index>.
 
 This may also be used to add a new metadata key. Simply provide 
-the name of a new $key that is not present
+the name of a new C<$key> that is not present.
 
 If no key is provided, then a hash or hash reference is returned 
 representing the entire metadata for that column.
@@ -1907,16 +1907,16 @@ representing the entire metadata for that column.
 
   $Data->copy_metadata($source, $target);
 
-This method will copy the metadata (everything except name and 
-index) between the source column and target column. Returns 1 if 
+This method will copy the metadata (everything except C<name> and 
+C<index>) between the source column and target column. Returns 1 if 
 successful.  
 
 =item delete_metadata
 
   $Data->delete_metadata($index, $key);
 
-Deletes a column-specific metadata $key and value for a specific 
-column $index. If a $key is not provided, then all metadata keys 
+Deletes a column-specific metadata C<$key> and value for a specific 
+column C<$index>. If a C<$key> is not provided, then all metadata keys 
 for that index will be deleted.
 
 =item find_column
@@ -2032,8 +2032,8 @@ This method will generate a new column in the Data table representing the
 length of a transcript, i.e. the sum of the length of subfeatures for 
 the stored SeqFeature object in the Data table. The default subfeature is 
 C<exon>; however, alternative subfeature types may be passed to the method 
-and used. These include C<cds>, C<5p_utr>, and C<3p_utr> for CDS, the 5C<'> UTR, 
-and the 3C<'> UTR, respectively. See the corresponding transcript length 
+and used. These include C<cds>, C<5p_utr>, and C<3p_utr> for CDS, the C<5'> UTR, 
+and the C<3'> UTR, respectively. See the corresponding transcript length 
 methods in L<Bio::ToolBox::GeneTools> for more information. If a length 
 is not calculated, for example the feature C<primary_tag> is a "gene", 
 then the simple length of the feature is recorded. 
@@ -2185,9 +2185,9 @@ that lacks a defined file extension, e.g. UCSC formats. This can be based
 on the file extension, metadata headers, and/or file contents from the
 first 10 lines. Returns two strings: the first is a generic flavor, and the
 second is a more specific format, if applicable. Generic flavor values will
-be one of `gff`, `bed`, `ucsc`, or `undefined`. These correlate to specific
+be one of C<gff>, C<bed>, C<ucsc>, or C<undefined>. These correlate to specific
 Parser adapters. Specific formats could be any number of possibilities, for
-example `undefined`, `gtf`, `gff3`, `narrowPeak`, `genePred`, etc.  
+example C<undefined>, C<gtf>, C<gff3>, C<narrowPeak>, C<genePred>, etc.  
 
 
 =item save
@@ -2217,8 +2217,8 @@ You may pass additional options.
 Optionally pass a new filename. Required for new objects; previous 
 opened files may be overwritten if a new name is not provided. If 
 necessary, the file extension may be changed; for example, BED files 
-that no longer match the defined format lose the .bed and gain a .txt 
-extension. Compression may or add or strip .gz as appropriate. If 
+that no longer match the defined format lose the F<.bed> and gain a F<.txt> 
+extension. Compression may or add or strip F<.gz> as appropriate. If 
 a path is not provided, the current working directory is used.
 
 =item gz
@@ -2240,7 +2240,7 @@ Write a separate file summarizing columns of data (mean values).
 The mean value of each column becomes a row value, and each column 
 header becomes a row identifier (i.e. the table is transposed). The 
 best use of this is to summarize the mean profile of windowed data 
-collected across a feature. See the Bio::ToolBox scripts 
+collected across a feature. See the L<Bio::ToolBox> scripts 
 L<get_relative_data.pl> and L<get_binned_data.pl> as examples. 
 For data from L<get_binned_data.pl> where the columns are expressed 
 as percentile bins, the reported midpoint column is automatically 
@@ -2305,7 +2305,7 @@ methods.
  my $dataset = $Data->verify_dataset($dataset, $database);
 
 Pass the name of the dataset (GFF type or type:source) for a GFF3-based 
-database, e.g. <Bio::DB::SeqFeature::Store>, or path and file name for a 
+database, e.g. L<Bio::DB::SeqFeature::Store>, or path and file name for a 
 data file, e.g. Bam, BigWig, BigBed, or USeq file. If a separate database 
 is being used, pass the name or opened database object as a second 
 parameter. For more advance options, see 
@@ -2340,11 +2340,11 @@ object, you can retrieve values, set values, and add new values.
 =item row_stream
 
 This returns an C<Bio::ToolBox::Data::Iterator> object, which has one 
-method, C<next_row()>. Call this method repeatedly until it returns 
+method, C<next_row>. Call this method repeatedly until it returns 
 C<undef> to work through each row of data.
 
 Users of the C<Bio::DB> family of database adaptors may recognize the 
-analogy to the C<seq_stream()> method.
+analogy to the C<seq_stream> method.
 
 =item next_row
 
@@ -2360,7 +2360,7 @@ Called from a C<Bio::ToolBox::Data::Iterator> object, it returns a
 L<Bio::ToolBox::Data::Feature> row object. If SeqFeature objects are 
 associated with the row, perhaps from a parsed input annotation file, 
 then they are automatically associated with the row object. (Previous 
-versions required separately calling the seqfeature() row method to 
+versions required separately calling the C<seqfeature> row method to 
 perform this.)
 
 =back
