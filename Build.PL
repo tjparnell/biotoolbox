@@ -40,6 +40,7 @@ sub get_base_options {
 		test_requires     => {
 			'Test::More'              => 1.302,
 			'Test::Warn'              => 0.36,
+			'Test::Script'            => 1.29,
 		},
 		meta_merge        => {
 			resources     => {

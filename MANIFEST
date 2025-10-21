@@ -71,6 +71,7 @@ t/08.BigWigSet-UCSC.t
 t/09.USeq.t
 t/10.Wiggle.t
 t/11.big_helper.t
+t/12.scripts.t
 t/Data/biotoolbox.cfg
 t/Data/chrI.gff3
 t/Data/ensemblSource.txt
