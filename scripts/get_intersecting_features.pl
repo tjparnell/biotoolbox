@@ -6,7 +6,6 @@ use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Bio::Range;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -15,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::utility qw(format_with_commas);
 
-our $VERSION = '2.00';
+our $VERSION = '2.04';
 
 print "\n A script to pull out overlapping features\n\n";
 
@@ -574,18 +573,22 @@ sub determine_overlap {
 	# work (what!!!!????), intersection and overlap_extent fail to
 	# give proper end values, just returns "-end"
 
-	# the workaround is to create a new simple Bio::Range object
-	# using the coordinates from the reference region, and then determine the
-	# overlap between it and the target feature
-	my $a = Bio::Range->new(
-		-start  => $reference->start,
-		-end    => $reference->end,
-		-strand => $ref_strand,
-	);
-
-	# find the overlap
-	my $int = $a->intersection($target);
-	return $int->length;
+	# the workaround is to just calculate the intersection ourself
+	my ( $istart, $istop );
+	if ( $reference->start <= $target->start ) {
+		$istart = $reference->start;
+	}
+	else {
+		$istart = $target->start;
+	}
+	if ( $reference->end >= $target->end ) {
+		$istop = $reference->end;
+	}
+	else {
+		$istop = $target->end;
+	}
+	return 0 if $istart > $istop;
+	return ($istop - $istart + 1);
 }
 
 sub summarize_found_features {
