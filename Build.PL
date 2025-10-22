@@ -38,8 +38,7 @@ sub get_base_options {
 			'Module::Build'           => 0.42,
 		},
 		test_requires     => {
-			'Test::More'              => 1.302,
-			'Test::Warn'              => 0.36,
+			'Test2::V0'               => 1.302,
 			'Test::Script'            => 1.29,
 		},
 		meta_merge        => {

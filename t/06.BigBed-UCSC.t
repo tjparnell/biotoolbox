@@ -1,43 +1,44 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
-# Test script for Bio::ToolBox::Data
+# Test script for Bio::ToolBox::db_helper::big
 # working with BigBed data
 
-use strict;
-use Test::More;
+use Test2::V0 -no_srand => 1;
 use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
 	if ( eval { require Bio::DB::BigBed; 1 } ) {
-		plan tests => 50;
+		plan(48);
 	}
 	else {
-		plan skip_all => 'Alternate module Bio::DB::BigBed not available';
+		skip_all('Alternate module Bio::DB::BigBed not available');
 	}
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
 }
 
-require_ok 'Bio::ToolBox::Data'
-	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
-use_ok( 'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support',
-	'get_chromosome_list' );
+use Bio::ToolBox::Data;
+use Bio::ToolBox::db_helper qw(
+	check_dataset_for_rpm_support
+	get_chromosome_list
+);
 
+# Data file
 my $dataset = File::Spec->catfile( $Bin, "Data", "sample1.bb" );
 
 ### Open a test file
 my $infile = File::Spec->catfile( $Bin, "Data", "sample.bed" );
 my $Data   = Bio::ToolBox::Data->new( file => $infile );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'BED Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a new Bed Data object' );
 
 # add a database
 is( $Data->big_adapter('ucsc'), 'ucsc', 'set preferred database adapter to ucsc' );
 $Data->database($dataset);
 is( $Data->database, $dataset, 'get database' );
 my $db = $Data->open_database;
-isa_ok( $db, 'Bio::DB::BigBed', 'connected database' );
+isa_ok( $db, ['Bio::DB::BigBed'], 'got a BigBed database object' );
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
@@ -51,7 +52,7 @@ is( $total, 1414, "number of features in BigBed" );
 
 ### Initialize row stream
 my $stream = $Data->row_stream;
-isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
+isa_ok( $stream, ['Bio::ToolBox::Data::Iterator'], 'got a row stream iterator object' );
 
 # First row is YAL047C
 my $row = $stream->next_row;
@@ -59,7 +60,7 @@ is( $row->name, 'YAL047C', 'row name' );
 
 # try a segment
 my $segment = $row->segment;
-isa_ok( $segment, 'Bio::DB::BigFile::Segment', 'row segment' );
+isa_ok( $segment, ['Bio::DB::BigFile::Segment'], 'got a row Segment object' );
 is( $segment->start, 54989, 'segment start' );
 
 # read count sum
@@ -220,18 +221,18 @@ $Data = Bio::ToolBox::Data->new(
 	db      => $dataset,
 	win     => 500
 );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'new genome window file' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'new genome window Data object' );
 is( $Data->feature,        'genome',     'Data feature name' );
 is( $Data->feature_type,   'coordinate', 'Data feature type is coordinate' );
 is( $Data->number_columns, 3,            'Data number of columns' );
 is( $Data->number_rows,    461,          'Data number of rows' );
 $row = $Data->get_row(1);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'First row object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'First row Feature object' );
 is( $row->start,  1,   'First row start coordinate' );
 is( $row->stop,   500, 'First row stop coordinate' );
 is( $row->length, 500, 'First row length' );
 $row = $Data->get_row(461);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'Last row object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'Last row Feature object' );
 is( $row->start,  230001, 'Last row start coordinate' );
 is( $row->length, 208,    'Last row length' );
 

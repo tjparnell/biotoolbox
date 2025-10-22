@@ -1,24 +1,26 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
-# Test script for Bio::ToolBox::GeneTools modules
+# Test script for Bio::ToolBox::GeneTools module
 
-use strict;
-use Test::More;
+use Test2::V0 -no_srand => 1;
+plan(87);
 use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 89;
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
-	use_ok('Bio::ToolBox::Parser::ucsc');
-	use_ok( 'Bio::ToolBox::GeneTools', qw(:all) );
 }
 
+use Bio::ToolBox::Parser::ucsc;
+use Bio::ToolBox::GeneTools qw(:all);
+
+# data files
 my $ucscfile = File::Spec->catfile( $Bin, "Data", "ensGene.txt" );
 my $enssrc   = File::Spec->catfile( $Bin, "Data", "ensemblSource.txt" );
 
+# initialize parser
 my $ucsc = Bio::ToolBox::Parser::ucsc->new(
 	file    => $ucscfile,
 	enssrc  => $enssrc,
@@ -32,7 +34,7 @@ my $ucsc = Bio::ToolBox::Parser::ucsc->new(
 my $parsed = $ucsc->parse_table();
 is( $parsed, 1, "parsed table" );
 my $gene = $ucsc->next_top_feature;
-isa_ok( $gene, 'Bio::ToolBox::SeqFeature', 'first gene object' );
+isa_ok( $gene, ['Bio::ToolBox::SeqFeature'], 'first gene SeqFeature object' );
 is( $gene->seq_id,       'chr20',           'gene seq_id' );
 is( $gene->start,        388142,            'gene start' );
 is( $gene->stop,         411610,            'gene stop' );
@@ -46,7 +48,8 @@ is( scalar @transcripts, 13, 'get_transcripts method' );
 
 # filter transcript
 my $filt_gene1 = filter_transcript_biotype( $gene, 'processed_transcript' );
-isa_ok( $filt_gene1, 'Bio::ToolBox::SeqFeature', 'first filtered gene transcript' );
+isa_ok( $filt_gene1, ['Bio::ToolBox::SeqFeature'],
+	'first filtered transcript SeqFeature object' );
 my @filt_gene1_trx = get_transcripts($filt_gene1);
 is( scalar @filt_gene1_trx, 2, 'number filtered processed_transcripts' );
 
@@ -72,7 +75,8 @@ is( $alt_introns[0]->start, 388316, 'first alt gene intron start' );
 
 # collapsed transcript
 my $collapsedT = collapse_transcripts(@transcripts);
-isa_ok( $collapsedT, 'Bio::ToolBox::SeqFeature', 'collapsed transcript object' );
+isa_ok( $collapsedT, ['Bio::ToolBox::SeqFeature'],
+	'collapsed transcript SeqFeature object' );
 is( get_transcript_length($collapsedT), 3839, 'collapsed transcript length' );
 my @collapsedT_exons = get_exons($collapsedT);
 is( scalar @collapsedT_exons, 14, 'collapsed transcript exon number' );
@@ -86,7 +90,7 @@ is( get_transcript_cds_length($collapsedT), 0,     'collapsed transcript CDS len
 
 # first transcript
 my $t1 = shift @transcripts;
-isa_ok( $t1, 'Bio::ToolBox::SeqFeature', 'first transcript object' );
+isa_ok( $t1, ['Bio::ToolBox::SeqFeature'], 'first transcript SeqFeature object' );
 is( is_coding($t1),             1,                 'transcript1 is_coding' );
 is( $t1->primary_tag,           'mRNA',            'transcript1 primary_tag' );
 is( $t1->primary_id,            'ENST00000411647', 'transcript1 primary_id' );
@@ -118,7 +122,7 @@ is( get_transcript_utr_length($t1),    241, 'combined UTR length' );
 
 # second transcript
 my $t2 = shift @transcripts;
-isa_ok( $t2, 'Bio::ToolBox::SeqFeature', 'second transcript object' );
+isa_ok( $t2, ['Bio::ToolBox::SeqFeature'], 'second transcript SeqFeature object' );
 is( is_coding($t2),             0,                      'transcript2 is_coding' );
 is( $t2->primary_tag,           'processed_transcript', 'transcript2 primary_tag' );
 is( $t2->primary_id,            'ENST00000465226',      'transcript2 primary_id' );
@@ -206,8 +210,10 @@ my $check_gtf = join( "\n", splice( @gtf, 0, 11 ) ) . "\n";
 is( $check_gtf, $expected_gtf, 'first gtf transcript' );
 
 # export as bed12, just use first transcript
-is( $t1->display_name('RBCK1.t1'), 'RBCK1.t1',
-	'set new display name for first transcript' );
+is(
+	$t1->display_name('RBCK1.t1'), 'RBCK1.t1',
+	'set new display name for first transcript'
+);
 my $expected_bed = <<END;
 chr20	388141	398466	RBCK1.t1	1000	+	389401	398466	0	5	174,89,145,94,91	0,1193,2383,10028,10234
 END

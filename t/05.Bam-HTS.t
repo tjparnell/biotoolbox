@@ -1,47 +1,47 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
-# Test script for Bio::ToolBox::Data
+# Test script for Bio::ToolBox::db_helper::hts
 # working with Bam data
 
-use strict;
-use Test::More;
+use Test2::V0 -no_srand => 1;
 use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
 	if ( eval { require Bio::DB::HTS; 1 } ) {
-		plan tests => 74;
+		plan(72);
 	}
 	else {
-		plan skip_all => 'Optional module Bio::DB::HTS not available';
+		skip_all('Optional module Bio::DB::HTS not available');
 	}
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
 }
 
-require_ok 'Bio::ToolBox::Data'
-	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
-use_ok(
-	'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support',
-	'get_chromosome_list',     'get_genomic_sequence',
-	'use_minimum_mapq'
+use Bio::ToolBox::Data;
+use Bio::ToolBox::db_helper qw(
+	check_dataset_for_rpm_support
+	get_chromosome_list
+	get_genomic_sequence
+	use_minimum_mapq
 );
 
+# set example file paths
 my $dataset = File::Spec->catfile( $Bin, "Data", "sample1.bam" );
 my $fasta   = File::Spec->catfile( $Bin, "Data", 'sequence.fa' );
 
 ### Open a test file
 my $infile = File::Spec->catfile( $Bin, "Data", "sample.bed" );
 my $Data   = Bio::ToolBox::Data->new( file => $infile );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'BED Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a BED Data object' );
 
 # add a database
 is( $Data->bam_adapter('hts'), 'hts', 'set preferred database adapter to hts' );
 $Data->database($dataset);
 is( $Data->database, $dataset, 'get database' );
 my $db = $Data->open_database;
-isa_ok( $db, 'Bio::DB::HTS', 'connected database' );
+isa_ok( $db, ['Bio::DB::HTS'], 'got a Bio::DB::HTS database object' );
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
@@ -64,7 +64,7 @@ is( use_minimum_mapq(0), 0,    'reset minimum mapq' );    # reset for below
 
 # check fasta
 my $fdb = $Data->open_new_database($fasta);
-isa_ok( $fdb, 'Bio::DB::HTS::Faidx', 'HTS Faidx fasta database' );
+isa_ok( $fdb, ['Bio::DB::HTS::Faidx'], 'got a Faidx database object' );
 my $seq = get_genomic_sequence( $fdb, 'chrI', 257, 275 );
 is( $seq, 'ACCCTACCATTACCCTACC', 'fetched fasta sequence' );
 @chromos = get_chromosome_list($fdb);
@@ -75,7 +75,7 @@ unlink "$fasta.fai";
 
 ### Initialize row stream
 my $stream = $Data->row_stream;
-isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
+isa_ok( $stream, ['Bio::ToolBox::Data::Iterator'], 'got a row stream Iterator object' );
 
 # First row is YAL047C
 my $row = $stream->next_row;
@@ -83,7 +83,7 @@ is( $row->name, 'YAL047C', 'row name' );
 
 # try a segment
 my $segment = $row->segment;
-isa_ok( $segment, 'Bio::DB::HTS::Segment', 'row segment' );
+isa_ok( $segment, ['Bio::DB::HTS::Segment'], 'got a row HTS segment object' );
 is( $segment->start, 54989, 'segment start' );
 
 # read count sum with default mapq
@@ -293,8 +293,10 @@ use_minimum_mapq(100);
 # 	printf "  > $_ => %s\n", join(',', @{$pos2scores{$_}});
 # }
 is( scalar keys %pos2scores, 145, 'number of named positioned scores with high MAPQ' );
-is( $pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1',
-	'positioned named at 6 with high MAPQ' );
+is(
+	$pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1',
+	'positioned named at 6 with high MAPQ'
+);
 is( scalar @{ $pos2scores{101} }, 1, 'positioned name count at 101 with high MAPQ' );
 use_minimum_mapq(0);
 
@@ -328,18 +330,18 @@ $Data = Bio::ToolBox::Data->new(
 	db      => $dataset,
 	win     => 500
 );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'new genome window file' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a new genome window Data object' );
 is( $Data->feature,        'genome',     'Data feature name' );
 is( $Data->feature_type,   'coordinate', 'Data feature type is coordinate' );
 is( $Data->number_columns, 3,            'Data number of columns' );
 is( $Data->number_rows,    461,          'Data number of rows' );
 $row = $Data->get_row(1);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'First row object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got the first row Feature object' );
 is( $row->start,  1,   'First row start coordinate' );
 is( $row->stop,   500, 'First row stop coordinate' );
 is( $row->length, 500, 'First row length' );
 $row = $Data->get_row(461);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'Last row object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got the last row Feature object' );
 is( $row->start,  230001, 'Last row start coordinate' );
 is( $row->length, 208,    'Last row length' );
 

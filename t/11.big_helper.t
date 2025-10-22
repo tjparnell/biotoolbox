@@ -1,35 +1,32 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # Test script for Bio::ToolBox::big_helper
 
-use strict;
+use Test2::V0 -no_srand => 1;
+plan(40);
 use English qw(-no_match_vars);
-use Test::More;
 use File::Spec;
-use IO::File;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 41;
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, 'Data', 'biotoolbox.cfg' );
 	## use critic
 }
 
-use_ok(
-	'Bio::ToolBox::big_helper', qw(
-		get_bed_to_bigbed_app
-		get_bigwig_to_bdg_app
-		get_bigwig_to_wig_app
-		get_wig_to_bigwig_app
-		check_wigToBigWig_version
-		open_wig_to_bigwig_fh
-		open_bigwig_to_wig_fh
-		bed_to_bigbed_conversion
-		generate_chromosome_file
-		wig_to_bigwig_conversion
-	)
-) or BAIL_OUT "Cannot load Bio::ToolBox::big_helper";
+use IO::File;
+use Bio::ToolBox::big_helper qw(
+	get_bed_to_bigbed_app
+	get_bigwig_to_bdg_app
+	get_bigwig_to_wig_app
+	get_wig_to_bigwig_app
+	check_wigToBigWig_version
+	open_wig_to_bigwig_fh
+	open_bigwig_to_wig_fh
+	bed_to_bigbed_conversion
+	generate_chromosome_file
+	wig_to_bigwig_conversion
+);
 
 # sample files
 my $bamfile  = File::Spec->catfile( $Bin, 'Data', 'sample1.bam' );
@@ -44,7 +41,7 @@ my $outfile2 = File::Spec->catfile( $Bin, 'Data', 'example.bb' );
 ## generate chromosome file using variety of database adapters
 SKIP: {
 	eval { require Bio::DB::HTS };
-	skip "Bio::DB::HTS not installed", 3 if $EVAL_ERROR;
+	skip( "Bio::DB::HTS not installed", 3 ) if $EVAL_ERROR;
 	my $file = generate_chromosome_file($bamfile);
 	like( $file, qr/chr_sizes_ \w{5} $/x, 'HTS BAM chromosome file' );
 	my $fh   = IO::File->new( $file, 'r' );
@@ -58,7 +55,7 @@ SKIP: {
 }
 SKIP: {
 	eval { require Bio::DB::Sam };
-	skip "Bio::DB::Sam not installed", 3 if $EVAL_ERROR;
+	skip( "Bio::DB::Sam not installed", 3 ) if $EVAL_ERROR;
 	my $file = generate_chromosome_file($bamfile);
 	like( $file, qr/chr_sizes_ \w{5} $/x, 'Sam BAM chromosome file' );
 	my $fh   = IO::File->new( $file, 'r' );
@@ -72,7 +69,7 @@ SKIP: {
 }
 SKIP: {
 	eval { require Bio::DB::BigWig };
-	skip "Bio::DB::BigWig not installed", 3 if $EVAL_ERROR;
+	skip( "Bio::DB::BigWig not installed", 3 ) if $EVAL_ERROR;
 	my $file = generate_chromosome_file($bwfile);
 	like( $file, qr/chr_sizes_ \w{5} $/x, 'UCSC BigWig chromosome file' );
 	my $fh   = IO::File->new( $file, 'r' );
@@ -86,7 +83,7 @@ SKIP: {
 }
 SKIP: {
 	eval { require Bio::DB::BigBed };
-	skip "Bio::DB::BigBed not installed", 3 if $EVAL_ERROR;
+	skip( "Bio::DB::BigBed not installed", 3 ) if $EVAL_ERROR;
 	my $file = generate_chromosome_file($bbfile);
 	like( $file, qr/chr_sizes_ \w{5} $/x, 'UCSC BigBed chromosome file' );
 	my $fh   = IO::File->new( $file, 'r' );
@@ -100,7 +97,7 @@ SKIP: {
 }
 SKIP: {
 	eval { require Bio::DB::Big };
-	skip "Bio::DB::Big not installed", 6 if $EVAL_ERROR;
+	skip( "Bio::DB::Big not installed", 6 ) if $EVAL_ERROR;
 
 	# bigWig
 	my $file = generate_chromosome_file($bwfile);
@@ -138,13 +135,13 @@ SKIP: {
 SKIP: {
 	my $bw2w_app = get_bigwig_to_wig_app();
 
-	skip 'bigWigToWig not available', 5 if not defined $bw2w_app;
+	skip( 'bigWigToWig not available', 5 ) if not defined $bw2w_app;
 	like( $bw2w_app, qr/bigWigTo (?:Wig | BedGraph) $/x, 'bigWigToWig application path' );
 	my $fh = open_bigwig_to_wig_fh(
 		bw        => $bwfile,
 		bwapppath => $bw2w_app
 	);
-	isa_ok( $fh, 'IO::File', 'opened bigWigToWig file handle pipe object' );
+	isa_ok( $fh, ['IO::File'], 'opened bigWigToWig file handle pipe object' );
 	is( $fh->opened, 1, 'file handle is opened' );
 	my $line   = $fh->getline;
 	my $expect = <<END;
@@ -163,13 +160,13 @@ END
 # this can only return bigWigToBedGraph path
 SKIP: {
 	my $bw2w_app = get_bigwig_to_bdg_app();
-	skip 'bigWigToBedGraph not available', 4 if not defined $bw2w_app;
+	skip( 'bigWigToBedGraph not available', 4 ) if not defined $bw2w_app;
 	like( $bw2w_app, qr/bigWigToBedGraph $/x, 'bigWigToBedGraph application path' );
 	my $fh = open_bigwig_to_wig_fh(
 		bw        => $bwfile,
 		bwapppath => $bw2w_app
 	);
-	isa_ok( $fh, 'IO::File', 'opened bigWigToBedGraph file handle pipe object' );
+	isa_ok( $fh, ['IO::File'], 'opened bigWigToBedGraph file handle pipe object' );
 	is( $fh->opened, 1, 'file handle is opened' );
 	my $line   = $fh->getline;
 	my $expect = <<END;
@@ -184,7 +181,7 @@ END
 # wigToBigWig tests
 SKIP: {
 	my $w2bw_app = get_wig_to_bigwig_app();
-	skip 'wigToBigWig not available', 9, if not defined $w2bw_app;
+	skip( 'wigToBigWig not available', 9 ) if not defined $w2bw_app;
 	like(
 		$w2bw_app, qr/ (?: wigToBigWig | BioDBBigFile ) $/x,
 		'wigToBigWig application path'
@@ -216,13 +213,13 @@ SKIP: {
 SKIP: {
 		my $version;
 		eval { $version = check_wigToBigWig_version($w2bw_app) };
-		skip 'wigToBigWig does not support stdin', 5 if not $version;
+		skip( 'wigToBigWig does not support stdin', 5 ) if not $version;
 		my $bwfh = open_wig_to_bigwig_fh(
 			bwapppath => $w2bw_app,
 			chromo    => $chrfile,
 			bw        => $outfile1
 		);
-		isa_ok( $bwfh, 'IO::File', 'opened wigToBigWig pipe object' );
+		isa_ok( $bwfh, ['IO::File'], 'opened wigToBigWig pipe object' );
 		is( $fh->opened, q(), 'pipe has no valid file descriptor' );
 		$bwfh->print( var_data() );
 		my $complete = $bwfh->close;
@@ -239,7 +236,7 @@ SKIP: {
 # bedToBigBed conversion
 SKIP: {
 	my $b2bb_app = get_bed_to_bigbed_app();
-	skip 'bedToBigBed not available', 4 unless defined $b2bb_app;
+	skip( 'bedToBigBed not available', 4 ) unless defined $b2bb_app;
 	like( $b2bb_app, qr/bedToBigBed $/x, 'bedToBigBed application' );
 
 	# write test bed and chromosome files

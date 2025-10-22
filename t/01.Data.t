@@ -1,29 +1,25 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # Test script for Bio::ToolBox::Data and Bio::ToolBox::Data::Stream
 
-use strict;
-use Test::More;
-use Test::Warn;
+use Test2::V0 -no_srand => 1;
+plan(255);
 use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 261;
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
 }
 
-require_ok 'Bio::ToolBox::Data'
-	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
-require_ok 'Bio::ToolBox::Data::Stream'
-	or BAIL_OUT "Cannot load Bio::ToolBox::Data::Stream";
+require Bio::ToolBox::Data;
+require Bio::ToolBox::Data::Stream;
 
 ### Open a test file
 my $infile = File::Spec->catfile( $Bin, "Data", "chrI.gff3" );
 my $Data   = Bio::ToolBox::Data->new( file => $infile, );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'GFF3 Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a GFF3 Data object' );
 
 # test general metadata
 is( $Data->gff,          3,            'gff version' );
@@ -96,10 +92,15 @@ is( $Data->name(7),       'Strand', 'name of column 7 again' );
 # column metadata
 is( $Data->metadata( 1, 'name' ), 'Chromosome', 'column name via metadata value' );
 $Data->metadata( 2, 'accuracy', 'bogus' );
-my $md = $Data->metadata(2);
+my $md       = $Data->metadata(2);
+my $expected = {
+	'index'    => 2,
+	'name'     => 'Source',
+	'AUTO'     => 3,
+	'accuracy' => 'bogus'
+};
 ok( $md, 'metadata success' );
-isa_ok( $md, 'HASH', 'metadata is a hash' );
-is( $md->{'accuracy'}, 'bogus', 'set metadata value is correct' );
+is( $md, $expected, 'metadata hash matches expected' );
 
 # column values
 my $cv = $Data->column_values(4);
@@ -109,7 +110,7 @@ is( $cv->[1],      1,  'check specific column value' );
 
 # test duplicate
 my $Dupe = $Data->duplicate;
-isa_ok( $Dupe, 'Bio::ToolBox::Data', 'Duplicated object' );
+isa_ok( $Dupe, ['Bio::ToolBox::Data'],   'Duplicated object' );
 is( $Dupe->gff,            3,            'Dupe gff version' );
 is( $Dupe->program,        undef,        'Dupe program name' );
 is( $Dupe->feature,        'region',     'Dupe general feature' );
@@ -121,11 +122,11 @@ is( $Dupe->last_row,       0,            'Dupe last row index' );
 
 # test row_stream
 my $stream = $Data->row_stream;
-isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'Iterator object' );
+isa_ok( $stream, ['Bio::ToolBox::Data::Iterator'], 'Got an Iterator object' );
 
 # first row feature
 my $row = $stream->next_row;
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'Feature object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'Got a Feature object' );
 is( $row->value(1),   'chrI',          'row object value of index 1' );
 is( $row->seq_id,     'chrI',          'row object chromosome value' );
 is( $row->start,      1,               'row object start value' );
@@ -146,8 +147,12 @@ is( $row->end,      62,              'row object end value' );
 
 # check gff attribute
 my $gff_att = $row->gff_attributes;
-isa_ok( $gff_att, 'HASH', 'row GFF attributes hash' );
-is( $gff_att->{Name}, 'TEL01L-TR', 'row GFF attribute Name' );
+$expected = {
+	'Note' => 'Terminal stretch of telomeric repeats on the left arm of Chromosome I',
+	'Name' => 'TEL01L-TR',
+	'ID'   => 'TEL01L-TR'
+};
+is( $gff_att, $expected, 'row GFF attributes hash' );
 $gff_att->{Note} = 'I hereby claim this telomeric repeat to be mine';
 is( $row->rewrite_gff_attributes, 1, 'rewrite row GFF attributes' );
 is(
@@ -201,10 +206,13 @@ is( $Data->metadata( 10, 'name' ), 'Name', 'Name of new column' );
 # change and copy metadata
 $Data->name( 10, 'DuplicateName' );
 $Data->copy_metadata( 2, 10 );
-$md = $Data->metadata(10);
-is( $md->{name},     'DuplicateName', 'metadata of changed column name' );
-is( $md->{accuracy}, 'bogus',         'metadata of copied column' );
-is( $md->{'index'},  10,              'metadata of copied column' );
+$md       = $Data->metadata(10);
+$expected = {
+	'name'     => 'DuplicateName',
+	'index'    => 10,
+	'accuracy' => 'bogus'
+};
+is( $md, $expected, 'copied metadata is expected' );
 
 # sort table
 $Data->sort_data( 9, 'd' );
@@ -264,7 +272,7 @@ undef $Data;
 $Data = Bio::ToolBox::Data->new( file => $file );
 
 # metadata tests
-isa_ok( $Data, 'Bio::ToolBox::Data', 'Bed Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'Got a bed Data object' );
 is( $Data->gff,            0,            'gff version' );
 is( $Data->bed,            4,            'bed version' );
 is( $Data->format,         'bed4',       'bed format' );
@@ -289,7 +297,7 @@ is( $Data->headers,        0,            'includes headers' );
 # stream tests and row feature
 $stream = $Data->row_stream;
 $row    = $stream->next_row;
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'Feature object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got a Feature object' );
 is( $row->value(1),   'chrI',             'row object value of chromo index' );
 is( $row->start,      35155,              'row object start value' );
 is( $row->end,        36303,              'row object end value' );
@@ -299,7 +307,7 @@ is( $row->coordinate, 'chrI:35155-36303', 'row object coordinate string' );
 
 # grab row feature directly and change attributes using high API functions - v1.68
 $row = $Data->get_row(25);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'Direct Feature object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'Got a direct Feature object' );
 is( $row->value(1),        'chrI', 'Feature chromosome actual value' );
 is( $row->seq_id,          'chrI', 'Feature chromosome' );
 is( $row->seq_id('chrX'),  'chrX', 'Change chromosome via high level' );
@@ -326,18 +334,19 @@ is( $Data->value( 25, 4 ), 'bob',       'Feature name actual value' );
 
 is( $row->value(5), '.', 'Feature actual strand value (nonexistent)' );
 is( $row->strand,   0,   'Feature strand (implied)' );
-warning_is(
-	sub { $row->strand(1) },
-	'ERROR: No Strand column to update!',
+
+like(
+	warning { $row->strand(1) },
+	qr/^ ERROR:\ No\ Strand\ column\ to\ update!/x,
 	'Attempt strand change via high level'
 );
 is( $row->strand,          0,     'Check attempted strand change' );
 is( $Data->value( 25, 5 ), undef, 'Feature actual changed strand value' );
-
 is( $row->type, 'region', 'Feature type (implied)' );
-warning_is(
-	sub { $row->type('gene') },
-	'ERROR: No Type column to update!',
+
+like(
+	warning { $row->type('gene') },
+	qr/^ ERROR:\ No\ Type\ column\ to\ update!/x,
 	'Attempt type change via high level'
 );
 isnt( $row->type, 'gene', 'Check attempted type change' );
@@ -365,7 +374,7 @@ undef $Data;
 
 # open the bed file we just wrote
 my $Stream = Bio::ToolBox::Data::Stream->new( in => $file, );
-isa_ok( $Stream, 'Bio::ToolBox::Data::Stream', 'Stream Bed object' );
+isa_ok( $Stream, ['Bio::ToolBox::Data::Stream'], 'Got a Stream object' );
 is( $Stream->bed,          4,            'bed value' );
 is( $Stream->gff,          0,            'gff value' );
 is( $Stream->feature,      'region',     'feature' );
@@ -386,7 +395,7 @@ is( $Stream->name(3),     'End',  'name of column again' );
 
 # iterate
 my $f = $Stream->next_row;
-isa_ok( $f, 'Bio::ToolBox::Data::Feature', 'next row Feature object' );
+isa_ok( $f, ['Bio::ToolBox::Data::Feature'], 'got the next row Feature object' );
 
 # check feature
 is( $f->seq_id,     'chrI',             'feature seq_id' );
@@ -405,13 +414,14 @@ $Stream = Bio::ToolBox::Data->new(
 	stream => 1,
 	in     => $file,
 );
-isa_ok( $Stream, 'Bio::ToolBox::Data::Stream', 'Stream object' );
+isa_ok( $Stream, ['Bio::ToolBox::Data::Stream'],
+	'got another Stream object differently' );
 
 # create output file
 my $file1 = $file;
 $file1 =~ s/\.bed$/_2.bed/;
 my $outStream = $Stream->duplicate($file1);
-isa_ok( $outStream, 'Bio::ToolBox::Data::Stream', 'duplicated Stream object' );
+isa_ok( $outStream, ['Bio::ToolBox::Data::Stream'], 'got a duplicated Stream object' );
 is( $Stream->basename,    'chrI',   'in Stream basename' );
 is( $outStream->basename, 'chrI_2', 'out Stream basename' );
 
@@ -445,7 +455,7 @@ cmp_ok( -s $file2, '<', -s $file, "smaller file size due to lack of comments" );
 # reload the duplicate files
 # this should effectively delete the child files
 $Data = Bio::ToolBox::Data->new();
-isa_ok( $Data, 'Bio::ToolBox::Data', 'new empty Data object' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a shiny new empty Data object' );
 is( $Data->number_columns, 0, 'number of columns' );
 is( $Data->last_row,       0, 'last row index' );
 
@@ -460,7 +470,7 @@ undef $Data;
 undef $row;
 $infile = File::Spec->catfile( $Bin, "Data", "H3K4me3.narrowPeak" );
 $Data   = Bio::ToolBox::Data->new( file => $infile, );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'narrowPeak Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a narrowPeak Data object' );
 
 # test general metadata
 is( $Data->gff,                   0,             'gff version' );
@@ -476,7 +486,7 @@ is( $Data->find_column('pValue'), 8,             'find column pValue' );
 is( $Data->find_column('peak'),   10,            'find column peak' );
 is( $Data->headers,               0,             'include_headers' );
 $row = $Data->get_row(1);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'first peak interval Feature object' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got first peak interval Feature object' );
 is( $row->peak,     11908866, 'peak interval peak coordinate' );
 is( $row->midpoint, 11909060, 'peak interval midpoint' );
 
@@ -484,7 +494,7 @@ is( $row->midpoint, 11909060, 'peak interval midpoint' );
 undef $Data;
 $infile = File::Spec->catfile( $Bin, "Data", "H3K27ac.bed" );
 $Data   = Bio::ToolBox::Data->new( file => $infile, );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'gappedPeak bed Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a gappedPeak bed Data object' );
 
 # test general metadata
 is( $Data->gff,                   0,            'gff version' );
@@ -506,7 +516,7 @@ undef $row;
 $infile = File::Spec->catfile( $Bin, "Data", "H3K4me3.narrowPeak" );
 $Stream = Bio::ToolBox::Data::Stream->new( in => $infile );
 $Data   = $Stream->duplicate;
-isa_ok( $Data, 'Bio::ToolBox::Data', 'duplicate Stream object to Data object' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a duplicate Stream object to Data object' );
 is( $Data->number_columns, 10,           'number columns' );
 is( $Data->bed,            10,           'bed value' );
 is( $Data->feature,        'region',     'feature' );
@@ -527,7 +537,7 @@ undef $Data;
 
 # reopen and check
 my $fh = Bio::ToolBox::Data->open_to_read_fh('test.txt');
-isa_ok( $fh, 'IO::File', 'opened filehandle' );
+isa_ok( $fh, ['IO::File'], 'got an opened filehandle object' );
 is( $fh->getline, "# example Me3 narrowPeak\n", 'first line' );
 my @headers = split( /\t/, $fh->getline );
 is( scalar(@headers), 10,            'number of header items' );
@@ -541,9 +551,9 @@ unlink('test.txt');
 undef $Data;
 $infile = File::Spec->catfile( $Bin, 'Data', 'sample.bed' );
 $Data   = Bio::ToolBox::Data->new( in => $infile );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'new sample bed file object' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a new sample bed Data object' );
 my $Data1 = Bio::ToolBox::Data->new( columns => [qw(Coordinate Name)] );
-isa_ok( $Data1, 'Bio::ToolBox::Data', 'new empty Data object with columns' );
+isa_ok( $Data1, ['Bio::ToolBox::Data'], 'got a new empty Data object with columns' );
 $iterate_success = $Data->iterate(
 	sub {
 		my $r = shift;
@@ -555,7 +565,7 @@ is( $Data1->number_rows, $Data->number_rows, 'number of new rows' );
 
 # check extraction of coordinates from string, start is transformed
 $row = $Data1->get_row(1);
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'first feature' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got the first Feature object' );
 is( $row->seq_id, 'chrI', 'extracted seq_id from coordinate string' );
 is( $row->start,  54989,  'extracted start from coordinate string' );
 is( $row->end,    56857,  'extracted end from coordinate string' );

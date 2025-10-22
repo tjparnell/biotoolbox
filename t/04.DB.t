@@ -1,29 +1,28 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # Test script for Bio::ToolBox::Data
 # working with a Bio::DB::SeqFeature::Store database
 # using in memory database for simplicity here....
 
-use strict;
-use Test::More;
+use Test2::V0 -no_srand => 1;
 use File::Spec;
 use FindBin '$Bin';
-use Statistics::Lite qw(min max);
 
 BEGIN {
+
 	if ( eval { require Bio::DB::SeqFeature::Store::memory; 1 } ) {
-		plan tests => 88;
+		plan(87);
 	}
 	else {
-		plan skip_all => 'Bio::DB::SeqFeature::Store not available';
+		skip_all('Bio::DB::SeqFeature::Store not available');
 	}
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
 }
 
-require_ok 'Bio::ToolBox::Data'
-	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+use Statistics::Lite qw(min max);
+use Bio::ToolBox::Data;
 
 ### Collect features from a database
 my $infile = File::Spec->catfile( $Bin, "Data", "chrI.gff3" );
@@ -31,7 +30,7 @@ my $Data   = Bio::ToolBox::Data->new(
 	'db'      => 'mem_test_file',
 	'feature' => 'gene:SGD',
 );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'db collected gene table' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a Data object with collected gene table' );
 
 # check metadata
 is( $Data->feature,      'gene:SGD', 'feature' );
@@ -53,7 +52,7 @@ is( $Data->type_column, 3, 'identify type column' );
 # test database
 is( $Data->database, 'mem_test_file', 'database name' );
 my $db = $Data->open_database;
-isa_ok( $db, 'Bio::DB::SeqFeature::Store', 'opened database' );
+isa_ok( $db, ['Bio::DB::SeqFeature::Store'], 'got an opened database object' );
 
 # since we are dealing with a memory database, the features returned
 # are not in a predictable order suitable for testing
@@ -62,11 +61,11 @@ $Data->sort_data( 2, 'i' );
 
 # test row_stream
 my $stream = $Data->row_stream;
-isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
+isa_ok( $stream, ['Bio::ToolBox::Data::Iterator'], 'got row stream iterator object' );
 
 # look at first row
 my $row = $stream->next_row;
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'row Feature' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got a row Feature object' );
 ok( $row->row_index, 'row index' );           # could be anything
 is( $row->type, 'gene:SGD', 'Feature type' );
 is( $row->name, 'YAL043C',  'Feature name' );
@@ -76,11 +75,11 @@ is( $row->stop,  61052, 'Feature stop' );     # now automatically collected from
 
 # test SeqFeature
 my $feature = $row->feature;
-isa_ok( $feature, 'Bio::DB::SeqFeature', 'db SeqFeature from row Feature' );
+isa_ok( $feature, ['Bio::DB::SeqFeature'], 'got a db SeqFeature object from row' );
 is( $row->start, 58695, 'Feature start, defined' );    # uses db feature for start
 is( $row->stop,  61052, 'Feature stop, defined' );     # uses db feature for stop
 my $segment = $row->segment;
-isa_ok( $segment, 'Bio::DB::SeqFeature::Segment', 'db segment from row Feature' );
+isa_ok( $segment, ['Bio::DB::SeqFeature::Segment'], 'got a db Segment object from row' );
 
 ### Using a second test database for data collection
 # verify data from a data database
@@ -184,7 +183,7 @@ is( $score1{686},        1,    'score at position 686 in positioned ncount hash'
 
 # move to next gene to get better relative scores
 $row = $stream->next_row;
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'row Feature' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got a row Feature object' );
 is( $row->name, 'YAL044C', 'Feature name' );
 
 # collect 5' relative position scores
@@ -196,8 +195,10 @@ is( $row->name, 'YAL044C', 'Feature name' );
 );
 is( min( keys %score1 ), -467, 'min 5prime relative position in positioned score hash' );
 is( max( keys %score1 ),  467, 'max 5prime relative position in positioned score hash' );
-is( $score1{218}, 0.62,
-	'score at position 218 in 5prime relative positioned score hash' );
+is(
+	$score1{218}, 0.62,
+	'score at position 218 in 5prime relative positioned score hash'
+);
 
 # collect 3' relative position scores
 %score1 = $row->get_relative_point_position_scores(
@@ -210,8 +211,10 @@ is( $score1{218}, 0.62,
 # print "3' position_score is \n" . print_hash(\%score1);
 is( min( keys %score1 ), -430, 'min 3prime relative position in positioned score hash' );
 is( max( keys %score1 ),  481, 'max 3prime relative position in positioned score hash' );
-is( $score1{187}, 0.75,
-	'score at position 187 in 3prime relative positioned score hash' );
+is(
+	$score1{187}, 0.75,
+	'score at position 187 in 3prime relative positioned score hash'
+);
 
 # collect region extended relative position scores
 %score1 = $row->get_region_position_scores(
@@ -222,14 +225,22 @@ is( $score1{187}, 0.75,
 );
 
 # print "extended position_score is \n" . print_hash(\%score1);
-is( min( keys %score1 ),
-	57469, 'min extended relative position in positioned score hash' );
-is( max( keys %score1 ),
-	58929, 'max extended relative position in positioned score hash' );
-is( $score1{58532}, 0.34,
-	'score at position 58532 in extended relative positioned score hash' );
-is( scalar( keys %score1 ), 39,
-	'number of keys extended relative positioned score hash' );
+is(
+	min( keys %score1 ),
+	57469, 'min extended relative position in positioned score hash'
+);
+is(
+	max( keys %score1 ),
+	58929, 'max extended relative position in positioned score hash'
+);
+is(
+	$score1{58532}, 0.34,
+	'score at position 58532 in extended relative positioned score hash'
+);
+is(
+	scalar( keys %score1 ), 39,
+	'number of keys extended relative positioned score hash'
+);
 
 # collect avoided extended relative position scores
 %score1 = $row->get_region_position_scores(
@@ -241,14 +252,22 @@ is( scalar( keys %score1 ), 39,
 );
 
 # print "avoided extended position_score is \n" . print_hash(\%score1);
-is( min( keys %score1 ),
-	56969, 'min avoided extended relative position in positioned score hash' );
-is( max( keys %score1 ),
-	58683, 'max avoided extended relative position in positioned score hash' );
-is( $score1{58532}, 0.34,
-	'score at position 58532 in avoided extended relative positioned score hash' );
-is( scalar( keys %score1 ),
-	26, 'number of keys avoided extended relative positioned score hash' );
+is(
+	min( keys %score1 ),
+	56969, 'min avoided extended relative position in positioned score hash'
+);
+is(
+	max( keys %score1 ),
+	58683, 'max avoided extended relative position in positioned score hash'
+);
+is(
+	$score1{58532}, 0.34,
+	'score at position 58532 in avoided extended relative positioned score hash'
+);
+is(
+	scalar( keys %score1 ),
+	26, 'number of keys avoided extended relative positioned score hash'
+);
 
 # collect absolute position scores
 %score1 = $row->get_relative_point_position_scores(
@@ -275,7 +294,7 @@ $Data = Bio::ToolBox::Data->new(
 
 	# we need to work with transcripts here, not genes
 );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'db collected gene table' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a collected gene table Data object' );
 
 # check metadata
 is( $Data->feature,      'mRNA:tim', 'feature' );
@@ -293,15 +312,15 @@ is( $Data->type_column, 3, 'identify type column' );
 # check first feature
 $Data->sort_data( 2, 'i' );
 $stream = $Data->row_stream;
-isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
+isa_ok( $stream, ['Bio::ToolBox::Data::Iterator'], 'got a row stream iterator object' );
 $row = $stream->next_row;
-isa_ok( $row, 'Bio::ToolBox::Data::Feature', 'row Feature' );
+isa_ok( $row, ['Bio::ToolBox::Data::Feature'], 'got a row Feature object' );
 is( $row->type, 'mRNA:tim', 'Feature type' );
 is( $row->name, 'YAL030W',  'Feature name' );
 
 # test SeqFeature
 $feature = $row->feature;
-isa_ok( $feature, 'Bio::DB::SeqFeature', 'db SeqFeature from row Feature' );
+isa_ok( $feature, ['Bio::DB::SeqFeature'], 'got a db SeqFeature object from row' );
 
 # test subfeature scores, should use same database
 $score = $row->get_score(
@@ -379,7 +398,7 @@ undef $Data;
 undef $stream;
 $Data =
 	Bio::ToolBox::Data->new( file => File::Spec->catfile( $Bin, "Data", "sample.bed" ) );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'BED Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a BED Data object' );
 $stream = $Data->row_stream;
 $row    = $stream->next_row;
 $score  = $row->get_score(
@@ -394,8 +413,10 @@ $score = $row->get_score(
 	dataset  => 'data',
 	'method' => 'median',
 );
-is( sprintf( "%.1f", $score ),
-	0.5, 'median score across second bed feature with alt chromo' );
+is(
+	sprintf( "%.1f", $score ),
+	0.5, 'median score across second bed feature with alt chromo'
+);
 
 ### Test for sequence retrieval using Bio::DB::Fasta
 # reusing the Data object immediately above
@@ -403,7 +424,7 @@ $Data->bam_adapter('none');    # to ensure we use BioPerl's Bio::DB::Fasta
 my $fasta = File::Spec->catfile( $Bin, "Data", "sequence.fa" );
 print "opening $fasta...\n";
 my $fdb = Bio::ToolBox::Data->open_database($fasta);
-isa_ok( $fdb, 'Bio::DB::Fasta', 'BioPerl fasta adapter database' );
+isa_ok( $fdb, ['Bio::DB::Fasta'], 'got a BioPerl fasta database object' );
 
 # reuse row object from above, but we will specify our own coordinates since our
 # fasta file is too small and doesn't cover the bed coordinates

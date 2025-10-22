@@ -1,28 +1,26 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
-# Test script for Bio::ToolBox::Data
+# Test script for Bio::ToolBox::db_helper::wiggle
 # working with binary wiggle data
 
-use strict;
-use Test::More;
+use Test2::V0 -no_srand => 1;
 use File::Spec;
-use IO::File;
 use FindBin '$Bin';
 
 BEGIN {
 	if ( eval { require Bio::Graphics::Wiggle; 1 } ) {
-		plan tests => 17;
+		plan(16);
 	}
 	else {
-		plan skip_all => 'Optional module Bio::Graphics not available';
+		skip_all('Optional module Bio::Graphics not available');
 	}
 	## no critic
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile( $Bin, "Data", "biotoolbox.cfg" );
 	## use critic
 }
 
-require_ok 'Bio::ToolBox::Data'
-	or BAIL_OUT "Cannot load Bio::ToolBox::Data";
+use IO::File;
+use Bio::ToolBox::Data;
 
 ### Prepare the GFF database
 my $database = File::Spec->catfile( $Bin, "Data", "sample2_wib.gff3" );
@@ -42,17 +40,17 @@ OUT
 ### Open a test file
 my $infile = File::Spec->catfile( $Bin, "Data", "sample.bed" );
 my $Data   = Bio::ToolBox::Data->new( file => $infile );
-isa_ok( $Data, 'Bio::ToolBox::Data', 'BED Data' );
+isa_ok( $Data, ['Bio::ToolBox::Data'], 'got a bed Data object' );
 
 # add a database
 $Data->database($database);
 is( $Data->database, $database, 'get database' );
 my $db = $Data->open_database;
-isa_ok( $db, 'Bio::DB::SeqFeature::Store', 'connected database' );
+isa_ok( $db, ['Bio::DB::SeqFeature::Store'], 'got a SeqFeature Store database object' );
 
 ### Initialize row stream
 my $stream = $Data->row_stream;
-isa_ok( $stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator' );
+isa_ok( $stream, ['Bio::ToolBox::Data::Iterator'], 'got row stream Iterator ojbect' );
 
 # First row is YAL047C
 my $row = $stream->next_row;
@@ -60,7 +58,7 @@ is( $row->name, 'YAL047C', 'row name' );
 
 # try a segment
 my $segment = $row->segment;
-isa_ok( $segment, 'Bio::DB::SeqFeature::Segment', 'row segment' );
+isa_ok( $segment, ['Bio::DB::SeqFeature::Segment'], 'got a row Segment object' );
 is( $segment->start, 54989, 'segment start' );
 
 # score count sum
