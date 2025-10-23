@@ -1,6 +1,16 @@
 ######## Bio::ToolBox revision history #############
 
 
+v2.04
+	- Fix bugs that prevented scripts get_binned_data.pl and 
+	  get_relative_data.pl from compiling.
+	- Clean up code in utility and big_helper modules.
+	- Add new Build tests for big_helper.pm, which requires that
+	  external UCSC utilities are in the PATH, but should safely
+	  skip if they are not.
+	- Add new Build test to verify all included application scripts.
+	- Change all tests to use the modern Test2 suite.
+
 v2.03
 	- Improve Data table sorting (again) to handle natural sorting by
 	  using embedded numeric values, regardless at beginning, middle,
