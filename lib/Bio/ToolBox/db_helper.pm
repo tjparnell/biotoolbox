@@ -16,7 +16,7 @@ use Bio::ToolBox::utility qw(
 );
 require Exporter;
 
-our $VERSION = '2.03';
+our $VERSION = '2.041';
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources
@@ -154,7 +154,7 @@ sub use_minimum_mapq {
 	my $m = shift;
 	if ( defined $m ) {
 		$m = int $m;
-		unless ( 0 <= $m <= 255 ) {
+		unless ( $m >= 0 and $m <= 255 ) {
 			carp " ERROR: requested mapping quality '$m' out of bounds (0..255).";
 			return;
 		}
