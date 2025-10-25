@@ -1,6 +1,10 @@
 ######## Bio::ToolBox revision history #############
 
 
+v2.041
+	- Fix bug that prevented compilation on Perls <= 5.28
+	- Fix testing bug
+
 v2.04
 	- Fix bugs that prevented scripts get_binned_data.pl and 
 	  get_relative_data.pl from compiling.
