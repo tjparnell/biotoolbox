@@ -38,8 +38,8 @@ sub get_base_options {
 			'Module::Build'           => 0.42,
 		},
 		test_requires     => {
-			'Test2::V0'               => 1.302,
-			'Test::Script'            => 1.29,
+			'Test2::V0'               => 0.000138,
+			'Test::Script'            => 1.26,
 		},
 		meta_merge        => {
 			resources     => {
