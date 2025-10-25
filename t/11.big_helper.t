@@ -132,11 +132,13 @@ SKIP: {
 
 # bigWigToWig filehandle pipe
 # this method could actually return bigWigToBedGraph if available and bigWigToWig is not
+# but only test bigWigToWig
 SKIP: {
 	my $bw2w_app = get_bigwig_to_wig_app();
 
-	skip( 'bigWigToWig not available', 5 ) if not defined $bw2w_app;
-	like( $bw2w_app, qr/bigWigTo (?:Wig | BedGraph) $/x, 'bigWigToWig application path' );
+	skip( 'bigWigToWig not available', 5 )
+		unless ( defined $bw2w_app and $bw2w_app =~ /bigWigToWig $/x );
+	like( $bw2w_app, qr/bigWigToWig $/x, 'bigWigToWig application path' );
 	my $fh = open_bigwig_to_wig_fh(
 		bw        => $bwfile,
 		bwapppath => $bw2w_app
