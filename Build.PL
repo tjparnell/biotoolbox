@@ -47,6 +47,7 @@ sub get_base_options {
 			}
 		},
 		requires          => {
+			'perl'                    => 5.22,
 			'Config::Simple'          => 4.58,
 			'File::Which'             => 1.17,
 			'Getopt::Long'            => 2.24,
